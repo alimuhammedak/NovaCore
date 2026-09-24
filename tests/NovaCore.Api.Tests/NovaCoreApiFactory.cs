@@ -14,7 +14,7 @@ namespace NovaCore.Api.Tests;
 /// The Identity store is swapped to a shared in-memory SQLite database so the full auth flow
 /// (register/login/refresh/permissions) can be exercised without a real SQL Server.
 /// </summary>
-public sealed class NovaCoreApiFactory : WebApplicationFactory<Program>
+public class NovaCoreApiFactory : WebApplicationFactory<Program>
 {
     // A single open connection keeps the in-memory database alive for the factory's lifetime.
     private readonly SqliteConnection _identityConnection = new("DataSource=:memory:");

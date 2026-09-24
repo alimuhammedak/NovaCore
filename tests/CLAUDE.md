@@ -37,4 +37,9 @@ in-memory DB alive for the test class.
 constructor** (`RateLimiting__PermitLimit`, `Jwt__SigningKey` — `__` is the section separator). Tests bump
 the rate limit high so the many `/auth` calls don't trip the `"strict"` policy (which would return 429).
 
+**One factory needs a different eager value?** Don't touch the env var (it is process-wide and races the
+other test classes). Subclass `NovaCoreApiFactory`, override `CreateHost` and add the value with
+`builder.ConfigureHostConfiguration(...)`: host configuration reaches `Program` as `args` and beats env vars
+(docs/plan/RESEARCH.md R-026). Example: `StrictRateLimitApiFactory`.
+
 `xUnit1051` (CancellationToken) is `NoWarn`'d for these simple `HttpClient` tests.

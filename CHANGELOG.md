@@ -21,3 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NuGet audit: high (NU1903) and critical (NU1904) vulnerabilities now fail the restore.
 
 ### Fixed
+
+- The `"strict"` rate-limit policy (used by `/api/v1/auth`) is now partitioned per client IP. Before, it was a single
+  shared counter, so one client could exhaust it and lock every other client out of login.

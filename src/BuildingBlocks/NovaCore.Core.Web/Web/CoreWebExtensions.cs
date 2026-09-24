@@ -129,13 +129,17 @@ public static class CoreWebExtensions
                         QueueLimit = 0
                     }));
 
-            // Opt-in stricter policy for sensitive endpoints: .RequireRateLimiting("strict").
-            options.AddFixedWindowLimiter("strict", limiter =>
-            {
-                limiter.PermitLimit = Math.Max(1, permitLimit / 10);
-                limiter.Window = TimeSpan.FromSeconds(windowSeconds);
-                limiter.QueueLimit = 0;
-            });
+            // Opt-in stricter policy for sensitive endpoints: .RequireRateLimiting("strict"). Also partitioned by
+            // caller IP: an unpartitioned limiter is one shared counter, so a single client could lock everyone out.
+            options.AddPolicy("strict", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = Math.Max(1, permitLimit / 10),
+                        Window = TimeSpan.FromSeconds(windowSeconds),
+                        QueueLimit = 0
+                    }));
         });
     }
 }

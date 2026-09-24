@@ -135,8 +135,8 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 
 - **Eager config reads.** `AddCoreWeb` reads `RateLimiting:PermitLimit`, `Jwt:SigningKey`, and
   `Database:ApplyMigrations` *eagerly* during service registration. `WebApplicationFactory`'s in-memory
-  config is layered in too late to override these — set them as **environment variables** in tests
-  (see `tests/CLAUDE.md`).
+  config is layered in too late to override these — set them as **environment variables** in tests, or
+  per factory via `CreateHost` + `ConfigureHostConfiguration` (see `tests/CLAUDE.md`).
 - **`WithTags` on a route group** needs `using Microsoft.AspNetCore.Http;` (not just `...Builder`).
 - **SQL Server, not Postgres:** use `EF.Functions.Like` (not `ILike`); `UseSqlServer`, not `UseNpgsql`.
 - **Two EF providers can't coexist** in one container. The test host swaps Identity to SQLite and must

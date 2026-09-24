@@ -26,8 +26,8 @@ Biçim: `- [x] F0.3 (abc1234): not`
 
 ### Faz 0
 - [x] F0.1 (849a30d, b87f5ea, 610163e): Baseline `849a30d` main'de, docker-compose.yml hariç (D-008). LICENSE (MIT) ve CHANGELOG eklendi. Compose SA parolasını `.env`'den okuyor, parola git geçmişinde yok. `.gitignore`'da değişiklik gerekmedi.
-- [ ] F0.2 Paketler ve açıklar. **Devam ediyor.**
-- [ ] F0.3 Rate limiter bölümleme
+- [x] F0.2 (f865e89): ASP.NET Core ve EF paketleri 10.0.12'ye (dotnet-ef dahil), OTel 1.19.x'e, Scalar 2.17.9'a çıktı. İki yüksek açık (R-028) top-level güncellemeyle kapandı, transitive pinning gerekmedi. NU1903/NU1904 artık hata. `restore --force` temiz, build 0 uyarı, 33/33 test yeşil. Q-09 kapsamındaki paketlere dokunulmadı.
+- [ ] F0.3 Rate limiter bölümleme. **Devam ediyor.**
 - [ ] F0.4 IDomainEvent sabit değerler
 - [ ] F0.5 E-posta gönderici yalnızca dev
 - [ ] F0.6 Ölü kod ve doküman düzeltmesi
