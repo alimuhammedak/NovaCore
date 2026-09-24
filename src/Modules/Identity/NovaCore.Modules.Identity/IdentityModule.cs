@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using NovaCore.Core.Infrastructure.Persistence;
 using NovaCore.Core.Web.Authorization;
 using NovaCore.Core.Web.Modules;
@@ -74,7 +75,12 @@ public sealed class IdentityModule : IModule
         services.AddPermissionDefinitions<IdentityPermissionProvider>();
         services.AddScoped<IAuthTokenService, AuthTokenService>();
         services.AddSingleton<ISecurityAuditLogger, SecurityAuditLogger>();
-        services.AddSingleton<IEmailSender, LoggingEmailSender>();
+
+        // LoggingEmailSender writes confirmation links (tokens) to the log: Development only. Elsewhere the host must
+        // register a real IEmailSender, or EmailSenderStartupCheck stops startup.
+        if (IsDevelopment(configuration))
+            services.AddSingleton<IEmailSender, LoggingEmailSender>();
+        services.AddHostedService<EmailSenderStartupCheck>();
 
         services.Configure<IdentitySeedOptions>(configuration.GetSection(IdentitySeedOptions.SectionName));
         services.AddScoped<IdentityDataSeeder>();
@@ -106,4 +112,9 @@ public sealed class IdentityModule : IModule
 
         return endpoints;
     }
+
+    // AddModule gets no IHostEnvironment. The host builds IHostEnvironment.EnvironmentName from this same configuration
+    // key; when it's unset the environment is Production (docs/plan/RESEARCH.md R-030).
+    private static bool IsDevelopment(IConfiguration configuration) =>
+        string.Equals(configuration[HostDefaults.EnvironmentKey], Environments.Development, StringComparison.OrdinalIgnoreCase);
 }

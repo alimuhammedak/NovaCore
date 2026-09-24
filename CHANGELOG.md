@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([GHSA-2m69-gcr7-jv3q](https://github.com/advisories/GHSA-2m69-gcr7-jv3q)). ASP.NET Core and EF Core packages → 10.0.12,
   OpenTelemetry → 1.19.x, Scalar → 2.17.9.
 - NuGet audit: high (NU1903) and critical (NU1904) vulnerabilities now fail the restore.
+- `LoggingEmailSender`, which writes email bodies (including confirmation tokens) to the log, is registered only in
+  Development. In any other environment the host fails at startup with a clear error unless a real `IEmailSender` is
+  registered.
 
 ### Fixed
 

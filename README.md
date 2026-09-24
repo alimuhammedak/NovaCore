@@ -303,7 +303,8 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
 - **Seed:** roller (`Administrator`, `User`) + tüm modül izinleri + opsiyonel admin (parola user-secrets ile).
 
 > **Üretimde mutlaka:** `Jwt:SigningKey` ayarla (≥32 bayt, user-secrets/env), TLS/HTTPS'i edge'de zorla,
-> gerçek bir `IEmailSender` (SMTP/SendGrid) tak, admin parolasını güçlü ver.
+> gerçek bir `IEmailSender` (SMTP/SendGrid) tak, admin parolasını güçlü ver. `LoggingEmailSender` yalnızca
+> Development'ta kayıtlıdır. Diğer ortamlarda `IEmailSender` kayıtlı değilse uygulama açılışta anlamlı bir hatayla durur.
 
 **Kaynaklar:** [OWASP Authentication CS](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) ·
 [OWASP Password Storage CS](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) ·

@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace NovaCore.Modules.Identity.Services;
@@ -19,4 +21,26 @@ public sealed class LoggingEmailSender(ILogger<LoggingEmailSender> logger) : IEm
         logger.LogInformation("DEV EMAIL → {To} | {Subject}\n{Body}", toEmail, subject, htmlBody);
         return Task.CompletedTask;
     }
+}
+
+/// <summary>
+/// Fails startup outside Development when no <see cref="IEmailSender"/> is registered, instead of letting the first
+/// registration request fail. Runs after the container is built, so it also sees a sender the host registered after
+/// the modules.
+/// </summary>
+internal sealed class EmailSenderStartupCheck(IHostEnvironment environment, IServiceProviderIsService registrations)
+    : IHostedService
+{
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        if (!environment.IsDevelopment() && !registrations.IsService(typeof(IEmailSender)))
+            throw new InvalidOperationException(
+                $"No {nameof(IEmailSender)} is registered for the '{environment.EnvironmentName}' environment. " +
+                $"{nameof(LoggingEmailSender)} is Development-only because it writes emails, including confirmation " +
+                $"tokens, to the log. Register a real {nameof(IEmailSender)} (SMTP, SendGrid, ...) in the host.");
+
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

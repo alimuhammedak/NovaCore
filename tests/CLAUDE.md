@@ -42,4 +42,6 @@ other test classes). Subclass `NovaCoreApiFactory`, override `CreateHost` and ad
 `builder.ConfigureHostConfiguration(...)`: host configuration reaches `Program` as `args` and beats env vars
 (docs/plan/RESEARCH.md R-026). Example: `StrictRateLimitApiFactory`.
 
+**Different environment?** Override `EnvironmentName` (default `Development`), e.g. `ProductionApiFactory`.
+
 `xUnit1051` (CancellationToken) is `NoWarn`'d for these simple `HttpClient` tests.

@@ -35,6 +35,7 @@ Design is grounded in the OWASP Authentication / Password Storage / OAuth2 cheat
 ## Production checklist (must be true before shipping)
 
 - `Jwt:SigningKey` set from user-secrets/env (≥ 32 bytes) — the dev fallback only exists in Development.
-- A real `IEmailSender` replaces `LoggingEmailSender` (which only logs the confirmation link).
+- A real `IEmailSender` is registered by the host. `LoggingEmailSender` (logs the confirmation link) is wired only in
+  Development; anywhere else `EmailSenderStartupCheck` stops startup if no `IEmailSender` is registered.
 - TLS/HTTPS enforced at the edge (HSTS is wired for non-dev).
 - Admin seed password supplied via user-secrets, never committed.
