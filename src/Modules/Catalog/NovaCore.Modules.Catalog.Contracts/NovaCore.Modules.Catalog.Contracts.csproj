@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Catalog.Contracts: the ONLY surface other modules may depend on. Pure interfaces + DTOs, no
+    implementation, no EF. Payments references this — never the Catalog module itself.
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Public contracts exposed by the Catalog module to other modules.</Description>
+  </PropertyGroup>
+
+</Project>

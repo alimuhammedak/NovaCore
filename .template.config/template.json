@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "NovaCore",
+  "classifications": [ "Web", "API", "Modular Monolith", "Vertical Slice", "Clean Architecture" ],
+  "identity": "NovaCore.ModularMonolith.CSharp",
+  "name": "NovaCore Modular Monolith (.NET 10 Web API)",
+  "description": "A single-developer .NET 10 modular-monolith Web API: BuildingBlocks core + vertical-slice modules, no MediatR/AutoMapper, MIT/Apache packages only.",
+  "shortName": "novacore",
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "sourceName": "NovaCore",
+  "preferNameDirectory": true,
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/.vs/**",
+            "**/.vscode/**",
+            "**/.git/**",
+            "**/.idea/**",
+            "**/*.user",
+            "**/TestResults/**",
+            "artifacts/**",
+            "logs/**"
+          ]
+        }
+      ]
+    }
+  ]
+}

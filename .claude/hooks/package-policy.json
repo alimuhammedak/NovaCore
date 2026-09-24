@@ -1,0 +1,34 @@
+{
+  "$comment": "NovaCore paket ve korunan dosya politikası. package-guard.js tarafından okunur. Bu dosyanın düzenlenmesi de kullanıcı onayı gerektirir. Kaynak: docs/plan/DECISIONS.md (D-003, D-004, Y-01, Y-06, Y-11).",
+  "banned": [
+    "MediatR",
+    "AutoMapper",
+    "FluentAssertions",
+    "Microsoft.EntityFrameworkCore.InMemory",
+    "Microsoft.EntityFrameworkCore.Proxies"
+  ],
+  "allowedPrefixes": [
+    "Microsoft.",
+    "System.",
+    "OpenTelemetry."
+  ],
+  "allowed": [
+    "Scalar.AspNetCore",
+    "Scrutor",
+    "FluentValidation",
+    "FluentValidation.DependencyInjectionExtensions",
+    "Riok.Mapperly",
+    "Asp.Versioning.Http",
+    "Serilog.AspNetCore",
+    "Serilog.Sinks.Console",
+    "Serilog.Sinks.Seq",
+    "xunit.v3",
+    "xunit.runner.visualstudio"
+  ],
+  "protectedPaths": [
+    "docs/plan/PLAN.md",
+    "docs/plan/DECISIONS.md",
+    ".claude/settings.json",
+    ".claude/hooks/"
+  ]
+}

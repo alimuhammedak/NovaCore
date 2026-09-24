@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    The host: a thin composition root. References Core.Web plus every business module, and does
+    nothing but compose them. Program.cs is ~15 lines.
+  -->
+  <PropertyGroup>
+    <UserSecretsId>novacore-api</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Dev-only: lets `dotnet ef` use the Api as a startup project when needed. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BuildingBlocks\NovaCore.Core.Web\NovaCore.Core.Web.csproj" />
+    <ProjectReference Include="..\..\Modules\Catalog\NovaCore.Modules.Catalog\NovaCore.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\..\Modules\Payments\NovaCore.Modules.Payments\NovaCore.Modules.Payments.csproj" />
+    <ProjectReference Include="..\..\Modules\Identity\NovaCore.Modules.Identity\NovaCore.Modules.Identity.csproj" />
+  </ItemGroup>
+
+</Project>

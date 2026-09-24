@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Catalog module: a vertical-slice business module. Owns its domain, its DbContext (schema
+    "catalog"), its endpoints. References Core.Web for the host plumbing and its own Contracts.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+    <PackageReference Include="Riok.Mapperly" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.Core.Web\NovaCore.Core.Web.csproj" />
+    <ProjectReference Include="..\NovaCore.Modules.Catalog.Contracts\NovaCore.Modules.Catalog.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,46 @@
+## .NET / Visual Studio
+bin/
+obj/
+out/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.user
+*.suo
+.vs/
+.vscode/
+*.userprefs
+
+## Rider
+.idea/
+
+## Build / test output
+TestResults/
+artifacts/
+*.trx
+coverage*.json
+coverage*.xml
+*.coverage
+
+## NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+## Local secrets & env
+*.local.json
+.env
+appsettings.*.local.json
+secrets.json
+
+## Logs / data
+logs/
+*.log
+*.db
+*.db-shm
+*.db-wal
+
+## Claude Code hook durumu (makineye özel)
+.claude/hooks/.last-verified

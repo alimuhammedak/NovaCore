@@ -1,0 +1,30 @@
+<Project>
+
+  <!--
+    Solution-wide build defaults for every project under NovaCore.
+    Per-project .csproj files stay tiny; everything common lives here.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <!--
+      EXTEXP0018 : HybridCache APIs are still flagged [Experimental] in .NET 10 even though
+                   the feature is GA / production-ready since .NET 9. We opt in knowingly.
+      CS1591     : missing XML doc comments (docs are off solution-wide).
+    -->
+    <!--
+      RMG020: Mapperly "source member not mapped" — intentional for DTOs that deliberately drop
+              audit/domain-event fields. Suppressed so honest, narrow DTOs don't spam warnings.
+    -->
+    <NoWarn>$(NoWarn);EXTEXP0018;CS1591;RMG020</NoWarn>
+    <RootNamespace>$(MSBuildProjectName)</RootNamespace>
+    <AssemblyName>$(MSBuildProjectName)</AssemblyName>
+  </PropertyGroup>
+
+</Project>

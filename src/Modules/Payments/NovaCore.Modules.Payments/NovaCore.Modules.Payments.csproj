@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Payments module. Talks to Catalog ONLY through NovaCore.Modules.Catalog.Contracts — never the
+    Catalog module or its database. That decoupling is what keeps the monolith genuinely modular.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+    <PackageReference Include="Riok.Mapperly" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.Core.Web\NovaCore.Core.Web.csproj" />
+    <ProjectReference Include="..\..\Catalog\NovaCore.Modules.Catalog.Contracts\NovaCore.Modules.Catalog.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Core.Abstractions: UI-agnostic kernel. BCL only — no ASP.NET, no EF, no NuGet.
+    Anything every layer can depend on with zero coupling lives here.
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>NovaCore building blocks: Result, paging, base entities and messaging abstractions.</Description>
+  </PropertyGroup>
+
+</Project>

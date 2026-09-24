@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Core.Infrastructure: cross-cutting implementations that need the ASP.NET / EF Core surface
+    but not the full web host wiring — exception handling, Result->HTTP, caching, auditing.
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>NovaCore cross-cutting infrastructure: ProblemDetails exception handling, HybridCache, EF Core auditing.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Scrutor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NovaCore.Core.Abstractions\NovaCore.Core.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
