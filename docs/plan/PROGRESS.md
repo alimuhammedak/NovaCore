@@ -7,7 +7,7 @@
 
 | Faz | Durum | Branch | Başlangıç | Bitiş | Merge |
 |---|---|---|---|---|---|
-| 0 | ⏳ başlamadı | | | | |
+| 0 | 🔄 devam ediyor | `faz/0-stabilizasyon` | 2026-09-25 | | |
 | 1 | ⏳ başlamadı | | | | |
 | 2a | ⏳ başlamadı | | | | |
 | 2b | ⏳ başlamadı | | | | |
@@ -25,7 +25,7 @@ Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıld�
 Biçim: `- [x] F0.3 (abc1234): not`
 
 ### Faz 0
-- [ ] F0.1 Git başlangıcı, LICENSE, CHANGELOG
+- [ ] F0.1 Git başlangıcı, LICENSE, CHANGELOG. **Devam ediyor.** Baseline `849a30d` (main), docker-compose.yml hariç (D-008).
 - [ ] F0.2 Paketler ve açıklar
 - [ ] F0.3 Rate limiter bölümleme
 - [ ] F0.4 IDomainEvent sabit değerler
@@ -105,12 +105,19 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-03 | GitHub remote/repo var mı? CI ve paket feed'i için | F0.8, F1.6 | **Henüz yok** (2026-09-25). F0.8: workflow yazılır, komutlar yerelde çalıştırılarak doğrulanır, ilk CI koşusu repo açılınca yapılır. F1.6: workflow yazılır ama tetiklenmez. Repo açıldığında bu satır güncellenir. |
 | Q-04 | Faz 3'e kadar Identity modülü aktif kullanılacak mı? (F0.9 yapılsın mı?) | Faz 0 başı | **Hayır.** Kullanıcı, plan bitene kadar Identity'yi hiç kullanmayacak (2026-09-25). **F0.9 atlanır.** F0.5'in (yalnızca Identity'ye ait) kaderi Q-05'te. |
 | Q-05 | F0.5 (LoggingEmailSender yalnızca dev) hâlâ yapılsın mı? Identity kullanılmayacak ve Faz 3b'de emekliye ayrılacak | Faz 0 başı | **Evet, yapılsın** (2026-09-25, kullanıcı). F0.5 planda olduğu gibi kalır. |
+| Q-06 | `docker-compose.yml:16`'da düz metin SA parolası var (Y-35). Baseline'a nasıl girsin? | F0.1 | **`.env`'e taşı** (2026-09-25, kullanıcı) → D-008. Baseline'a bu dosya girmez. |
+| Q-07 | F0.3 kriteri "farklı IP 200 alır", ama /auth uç noktaları DB olmadan 200 dönmüyor. Test neye karşı yazılsın? | F0.3 | **Gerçek `/api/v1/auth/login`** (2026-09-25, kullanıcı) → D-009: "farklı IP 429 almaz". |
+| Q-08 | F0.5: `IModule.AddModule` ortam almıyor. Identity "Development mı?" sorusunu nasıl cevaplasın? | F0.5 | **`configuration[HostDefaults.EnvironmentKey]`** (2026-09-25, kullanıcı, R-030). Public API değişmez. |
+| Q-09 | F0.2: 10.0.x şemasına uymayan Microsoft paketleri (Caching.Hybrid, Http.Resilience 10.0.0 → 10.10.0; Test.Sdk 18.6.0 → 18.10.1) güncellensin mi? | F0.2 | **Dokunma** (2026-09-25, kullanıcı). "Sonraya bırakılanlar"a yazıldı. |
 
 ## Sonraya bırakılanlar
 
 Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konular. Her faz sonunda kullanıcı bunları gözden geçirir.
 
 - xUnit v3 → 4.x ve xunit.runner.visualstudio 4.x major güncellemesi (F0.2 kapsamı dışında). Kaynak: `dotnet list package --outdated`, 2026-09-24.
+- (Faz 0, Q-09) `Microsoft.Extensions.Caching.Hybrid` ve `Microsoft.Extensions.Http.Resilience` 10.0.0 → 10.10.0, `Microsoft.NET.Test.Sdk` 18.6.0 → 18.10.1. Açıkları yok. Hybrid için F2c.3, Resilience için F2a.2 (eklenti paketi) uygun yer olabilir.
+- (Faz 0) Global ve "strict" rate limiter partition anahtarı olarak `RemoteIpAddress` kullanıyor. Bir reverse proxy arkasında bu proxy'nin IP'si olur. `ForwardedHeaders` yapılandırılmamış.
+- (Faz 0) "strict" policy'nin tek tüketicisi Identity'nin `/api/v1/auth` grubu. Identity F3b.3'te emekliye ayrılınca policy'nin ve `StrictRateLimitTests`'in yeri yeniden değerlendirilmeli.
 
 ## Son devir notu
 
