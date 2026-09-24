@@ -126,7 +126,7 @@ NovaCore.sln
 │
 ├── src/
 │   ├── BuildingBlocks/
-│   │   ├── NovaCore.Core.Abstractions/   # Result, PagedList, Entity, IDomainEvent, ICacheService, ICurrentUser
+│   │   ├── NovaCore.Core.Abstractions/   # Result, PagedList, Entity, IDomainEvent/DomainEvent, ICacheService, ICurrentUser
 │   │   ├── NovaCore.Core.Infrastructure/ # GlobalExceptionHandler, Result→HTTP, HybridCache, auditing, migration
 │   │   └── NovaCore.Core.Web/            # IModule, AddCoreDefaults/AddCoreWeb, JWT, OpenAPI+Scalar, validation
 │   │

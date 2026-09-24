@@ -24,3 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `"strict"` rate-limit policy (used by `/api/v1/auth`) is now partitioned per client IP. Before, it was a single
   shared counter, so one client could exhaust it and lock every other client out of login.
+- `IDomainEvent.EventId` and `OccurredOnUtc` returned a new value on every read (default interface members). They are
+  now plain interface properties, and the new `DomainEvent` base record fixes both when the event is created.
+  **Breaking:** events must derive from `DomainEvent` (or implement the two properties themselves).
