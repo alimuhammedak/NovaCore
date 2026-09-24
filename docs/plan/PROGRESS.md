@@ -25,8 +25,8 @@ Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıld�
 Biçim: `- [x] F0.3 (abc1234): not`
 
 ### Faz 0
-- [ ] F0.1 Git başlangıcı, LICENSE, CHANGELOG. **Devam ediyor.** Baseline `849a30d` (main), docker-compose.yml hariç (D-008).
-- [ ] F0.2 Paketler ve açıklar
+- [x] F0.1 (849a30d, b87f5ea, 610163e): Baseline `849a30d` main'de, docker-compose.yml hariç (D-008). LICENSE (MIT) ve CHANGELOG eklendi. Compose SA parolasını `.env`'den okuyor, parola git geçmişinde yok. `.gitignore`'da değişiklik gerekmedi.
+- [ ] F0.2 Paketler ve açıklar. **Devam ediyor.**
 - [ ] F0.3 Rate limiter bölümleme
 - [ ] F0.4 IDomainEvent sabit değerler
 - [ ] F0.5 E-posta gönderici yalnızca dev
@@ -117,6 +117,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - xUnit v3 → 4.x ve xunit.runner.visualstudio 4.x major güncellemesi (F0.2 kapsamı dışında). Kaynak: `dotnet list package --outdated`, 2026-09-24.
 - (Faz 0, Q-09) `Microsoft.Extensions.Caching.Hybrid` ve `Microsoft.Extensions.Http.Resilience` 10.0.0 → 10.10.0, `Microsoft.NET.Test.Sdk` 18.6.0 → 18.10.1. Açıkları yok. Hybrid için F2c.3, Resilience için F2a.2 (eklenti paketi) uygun yer olabilir.
 - (Faz 0) Global ve "strict" rate limiter partition anahtarı olarak `RemoteIpAddress` kullanıyor. Bir reverse proxy arkasında bu proxy'nin IP'si olur. `ForwardedHeaders` yapılandırılmamış.
+- (Faz 0, F0.2) Bu makinede kurulu shared framework 10.0.8, paketler artık 10.0.12. Runtime'ı 10.0.12'ye güncellemek ortam işi, repo işi değil.
 - (Faz 0) "strict" policy'nin tek tüketicisi Identity'nin `/api/v1/auth` grubu. Identity F3b.3'te emekliye ayrılınca policy'nin ve `StrictRateLimitTests`'in yeri yeniden değerlendirilmeli.
 
 ## Son devir notu
