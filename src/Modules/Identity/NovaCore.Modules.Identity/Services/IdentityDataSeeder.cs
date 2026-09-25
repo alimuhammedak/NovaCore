@@ -21,6 +21,7 @@ public sealed partial class IdentityDataSeeder(
     UserManager<ApplicationUser> userManager,
     IEnumerable<IPermissionDefinitionProvider> permissionProviders,
     IOptions<IdentitySeedOptions> seedOptions,
+    TimeProvider timeProvider,
     ILogger<IdentityDataSeeder> logger)
 {
     public const string AdministratorRole = HttpContextCurrentUser.SuperAdminRole; // "Administrator"
@@ -88,7 +89,8 @@ public sealed partial class IdentityDataSeeder(
             UserName = options.AdminEmail,
             Email = options.AdminEmail,
             EmailConfirmed = true,
-            DisplayName = "Administrator"
+            DisplayName = "Administrator",
+            CreatedAtUtc = timeProvider.GetUtcNow()
         };
 
         var result = await userManager.CreateAsync(admin, options.AdminPassword);

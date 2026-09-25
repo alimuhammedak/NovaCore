@@ -4,31 +4,37 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using NovaCore.EntityFrameworkCore.Persistence;
+using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Identity.Infrastructure;
+using NovaCore.Modules.Payments.Infrastructure;
 
 namespace NovaCore.Api.Tests;
 
 /// <summary>
 /// Boots the real Program host in-memory (Development), with a fixed signing key and migrations off.
-/// The Identity store is swapped to a shared in-memory SQLite database so the full auth flow
-/// (register/login/refresh/permissions) can be exercised without a real SQL Server.
+/// Every module's DbContext is swapped to its own in-memory SQLite database, so the full auth flow
+/// (register/login/refresh/permissions) and the database health checks run without a real SQL Server.
 /// </summary>
 public class NovaCoreApiFactory : WebApplicationFactory<Program>
 {
-    // A single open connection keeps the in-memory database alive for the factory's lifetime.
+    // One open connection per module keeps each in-memory database alive for the factory's lifetime.
     private readonly SqliteConnection _identityConnection = new("DataSource=:memory:");
+    private readonly SqliteConnection _catalogConnection = new("DataSource=:memory:");
+    private readonly SqliteConnection _paymentsConnection = new("DataSource=:memory:");
+
+    // The SQLite contexts get their own EF internal provider: the app still registers SQL Server, and EF forbids two
+    // providers in one container.
+    private readonly ServiceProvider _sqliteServices = new ServiceCollection()
+        .AddEntityFrameworkSqlite()
+        .BuildServiceProvider();
 
     public NovaCoreApiFactory()
     {
-        // These values are read EAGERLY while Program builds services (before WebApplicationFactory's
-        // in-memory config is layered in), so they must come from environment variables, which the
-        // host reads at CreateBuilder time. (__ is the config section separator.)
-        Environment.SetEnvironmentVariable("RateLimiting__PermitLimit", "1000000");
-        Environment.SetEnvironmentVariable("Jwt__SigningKey", "novacore-integration-test-signing-key-0123456789-abcdef");
-
         _identityConnection.Open();
+        _catalogConnection.Open();
+        _paymentsConnection.Open();
     }
 
     /// <summary>The host environment the app boots in. Override to test environment-specific wiring.</summary>
@@ -60,40 +66,52 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
                 ["Database:ApplyMigrations"] = "false",
                 ["Identity:Seed:SeedOnStartup"] = "false",
                 // Keep the rate limiter wired but out of the way of the many auth calls the tests make.
-                ["RateLimiting:PermitLimit"] = "100000",
-                ["ConnectionStrings:Database"] =
-                    "Server=localhost;Database=NovaCore_Test;Trusted_Connection=True;TrustServerCertificate=True;Encrypt=True;"
+                ["RateLimiting:PermitLimit"] = "100000"
             });
         });
 
         builder.ConfigureServices(services =>
         {
-            // Replace the SQL Server Identity store with shared in-memory SQLite. EF Core 10 registers
-            // the provider via additive IDbContextOptionsConfiguration<TContext>, so remove EVERY
-            // registration generic over IdentityDbContext (options, configuration, the context) first.
-            var toRemove = services
-                .Where(d => d.ServiceType == typeof(IdentityDbContext)
-                            || (d.ServiceType.IsGenericType
-                                && d.ServiceType.GetGenericArguments().Contains(typeof(IdentityDbContext))))
-                .ToList();
-            foreach (var descriptor in toRemove)
-                services.Remove(descriptor);
+            ReplaceWithSqlite<IdentityDbContext>(services, options => options.UseSqlite(_identityConnection));
+            ReplaceWithSqlite<CatalogDbContext>(services, options => options.UseSqlite(_catalogConnection));
+            ReplaceWithSqlite<PaymentsDbContext>(services, options => options.UseSqlite(_paymentsConnection));
+        });
+    }
 
-            // Give the SQLite context its own internal provider (the app also has SQL Server registered).
-            var sqliteServices = new ServiceCollection()
-                .AddEntityFrameworkSqlite()
-                .BuildServiceProvider();
+    /// <summary>
+    /// Replaces a module's SQL Server registration of <typeparamref name="TContext"/> with SQLite, keeping the audit
+    /// interceptor the module adds. EF Core 10 registers the provider via additive
+    /// <c>IDbContextOptionsConfiguration&lt;TContext&gt;</c>, so EVERY registration generic over the context (options,
+    /// configuration, the context) is removed first.
+    /// </summary>
+    protected void ReplaceWithSqlite<TContext>(IServiceCollection services, Action<DbContextOptionsBuilder> useSqlite)
+        where TContext : DbContext
+    {
+        var toRemove = services
+            .Where(d => d.ServiceType == typeof(TContext)
+                        || (d.ServiceType.IsGenericType && d.ServiceType.GetGenericArguments().Contains(typeof(TContext))))
+            .ToList();
+        foreach (var descriptor in toRemove)
+            services.Remove(descriptor);
 
-            services.AddDbContext<IdentityDbContext>(options => options
-                .UseSqlite(_identityConnection)
-                .UseInternalServiceProvider(sqliteServices));
+        services.AddDbContext<TContext>((provider, options) =>
+        {
+            useSqlite(options);
+            options
+                .UseInternalServiceProvider(_sqliteServices)
+                .AddInterceptors(provider.GetRequiredService<AuditableEntityInterceptor>());
         });
     }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
+        {
             _identityConnection.Dispose();
+            _catalogConnection.Dispose();
+            _paymentsConnection.Dispose();
+            _sqliteServices.Dispose();
+        }
 
         base.Dispose(disposing);
     }

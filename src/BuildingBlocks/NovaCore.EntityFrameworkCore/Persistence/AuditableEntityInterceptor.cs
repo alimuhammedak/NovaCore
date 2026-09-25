@@ -9,8 +9,9 @@ namespace NovaCore.EntityFrameworkCore.Persistence;
 /// <summary>
 /// Stamps <see cref="IAuditableEntity"/> rows with who/when on every save, in one place, so no
 /// handler ever has to remember to set CreatedBy/ModifiedAt. Wire it into each module's DbContext.
+/// The time comes from the injected <see cref="TimeProvider"/>.
 /// </summary>
-public sealed class AuditableEntityInterceptor(ICurrentUser currentUser) : SaveChangesInterceptor
+public sealed class AuditableEntityInterceptor(ICurrentUser currentUser, TimeProvider timeProvider) : SaveChangesInterceptor
 {
     /// <inheritdoc />
     public override InterceptionResult<int> SavingChanges(
@@ -33,7 +34,7 @@ public sealed class AuditableEntityInterceptor(ICurrentUser currentUser) : SaveC
         if (context is null)
             return;
 
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var user = currentUser.UserName ?? currentUser.UserId ?? "system";
 
         foreach (EntityEntry<IAuditableEntity> entry in context.ChangeTracker.Entries<IAuditableEntity>())

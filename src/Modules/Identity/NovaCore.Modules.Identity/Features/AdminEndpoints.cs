@@ -51,6 +51,7 @@ public static class AdminEndpoints
 
     private static async Task<IResult> ListUsers(
         UserManager<ApplicationUser> userManager,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken,
         int? page = null,
         int? pageSize = null)
@@ -60,7 +61,7 @@ public static class AdminEndpoints
         var query = userManager.Users.AsNoTracking().OrderBy(u => u.Email);
         var total = await query.LongCountAsync(cancellationToken);
 
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var users = await query
             .Skip(pagination.Skip).Take(pagination.PageSize)
             .Select(u => new UserSummary(

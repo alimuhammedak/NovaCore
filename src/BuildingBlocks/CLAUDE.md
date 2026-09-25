@@ -20,9 +20,10 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   (`Authorization/`), the OpenAPI document, `SecurityHeadersMiddleware`, `HybridCacheService`. Depends on
   Abstractions + `FrameworkReference Microsoft.AspNetCore.App`, never on EntityFrameworkCore.
 
-- **`NovaCore.EntityFrameworkCore`** — persistence without ASP.NET Core: `AddModuleDbContext`, `AddCorePersistence`
-  (`AuditableEntityInterceptor`, `DomainEventDispatcher`, opt-in `DatabaseMigrationService`). Depends on Abstractions,
-  EF Core and the `Microsoft.Extensions` hosting/configuration abstractions only, never on AspNetCore (D-020).
+- **`NovaCore.EntityFrameworkCore`** — persistence without ASP.NET Core: `AddModuleDbContext` (also a "ready"-tagged
+  `AddDbContextCheck` per context), `AddCorePersistence` (`AuditableEntityInterceptor`, `DomainEventDispatcher`,
+  `DatabaseMigrationService`, which migrates only when `Database:ApplyMigrations` is true). Depends on Abstractions,
+  EF Core and `Microsoft.Extensions` hosting/options/health-check packages only, never on AspNetCore (D-020).
 
 **Add-ons** (optional, one third-party library each; they may reference AspNetCore/Abstractions only):
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`), `NovaCore.Scalar`
@@ -35,6 +36,11 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 
 - Public surface is **extension methods** that read as a two-call story: `builder.AddXxx()` then
   `app.UseXxx()`/`app.MapXxx()`. Keep `Program.cs` in consumers tiny.
+- **Configuration is validated options, read lazily** (root `CLAUDE.md` Standards, R-048). New settings get an options
+  type (internal unless a consumer needs it), `BindConfiguration` + `ValidateOnStart`, and an `[OptionsValidator]`.
+- **Time comes from `TimeProvider`**: register `TimeProvider.System` with `TryAddSingleton` where its consumer is
+  registered, so the package works whichever `AddCore*` the host calls first.
+- **Health endpoints are Development-only** (`MapDefaultEndpoints`, D-022); `/health` includes every module database.
 - **`IExceptionHandler` order matters** — they run in registration order (R-046). `AddValidationExceptionHandler`
   inserts `ValidationExceptionHandler` ahead of `GlobalExceptionHandler` (validation wins); `ExceptionHandlerOrderTests`
   checks it.

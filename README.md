@@ -55,8 +55,8 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 
 | Uç nokta | Açıklama |
 |---|---|
-| `GET /health` | Readiness (tüm health check'ler) |
-| `GET /alive` | Liveness (yalnızca "live" etiketli) |
+| `GET /health` | Readiness: tüm health check'ler, her modülün DB bağlantısı dahil (yalnızca Development) |
+| `GET /alive` | Liveness: yalnızca "live" etiketli (yalnızca Development) |
 | `GET /openapi/v1.json` | OpenAPI 3.1 dokümanı |
 | `/scalar/v1` | Scalar API arayüzü (yalnızca Development) |
 | `POST /api/v1/auth/register` · `login` · `refresh` · `logout` · `me` | Kimlik doğrulama akışı (bkz. [Güvenlik](#güvenlik--yetkilendirme)) |
@@ -65,8 +65,13 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 | `/api/v1/products` | Catalog modülü (CRUD, permission korumalı) |
 | `/api/v1/payments` | Payments modülü (Catalog'a contract üzerinden bağlı) |
 
-> SQL Server olmadan da uygulama açılır ve `/health`, `/openapi`, validation/401 kapıları çalışır.
-> DB'ye dokunan endpoint'ler düzgün bir **RFC 9457 ProblemDetails** ile yanıt verir.
+> SQL Server olmadan da uygulama açılır ve `/openapi`, validation/401 kapıları çalışır. `/health` bu durumda
+> `Unhealthy` (503) döner, çünkü modül veritabanlarına ulaşamaz. DB'ye dokunan endpoint'ler düzgün bir
+> **RFC 9457 ProblemDetails** ile yanıt verir.
+>
+> `/health` ve `/alive` yalnızca Development'ta map'lenir (DECISIONS D-022). Production'da probe gerekiyorsa host
+> kendi `MapHealthChecks` kaydını yapar. `RequireHost` Host header'ına güvendiği için sahtelenebilir; port kontrolü
+> `ConnectionInfo.LocalPort` ile yapılmalıdır.
 
 ### 5 dakikada yeni proje (template)
 ```bash
@@ -184,7 +189,7 @@ app.UseSerilogRequestLogging();                    // istek başına bir log sat
 app.UseCoreWeb();                                  // security headers, exception handling, auth, rate limiter, OpenAPI (Development)
 app.MapCoreScalar();                               // Scalar UI (Development)
 app.MapModules();                                  // modüllerin endpoint'leri
-app.MapDefaultEndpoints();                         // /health, /alive
+app.MapDefaultEndpoints();                         // /health, /alive (Development)
 
 app.Run();
 ```
@@ -267,7 +272,7 @@ HTTP/mesaj kuyruğuna döner.
 | **Auth** | ASP.NET Core Identity + JWT/refresh + permission-based | bkz. [Güvenlik & Yetkilendirme](#güvenlik--yetkilendirme) |
 | **Auditing** | EF Core `SaveChangesInterceptor` | `AuditableEntityInterceptor` — CreatedBy/ModifiedAt merkezî |
 | **Rate limiting** | Yerleşik `AddRateLimiter` | IP bazlı fixed-window + `"strict"` adlı policy |
-| **Health** | Yerleşik Health Checks | `/health` + `/alive` |
+| **Health** | Yerleşik Health Checks + `AddDbContextCheck` | `/health` (her modül DB'si, "ready" etiketi) + `/alive`, yalnızca Development |
 | **API docs** | `Microsoft.AspNetCore.OpenApi` + Scalar | Bearer security scheme transformer ile; Scalar UI `NovaCore.Scalar` eklentisinde (`MapCoreScalar`) |
 | **Modül kaydı** | Açık kayıt | `builder.AddModule<TModule>()` (assembly taraması yok) |
 | **Result** | Result pattern | Sıfır-bağımlılık `Result<T>` + `ToHttpResult()` |
@@ -352,7 +357,7 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
   "Identity":      { "Seed": { "SeedOnStartup": false, "AdminEmail": "admin@novacore.local", "AdminPassword": "" } },
   "Cache":         { "DefaultExpiration": "00:05:00" },
   "RateLimiting":  { "PermitLimit": 100, "WindowSeconds": 60 },   // /auth grubu 1/10'unu kullanır ("strict")
-  "Cors":          { "AllowedOrigins": [] },        // boş = dev'de hepsine izin
+  "Cors":          { "AllowedOrigins": [] },        // boş = her ortamda her origin'e izin (credentials olmadan)
   "Seq":           { "ServerUrl": "" }              // dolu = Seq'e log gönder
 }
 ```
@@ -360,6 +365,18 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
 
 > **Üretim:** `Jwt:SigningKey` zorunludur (≥32 bayt). Development'ta yoksa otomatik dev anahtarı üretilir.
 > Gizli değerler için `dotnet user-secrets` kullanın.
+
+Bu bölümler options pattern ile bağlanır ve **uygulama açılırken doğrulanır** (`ValidateOnStart`). Geçersiz bir değer
+host'u, ayarın adını veren bir hatayla durdurur:
+
+- `Jwt`: `Issuer`/`Audience` boş olamaz, `SigningKey` en az 32 bayt (Development dışında zorunlu),
+  `AccessTokenMinutes` ≥ 1, `RefreshTokenDays` 1–36.500.
+- `RateLimiting`: `PermitLimit` ve `WindowSeconds` ≥ 1. `Cache:DefaultExpiration` pozitif bir süre.
+- `Cors:AllowedOrigins`: her giriş çıplak bir origin olmalı (`https://app.example.com`): yol, sondaki `/` ve `*` yok.
+- `Database:ApplyMigrations`: `true`/`false`.
+
+Değerler kayıt anında değil, ilk kullanımda okunur. Bu yüzden `CreateBuilder`'dan sonra eklenen config (ör. testlerde
+`ConfigureAppConfiguration`) da geçerlidir.
 
 ---
 

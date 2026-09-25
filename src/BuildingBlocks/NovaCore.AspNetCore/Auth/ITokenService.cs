@@ -9,9 +9,12 @@ public interface ITokenService
     AccessToken CreateAccessToken(IReadOnlyCollection<Claim> claims);
 }
 
-/// <summary>A freshly minted access token and when it expires.</summary>
-public readonly record struct AccessToken(string Token, DateTimeOffset ExpiresAtUtc)
+/// <summary>A freshly minted access token, when it was issued and when it expires.</summary>
+public readonly record struct AccessToken(string Token, DateTimeOffset IssuedAtUtc, DateTimeOffset ExpiresAtUtc)
 {
-    /// <summary>Seconds left until <see cref="ExpiresAtUtc"/>, measured now; never negative.</summary>
-    public int ExpiresInSeconds => (int)Math.Max(0, (ExpiresAtUtc - DateTimeOffset.UtcNow).TotalSeconds);
+    /// <summary>
+    /// The token's lifetime in seconds, from <see cref="IssuedAtUtc"/> to <see cref="ExpiresAtUtc"/> (OAuth
+    /// <c>expires_in</c>); never negative.
+    /// </summary>
+    public int ExpiresInSeconds => (int)Math.Max(0, (ExpiresAtUtc - IssuedAtUtc).TotalSeconds);
 }

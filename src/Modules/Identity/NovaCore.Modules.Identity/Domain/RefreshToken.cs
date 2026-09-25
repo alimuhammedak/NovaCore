@@ -16,7 +16,7 @@ public sealed class RefreshToken
     /// <summary>Lineage id shared by every token produced through rotation from one login.</summary>
     public Guid Family { get; set; }
 
-    public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    public required DateTimeOffset CreatedAtUtc { get; set; }
     public string? CreatedByIp { get; set; }
     public DateTimeOffset ExpiresAtUtc { get; set; }
 
@@ -25,6 +25,6 @@ public sealed class RefreshToken
     public string? ReplacedByTokenHash { get; set; }
     public string? ReasonRevoked { get; set; }
 
-    public bool IsExpired => DateTimeOffset.UtcNow >= ExpiresAtUtc;
-    public bool IsActive => RevokedAtUtc is null && !IsExpired;
+    public bool IsExpired(DateTimeOffset now) => now >= ExpiresAtUtc;
+    public bool IsActive(DateTimeOffset now) => RevokedAtUtc is null && !IsExpired(now);
 }

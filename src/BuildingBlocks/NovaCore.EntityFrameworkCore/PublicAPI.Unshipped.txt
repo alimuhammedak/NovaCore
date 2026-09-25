@@ -3,11 +3,7 @@ NovaCore.EntityFrameworkCore.Messaging.DomainEventDispatcher
 NovaCore.EntityFrameworkCore.Messaging.DomainEventDispatcher.DispatchAsync(System.Collections.Generic.IEnumerable<NovaCore.Abstractions.Messaging.IDomainEvent!>! domainEvents, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 NovaCore.EntityFrameworkCore.Messaging.DomainEventDispatcher.DomainEventDispatcher(System.IServiceProvider! serviceProvider) -> void
 NovaCore.EntityFrameworkCore.Persistence.AuditableEntityInterceptor
-NovaCore.EntityFrameworkCore.Persistence.AuditableEntityInterceptor.AuditableEntityInterceptor(NovaCore.Abstractions.Identity.ICurrentUser! currentUser) -> void
-NovaCore.EntityFrameworkCore.Persistence.DatabaseMigrationService
-NovaCore.EntityFrameworkCore.Persistence.DatabaseMigrationService.DatabaseMigrationService(System.IServiceProvider! serviceProvider, System.Collections.Generic.IEnumerable<NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor!>! contexts, Microsoft.Extensions.Logging.ILogger<NovaCore.EntityFrameworkCore.Persistence.DatabaseMigrationService!>! logger) -> void
-NovaCore.EntityFrameworkCore.Persistence.DatabaseMigrationService.StartAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
-NovaCore.EntityFrameworkCore.Persistence.DatabaseMigrationService.StopAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NovaCore.EntityFrameworkCore.Persistence.AuditableEntityInterceptor.AuditableEntityInterceptor(NovaCore.Abstractions.Identity.ICurrentUser! currentUser, System.TimeProvider! timeProvider) -> void
 NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor
 NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.<Clone>$() -> NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor!
 NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.ContextType.get -> System.Type!

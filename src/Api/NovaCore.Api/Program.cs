@@ -34,7 +34,7 @@ app.UseSerilogRequestLogging();                    // one log line per request, 
 app.UseCoreWeb();                                  // security headers, exception handling, auth, rate limiter, OpenAPI (Development)
 app.MapCoreScalar();                               // Scalar UI at /scalar/v1 (Development)
 app.MapModules();                                  // every module's endpoints
-app.MapDefaultEndpoints();                         // /health (readiness) and /alive (liveness)
+app.MapDefaultEndpoints();                         // /health (readiness) and /alive (liveness), Development only
 
 app.Run();
 

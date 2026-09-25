@@ -8,6 +8,8 @@ namespace NovaCore.AspNetCore.Exceptions;
 /// <summary>
 /// Last line of defence: turns any unhandled exception into an RFC 9457 ProblemDetails response.
 /// Registered after more specific handlers (e.g. validation), so it only sees what they pass through.
+/// Only <see cref="AppException"/> messages reach the client; every other exception keeps its status code but its
+/// message stays in the server log.
 /// </summary>
 /// <remarks>
 /// .NET 10 note: when <see cref="TryHandleAsync"/> returns true, the framework now suppresses the
@@ -43,8 +45,9 @@ public sealed partial class GlobalExceptionHandler(
                 Status = status,
                 Title = title,
                 Type = $"https://httpstatuses.io/{status}",
-                // Never leak internals for 5xx; echo the message for client (4xx) errors.
-                Detail = status >= StatusCodes.Status500InternalServerError ? null : exception.Message
+                // AppException messages are written for clients. Any other message (ArgumentException, framework
+                // exceptions, ...) can carry internals such as connection strings or file paths (Y-35).
+                Detail = exception is AppException ? exception.Message : null
             }
         });
     }

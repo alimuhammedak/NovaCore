@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -56,17 +56,16 @@ public class StrictRateLimitTests(StrictRateLimitApiFactory factory) : IClassFix
 }
 
 /// <summary>
-/// Host with <c>RateLimiting:PermitLimit=10</c>, so the strict policy allows 1 request per window. Passed as host
-/// configuration because <c>AddCoreWeb</c> reads it eagerly; host configuration reaches <c>Program</c> as
-/// <c>args</c> and overrides the factory's process-wide environment variable without racing other tests (R-026).
+/// Host with <c>RateLimiting:PermitLimit=10</c>, so the strict policy allows 1 request per window. Added after the base
+/// factory's configuration, so it wins over the base factory's high test limit.
 /// </summary>
 public sealed class StrictRateLimitApiFactory : NovaCoreApiFactory
 {
-    protected override IHost CreateHost(IHostBuilder builder)
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.ConfigureHostConfiguration(configuration => configuration.AddInMemoryCollection(
-            new Dictionary<string, string?> { ["RateLimiting:PermitLimit"] = "10" }));
+        base.ConfigureWebHost(builder);
 
-        return base.CreateHost(builder);
+        builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?> { ["RateLimiting:PermitLimit"] = "10" }));
     }
 }

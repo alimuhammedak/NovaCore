@@ -2,23 +2,29 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace NovaCore.EntityFrameworkCore.Persistence;
 
 /// <summary>
 /// On startup, applies pending EF Core migrations for every module-owned DbContext that was
 /// registered via <see cref="PersistenceExtensions.AddModuleDbContext{TContext}"/>. Opt-in
-/// (see <c>Database:ApplyMigrations</c>) so test hosts and DB-less runs are never blocked.
+/// (see <c>Database:ApplyMigrations</c>) so test hosts and DB-less runs are never blocked. The setting is read when the
+/// host starts, so configuration added after registration still applies.
 /// </summary>
-public sealed partial class DatabaseMigrationService(
+internal sealed partial class DatabaseMigrationService(
     IServiceProvider serviceProvider,
     IEnumerable<ModuleDbContextDescriptor> contexts,
+    IOptions<DatabaseOptions> options,
     ILogger<DatabaseMigrationService> logger) : IHostedService
 {
     /// <summary>Applies pending migrations for each registered module DbContext, one after another.</summary>
     /// <param name="cancellationToken">Cancels the migration.</param>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        if (!options.Value.ApplyMigrations)
+            return;
+
         foreach (var descriptor in contexts)
         {
             await using var scope = serviceProvider.CreateAsyncScope();
@@ -30,7 +36,6 @@ public sealed partial class DatabaseMigrationService(
         }
     }
 
-    /// <inheritdoc />
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     [LoggerMessage(EventId = 11, Level = LogLevel.Information, Message = "Applying migrations for {Context}...")]

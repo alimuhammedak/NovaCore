@@ -71,6 +71,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Logging goes through source-generated `[LoggerMessage]` methods (`GlobalExceptionHandler`, `DatabaseMigrationService`,
   the Identity security audit log, seeder and development email sender). Levels and message templates are unchanged;
   every entry now carries an explicit event ID and event name.
+- Configuration goes through the options pattern and is validated when the host starts. `Jwt`, `RateLimiting`, `Cors`,
+  `Cache` and `Database` are read when first used rather than at registration, so configuration added after `CreateBuilder` (for
+  example by `WebApplicationFactory`) now applies. Invalid values stop startup with a message naming the setting:
+  - a missing `Jwt:SigningKey` outside Development, or one shorter than 32 bytes;
+  - an empty `Jwt:Issuer`/`Jwt:Audience`, non-positive token lifetimes, or `Jwt:RefreshTokenDays` above 36,500;
+  - a non-positive `RateLimiting:PermitLimit`/`WindowSeconds` or `Cache:DefaultExpiration`;
+  - a `Cors:AllowedOrigins` entry that is not a bare origin (`*`, or one with a path or trailing slash);
+  - a `Database:ApplyMigrations` value that is not a boolean.
+- **Breaking:** `JwtOptions` is registered as `IOptions<JwtOptions>` instead of a plain singleton, and
+  `JwtTokenService` takes `IOptions<JwtOptions>`. `AddCoreAuthentication`, `AddCoreInfrastructure` and `AddCoreCaching`
+  no longer take `IConfiguration` (nor `IHostEnvironment`); they read both from DI.
+- The time comes from an injected `TimeProvider` (`TimeProvider.System` unless the host registers another):
+  audit stamps, access-token `iat`/`exp`, refresh-token creation, expiry and revocation, user creation and the admin
+  lockout listing. Entities no longer default `CreatedAtUtc` to the current time; it is `required`, and the code that
+  creates them sets it.
+- **Breaking:** `AccessToken` carries `IssuedAtUtc`, and `ExpiresInSeconds` is the token's lifetime
+  (`ExpiresAtUtc - IssuedAtUtc`) instead of the time left when read. The token response's `expiresIn` is now the full
+  lifetime (e.g. 900 instead of 899). `JwtTokenService` and `AuditableEntityInterceptor` take a `TimeProvider`.
+- **Breaking:** `/health` and `/alive` are mapped in Development only (`MapDefaultEndpoints`). A production host that
+  needs probes maps its own health endpoints.
+- Every module DbContext registered with `AddModuleDbContext` gets a database health check (`AddDbContextCheck`, named
+  after the context, tagged `ready`), so `/health` reports `Unhealthy` when a module database can't be reached.
+  `NovaCore.EntityFrameworkCore` references `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`.
+- **Breaking:** `DatabaseMigrationService` is internal. `AddCorePersistence` always registers it and it reads
+  `Database:ApplyMigrations` when the host starts. `NovaCore.EntityFrameworkCore` references
+  `Microsoft.Extensions.Options.ConfigurationExtensions` instead of `Microsoft.Extensions.Configuration.Binder` (which
+  still comes transitively).
 
 ### Removed
 
@@ -89,8 +116,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LoggingEmailSender`, which writes email bodies (including confirmation tokens) to the log, is registered only in
   Development. In any other environment the host fails at startup with a clear error unless a real `IEmailSender` is
   registered.
+- `GlobalExceptionHandler` sends only `AppException` messages to the client. Other exceptions it maps to a 4xx status
+  (`ArgumentException`, `FormatException`, `UnauthorizedAccessException`, `KeyNotFoundException`) keep their status
+  code, but their message (which can carry connection strings, paths or other internals) is only logged.
 
 ### Fixed
+
+- The ProblemDetails `instance` member is a URI reference, the request path (e.g. `/api/v1/products/42`), instead of
+  `"GET /api/v1/products/42"`. The query string is left out.
 
 - The `"strict"` rate-limit policy (used by `/api/v1/auth`) is now partitioned per client IP. Before, it was a single
   shared counter, so one client could exhaust it and lock every other client out of login.

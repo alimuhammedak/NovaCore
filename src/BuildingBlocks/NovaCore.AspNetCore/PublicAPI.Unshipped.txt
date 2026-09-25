@@ -1,12 +1,14 @@
 #nullable enable
 NovaCore.AspNetCore.Auth.AccessToken
 NovaCore.AspNetCore.Auth.AccessToken.AccessToken() -> void
-NovaCore.AspNetCore.Auth.AccessToken.AccessToken(string! Token, System.DateTimeOffset ExpiresAtUtc) -> void
-NovaCore.AspNetCore.Auth.AccessToken.Deconstruct(out string! Token, out System.DateTimeOffset ExpiresAtUtc) -> void
+NovaCore.AspNetCore.Auth.AccessToken.AccessToken(string! Token, System.DateTimeOffset IssuedAtUtc, System.DateTimeOffset ExpiresAtUtc) -> void
+NovaCore.AspNetCore.Auth.AccessToken.Deconstruct(out string! Token, out System.DateTimeOffset IssuedAtUtc, out System.DateTimeOffset ExpiresAtUtc) -> void
 NovaCore.AspNetCore.Auth.AccessToken.Equals(NovaCore.AspNetCore.Auth.AccessToken other) -> bool
 NovaCore.AspNetCore.Auth.AccessToken.ExpiresAtUtc.get -> System.DateTimeOffset
 NovaCore.AspNetCore.Auth.AccessToken.ExpiresAtUtc.init -> void
 NovaCore.AspNetCore.Auth.AccessToken.ExpiresInSeconds.get -> int
+NovaCore.AspNetCore.Auth.AccessToken.IssuedAtUtc.get -> System.DateTimeOffset
+NovaCore.AspNetCore.Auth.AccessToken.IssuedAtUtc.init -> void
 NovaCore.AspNetCore.Auth.AccessToken.Token.get -> string!
 NovaCore.AspNetCore.Auth.AccessToken.Token.init -> void
 NovaCore.AspNetCore.Auth.AuthenticationExtensions
@@ -26,7 +28,7 @@ NovaCore.AspNetCore.Auth.JwtOptions.SigningKey.get -> string!
 NovaCore.AspNetCore.Auth.JwtOptions.SigningKey.set -> void
 NovaCore.AspNetCore.Auth.JwtTokenService
 NovaCore.AspNetCore.Auth.JwtTokenService.CreateAccessToken(System.Collections.Generic.IReadOnlyCollection<System.Security.Claims.Claim!>! claims) -> NovaCore.AspNetCore.Auth.AccessToken
-NovaCore.AspNetCore.Auth.JwtTokenService.JwtTokenService(NovaCore.AspNetCore.Auth.JwtOptions! options) -> void
+NovaCore.AspNetCore.Auth.JwtTokenService.JwtTokenService(Microsoft.Extensions.Options.IOptions<NovaCore.AspNetCore.Auth.JwtOptions!>! options, System.TimeProvider! timeProvider) -> void
 NovaCore.AspNetCore.Authorization.AuthorizationExtensions
 NovaCore.AspNetCore.Authorization.HasPermissionAttribute
 NovaCore.AspNetCore.Authorization.HasPermissionAttribute.HasPermissionAttribute(string! permission) -> void
@@ -114,14 +116,14 @@ override NovaCore.AspNetCore.Authorization.PermissionDefinition.GetHashCode() ->
 override NovaCore.AspNetCore.Authorization.PermissionDefinition.ToString() -> string!
 static NovaCore.AspNetCore.Auth.AccessToken.operator !=(NovaCore.AspNetCore.Auth.AccessToken left, NovaCore.AspNetCore.Auth.AccessToken right) -> bool
 static NovaCore.AspNetCore.Auth.AccessToken.operator ==(NovaCore.AspNetCore.Auth.AccessToken left, NovaCore.AspNetCore.Auth.AccessToken right) -> bool
-static NovaCore.AspNetCore.Auth.AuthenticationExtensions.AddCoreAuthentication(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, Microsoft.Extensions.Hosting.IHostEnvironment! environment) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static NovaCore.AspNetCore.Auth.AuthenticationExtensions.AddCoreAuthentication(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static NovaCore.AspNetCore.Authorization.AuthorizationExtensions.AddCoreAuthorization(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static NovaCore.AspNetCore.Authorization.AuthorizationExtensions.AddPermissionDefinitions<TProvider>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static NovaCore.AspNetCore.Authorization.AuthorizationExtensions.RequirePermission<TBuilder>(this TBuilder builder, string! permission) -> TBuilder
 static NovaCore.AspNetCore.Authorization.PermissionDefinition.operator !=(NovaCore.AspNetCore.Authorization.PermissionDefinition? left, NovaCore.AspNetCore.Authorization.PermissionDefinition? right) -> bool
 static NovaCore.AspNetCore.Authorization.PermissionDefinition.operator ==(NovaCore.AspNetCore.Authorization.PermissionDefinition? left, NovaCore.AspNetCore.Authorization.PermissionDefinition? right) -> bool
-static NovaCore.AspNetCore.DependencyInjection.InfrastructureServiceCollectionExtensions.AddCoreCaching(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static NovaCore.AspNetCore.DependencyInjection.InfrastructureServiceCollectionExtensions.AddCoreInfrastructure(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static NovaCore.AspNetCore.DependencyInjection.InfrastructureServiceCollectionExtensions.AddCoreCaching(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static NovaCore.AspNetCore.DependencyInjection.InfrastructureServiceCollectionExtensions.AddCoreInfrastructure(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static NovaCore.AspNetCore.Exceptions.NotFoundException.For(string! entity, object! key) -> NovaCore.AspNetCore.Exceptions.NotFoundException!
 static NovaCore.AspNetCore.Hosting.HostingExtensions.AddCoreDefaults(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static NovaCore.AspNetCore.Hosting.HostingExtensions.AddCoreHealthChecks(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!

@@ -49,11 +49,12 @@
 
   <ItemGroup>
     <!--
-      Hosting and configuration abstractions for NovaCore.EntityFrameworkCore, which has no ASP.NET Core dependency.
+      Hosting abstractions, options binding and the DbContext health check for NovaCore.EntityFrameworkCore, which has no ASP.NET Core dependency.
       Same 10.0.12 servicing patch that EF Core 10.0.12 depends on.
     -->
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>
@@ -72,6 +73,7 @@
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
   </ItemGroup>
 
 </Project>

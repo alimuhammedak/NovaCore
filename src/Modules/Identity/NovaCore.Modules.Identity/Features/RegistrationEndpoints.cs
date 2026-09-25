@@ -49,6 +49,7 @@ public static class RegistrationEndpoints
         UserManager<ApplicationUser> userManager,
         IEmailSender emailSender,
         ISecurityAuditLogger audit,
+        TimeProvider timeProvider,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
@@ -56,7 +57,8 @@ public static class RegistrationEndpoints
         {
             UserName = request.Email,
             Email = request.Email,
-            DisplayName = request.DisplayName
+            DisplayName = request.DisplayName,
+            CreatedAtUtc = timeProvider.GetUtcNow()
         };
 
         var result = await userManager.CreateAsync(user, request.Password);
