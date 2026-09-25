@@ -8,7 +8,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using NovaCore.Abstractions.Identity;
 using NovaCore.Core.Infrastructure.DependencyInjection;
-using NovaCore.Core.Infrastructure.Persistence;
 using NovaCore.Core.Web.Auth;
 using NovaCore.Core.Web.Authorization;
 using NovaCore.Core.Web.Identity;
@@ -31,7 +30,7 @@ public static class CoreWebExtensions
 
     /// <summary>
     /// Registers the web services: ProblemDetails and exception handlers, OpenAPI, JWT authentication, permission
-    /// authorization, rate limiting and CORS, plus startup migrations when <c>Database:ApplyMigrations</c> is true.
+    /// authorization, rate limiting and CORS.
     /// </summary>
     public static IHostApplicationBuilder AddCoreWeb(this IHostApplicationBuilder builder)
     {
@@ -62,11 +61,6 @@ public static class CoreWebExtensions
             else
                 policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
         }));
-
-        // Opt-in: apply every module's EF Core migrations on startup. Off by default so test hosts
-        // and DB-less runs never block. Enable with Database:ApplyMigrations=true once SQL Server is reachable.
-        if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations"))
-            services.AddHostedService<DatabaseMigrationService>();
 
         return builder;
     }

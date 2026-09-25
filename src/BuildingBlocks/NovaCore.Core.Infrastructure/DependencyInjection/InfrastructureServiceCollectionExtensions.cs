@@ -3,18 +3,15 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Abstractions.Caching;
-using NovaCore.Abstractions.Messaging;
 using NovaCore.Core.Infrastructure.Caching;
 using NovaCore.Core.Infrastructure.Exceptions;
-using NovaCore.Core.Infrastructure.Messaging;
-using NovaCore.Core.Infrastructure.Persistence;
 
 namespace NovaCore.Core.Infrastructure.DependencyInjection;
 
 /// <summary>Service registration for the cross-cutting infrastructure.</summary>
 public static class InfrastructureServiceCollectionExtensions
 {
-    /// <summary>Wires the cross-cutting infrastructure: ProblemDetails, exception handling, caching, auditing, eventing.</summary>
+    /// <summary>Wires the cross-cutting infrastructure: ProblemDetails, exception handling and caching.</summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The application configuration.</param>
     /// <returns><paramref name="services"/>, for chaining.</returns>
@@ -28,12 +25,6 @@ public static class InfrastructureServiceCollectionExtensions
             context.ProblemDetails.Instance ??= $"{context.HttpContext.Request.Method} {context.HttpContext.Request.Path}";
         });
         services.AddExceptionHandler<GlobalExceptionHandler>();
-
-        // Audit stamping runs inside the unit of work; scoped so it sees the request's ICurrentUser.
-        services.AddScoped<AuditableEntityInterceptor>();
-
-        // In-process domain-event dispatch — no commercial mediator required.
-        services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
 
         services.AddCoreCaching(configuration);
         return services;

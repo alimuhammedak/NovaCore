@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.Core.Web\NovaCore.Core.Web.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.EntityFrameworkCore\NovaCore.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\NovaCore.Modules.Catalog.Contracts\NovaCore.Modules.Catalog.Contracts.csproj" />
   </ItemGroup>
 

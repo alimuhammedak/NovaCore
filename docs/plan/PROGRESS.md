@@ -131,6 +131,8 @@ Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-2
   - **Sürpriz:** CA1873 yalnızca `UserRegistered`'daki `Mask(email)` argümanını işaretledi (Information seviyesi; kural varsayılan olarak Information ve altını denetliyor). `IsEnabled` guard'ı instance ve static `[LoggerMessage]` metotlarında tanınmadı, çünkü analyzer guard ile log çağrısının aynı alıcıda (receiver) olmasını istiyor (R-047). Çözüm: audit log tanımları `this ILogger` extension biçiminde (`SecurityAuditLog`). Bastırma yok.
   - Kök CLAUDE.md'ye Standards → "Logging is source-generated" maddesi eklendi, Gotchas'taki CA1848 maddesi silindi. CHANGELOG'a "Changed" notu yazıldı. `--no-incremental` build 0/0, 46/46.
 - [ ] F2a.1 Çekirdek projeler (alt adımlar: 1a Abstractions, 1b EntityFrameworkCore, 1c AspNetCore, 1d Catalog.Contracts paketlenmez)
+  - [x] F2a.1a (975e19c): `NovaCore.Core.Abstractions` → `NovaCore.Abstractions` (`git mv`). Namespace kökü, using'ler, proje referansları, slnx ve `release.yml`'deki VersionPrefix yolu güncellendi. PublicAPI satırlarında yalnızca namespace değişti, analyzer kabul etti. 46/46.
+    - **Sürpriz:** yeniden adlandırmadan sonra test ve Api çıktı klasörlerinde eski `NovaCore.Core.Abstractions.dll` kalıyor, `Solution.ProductionAssemblies` bunu da yüklerdi. Her adlandırmada `bin/obj` silindi. CI temiz checkout kullandığı için etkilenmiyor.
 - [ ] F2a.2 Eklenti paketleri (alt adımlar: 2a Serilog, 2b OpenTelemetry, 2c Scalar, 2d FluentValidation köprüsü, D-019)
 - [ ] F2a.3 Açık modül kaydı
 - [ ] F2a.4 Mimari testler

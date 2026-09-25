@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** the packages are restructured to the target package map (docs/plan/ANALYSIS.md §4). Package names and
   namespace roots change; the members keep their names and behaviour:
   - `NovaCore.Core.Abstractions` → `NovaCore.Abstractions`.
+  - New `NovaCore.EntityFrameworkCore` (Microsoft packages only, no ASP.NET Core): `AddModuleDbContext`,
+    `AuditableEntityInterceptor`, `DatabaseMigrationService` and `DomainEventDispatcher`, moved out of
+    `NovaCore.Core.Infrastructure`. Hosts register them with the new `builder.AddCorePersistence()`, called before the
+    modules; `AddCoreWeb`/`AddCoreInfrastructure` no longer do.
 - Logging goes through source-generated `[LoggerMessage]` methods (`GlobalExceptionHandler`, `DatabaseMigrationService`,
   the Identity security audit log, seeder and development email sender). Levels and message templates are unchanged;
   every entry now carries an explicit event ID and event name.

@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\BuildingBlocks\NovaCore.Core.Web\NovaCore.Core.Web.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\NovaCore.EntityFrameworkCore\NovaCore.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\Modules\Catalog\NovaCore.Modules.Catalog\NovaCore.Modules.Catalog.csproj" />
     <ProjectReference Include="..\..\Modules\Payments\NovaCore.Modules.Payments\NovaCore.Modules.Payments.csproj" />
     <ProjectReference Include="..\..\Modules\Identity\NovaCore.Modules.Identity\NovaCore.Modules.Identity.csproj" />

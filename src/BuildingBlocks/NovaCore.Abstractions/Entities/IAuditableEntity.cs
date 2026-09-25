@@ -2,7 +2,7 @@ namespace NovaCore.Abstractions.Entities;
 
 /// <summary>
 /// Entities that should be stamped with creation/modification audit data automatically.
-/// The stamping is done centrally by an EF Core interceptor (see Core.Infrastructure).
+/// The stamping is done centrally by an EF Core interceptor (see NovaCore.EntityFrameworkCore).
 /// </summary>
 public interface IAuditableEntity
 {

@@ -1,0 +1,58 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using NovaCore.Abstractions.Messaging;
+using NovaCore.EntityFrameworkCore.Messaging;
+
+namespace NovaCore.EntityFrameworkCore.Persistence;
+
+/// <summary>Records that a module owns a given DbContext, so the host can migrate them all generically.</summary>
+public sealed record ModuleDbContextDescriptor(Type ContextType);
+
+/// <summary>Service registration for module-owned DbContexts.</summary>
+public static class PersistenceExtensions
+{
+    /// <summary>
+    /// Registers the persistence services every module DbContext relies on: the audit-stamping interceptor, the
+    /// in-process domain-event dispatcher and, when <c>Database:ApplyMigrations</c> is true, startup migrations.
+    /// Call it before registering the modules, so the migrations run before any module's own hosted services.
+    /// </summary>
+    /// <param name="builder">The host application builder.</param>
+    /// <returns><paramref name="builder"/>, for chaining.</returns>
+    public static IHostApplicationBuilder AddCorePersistence(this IHostApplicationBuilder builder)
+    {
+        var services = builder.Services;
+
+        // Audit stamping runs inside the unit of work; scoped so it sees the request's ICurrentUser.
+        services.AddScoped<AuditableEntityInterceptor>();
+
+        // In-process domain-event dispatch — no commercial mediator required.
+        services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
+
+        // Opt-in: apply every module's EF Core migrations on startup. Off by default so test hosts
+        // and DB-less runs never block. Enable with Database:ApplyMigrations=true once SQL Server is reachable.
+        if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations"))
+            services.AddHostedService<DatabaseMigrationService>();
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Registers a module's DbContext <em>and</em> advertises it for generic startup migration.
+    /// Each module keeps its own context (and its own schema) — the modular-monolith boundary at the DB level.
+    /// </summary>
+    /// <typeparam name="TContext">The module's DbContext.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Configures the context options (provider, connection string, interceptors).</param>
+    /// <returns><paramref name="services"/>, for chaining.</returns>
+    public static IServiceCollection AddModuleDbContext<TContext>(
+        this IServiceCollection services,
+        Action<IServiceProvider, DbContextOptionsBuilder> configure)
+        where TContext : DbContext
+    {
+        services.AddDbContext<TContext>(configure);
+        services.AddSingleton(new ModuleDbContextDescriptor(typeof(TContext)));
+        return services;
+    }
+}

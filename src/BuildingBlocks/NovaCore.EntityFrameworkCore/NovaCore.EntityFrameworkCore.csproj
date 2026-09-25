@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NovaCore.EntityFrameworkCore: module-owned EF Core DbContexts, audit stamping, startup migrations and in-process
+    domain events. Microsoft packages only and no ASP.NET Core, so it works in any .NET host (docs/plan/DECISIONS.md D-020).
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>NovaCore persistence building blocks: module-owned EF Core DbContexts, audit stamping, startup migrations and in-process domain events.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NovaCore.Abstractions\NovaCore.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

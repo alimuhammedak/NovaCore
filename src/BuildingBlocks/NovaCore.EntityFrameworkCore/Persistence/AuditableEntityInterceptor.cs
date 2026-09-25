@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using NovaCore.Abstractions.Entities;
 using NovaCore.Abstractions.Identity;
 
-namespace NovaCore.Core.Infrastructure.Persistence;
+namespace NovaCore.EntityFrameworkCore.Persistence;
 
 /// <summary>
 /// Stamps <see cref="IAuditableEntity"/> rows with who/when on every save, in one place, so no

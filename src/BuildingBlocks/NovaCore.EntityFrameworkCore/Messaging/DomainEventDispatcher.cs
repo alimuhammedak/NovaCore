@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Abstractions.Messaging;
 
-namespace NovaCore.Core.Infrastructure.Messaging;
+namespace NovaCore.EntityFrameworkCore.Messaging;
 
 /// <summary>
 /// In-process domain-event dispatcher. Resolves every <see cref="IDomainEventHandler{TEvent}"/> for

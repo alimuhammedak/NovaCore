@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace NovaCore.Core.Infrastructure.Persistence;
+namespace NovaCore.EntityFrameworkCore.Persistence;
 
 /// <summary>
 /// On startup, applies pending EF Core migrations for every module-owned DbContext that was
