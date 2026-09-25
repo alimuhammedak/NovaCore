@@ -14,11 +14,9 @@
   ],
   "allowed": [
     "Scalar.AspNetCore",
-    "Scrutor",
     "FluentValidation",
     "FluentValidation.DependencyInjectionExtensions",
     "Riok.Mapperly",
-    "Asp.Versioning.Http",
     "Serilog.AspNetCore",
     "Serilog.Sinks.Console",
     "Serilog.Sinks.Seq",

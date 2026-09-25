@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - MIT `LICENSE` and this changelog.
 
+### Removed
+
+- Unused dependencies and wiring: `Scrutor` (never called), `Asp.Versioning.Http` + `AddApiVersioning` (no endpoint used a
+  version set), `AddOutputCache`/`UseOutputCache` (no policy or endpoint used it).
+
 ### Security
 
 - `docker-compose.yml` reads the SQL Server SA password from a git-ignored `.env` file instead of a hard-coded value.

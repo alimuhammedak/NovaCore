@@ -1,5 +1,4 @@
 using System.Threading.RateLimiting;
-using Asp.Versioning;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
@@ -23,7 +22,7 @@ namespace NovaCore.Core.Web.Web;
 
 /// <summary>
 /// The web-layer composition root: ProblemDetails, exception handling, OpenAPI + Scalar, JWT auth,
-/// API versioning, rate limiting, output caching and CORS — all behind two calls.
+/// rate limiting and CORS — all behind two calls.
 /// </summary>
 public static class CoreWebExtensions
 {
@@ -48,19 +47,7 @@ public static class CoreWebExtensions
 
         services.AddOpenApi(options => options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 
-        services.AddApiVersioning(options =>
-        {
-            options.DefaultApiVersion = new ApiVersion(1, 0);
-            options.AssumeDefaultVersionWhenUnspecified = true;
-            options.ReportApiVersions = true;
-            options.ApiVersionReader = ApiVersionReader.Combine(
-                new UrlSegmentApiVersionReader(),
-                new HeaderApiVersionReader("X-Api-Version"));
-        });
-
         AddRateLimiting(services, builder.Configuration);
-
-        services.AddOutputCache();
 
         services.AddCors(options => options.AddPolicy(CorsPolicyName, policy =>
         {
@@ -72,7 +59,7 @@ public static class CoreWebExtensions
         }));
 
         // Opt-in: apply every module's EF Core migrations on startup. Off by default so test hosts
-        // and DB-less runs never block. Enable with Database:ApplyMigrations=true once Postgres is up.
+        // and DB-less runs never block. Enable with Database:ApplyMigrations=true once SQL Server is reachable.
         if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations"))
             services.AddHostedService<DatabaseMigrationService>();
 
@@ -101,7 +88,6 @@ public static class CoreWebExtensions
 
         app.UseCors(CorsPolicyName);
         app.UseRateLimiter();
-        app.UseOutputCache();
 
         app.UseAuthentication();
         app.UseAuthorization();
