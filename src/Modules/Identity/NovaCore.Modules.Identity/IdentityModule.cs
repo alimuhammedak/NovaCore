@@ -7,9 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using NovaCore.Core.Infrastructure.Persistence;
-using NovaCore.Core.Web.Authorization;
-using NovaCore.Core.Web.Modules;
+using NovaCore.AspNetCore.Authorization;
+using NovaCore.AspNetCore.Modules;
+using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Modules.Identity.Authorization;
 using NovaCore.Modules.Identity.Domain;
 using NovaCore.Modules.Identity.Features;
@@ -21,7 +21,7 @@ namespace NovaCore.Modules.Identity;
 
 /// <summary>
 /// The Identity module: ASP.NET Core Identity (hardened) + JWT/refresh tokens + 2FA + admin. Owns the
-/// <c>identity</c> schema. Discovered and wired automatically like any other module.
+/// <c>identity</c> schema. Added by the host with <c>AddModule&lt;IdentityModule&gt;()</c> like any other module.
 /// </summary>
 public sealed class IdentityModule : IModule
 {

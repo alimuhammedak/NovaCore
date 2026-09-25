@@ -1,18 +1,40 @@
-using NovaCore.Core.Web.Hosting;
-using NovaCore.Core.Web.Modules;
-using NovaCore.Core.Web.Web;
+using NovaCore.AspNetCore.Hosting;
+using NovaCore.AspNetCore.Modules;
+using NovaCore.AspNetCore.Web;
+using NovaCore.EntityFrameworkCore.Persistence;
+using NovaCore.FluentValidation;
+using NovaCore.Modules.Catalog;
+using NovaCore.Modules.Identity;
+using NovaCore.Modules.Payments;
+using NovaCore.OpenTelemetry;
+using NovaCore.Scalar;
+using NovaCore.Serilog;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.AddCoreDefaults();   // structured logging (Serilog) + OpenTelemetry + health + resilient HttpClients
-builder.AddCoreWeb();        // ProblemDetails, OpenAPI + Scalar, JWT auth, rate limiting, CORS
-builder.AddModules();        // discover every NovaCore.Modules.* IModule and register its services
+// Add-ons (third-party packages): logging and observability.
+builder.AddCoreLogging();                          // Serilog: console, plus Seq when configured
+builder.AddCoreObservability();                    // OpenTelemetry metrics + tracing, OTLP export when configured
+
+// Core.
+builder.AddCoreDefaults();                         // health checks + resilient HttpClients
+builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth, rate limiting, CORS
+builder.AddCorePersistence();                      // audit interceptor, domain events, opt-in startup migrations
+builder.Services.AddValidationExceptionHandler();  // FluentValidation exceptions -> 400, ahead of the global handler
+
+// Modules, after AddCorePersistence so migrations start before module hosted services. Endpoints map in this order.
+builder.AddModule<CatalogModule>();
+builder.AddModule<IdentityModule>();
+builder.AddModule<PaymentsModule>();
 
 var app = builder.Build();
 
-app.UseCoreWeb();            // exception handling, auth, rate limiter, Scalar UI (Development)
-app.MapModules();            // map every module's endpoints
-app.MapDefaultEndpoints();   // /health (readiness) and /alive (liveness)
+app.UseSerilogRequestLogging();                    // one log line per request, wrapping the rest of the pipeline
+app.UseCoreWeb();                                  // security headers, exception handling, auth, rate limiter, OpenAPI (Development)
+app.MapCoreScalar();                               // Scalar UI at /scalar/v1 (Development)
+app.MapModules();                                  // every module's endpoints
+app.MapDefaultEndpoints();                         // /health (readiness) and /alive (liveness)
 
 app.Run();
 

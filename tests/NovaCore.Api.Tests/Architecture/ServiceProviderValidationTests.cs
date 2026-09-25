@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Api.Tests.Integration;
-using NovaCore.Core.Abstractions.Identity;
+using NovaCore.Abstractions.Identity;
 using NovaCore.Modules.Identity.Services;
 using Xunit;
 

@@ -1,0 +1,150 @@
+#nullable enable
+abstract NovaCore.Abstractions.Messaging.DomainEvent.<Clone>$() -> NovaCore.Abstractions.Messaging.DomainEvent!
+const NovaCore.Abstractions.Pagination.PaginationRequest.DefaultPageSize = 20 -> int
+const NovaCore.Abstractions.Pagination.PaginationRequest.MaxPageSize = 100 -> int
+NovaCore.Abstractions.Caching.CacheEntryOptions
+NovaCore.Abstractions.Caching.CacheEntryOptions.CacheEntryOptions() -> void
+NovaCore.Abstractions.Caching.CacheEntryOptions.CacheEntryOptions(System.TimeSpan? Expiration = null, System.TimeSpan? LocalCacheExpiration = null) -> void
+NovaCore.Abstractions.Caching.CacheEntryOptions.Deconstruct(out System.TimeSpan? Expiration, out System.TimeSpan? LocalCacheExpiration) -> void
+NovaCore.Abstractions.Caching.CacheEntryOptions.Equals(NovaCore.Abstractions.Caching.CacheEntryOptions other) -> bool
+NovaCore.Abstractions.Caching.CacheEntryOptions.Expiration.get -> System.TimeSpan?
+NovaCore.Abstractions.Caching.CacheEntryOptions.Expiration.init -> void
+NovaCore.Abstractions.Caching.CacheEntryOptions.LocalCacheExpiration.get -> System.TimeSpan?
+NovaCore.Abstractions.Caching.CacheEntryOptions.LocalCacheExpiration.init -> void
+NovaCore.Abstractions.Caching.ICacheService
+NovaCore.Abstractions.Caching.ICacheService.GetOrCreateAsync<T>(string! key, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! factory, NovaCore.Abstractions.Caching.CacheEntryOptions? options = null, System.Collections.Generic.IReadOnlyCollection<string!>? tags = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
+NovaCore.Abstractions.Caching.ICacheService.RemoveAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+NovaCore.Abstractions.Caching.ICacheService.RemoveByTagAsync(string! tag, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+NovaCore.Abstractions.Caching.ICacheService.SetAsync<T>(string! key, T value, NovaCore.Abstractions.Caching.CacheEntryOptions? options = null, System.Collections.Generic.IReadOnlyCollection<string!>? tags = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+NovaCore.Abstractions.Entities.AuditableEntity<TId>
+NovaCore.Abstractions.Entities.AuditableEntity<TId>.AuditableEntity() -> void
+NovaCore.Abstractions.Entities.AuditableEntity<TId>.AuditableEntity(TId id) -> void
+NovaCore.Abstractions.Entities.AuditableEntity<TId>.CreatedAtUtc.get -> System.DateTimeOffset
+NovaCore.Abstractions.Entities.AuditableEntity<TId>.CreatedAtUtc.set -> void
+NovaCore.Abstractions.Entities.AuditableEntity<TId>.CreatedBy.get -> string?
+NovaCore.Abstractions.Entities.AuditableEntity<TId>.CreatedBy.set -> void
+NovaCore.Abstractions.Entities.AuditableEntity<TId>.ModifiedAtUtc.get -> System.DateTimeOffset?
+NovaCore.Abstractions.Entities.AuditableEntity<TId>.ModifiedAtUtc.set -> void
+NovaCore.Abstractions.Entities.AuditableEntity<TId>.ModifiedBy.get -> string?
+NovaCore.Abstractions.Entities.AuditableEntity<TId>.ModifiedBy.set -> void
+NovaCore.Abstractions.Entities.Entity<TId>
+NovaCore.Abstractions.Entities.Entity<TId>.ClearDomainEvents() -> void
+NovaCore.Abstractions.Entities.Entity<TId>.DomainEvents.get -> System.Collections.Generic.IReadOnlyCollection<NovaCore.Abstractions.Messaging.IDomainEvent!>!
+NovaCore.Abstractions.Entities.Entity<TId>.Entity() -> void
+NovaCore.Abstractions.Entities.Entity<TId>.Entity(TId id) -> void
+NovaCore.Abstractions.Entities.Entity<TId>.Id.get -> TId
+NovaCore.Abstractions.Entities.Entity<TId>.Id.set -> void
+NovaCore.Abstractions.Entities.Entity<TId>.Raise(NovaCore.Abstractions.Messaging.IDomainEvent! domainEvent) -> void
+NovaCore.Abstractions.Entities.IAuditableEntity
+NovaCore.Abstractions.Entities.IAuditableEntity.CreatedAtUtc.get -> System.DateTimeOffset
+NovaCore.Abstractions.Entities.IAuditableEntity.CreatedAtUtc.set -> void
+NovaCore.Abstractions.Entities.IAuditableEntity.CreatedBy.get -> string?
+NovaCore.Abstractions.Entities.IAuditableEntity.CreatedBy.set -> void
+NovaCore.Abstractions.Entities.IAuditableEntity.ModifiedAtUtc.get -> System.DateTimeOffset?
+NovaCore.Abstractions.Entities.IAuditableEntity.ModifiedAtUtc.set -> void
+NovaCore.Abstractions.Entities.IAuditableEntity.ModifiedBy.get -> string?
+NovaCore.Abstractions.Entities.IAuditableEntity.ModifiedBy.set -> void
+NovaCore.Abstractions.Entities.IEntity
+NovaCore.Abstractions.Entities.IEntity<TId>
+NovaCore.Abstractions.Entities.IEntity<TId>.Id.get -> TId
+NovaCore.Abstractions.Identity.ICurrentUser
+NovaCore.Abstractions.Identity.ICurrentUser.Email.get -> string?
+NovaCore.Abstractions.Identity.ICurrentUser.HasPermission(string! permission) -> bool
+NovaCore.Abstractions.Identity.ICurrentUser.IsAuthenticated.get -> bool
+NovaCore.Abstractions.Identity.ICurrentUser.IsInRole(string! role) -> bool
+NovaCore.Abstractions.Identity.ICurrentUser.Permissions.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+NovaCore.Abstractions.Identity.ICurrentUser.Roles.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+NovaCore.Abstractions.Identity.ICurrentUser.UserId.get -> string?
+NovaCore.Abstractions.Identity.ICurrentUser.UserName.get -> string?
+NovaCore.Abstractions.Messaging.DomainEvent
+NovaCore.Abstractions.Messaging.DomainEvent.DomainEvent() -> void
+NovaCore.Abstractions.Messaging.DomainEvent.DomainEvent(NovaCore.Abstractions.Messaging.DomainEvent! original) -> void
+NovaCore.Abstractions.Messaging.DomainEvent.EventId.get -> System.Guid
+NovaCore.Abstractions.Messaging.DomainEvent.EventId.init -> void
+NovaCore.Abstractions.Messaging.DomainEvent.OccurredOnUtc.get -> System.DateTimeOffset
+NovaCore.Abstractions.Messaging.DomainEvent.OccurredOnUtc.init -> void
+NovaCore.Abstractions.Messaging.IDomainEvent
+NovaCore.Abstractions.Messaging.IDomainEvent.EventId.get -> System.Guid
+NovaCore.Abstractions.Messaging.IDomainEvent.OccurredOnUtc.get -> System.DateTimeOffset
+NovaCore.Abstractions.Messaging.IDomainEventDispatcher
+NovaCore.Abstractions.Messaging.IDomainEventDispatcher.DispatchAsync(System.Collections.Generic.IEnumerable<NovaCore.Abstractions.Messaging.IDomainEvent!>! domainEvents, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+NovaCore.Abstractions.Messaging.IDomainEventHandler<TEvent>
+NovaCore.Abstractions.Messaging.IDomainEventHandler<TEvent>.HandleAsync(TEvent domainEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+NovaCore.Abstractions.Pagination.PagedList<T>
+NovaCore.Abstractions.Pagination.PagedList<T>.HasNextPage.get -> bool
+NovaCore.Abstractions.Pagination.PagedList<T>.HasPreviousPage.get -> bool
+NovaCore.Abstractions.Pagination.PagedList<T>.Items.get -> System.Collections.Generic.IReadOnlyList<T>!
+NovaCore.Abstractions.Pagination.PagedList<T>.Map<TOut>(System.Func<T, TOut>! selector) -> NovaCore.Abstractions.Pagination.PagedList<TOut>!
+NovaCore.Abstractions.Pagination.PagedList<T>.Page.get -> int
+NovaCore.Abstractions.Pagination.PagedList<T>.PagedList(System.Collections.Generic.IReadOnlyList<T>! items, int page, int pageSize, long totalCount) -> void
+NovaCore.Abstractions.Pagination.PagedList<T>.PageSize.get -> int
+NovaCore.Abstractions.Pagination.PagedList<T>.TotalCount.get -> long
+NovaCore.Abstractions.Pagination.PagedList<T>.TotalPages.get -> int
+NovaCore.Abstractions.Pagination.PaginationRequest
+NovaCore.Abstractions.Pagination.PaginationRequest.Equals(NovaCore.Abstractions.Pagination.PaginationRequest other) -> bool
+NovaCore.Abstractions.Pagination.PaginationRequest.Page.get -> int
+NovaCore.Abstractions.Pagination.PaginationRequest.PageSize.get -> int
+NovaCore.Abstractions.Pagination.PaginationRequest.PaginationRequest() -> void
+NovaCore.Abstractions.Pagination.PaginationRequest.PaginationRequest(int page = 1, int pageSize = 20) -> void
+NovaCore.Abstractions.Pagination.PaginationRequest.Skip.get -> int
+NovaCore.Abstractions.Results.Error
+NovaCore.Abstractions.Results.Error.Code.get -> string!
+NovaCore.Abstractions.Results.Error.Code.init -> void
+NovaCore.Abstractions.Results.Error.Deconstruct(out string! Code, out string! Message, out NovaCore.Abstractions.Results.ErrorType Type) -> void
+NovaCore.Abstractions.Results.Error.Equals(NovaCore.Abstractions.Results.Error other) -> bool
+NovaCore.Abstractions.Results.Error.Error() -> void
+NovaCore.Abstractions.Results.Error.Error(string! Code, string! Message, NovaCore.Abstractions.Results.ErrorType Type = NovaCore.Abstractions.Results.ErrorType.Failure) -> void
+NovaCore.Abstractions.Results.Error.Message.get -> string!
+NovaCore.Abstractions.Results.Error.Message.init -> void
+NovaCore.Abstractions.Results.Error.Type.get -> NovaCore.Abstractions.Results.ErrorType
+NovaCore.Abstractions.Results.Error.Type.init -> void
+NovaCore.Abstractions.Results.ErrorType
+NovaCore.Abstractions.Results.ErrorType.Conflict = 3 -> NovaCore.Abstractions.Results.ErrorType
+NovaCore.Abstractions.Results.ErrorType.Failure = 0 -> NovaCore.Abstractions.Results.ErrorType
+NovaCore.Abstractions.Results.ErrorType.Forbidden = 5 -> NovaCore.Abstractions.Results.ErrorType
+NovaCore.Abstractions.Results.ErrorType.NotFound = 2 -> NovaCore.Abstractions.Results.ErrorType
+NovaCore.Abstractions.Results.ErrorType.Unauthorized = 4 -> NovaCore.Abstractions.Results.ErrorType
+NovaCore.Abstractions.Results.ErrorType.Validation = 1 -> NovaCore.Abstractions.Results.ErrorType
+NovaCore.Abstractions.Results.Result
+NovaCore.Abstractions.Results.Result.Error.get -> NovaCore.Abstractions.Results.Error
+NovaCore.Abstractions.Results.Result.IsFailure.get -> bool
+NovaCore.Abstractions.Results.Result.IsSuccess.get -> bool
+NovaCore.Abstractions.Results.Result.Result(bool isSuccess, NovaCore.Abstractions.Results.Error error) -> void
+NovaCore.Abstractions.Results.Result<T>
+NovaCore.Abstractions.Results.Result<T>.Match<TOut>(System.Func<T, TOut>! onSuccess, System.Func<NovaCore.Abstractions.Results.Error, TOut>! onFailure) -> TOut
+NovaCore.Abstractions.Results.Result<T>.Value.get -> T
+override NovaCore.Abstractions.Caching.CacheEntryOptions.GetHashCode() -> int
+override NovaCore.Abstractions.Messaging.DomainEvent.Equals(object? obj) -> bool
+override NovaCore.Abstractions.Messaging.DomainEvent.GetHashCode() -> int
+override NovaCore.Abstractions.Messaging.DomainEvent.ToString() -> string!
+override NovaCore.Abstractions.Pagination.PaginationRequest.GetHashCode() -> int
+override NovaCore.Abstractions.Results.Error.GetHashCode() -> int
+override NovaCore.Abstractions.Results.Error.ToString() -> string!
+static NovaCore.Abstractions.Caching.CacheEntryOptions.operator !=(NovaCore.Abstractions.Caching.CacheEntryOptions left, NovaCore.Abstractions.Caching.CacheEntryOptions right) -> bool
+static NovaCore.Abstractions.Caching.CacheEntryOptions.operator ==(NovaCore.Abstractions.Caching.CacheEntryOptions left, NovaCore.Abstractions.Caching.CacheEntryOptions right) -> bool
+static NovaCore.Abstractions.Messaging.DomainEvent.operator !=(NovaCore.Abstractions.Messaging.DomainEvent? left, NovaCore.Abstractions.Messaging.DomainEvent? right) -> bool
+static NovaCore.Abstractions.Messaging.DomainEvent.operator ==(NovaCore.Abstractions.Messaging.DomainEvent? left, NovaCore.Abstractions.Messaging.DomainEvent? right) -> bool
+static NovaCore.Abstractions.Pagination.PaginationRequest.operator !=(NovaCore.Abstractions.Pagination.PaginationRequest left, NovaCore.Abstractions.Pagination.PaginationRequest right) -> bool
+static NovaCore.Abstractions.Pagination.PaginationRequest.operator ==(NovaCore.Abstractions.Pagination.PaginationRequest left, NovaCore.Abstractions.Pagination.PaginationRequest right) -> bool
+static NovaCore.Abstractions.Results.Error.Conflict(string! code, string! message) -> NovaCore.Abstractions.Results.Error
+static NovaCore.Abstractions.Results.Error.Forbidden(string! code, string! message) -> NovaCore.Abstractions.Results.Error
+static NovaCore.Abstractions.Results.Error.NotFound(string! code, string! message) -> NovaCore.Abstractions.Results.Error
+static NovaCore.Abstractions.Results.Error.operator !=(NovaCore.Abstractions.Results.Error left, NovaCore.Abstractions.Results.Error right) -> bool
+static NovaCore.Abstractions.Results.Error.operator ==(NovaCore.Abstractions.Results.Error left, NovaCore.Abstractions.Results.Error right) -> bool
+static NovaCore.Abstractions.Results.Error.Unauthorized(string! code, string! message) -> NovaCore.Abstractions.Results.Error
+static NovaCore.Abstractions.Results.Error.Validation(string! code, string! message) -> NovaCore.Abstractions.Results.Error
+static NovaCore.Abstractions.Results.Result.Failure(NovaCore.Abstractions.Results.Error error) -> NovaCore.Abstractions.Results.Result!
+static NovaCore.Abstractions.Results.Result.Failure<T>(NovaCore.Abstractions.Results.Error error) -> NovaCore.Abstractions.Results.Result<T>!
+static NovaCore.Abstractions.Results.Result.Success() -> NovaCore.Abstractions.Results.Result!
+static NovaCore.Abstractions.Results.Result.Success<T>(T value) -> NovaCore.Abstractions.Results.Result<T>!
+static NovaCore.Abstractions.Results.Result<T>.implicit operator NovaCore.Abstractions.Results.Result<T>!(NovaCore.Abstractions.Results.Error error) -> NovaCore.Abstractions.Results.Result<T>!
+static NovaCore.Abstractions.Results.Result<T>.implicit operator NovaCore.Abstractions.Results.Result<T>!(T value) -> NovaCore.Abstractions.Results.Result<T>!
+static readonly NovaCore.Abstractions.Results.Error.None -> NovaCore.Abstractions.Results.Error
+virtual NovaCore.Abstractions.Messaging.DomainEvent.EqualityContract.get -> System.Type!
+virtual NovaCore.Abstractions.Messaging.DomainEvent.Equals(NovaCore.Abstractions.Messaging.DomainEvent? other) -> bool
+virtual NovaCore.Abstractions.Messaging.DomainEvent.PrintMembers(System.Text.StringBuilder! builder) -> bool
+~override NovaCore.Abstractions.Caching.CacheEntryOptions.Equals(object obj) -> bool
+~override NovaCore.Abstractions.Caching.CacheEntryOptions.ToString() -> string
+~override NovaCore.Abstractions.Pagination.PaginationRequest.Equals(object obj) -> bool
+~override NovaCore.Abstractions.Pagination.PaginationRequest.ToString() -> string
+~override NovaCore.Abstractions.Results.Error.Equals(object obj) -> bool

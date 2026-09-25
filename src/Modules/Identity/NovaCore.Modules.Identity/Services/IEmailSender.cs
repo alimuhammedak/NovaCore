@@ -14,13 +14,16 @@ public interface IEmailSender
 /// Development email sender: writes the message to the log instead of sending it, so confirmation links
 /// are visible during local development without an SMTP server. NOT for production.
 /// </summary>
-public sealed class LoggingEmailSender(ILogger<LoggingEmailSender> logger) : IEmailSender
+public sealed partial class LoggingEmailSender(ILogger<LoggingEmailSender> logger) : IEmailSender
 {
     public Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("DEV EMAIL → {To} | {Subject}\n{Body}", toEmail, subject, htmlBody);
+        LogEmail(toEmail, subject, htmlBody);
         return Task.CompletedTask;
     }
+
+    [LoggerMessage(EventId = 31, Level = LogLevel.Information, Message = "DEV EMAIL → {To} | {Subject}\n{Body}")]
+    private partial void LogEmail(string to, string subject, string body);
 }
 
 /// <summary>

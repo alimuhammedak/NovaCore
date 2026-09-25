@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per package).
 - Release workflow (`.github/workflows/release.yml`): on a `v*` tag matching `VersionPrefix`, packs and pushes to
   GitHub Packages.
+- Architecture tests for the package map: the core packages depend on Microsoft packages only and point one way
+  (Abstractions ← AspNetCore / EntityFrameworkCore, add-ons → AspNetCore), and the building blocks never scan
+  assemblies. Host wiring tests pin the module order and endpoints, the exception-handler order and the Scalar UI.
+- `Directory.Build.targets` fails the build of a packable project that does not reference PublicApiAnalyzers.
 
 ### Changed
 
@@ -36,6 +40,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged.
 - The OpenAPI document now includes descriptions taken from the XML docs of the packable projects (for example on the
   `PagedList` schemas). .NET 10's OpenAPI source generator picks them up automatically.
+- **Breaking:** the packages are restructured to the target package map (docs/plan/ANALYSIS.md §4). Package names and
+  namespace roots change; the members keep their names and behaviour:
+  - `NovaCore.Core.Abstractions` → `NovaCore.Abstractions`.
+  - New `NovaCore.EntityFrameworkCore` (Microsoft packages only, no ASP.NET Core): `AddModuleDbContext`,
+    `AuditableEntityInterceptor`, `DatabaseMigrationService` and `DomainEventDispatcher`, moved out of
+    `NovaCore.Core.Infrastructure`. Hosts register them with the new `builder.AddCorePersistence()`, called before the
+    modules; `AddCoreWeb`/`AddCoreInfrastructure` no longer do.
+  - `NovaCore.Core.Web` and the rest of `NovaCore.Core.Infrastructure` (ProblemDetails exception handling, the
+    `AppException` types, `ResultHttpExtensions`, `HybridCacheService`) → `NovaCore.AspNetCore`. The
+    `NovaCore.Core.Infrastructure` package no longer exists.
+  - New add-on `NovaCore.Serilog`: `AddCoreLogging` moved here from `AddCoreDefaults`, which no longer configures
+    logging. `UseCoreWeb` no longer calls `UseSerilogRequestLogging`; the host calls it before `UseCoreWeb`.
+  - New add-on `NovaCore.OpenTelemetry`: `AddCoreObservability` moved here from `AddCoreDefaults`, which now only adds
+    health checks and the HttpClient resilience handler.
+  - New add-on `NovaCore.Scalar`: `app.MapCoreScalar()` maps the Scalar UI in Development. `UseCoreWeb` still maps the
+    OpenAPI document but no longer the Scalar UI.
+  - `ValidationFilter<T>` and `ValidationExceptionHandler` (FluentValidation) moved to the non-packable
+    `NovaCore.FluentValidation` project, so the core packages depend on Microsoft packages only. `AddCoreWeb` no longer
+    registers the handler; the host calls `AddValidationExceptionHandler()`, which puts it ahead of the global handler.
+    .NET 10's built-in validation replaces this project in a later phase.
+- **Breaking:** modules are registered explicitly with `builder.AddModule<TModule>()` and mapped in that order.
+  `AddModules()` and the assembly-scanning `ModuleLoader` are removed, and so is `IModule.IsEnabled` (it was never
+  configurable): leave a module out by not adding it.
+  Adding the same module twice throws at registration.
+- `AddModuleDbContext` also registers `AuditableEntityInterceptor` (if not already registered), so a module's context
+  resolves even before the host calls `AddCorePersistence`.
+  - `NovaCore.Modules.Catalog.Contracts` is no longer packed. The Catalog module is sample code; only the building
+    blocks are NuGet packages.
+- Logging goes through source-generated `[LoggerMessage]` methods (`GlobalExceptionHandler`, `DatabaseMigrationService`,
+  the Identity security audit log, seeder and development email sender). Levels and message templates are unchanged;
+  every entry now carries an explicit event ID and event name.
 
 ### Removed
 

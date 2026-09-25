@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NovaCore.OpenTelemetry: optional add-on. OpenTelemetry metrics and tracing for ASP.NET Core, HttpClient and the
+    runtime, exported over OTLP when configured. Third-party packages live in add-ons (docs/plan/DECISIONS.md D-003).
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>NovaCore add-on: OpenTelemetry metrics and tracing for ASP.NET Core, HttpClient and the runtime, exported over OTLP.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

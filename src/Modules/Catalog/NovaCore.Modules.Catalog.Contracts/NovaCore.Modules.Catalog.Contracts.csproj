@@ -3,15 +3,11 @@
   <!--
     Catalog.Contracts: the ONLY surface other modules may depend on. Pure interfaces + DTOs, no
     implementation, no EF. Payments references this — never the Catalog module itself.
+    Not a NuGet package: the Catalog module is sample code for the template, and only the building blocks ship as
+    packages (docs/plan/DECISIONS.md D-001, D-020).
   -->
   <PropertyGroup>
-    <IsPackable>true</IsPackable>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>Public contracts exposed by the Catalog module to other modules.</Description>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
-  </ItemGroup>
 
 </Project>

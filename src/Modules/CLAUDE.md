@@ -5,12 +5,14 @@ Subtree rules for `src/Modules/`. See the repo-root `CLAUDE.md` for global stand
 ## Adding a module (the only supported workflow)
 
 1. `dotnet new classlib -o src/Modules/<M>/NovaCore.Modules.<M>` — the assembly name **must** start with
-   `NovaCore.Modules.` (that prefix is how `ModuleLoader` discovers it).
-2. Reference `NovaCore.Core.Web`. Add packages: `Microsoft.EntityFrameworkCore.SqlServer`,
-   `Microsoft.EntityFrameworkCore.Design`, `Riok.Mapperly`, `FluentValidation(.DependencyInjectionExtensions)`.
+   `NovaCore.Modules.` (the architecture tests find modules by that prefix).
+2. Reference `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` and `NovaCore.FluentValidation`. Add packages:
+   `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.EntityFrameworkCore.Design`, `Riok.Mapperly`,
+   `FluentValidation(.DependencyInjectionExtensions)`.
 3. Implement `IModule` (`<M>Module.cs`): `AddModule` registers the DbContext + permissions + validators;
    `MapEndpoints` maps a `MapGroup("/api/v1/<area>")`.
-4. Add a `ProjectReference` from `src/Api/NovaCore.Api`. **Done — no central wiring file changes.**
+4. Add a `ProjectReference` from `src/Api/NovaCore.Api` and one line to its `Program.cs`:
+   `builder.AddModule<<M>Module>();` (modules map their endpoints in the order they are added).
 
 Use `Catalog` as the reference implementation (full CRUD + contracts); `Payments` shows cross-module use.
 

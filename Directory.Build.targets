@@ -35,4 +35,16 @@
     <Error Text="$(MSBuildProjectName) is packable but generates no XML documentation. Set &lt;GenerateDocumentationFile&gt;true&lt;/GenerateDocumentationFile&gt; next to IsPackable in its .csproj (docs/plan/DECISIONS.md D-014)." />
   </Target>
 
+  <!--
+    The PublicAPI.*.txt files above are only checked when the project references the analyzer. Without it, a new package
+    would silently ship an untracked public API, so a packable project without the reference fails the build (D-020).
+  -->
+  <Target Name="NovaCoreRequirePublicApiTracking" BeforeTargets="CoreCompile" Condition="'$(IsPackable)' == 'true'">
+    <ItemGroup>
+      <_NovaCorePublicApiAnalyzers Include="@(PackageReference)" Condition="'%(Identity)' == 'Microsoft.CodeAnalysis.PublicApiAnalyzers'" />
+    </ItemGroup>
+    <Error Condition="'@(_NovaCorePublicApiAnalyzers)' == ''"
+           Text="$(MSBuildProjectName) is packable but does not reference Microsoft.CodeAnalysis.PublicApiAnalyzers. Add &lt;PackageReference Include=&quot;Microsoft.CodeAnalysis.PublicApiAnalyzers&quot; PrivateAssets=&quot;all&quot; /&gt; to its .csproj (docs/plan/DECISIONS.md D-020)." />
+  </Target>
+
 </Project>

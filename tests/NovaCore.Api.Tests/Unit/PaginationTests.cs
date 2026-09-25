@@ -1,5 +1,5 @@
 using System.Globalization;
-using NovaCore.Core.Abstractions.Pagination;
+using NovaCore.Abstractions.Pagination;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Unit;

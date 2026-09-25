@@ -4,9 +4,9 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using NovaCore.Core.Abstractions.Results;
-using NovaCore.Core.Web.Auth;
-using NovaCore.Core.Web.Identity;
+using NovaCore.Abstractions.Results;
+using NovaCore.AspNetCore.Auth;
+using NovaCore.AspNetCore.Identity;
 using NovaCore.Modules.Identity.Domain;
 using NovaCore.Modules.Identity.Infrastructure;
 

@@ -17,7 +17,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.Core.Web\NovaCore.Core.Web.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.AspNetCore\NovaCore.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.EntityFrameworkCore\NovaCore.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.FluentValidation\NovaCore.FluentValidation.csproj" />
     <ProjectReference Include="..\..\Catalog\NovaCore.Modules.Catalog.Contracts\NovaCore.Modules.Catalog.Contracts.csproj" />
   </ItemGroup>
 

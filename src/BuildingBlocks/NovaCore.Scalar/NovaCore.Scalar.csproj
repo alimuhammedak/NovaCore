@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NovaCore.Scalar: optional add-on. The Scalar API reference UI over the OpenAPI document, in Development.
+    Third-party packages live in add-ons (docs/plan/DECISIONS.md D-003).
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>NovaCore add-on: the Scalar API reference UI for the OpenAPI document, mapped in Development.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

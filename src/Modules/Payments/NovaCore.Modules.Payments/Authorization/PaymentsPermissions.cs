@@ -1,4 +1,4 @@
-using NovaCore.Core.Web.Authorization;
+using NovaCore.AspNetCore.Authorization;
 
 namespace NovaCore.Modules.Payments.Authorization;
 

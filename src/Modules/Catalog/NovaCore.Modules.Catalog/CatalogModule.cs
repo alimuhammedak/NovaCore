@@ -5,9 +5,9 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using NovaCore.Core.Infrastructure.Persistence;
-using NovaCore.Core.Web.Authorization;
-using NovaCore.Core.Web.Modules;
+using NovaCore.AspNetCore.Authorization;
+using NovaCore.AspNetCore.Modules;
+using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Modules.Catalog.Authorization;
 using NovaCore.Modules.Catalog.Contracts;
 using NovaCore.Modules.Catalog.Features;
@@ -17,7 +17,7 @@ using NovaCore.Modules.Catalog.Internal;
 namespace NovaCore.Modules.Catalog;
 
 /// <summary>
-/// The Catalog module. Discovered automatically by the host — registers its own DbContext, public
+/// The Catalog module. Added by the host with <c>AddModule&lt;CatalogModule&gt;()</c> — registers its own DbContext, public
 /// contract and validators, and maps its endpoints under <c>/api/v1/products</c>.
 /// </summary>
 public sealed class CatalogModule : IModule

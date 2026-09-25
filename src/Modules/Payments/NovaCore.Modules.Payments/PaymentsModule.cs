@@ -5,9 +5,9 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using NovaCore.Core.Infrastructure.Persistence;
-using NovaCore.Core.Web.Authorization;
-using NovaCore.Core.Web.Modules;
+using NovaCore.AspNetCore.Authorization;
+using NovaCore.AspNetCore.Modules;
+using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Modules.Payments.Authorization;
 using NovaCore.Modules.Payments.Features;
 using NovaCore.Modules.Payments.Infrastructure;
@@ -16,7 +16,7 @@ namespace NovaCore.Modules.Payments;
 
 /// <summary>
 /// The Payments module — the "add a payments module" scenario from the design. Drop in the project,
-/// implement <see cref="IModule"/>, reference it from the host. No central wiring file changes.
+/// implement <see cref="IModule"/>, reference it from the host and add it with <c>AddModule&lt;PaymentsModule&gt;()</c>.
 /// </summary>
 public sealed class PaymentsModule : IModule
 {

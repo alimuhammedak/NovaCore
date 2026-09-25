@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NovaCore.AspNetCore: the web composition layer. ServiceDefaults-style host wiring, the IModule system,
+    ProblemDetails exception handling and Result->HTTP, OpenAPI, rate limiting, JWT auth and HybridCache.
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>NovaCore web building blocks: modular host defaults, ProblemDetails, Result to HTTP, OpenAPI, JWT auth, permission authorization, rate limiting.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NovaCore.Abstractions\NovaCore.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

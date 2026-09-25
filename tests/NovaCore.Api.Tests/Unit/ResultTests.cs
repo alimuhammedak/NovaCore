@@ -1,4 +1,4 @@
-using NovaCore.Core.Abstractions.Results;
+using NovaCore.Abstractions.Results;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Unit;

@@ -1,0 +1,27 @@
+#nullable enable
+NovaCore.EntityFrameworkCore.Messaging.DomainEventDispatcher
+NovaCore.EntityFrameworkCore.Messaging.DomainEventDispatcher.DispatchAsync(System.Collections.Generic.IEnumerable<NovaCore.Abstractions.Messaging.IDomainEvent!>! domainEvents, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+NovaCore.EntityFrameworkCore.Messaging.DomainEventDispatcher.DomainEventDispatcher(System.IServiceProvider! serviceProvider) -> void
+NovaCore.EntityFrameworkCore.Persistence.AuditableEntityInterceptor
+NovaCore.EntityFrameworkCore.Persistence.AuditableEntityInterceptor.AuditableEntityInterceptor(NovaCore.Abstractions.Identity.ICurrentUser! currentUser) -> void
+NovaCore.EntityFrameworkCore.Persistence.DatabaseMigrationService
+NovaCore.EntityFrameworkCore.Persistence.DatabaseMigrationService.DatabaseMigrationService(System.IServiceProvider! serviceProvider, System.Collections.Generic.IEnumerable<NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor!>! contexts, Microsoft.Extensions.Logging.ILogger<NovaCore.EntityFrameworkCore.Persistence.DatabaseMigrationService!>! logger) -> void
+NovaCore.EntityFrameworkCore.Persistence.DatabaseMigrationService.StartAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NovaCore.EntityFrameworkCore.Persistence.DatabaseMigrationService.StopAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor
+NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.<Clone>$() -> NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor!
+NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.ContextType.get -> System.Type!
+NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.ContextType.init -> void
+NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.Deconstruct(out System.Type! ContextType) -> void
+NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.Equals(NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor? other) -> bool
+NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.ModuleDbContextDescriptor(System.Type! ContextType) -> void
+NovaCore.EntityFrameworkCore.Persistence.PersistenceExtensions
+override NovaCore.EntityFrameworkCore.Persistence.AuditableEntityInterceptor.SavingChanges(Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData! eventData, Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result) -> Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>
+override NovaCore.EntityFrameworkCore.Persistence.AuditableEntityInterceptor.SavingChangesAsync(Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData! eventData, Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>>
+override NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.Equals(object? obj) -> bool
+override NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.GetHashCode() -> int
+override NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.ToString() -> string!
+static NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.operator !=(NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor? left, NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor? right) -> bool
+static NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor.operator ==(NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor? left, NovaCore.EntityFrameworkCore.Persistence.ModuleDbContextDescriptor? right) -> bool
+static NovaCore.EntityFrameworkCore.Persistence.PersistenceExtensions.AddCorePersistence(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
+static NovaCore.EntityFrameworkCore.Persistence.PersistenceExtensions.AddModuleDbContext<TContext>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<System.IServiceProvider!, Microsoft.EntityFrameworkCore.DbContextOptionsBuilder!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

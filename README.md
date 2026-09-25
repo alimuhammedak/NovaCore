@@ -6,7 +6,8 @@ ile organize edilmiş iş modülleri.
 
 > **Lisans felsefesi:** MediatR ve AutoMapper artık ticari (Lucky Penny). NovaCore bunları **kullanmaz**.
 > Yerine: sade CQRS (mediator yok), **Mapperly** (Apache-2.0), **FluentValidation** (Apache-2.0),
-> **Scalar** (MIT) ve Microsoft-yerleşik bileşenler. Çekirdekteki her paket MIT/Apache.
+> **Scalar** (MIT) ve Microsoft-yerleşik bileşenler. Çekirdek paketler yalnızca Microsoft paketlerine bağlıdır;
+> üçüncü taraf kütüphaneler (Serilog, OpenTelemetry, Scalar) opsiyonel eklenti paketlerindedir. Hepsi MIT/Apache.
 
 ---
 
@@ -82,21 +83,28 @@ dotnet new novacore -n SiparisServisi
 kullanabilir — diğerleri etkilenmez.
 
 ```
-Api (ince host / composition root)
-        │  referans
+Api (ince host / composition root) ──►  eklentiler: NovaCore.Serilog / .OpenTelemetry / .Scalar
+        │  referans                      (üçüncü taraf paketler; en fazla AspNetCore'a bağlanır)
         ▼
 Modules.*  ──(yalnızca Contracts üzerinden)──►  diğer Modules.*
         │
         ▼
-BuildingBlocks (Core.Web → Core.Infrastructure → Core.Abstractions)
-        │
-        ▼
+NovaCore.AspNetCore        NovaCore.EntityFrameworkCore     (çekirdek: yalnızca Microsoft paketleri;
+        │                           │                        ikisi birbirine bağlanmaz)
+        └─────────────┬─────────────┘
+                      ▼
+           NovaCore.Abstractions (yalnızca BCL)
+                      │
+                      ▼
 .NET 10 BCL / ASP.NET Core / EF Core
 ```
 
 **Bağımlılık kuralları**
-- `Core.Abstractions` hiçbir framework'e bağlı değildir (yalnızca BCL). Bu kural bir **mimari test**
-  ile zorlanır (`ModularityTests`).
+- `NovaCore.Abstractions` hiçbir framework'e bağlı değildir (yalnızca BCL).
+- Çekirdek paketler (`NovaCore.Abstractions`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore`) yalnızca
+  Microsoft paketlerine bağlanır. AspNetCore ile EntityFrameworkCore birbirine bağlanmaz; eklentiler en fazla
+  AspNetCore ve Abstractions'a bağlanır. Bu kurallar **mimari testlerle** zorlanır (`ModularityTests`,
+  `PackageDependencyTests`).
 - Modüller **birbirine doğrudan referans vermez**; yalnızca bir modülün `*.Contracts` projesine bağlanır.
   Bu da bir mimari test ile zorlanır.
 - `BuildingBlocks` hiçbir modüle bağlı değildir.
@@ -106,10 +114,10 @@ BuildingBlocks (Core.Web → Core.Infrastructure → Core.Abstractions)
 |---|---|
 | `Result<T>`, `Error`, `PagedList<T>` | Domain entity'leri (Product, Payment...) |
 | Global exception handling + ProblemDetails | İş modülleri ve endpoint'leri |
-| `IModule` keşif/kayıt altyapısı | DbContext'ler + migration'lar |
+| `IModule` + açık kayıt (`AddModule<TModule>()`) | DbContext'ler + migration'lar |
 | HybridCache sarmalayıcı (`ICacheService`) | İş kuralları, validator'lar |
-| Serilog + OpenTelemetry + Health (`AddCoreDefaults`) | Modüle özel konfigürasyon |
-| OpenAPI + Scalar, rate limiting, CORS | |
+| Health + resilient HttpClient (`AddCoreDefaults`); Serilog ve OpenTelemetry eklentileri | Modüle özel konfigürasyon |
+| OpenAPI (+ Scalar eklentisi), rate limiting, CORS | |
 | JWT bearer auth + permission-based authz altyapısı | Identity *modülü* (users/roles/tokens) |
 | Auditing interceptor, domain-event dispatcher | |
 
@@ -118,18 +126,22 @@ BuildingBlocks (Core.Web → Core.Infrastructure → Core.Abstractions)
 ## Proje Ağacı
 
 ```
-NovaCore.sln
+NovaCore.slnx
 ├── Directory.Build.props          # tüm projeler: net10.0, nullable, analyzer'lar, TreatWarningsAsErrors, VersionPrefix
-├── Directory.Build.targets        # IsPackable projeler: paket metadata'sı, README, PublicAPI dosyaları, doc koruması
+├── Directory.Build.targets        # IsPackable projeler: paket metadata'sı, README, PublicAPI dosyaları, doc/analyzer korumaları
 ├── Directory.Packages.props       # merkezî paket sürümleri (CPM)
 ├── docker-compose.yml             # opsiyonel SQL Server + Seq + Jaeger
 ├── .template.config/template.json # `dotnet new novacore`
 │
 ├── src/
 │   ├── BuildingBlocks/
-│   │   ├── NovaCore.Core.Abstractions/   # Result, PagedList, Entity, IDomainEvent/DomainEvent, ICacheService, ICurrentUser
-│   │   ├── NovaCore.Core.Infrastructure/ # GlobalExceptionHandler, Result→HTTP, HybridCache, auditing, migration
-│   │   └── NovaCore.Core.Web/            # IModule, AddCoreDefaults/AddCoreWeb, JWT, OpenAPI+Scalar, validation
+│   │   ├── NovaCore.Abstractions/        # Result, PagedList, Entity, IDomainEvent/DomainEvent, ICacheService, ICurrentUser (yalnızca BCL)
+│   │   ├── NovaCore.AspNetCore/          # IModule + AddModule<T>, AddCoreDefaults/AddCoreWeb, ProblemDetails, Result→HTTP, JWT, authz, OpenAPI, HybridCache
+│   │   ├── NovaCore.EntityFrameworkCore/ # AddModuleDbContext, AddCorePersistence: auditing, startup migration, domain-event dispatcher
+│   │   ├── NovaCore.Serilog/             # eklenti: AddCoreLogging (Console + opsiyonel Seq)
+│   │   ├── NovaCore.OpenTelemetry/       # eklenti: AddCoreObservability (metrics + tracing, OTLP)
+│   │   ├── NovaCore.Scalar/              # eklenti: MapCoreScalar (Scalar UI, yalnızca Development)
+│   │   └── NovaCore.FluentValidation/    # paket değil: ValidationFilter<T> + ValidationExceptionHandler
 │   │
 │   ├── Modules/
 │   │   ├── Catalog/
@@ -141,7 +153,7 @@ NovaCore.sln
 │   │       └── NovaCore.Modules.Identity/           # IdentityModule (schema: identity) — Identity+JWT/refresh+2FA+admin
 │   │
 │   └── Api/
-│       └── NovaCore.Api/           # ~15 satırlık Program.cs (composition root)
+│       └── NovaCore.Api/           # Program.cs: composition root, her şeyi açıkça ekler
 │
 └── tests/
     └── NovaCore.Api.Tests/         # unit + integration (WebApplicationFactory) + architecture testleri
@@ -151,15 +163,28 @@ NovaCore.sln
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-builder.AddCoreDefaults();   // Serilog + OpenTelemetry + health + resilient HttpClients
-builder.AddCoreWeb();        // ProblemDetails, OpenAPI+Scalar, JWT auth, rate limit, CORS
-builder.AddModules();        // tüm NovaCore.Modules.* IModule'lerini bulur ve kaydeder
+// Eklentiler (üçüncü taraf paketler)
+builder.AddCoreLogging();                          // Serilog: Console + opsiyonel Seq
+builder.AddCoreObservability();                    // OpenTelemetry metrics + tracing, OTLP yalnızca konfigüre ise
+
+// Çekirdek
+builder.AddCoreDefaults();                         // health + resilient HttpClients
+builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth, rate limit, CORS
+builder.AddCorePersistence();                      // audit interceptor, domain event'ler, opt-in startup migration
+builder.Services.AddValidationExceptionHandler();  // FluentValidation exception'ı → 400, global handler'dan önce
+
+// Modüller: açık kayıt; endpoint'ler bu sırayla bağlanır
+builder.AddModule<CatalogModule>();
+builder.AddModule<IdentityModule>();
+builder.AddModule<PaymentsModule>();
 
 var app = builder.Build();
 
-app.UseCoreWeb();            // exception handling, auth, rate limiter, Scalar (Development)
-app.MapModules();            // tüm modüllerin endpoint'lerini bağlar
-app.MapDefaultEndpoints();   // /health, /alive
+app.UseSerilogRequestLogging();                    // istek başına bir log satırı
+app.UseCoreWeb();                                  // security headers, exception handling, auth, rate limiter, OpenAPI (Development)
+app.MapCoreScalar();                               // Scalar UI (Development)
+app.MapModules();                                  // modüllerin endpoint'leri
+app.MapDefaultEndpoints();                         // /health, /alive
 
 app.Run();
 ```
@@ -168,11 +193,12 @@ app.Run();
 
 ## Yeni Modül Ekleme
 
-"Ödeme modülü ekleme" senaryosu tam olarak şöyle: **yeni proje + `IModule` + Api referansı.** Başka hiçbir
-merkezî dosya değişmez — host modülleri `NovaCore.Modules.*` derlemelerinden **otomatik keşfeder**.
+"Ödeme modülü ekleme" senaryosu tam olarak şöyle: **yeni proje + `IModule` + Api referansı + `Program.cs`'te bir
+satır.** Modüller assembly taranarak bulunmaz; host her modülü `builder.AddModule<TModule>()` ile açıkça ekler.
 
-1. `dotnet new classlib -o src/Modules/Orders/NovaCore.Modules.Orders` (isim `NovaCore.Modules.` ile başlamalı)
-2. `NovaCore.Core.Web`'e referans ver.
+1. `dotnet new classlib -o src/Modules/Orders/NovaCore.Modules.Orders` (isim `NovaCore.Modules.` ile başlamalı;
+   mimari testler modülleri bu önekle bulur)
+2. `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` ve `NovaCore.FluentValidation`'a referans ver.
 3. `IModule` implement et:
 
 ```csharp
@@ -200,7 +226,7 @@ public sealed class OrdersModule : IModule
     }
 }
 ```
-4. `NovaCore.Api`'ye proje referansı ekle. Bitti.
+4. `NovaCore.Api`'ye proje referansı ekle ve `Program.cs`'e `builder.AddModule<OrdersModule>();` yaz. Bitti.
 
 ### Bir özelliğin (feature) anatomisi — Vertical Slice
 Her özellik tek dosya: request + response + validator + route + handler bir arada. Mediator yok;
@@ -232,9 +258,9 @@ HTTP/mesaj kuyruğuna döner.
 
 | Concern | Yaklaşım (.NET 10) | NovaCore'da |
 |---|---|---|
-| **Exception handling** | `IExceptionHandler` + `AddProblemDetails` (RFC 9457) | `GlobalExceptionHandler` + `ValidationExceptionHandler` (validation önce çalışır) |
-| **Logging** | Serilog (structured) + OTel korelasyon | `AddCoreLogging` — Console + opsiyonel Seq |
-| **Tracing/Metrics** | OpenTelemetry | `AddCoreObservability` — OTLP yalnızca endpoint konfigüre ise |
+| **Exception handling** | `IExceptionHandler` + `AddProblemDetails` (RFC 9457) | `GlobalExceptionHandler` + `ValidationExceptionHandler` (`AddValidationExceptionHandler` onu en öne ekler) |
+| **Logging** | Serilog (structured) + OTel korelasyon | `AddCoreLogging` (`NovaCore.Serilog` eklentisi) — Console + opsiyonel Seq |
+| **Tracing/Metrics** | OpenTelemetry | `AddCoreObservability` (`NovaCore.OpenTelemetry` eklentisi) — OTLP yalnızca endpoint konfigüre ise |
 | **Caching** | HybridCache (L1 + opsiyonel L2) | `ICacheService` → `HybridCacheService` |
 | **Validation** | FluentValidation | `ValidationFilter<T>` endpoint filtresi |
 | **Mapping** | Mapperly (source-gen) | `[Mapper]` statik partial sınıflar, EF-translatable `ProjectToDto` |
@@ -242,8 +268,8 @@ HTTP/mesaj kuyruğuna döner.
 | **Auditing** | EF Core `SaveChangesInterceptor` | `AuditableEntityInterceptor` — CreatedBy/ModifiedAt merkezî |
 | **Rate limiting** | Yerleşik `AddRateLimiter` | IP bazlı fixed-window + `"strict"` adlı policy |
 | **Health** | Yerleşik Health Checks | `/health` + `/alive` |
-| **API docs** | `Microsoft.AspNetCore.OpenApi` + Scalar | Bearer security scheme transformer ile |
-| **Modül keşfi** | Reflection | `ModuleLoader` (assembly tarama) |
+| **API docs** | `Microsoft.AspNetCore.OpenApi` + Scalar | Bearer security scheme transformer ile; Scalar UI `NovaCore.Scalar` eklentisinde (`MapCoreScalar`) |
+| **Modül kaydı** | Açık kayıt | `builder.AddModule<TModule>()` (assembly taraması yok) |
 | **Result** | Result pattern | Sıfır-bağımlılık `Result<T>` + `ToHttpResult()` |
 
 `Result<T>` **beklenen** hatalar (NotFound/Validation/Conflict) için; gerçek istisnai durumlar için
@@ -364,8 +390,10 @@ dotnet test
 - **Integration:** gerçek host'u `WebApplicationFactory` ile ayağa kaldırır. Identity store testte
   **in-memory SQLite**'a takılır; böylece tam güvenlik akışı **SQL Server gerektirmeden** test edilir:
   login, refresh **rotation**, **reuse detection** (+ family revoke), permission 200/403, security headers.
-- **Architecture:** modül sınırlarını zorlar (Payments yalnızca Catalog.Contracts'a bağlı; Core.Abstractions
-  ASP.NET/EF içermez).
+- **Architecture:** modül sınırlarını zorlar (Payments yalnızca Catalog.Contracts'a bağlı), çekirdek paketlerin
+  yalnızca Microsoft paketlerine bağlı olduğunu ve paketler arası bağımlılık yönünü doğrular (`NovaCore.Abstractions`
+  ASP.NET/EF içermez), building block'larda assembly taraması olmadığını kontrol eder. Modül sırası ve endpoint listesi
+  de testle sabitlenmiştir.
 
 ---
 
@@ -383,8 +411,11 @@ dotnet test
    ```bash
    dotnet pack NovaCore.slnx -c Release -o ./artifacts                               # 0.1.0
    dotnet pack NovaCore.slnx -c Release -o ./artifacts --version-suffix preview.1    # 0.1.0-preview.1
-   # artifacts/ klasörünü lokal feed olarak ekleyin, sonra: dotnet add package NovaCore.Core.Web
+   # artifacts/ klasörünü lokal feed olarak ekleyin, sonra: dotnet add package NovaCore.AspNetCore (ve ihtiyaca göre diğerleri)
    ```
+   - Altı paket üretilir: çekirdek `NovaCore.Abstractions`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore`;
+     eklentiler `NovaCore.Serilog`, `NovaCore.OpenTelemetry`, `NovaCore.Scalar`. Modüller ve `NovaCore.FluentValidation`
+     paketlenmez.
    - Sürüm `Directory.Build.props`'taki `VersionPrefix`'ten gelir. API kararlı olana kadar 0.x kalır.
    - Her paket XML dokümanını, `src/PACKAGE.md`'den gelen README'yi, MIT lisans ifadesini ve repo linkini taşır. Yanında bir `.snupkg` sembol paketi üretilir.
    - Public API `PublicAPI.*.txt` dosyalarında izlenir. İzlenmeyen bir değişiklik build'i kırar.
@@ -397,11 +428,12 @@ dotnet test
 | Paket | İşlev | Lisans |
 |---|---|---|
 | Mapperly (Riok) | Object mapping (source-gen) | **Apache-2.0** |
-| FluentValidation | Validation | **Apache-2.0** |
-| Scalar.AspNetCore | OpenAPI arayüzü | **MIT** |
-| Serilog.AspNetCore | Structured logging | **Apache-2.0** |
-| OpenTelemetry.* | Observability | **Apache-2.0** |
-| Microsoft.AspNetCore.OpenApi / Caching.Hybrid / JwtBearer | Microsoft-yerleşik | **MIT** |
+| FluentValidation | Validation (modüller + paketlenmeyen `NovaCore.FluentValidation`) | **Apache-2.0** |
+| Scalar.AspNetCore | OpenAPI arayüzü (`NovaCore.Scalar` eklentisi) | **MIT** |
+| Serilog.AspNetCore | Structured logging (`NovaCore.Serilog` eklentisi) | **Apache-2.0** |
+| OpenTelemetry.* | Observability (`NovaCore.OpenTelemetry` eklentisi) | **Apache-2.0** |
+| Microsoft.AspNetCore.OpenApi / Caching.Hybrid / JwtBearer / Http.Resilience | Microsoft-yerleşik (`NovaCore.AspNetCore`) | **MIT** |
+| Microsoft.EntityFrameworkCore / Extensions.Hosting.Abstractions / Configuration.Binder | Microsoft-yerleşik (`NovaCore.EntityFrameworkCore`) | **MIT** |
 | Microsoft.AspNetCore.Identity.EntityFrameworkCore | Kullanıcı/rol deposu | **MIT** |
 | Microsoft.EntityFrameworkCore.SqlServer | EF Core sağlayıcı | **MIT** |
 | Microsoft.CodeAnalysis.PublicApiAnalyzers | Public API takibi (yalnızca build, pakete girmez) | **MIT** |
@@ -425,4 +457,4 @@ dotnet test
 - .NET 10 LTS'tir (Kasım 2025 → ~Kasım 2028).
 - HybridCache .NET 9'dan beri GA/production-ready; .NET 10'da API'leri hâlâ `[Experimental]` (EXTEXP0018)
   işaretli olduğundan `NoWarn` ile bilinçli olarak açıldı.
-- Reflection tabanlı modül taraması NativeAOT ile uyumsuzdur; AOT hedeflenirse source-generator tabanlı kayda geçilir.
+- Modüller açıkça kaydedilir (`AddModule<TModule>()`); assembly taranmaz.

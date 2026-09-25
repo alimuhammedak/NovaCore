@@ -4,9 +4,13 @@
     <Project Path="src/Api/NovaCore.Api/NovaCore.Api.csproj" />
   </Folder>
   <Folder Name="/src/BuildingBlocks/">
-    <Project Path="src/BuildingBlocks/NovaCore.Core.Abstractions/NovaCore.Core.Abstractions.csproj" />
-    <Project Path="src/BuildingBlocks/NovaCore.Core.Infrastructure/NovaCore.Core.Infrastructure.csproj" />
-    <Project Path="src/BuildingBlocks/NovaCore.Core.Web/NovaCore.Core.Web.csproj" />
+    <Project Path="src/BuildingBlocks/NovaCore.Abstractions/NovaCore.Abstractions.csproj" />
+    <Project Path="src/BuildingBlocks/NovaCore.AspNetCore/NovaCore.AspNetCore.csproj" />
+    <Project Path="src/BuildingBlocks/NovaCore.EntityFrameworkCore/NovaCore.EntityFrameworkCore.csproj" />
+    <Project Path="src/BuildingBlocks/NovaCore.FluentValidation/NovaCore.FluentValidation.csproj" />
+    <Project Path="src/BuildingBlocks/NovaCore.OpenTelemetry/NovaCore.OpenTelemetry.csproj" />
+    <Project Path="src/BuildingBlocks/NovaCore.Scalar/NovaCore.Scalar.csproj" />
+    <Project Path="src/BuildingBlocks/NovaCore.Serilog/NovaCore.Serilog.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/Catalog/">

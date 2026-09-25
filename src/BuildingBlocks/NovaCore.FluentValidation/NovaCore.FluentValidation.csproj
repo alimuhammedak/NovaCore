@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NovaCore.FluentValidation: the FluentValidation bridge for minimal APIs (endpoint filter + exception handler).
+    Kept out of NovaCore.AspNetCore so the core packages depend on Microsoft packages only. Not a package: F2c.1 replaces
+    it with .NET 10's built-in validation and deletes this project (docs/plan/DECISIONS.md D-019).
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+  </ItemGroup>
+
+</Project>
