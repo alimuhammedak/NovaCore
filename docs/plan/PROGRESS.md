@@ -10,7 +10,7 @@
 | 0 | ✅ tamam | `faz/0-stabilizasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2a | ✅ tamam | `faz/2a-paket-yapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
-| 2b | 🔄 devam ediyor | `faz/2b-konfigurasyon` | 2026-09-25 | | |
+| 2b | ✅ tamam | `faz/2b-konfigurasyon` | 2026-09-25 | 2026-09-25 | |
 | 2c | ⏳ başlamadı | | | | |
 | 3a | ⏳ başlamadı | | | | |
 | 3b | ⏳ başlamadı | | | | |
@@ -227,8 +227,33 @@ Plan onayı (2026-09-25): kullanıcı kararı Q-24 (D-022, health uçları yaln�
 - [x] F2b.4 (b2fe948): `GlobalExceptionHandler` `detail`'e yalnızca `AppException` mesajını yazıyor. `ArgumentException`, `FormatException`, `UnauthorizedAccessException` ve `KeyNotFoundException` 4xx durum kodunu koruyor ama mesaj yalnızca log'a gidiyor (Y-35). Status eşlemesi değişmedi.
   - ProblemDetails `instance` artık bir URI reference: `PathBase + Path` (`ToUriComponent`), query yok (R-051). Eskiden `"GET /path"` yazıyordu.
   - Yeni `GlobalExceptionHandlerTests` handler'ı `AddCoreInfrastructure`'ın ProblemDetails yapılandırmasıyla çalıştırıyor. 4xx'e eşlenen dört tip ve `instance` önce kırmızı görüldü; 500 ve AppException zaten doğruydu. 84/84.
-- [ ] F2b.5 Health (devam ediyor; commit sonrası işlenecek)
+- [x] F2b.5 (96bfe78): `AddModuleDbContext` her context için `AddDbContextCheck<TContext>` ekliyor ("ready" etiketi, ad = context tipi). Paket `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore` 10.0.12 (MIT, ASP.NET bağımlılığı yok, R-049).
+  - `MapDefaultEndpoints` `/health` ve `/alive`'ı yalnızca Development'ta map'liyor (Q-24, D-022). Ortam `endpoints.ServiceProvider`'dan okunuyor, `MapModules` ile aynı dar altyapı noktası. Public imza aynı.
+  - Test host üç modül context'ini de kendi in-memory SQLite'ına çeviriyor (`ReplaceWithSqlite<TContext>`, audit interceptor korunuyor, D-021 (8)). Mevcut `Health_endpoint_reports_healthy` testi değişmeden yeşil.
+  - `HealthEndpointsTests`'e eklenenler (önce kırmızı görüldü): her modül context'i için "ready" kontrolü; Catalog var olmayan bir SQLite dosyasına bağlanınca `/health` 503 "Unhealthy"; Production'da `/health` ve `/alive` 404.
+  - README, `tests/CLAUDE.md`, `src/BuildingBlocks/CLAUDE.md`, kök CLAUDE.md ve memory güncellendi. 88/88.
 - [x] F2b.6 (194b754) LoggerMessage → Faz 2a'da yapıldı (D-017)
+- Faz doğrulaması (2026-09-25):
+  - `restore --force`: temiz, NU uyarısı yok.
+  - `build -c Release --no-incremental`: 0 uyarı, 0 hata.
+  - `test`: 88/88 (review düzeltmelerinden sonra 89/89).
+  - `list package --vulnerable --include-transitive`: 13 projenin hepsi temiz.
+  - `has-pending-model-changes` (3 context): değişiklik yok.
+  - `git grep`: `src`'de `DateTime(Offset).UtcNow` yalnızca `IDomainEvent.cs:30` (D-021 (6)). `tests`/`src`'de `SetEnvironmentVariable` yok. Building block'larda `GetValue<`, `.Get<` ya da `GetSection(` yok.
+  - OpenAPI: faz başında main'den alınan `/openapi/v1.json` ile faz sonundaki belge **bayt bayt aynı** (29.460 bayt). Handler'lara eklenen `TimeProvider` parametreleri servis olarak çıkarıldı.
+  - Smoke run (Development, yerel SQL Server açık):
+    - `/alive` 200, `/health` 200 Healthy (üç DB kontrolü gerçek SQL Server'a karşı), `/scalar/v1` 200, `/api/v1/products` 401.
+    - Boş login gövdesi 400 ProblemDetails, `instance: "/api/v1/auth/login"`.
+    - `RateLimiting__PermitLimit=0` ve `Cors__AllowedOrigins__0=https://app.example.com/` ile açılış iki mesajla durdu: `PermitLimit: The field RateLimitingOptions.PermitLimit must be between 1 and 2147483647.` ve `Cors:AllowedOrigins entries must be origins such as https://app.example.com...`.
+- Faz sonu code review (xhigh), 10 bulgu:
+  - Düzeltildi (8d59e7f):
+    - (1) `Jwt:RefreshTokenDays` `int.MaxValue`'ya kadar kabul ediliyordu ama `now.AddDays` taşıyordu, doğrulama geçip ilk login patlıyordu. Artık üst sınır 36.500 ve buna bir test vakası var.
+    - (2) Varsayılan kalkınca `CreatedAtUtc`'yi unutan bir oluşturma yeri sessizce 0001-01-01 yazardı. `ApplicationUser` ve `RefreshToken`'da artık `required`.
+    - (3) Saat kuralındaki istisna artık dosyanın tamamını değil yalnızca o satırı kapsıyor. `TimeProvider.System.GetUtcNow()` da yakalanıyor. İstisna dosyasına eklenen geçici bir ihlal testi kırmızıya çevirdi (commit'lenmedi).
+    - (4) Test factory'si EF internal provider'ını dispose ediyor ve artık okunmayan SQL Server connection string'ini set etmiyor.
+    - (5) README'nin konfigürasyon bölümü doğrulama kurallarını anlatıyor. Boş `Cors:AllowedOrigins` "yalnızca dev'de" değil, her ortamda her origin'e izin veriyor.
+  - Yanlış alarm: IDN origin'lerin reddedileceği iddiası. .NET 10'da `GetLeftPart` Unicode host'u koruyor (betikle denendi).
+  - Atlandı ("Sonraya bırakılanlar"a yazıldı): Development'ta `BadHttpRequestException` → 500, DB health check'lerinde timeout yok, test yardımcılarındaki tekrar.
 
 ### Faz 2c
 - [ ] F2c.1 Validation
@@ -329,35 +354,35 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 2a, F2a.4 → F2c.1) **Y-20'nin modül kısmı henüz testli değil.** Modüller validator'ları `AddValidatorsFromAssembly` ile (assembly taraması) kaydediyor. Bu FluentValidation ile birlikte F2c.1'de gidiyor; o zaman `ExplicitRegistrationTests`'in taraması `src/Modules`'ü de kapsamalı. `ApplyConfigurationsFromAssembly` (EF model yapılandırması, DI kaydı değil) Y-20 kapsamında mı, o gün karar verilmeli.
 - (Faz 2a, F2a.2c) `SecurityHeadersMiddleware` hâlâ `/scalar` yolunu CSP'den muaf tutuyor. Scalar artık bir eklenti; çekirdeğin eklentinin yolunu bilmesi küçük bir bağlılık. Davranış değişikliği olacağı için 2a'da dokunulmadı.
 - (Faz 2a, F2a.2b) OpenTelemetry `service.version` olarak uygulamanın değil NovaCore eklentisinin assembly sürümünü (0.1.0.0) raporluyor. Davranış 2a'da korundu. Doğrusu muhtemelen giriş assembly'sinin sürümü.
+- (Faz 2b, code review) `GlobalExceptionHandler.Map`'te `BadHttpRequestException` için bir durum yok. Development'ta minimal API'ler bozuk gövdede bu exception'ı fırlatıyor (`ThrowOnBadRequest`), yanıt 400 yerine 500 oluyor ve Error seviyesinde log düşüyor. Bu 2b'den önce de böyleydi; status eşlemesini değiştirmek F2b.4'ün kapsamı dışında. Çözüm: `BadHttpRequestException.StatusCode`'u kullanmak.
+- (Faz 2b, code review) DbContext health check'lerinde timeout yok. SQL Server'a erişilemezse `/health` bağlantı timeout'u kadar bekleyebilir. Uçlar yalnızca Development'ta olduğu için şimdi etkisi düşük. Production'da probe gerekince (D-022) `HealthCheckRegistration.Timeout` ile birlikte ele alınmalı.
+- (Faz 2b, code review) Test yardımcıları tekrar ediyor: `NoOpEmailSender` iki dosyada (`EmailSenderRegistrationTests`, `ConfigurationValidationTests`), kullanıcı seed'i iki dosyada (`AuthFlowTests`, `RefreshTokenExpiryTests`). Paylaşılan bir test yardımcısına taşınabilir; mevcut testleri değiştirmek gerektiği için yapılmadı.
+- (Faz 2b) `NovaCore.OpenTelemetry`, `OTEL_EXPORTER_OTLP_ENDPOINT`'i kayıt anında okuyor (`OpenTelemetryHostingExtensions.cs:35`). F2b.1'in kapsamı iki çekirdek paketti. Bu okuma `ConfigureAppConfiguration` ile ezilemiyor, ama MS ServiceDefaults da aynı kalıbı kullanıyor.
+- (Faz 2b → Faz 3a) Token üretimi `TimeProvider`'dan okuyor, JwtBearer'ın lifetime doğrulaması (IdentityModel) ise gerçek saatten. Sahte saatli testler bu yüzden gerçek "şimdi"den başlıyor (R-050). F3a.1'de doğrulama yeniden yazılırken `TimeProvider` ile hizalanabilir.
 
 ## Son devir notu
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-25, Faz 2a bitti** ve kullanıcı onayıyla `faz/2a-paket-yapisi` main'e merge edildi (`--no-ff`), `main` push'landı.
+**2026-09-25, Faz 2b bitti.** Branch `faz/2b-konfigurasyon`. main'e merge kullanıcı onayı bekliyor.
 
 - **Yapılanlar:**
-  - F2b.6 (öne alındı, D-017): logging `[LoggerMessage]`'a çevrildi. `.editorconfig`'teki geçici CA1848/CA1873 satırları silindi.
-  - Paket haritası (ANALYSIS §4) uygulandı:
-    - Çekirdek: `NovaCore.Abstractions`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore`.
-    - Eklentiler: `NovaCore.Serilog`, `NovaCore.OpenTelemetry`, `NovaCore.Scalar`.
-    - Paketlenmeyen `NovaCore.FluentValidation` (D-019).
-    - `Catalog.Contracts` artık paket değil.
-  - Modüller açıkça kaydediliyor (`AddModule<TModule>()`), `IModule.IsEnabled` yok (D-018). `Program.cs` her şeyi açıkça ekliyor.
-  - Yeni testler: `PackageDependencyTests` (Y-05 + bağımlılık yönü), `ExplicitRegistrationTests` (Y-20, çekirdek kısmı), `ModuleRegistrationTests`, `ExceptionHandlerOrderTests`, Scalar UI testi ve iki review testi. 46 → 58.
-  - Davranış korundu: OpenAPI belgesi main ile bayt bayt aynı, 24 modül endpoint'i ve sırası testle sabit.
-  - Yerel `0.1.0-preview.1` pack yapıldı (6 paket). Tag ve push yok (Q-23).
-  - Kararlar: D-018, D-019 (kullanıcı), D-020 (model). Araştırmalar: R-044…R-047.
+  - Config (F2b.1a/1b): `Jwt`, `RateLimiting`, `Cors`, `Cache` ve `Database` artık `BindConfiguration` + `ValidateOnStart` ile bağlanan doğrulanmış options. `[OptionsValidator]` source-gen kullanılıyor, nitelikle ifade edilemeyen kurallar `.Validate` ile. Framework options'ları (`JwtBearerOptions`, `RateLimiterOptions`, `CorsOptions`, `HybridCacheOptions`) `Configure<IOptions<T>>` ile ilk kullanımda yapılandırılıyor. `DatabaseMigrationService` her zaman kayıtlı ve internal.
+  - Test host (F2b.2): env-var hack'i kalktı. `ConfigureAppConfiguration` yeterli.
+  - Saat (F2b.3): tüm zaman okumaları enjekte edilen `TimeProvider`'dan. Tek istisna `DomainEvent.OccurredOnUtc` varsayılanı. `AccessToken` `IssuedAtUtc` taşıyor. `SourceHygieneTests` kuralı koruyor.
+  - Hata yanıtları (F2b.4): istemciye yalnızca `AppException` mesajları gidiyor. `instance` bir URI reference (path, query yok).
+  - Health (F2b.5): her modül DbContext'i için "ready" etiketli DB kontrolü. `/health` ve `/alive` yalnızca Development'ta (D-022). Test host üç context'i de SQLite'a çeviriyor.
+  - Testler 58 → 89. OpenAPI belgesi main ile bayt bayt aynı.
+  - Kararlar: D-021 (model), D-022 (kullanıcı, Q-24). Araştırmalar: R-048…R-051.
 - **Sürprizler:**
-  - CA1873 `IsEnabled` guard'ını yalnızca log çağrısıyla aynı alıcıdaysa tanıyor. Bu yüzden `SecurityAuditLog` `this ILogger` extension biçiminde (R-047).
-  - Bir proje yeniden adlandırılınca test/Api `bin`'inde eski DLL kalıyor ve mimari testler onu da yükler. `bin/obj` silinmeli (kök CLAUDE.md Gotchas).
-  - `dotnet format` RS0016 code fix'i yeni bir projede satır yazmadı. PublicAPI satırları analyzer mesajından elle eklendi.
-  - Inline bash heredoc'larda ters bölüler yarıya iniyor. Windows yolları içeren script'ler dosyaya yazılıp çalıştırılmalı.
-- **Sonraki fazın (2b) bilmesi gerekenler:**
-  - Erken okunan config: `RateLimiting:PermitLimit` ve `Jwt:SigningKey` `AddCoreWeb`'de (NovaCore.AspNetCore), `Database:ApplyMigrations` artık `AddCorePersistence`'ta (NovaCore.EntityFrameworkCore). F2b.1 ikisini de Options'a çevirecek. `Microsoft.Extensions.Configuration.Binder` EF paketinde zaten var.
-  - F2b.6 bitti; 2b'nin adım listesinde "öne alındı" olarak işaretli.
-  - `DatabaseMigrationService` ile Identity seeder'ın başlama sırası `Program.cs`'teki çağrı sırasına bağlı (`AddCorePersistence` modüllerden önce).
-  - `ModuleRegistrationTests` endpoint listesini sabitliyor. Bir endpoint eklenir ya da değişirse beklenen liste güncellenir.
-  - F2c.1 `NovaCore.FluentValidation`'ı silecek ve Y-20 testini modülleri de kapsayacak şekilde genişletecek ("Sonraya bırakılanlar").
-- **Bekleyen:** önizleme yayını (tag + GitHub Packages) ayrı bir kullanıcı kararı.
-- **Sıradaki:** yeni oturumda `/novacore-phase 2b`.
+  - Tembel okumaya geçince `ConfigureHostConfiguration` (`args`) artık factory'nin `ConfigureAppConfiguration` değerini ezemiyor. Sonradan eklenen kaynak kazanıyor, bu yüzden `StrictRateLimitApiFactory` F2b.1a'da `ConfigureAppConfiguration`'a geçti.
+  - `ValidateOnStart` birden fazla hatayı `AggregateException` içinde topluyor. Testler iç mesajları düzleştirerek kontrol ediyor.
+  - `FakeTimeProvider` DI'a konunca ASP.NET Identity de onu kullanıyor (R-050). JWT doğrulaması ise gerçek saatte kalıyor.
+  - Bash'te inline Python heredoc'ları regex kaçışlarını ve tırnakları bozabiliyor. Uzun betikler dosyaya yazılıp çalıştırılmalı; regex içeren C# dosyaları Write/Edit ile yazılmalı.
+- **Sonraki fazın (2c) bilmesi gerekenler:**
+  - F2c.1: `NovaCore.FluentValidation` silinecek. `ConfigurationValidationTests` ve `HealthEndpointsTests` host'u bu köprü olmadan da açabilmeli. `ValidationExceptionHandler`'a bağımlı test: `ExceptionHandlerOrderTests`.
+  - F2c.3: `ICacheService`/`HybridCacheService` kalkacak. `CacheOptions` (`Cache:DefaultExpiration`) ve `HybridCacheOptions` yapılandırması `AddCoreCaching`'te duruyor; `AddHybridCache` doğrudan kullanılınca da korunmalı.
+  - Yeni config eklenecekse kök CLAUDE.md Standards'taki kural geçerli: options + `ValidateOnStart`, kayıt anında okuma yok.
+  - Açık "Sonraya bırakılanlar" maddeleri: `BadHttpRequestException` → 500, health check timeout, test yardımcılarındaki tekrar, OTel'in erken okuması.
+- **Bekleyen:** `faz/2b-konfigurasyon` → `main` merge onayı. Önizleme yayını (tag + GitHub Packages) hâlâ ayrı bir kullanıcı kararı.
+- **Sıradaki:** merge'den sonra yeni oturumda `/novacore-phase 2c`.
