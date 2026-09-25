@@ -15,6 +15,8 @@ public sealed class DatabaseMigrationService(
     IEnumerable<ModuleDbContextDescriptor> contexts,
     ILogger<DatabaseMigrationService> logger) : IHostedService
 {
+    /// <summary>Applies pending migrations for each registered module DbContext, one after another.</summary>
+    /// <param name="cancellationToken">Cancels the migration.</param>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         foreach (var descriptor in contexts)
@@ -28,5 +30,6 @@ public sealed class DatabaseMigrationService(
         }
     }
 
+    /// <inheritdoc />
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

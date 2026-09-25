@@ -11,9 +11,13 @@ using NovaCore.Core.Infrastructure.Persistence;
 
 namespace NovaCore.Core.Infrastructure.DependencyInjection;
 
+/// <summary>Service registration for the cross-cutting infrastructure.</summary>
 public static class InfrastructureServiceCollectionExtensions
 {
     /// <summary>Wires the cross-cutting infrastructure: ProblemDetails, exception handling, caching, auditing, eventing.</summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <returns><paramref name="services"/>, for chaining.</returns>
     public static IServiceCollection AddCoreInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         // RFC 9457 ProblemDetails, enriched with a correlation id every response carries.

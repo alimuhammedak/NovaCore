@@ -14,6 +14,9 @@ csharp_style_namespace_declarations = file_scoped:suggestion
 csharp_style_prefer_primary_constructors = true:suggestion
 csharp_prefer_braces = when_multiline:silent
 dotnet_sort_system_directives_first = true
+# Temporary: [LoggerMessage] (CA1848/CA1873) is F2b.6's job. Delete these two lines there (docs/plan/DECISIONS.md D-011).
+dotnet_diagnostic.CA1848.severity = suggestion
+dotnet_diagnostic.CA1873.severity = suggestion
 
 [*.{csproj,props,targets}]
 indent_size = 2

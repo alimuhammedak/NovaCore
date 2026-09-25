@@ -46,12 +46,15 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
   - Release build 225 uyarı, deneme envanteriyle birebir aynı (R-036). 46/46 yeşil.
   - OpenAPI belgesine XML açıklamaları giriyor (R-041, Q-19: kabul).
 - [ ] F1.2 Uyarıların düzeltilmesi
-  - [x] F1.2a (HASH): Core.Abstractions 0 uyarı.
+  - [x] F1.2a (8905aea): Core.Abstractions 0 uyarı.
     - 67 XML doc eklendi. Doc'lardaki iddialar kodla karşılaştırıldı (HTTP eşlemesi, audit damgası, cache varsayılanları).
     - CA1000: `Result<T>.Success/Failure` internal oldu, `PagedList<T>.Empty` silindi (D-012).
     - CA1711/CA1716 gerekçeli `[SuppressMessage]` ile bastırıldı (D-011).
     - Toplam uyarı 225 → 153. 46/46 yeşil.
-  - [ ] F1.2b Core.Infrastructure (XML doc, CA1848/CA1873 geçici `suggestion`)
+  - [x] F1.2b (HASH): Core.Infrastructure 0 uyarı.
+    - 22 XML doc eklendi, interface implementasyonlarında `<inheritdoc />`.
+    - `.editorconfig`: CA1848/CA1873 = `suggestion`, "F2b.6'da sil" yorumuyla (D-011). Identity'deki 32 uyarıyı da kapsıyor.
+    - Toplam uyarı 153 → 93. 46/46 yeşil.
   - [ ] F1.2c Core.Web (XML doc, CA1305)
   - [ ] F1.2d Modüller (CA1725)
   - [ ] F1.2e Testler (CA1707 tests/ için kapalı, küçük düzeltmeler)
