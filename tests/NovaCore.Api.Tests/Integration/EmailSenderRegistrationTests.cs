@@ -24,7 +24,9 @@ public class EmailSenderRegistrationTests
     [Fact]
     public async Task Outside_development_the_host_starts_with_a_real_email_sender()
     {
-        await using var factory = new ProductionApiFactory().WithWebHostBuilder(builder =>
+        // The parent owns the SQLite connection; disposing it also disposes the derived factory.
+        await using var production = new ProductionApiFactory();
+        var factory = production.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services => services.AddSingleton<IEmailSender, NoOpEmailSender>()));
 
         var sender = factory.Services.GetRequiredService<IEmailSender>();

@@ -7,7 +7,7 @@
 
 | Faz | Durum | Branch | Başlangıç | Bitiş | Merge |
 |---|---|---|---|---|---|
-| 0 | 🔄 devam ediyor | `faz/0-stabilizasyon` | 2026-09-25 | | |
+| 0 | ✅ tamam | `faz/0-stabilizasyon` | 2026-09-25 | 2026-09-25 | merge onayı bekleniyor |
 | 1 | ⏳ başlamadı | | | | |
 | 2a | ⏳ başlamadı | | | | |
 | 2b | ⏳ başlamadı | | | | |
@@ -32,7 +32,8 @@ Biçim: `- [x] F0.3 (abc1234): not`
 - [x] F0.5 (bfcb282): `LoggingEmailSender` yalnızca `configuration[HostDefaults.EnvironmentKey] == Development` olduğunda kaydediliyor (Q-08, R-030). Yeni `EmailSenderStartupCheck` (IHostedService) Development dışında sender yoksa açılışı durduruyor. 3 test eklendi, Production/sender yok testi önce kırmızı görüldü. Development testi, factory'nin `UseEnvironment` çağrısının config'e erken ulaştığını doğruladı. `NovaCoreApiFactory`'ye `virtual EnvironmentName` eklendi. README, Identity/CLAUDE.md ve tests/CLAUDE.md güncellendi.
 - [x] F0.6 (e826412): Scrutor, Asp.Versioning (`AddApiVersioning` dahil) ve `AddOutputCache`/`UseOutputCache` kaldırıldı. Paketler hook allowlist'inden de çıkarıldı. "Postgres" yorumu SQL Server oldu. README, CLAUDE.md ("0 warnings" + `restore --force` notu) ve Program.cs yorumları güncellendi, memory de güncellendi. Grep (docs/plan dışı) temiz, 38/38 yeşil.
 - [x] F0.7 (d087b6c): 6 yeni test dosyası, 8 test: Y-01/32/33, Y-08, Y-17, Y-15, Y-29, Y-26, Y-31, Y-38. Hepsi yeşil. Her kural kasıtlı ve commit'lenmemiş bir ihlalle kırmızıya döndü, ayrıca captive singleton da denendi. `NovaCoreApiFactory.CreateHost` ValidateScopes ve ValidateOnBuild'i açıkça açıyor. Y-29 taraması `NovaCore.*` namespace'iyle sınırlı, çünkü `Microsoft.AspNetCore.OpenApi` generator'ü assembly'lerimize kendi file-local tiplerini gömüyor. Y-31 ApiExplorer ile uygulanabildi, kör noktası "Sonraya bırakılanlar"da. xUnit2029 uyarısı öneriye uyularak giderildi.
-- [ ] F0.8 CI. **Devam ediyor.**
+- [x] F0.8 (caf4271): `.github/workflows/ci.yml` (ubuntu, checkout@v7, setup-dotnet@v6) çalıştırıyor: restore (NU1903/4 hata), Release build, test, 3 context için `has-pending-model-changes`, JSON'dan açık kontrolü (R-027). Remote yok (Q-03). Komutlar yerelde bash ile yeşil, `jq` adımı PowerShell eşdeğeriyle doğrulandı.
+- Faz sonu code review: 1 bulgu (test factory'lerinde `WithWebHostBuilder` ile parent factory dispose edilmiyordu, SQLite bağlantısı sızıyordu). Faz kapanış commit'inde düzeltildi.
 - [~] F0.9 (koşullu) Identity minimal düzeltmeleri. **Atlandı** (Q-04: Identity kullanılmayacak)
 
 ### Faz 1
@@ -127,4 +128,29 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-(Henüz faz oturumu yok. Kurulum 2026-09-24'te tamamlandı. 2026-09-25 itibarıyla **tüm açık sorular cevaplandı**: Q-01 (Y-13…Y-43, D-007), Q-02 (MIT, D-006), Q-03 (remote yok), Q-04 (Identity kullanılmayacak, F0.9 atlandı), Q-05 (F0.5 yapılacak). Faz 0 başlamaya hazır. Sıradaki adım: yeni bir oturumda `/novacore-phase 0`.)
+**2026-09-25, Faz 0 bitti** (`faz/0-stabilizasyon`, main'e henüz merge edilmedi).
+
+- **Yapılanlar:**
+  - Git kuruldu. Baseline `849a30d` main'de.
+  - LICENSE ve CHANGELOG eklendi. docker-compose SA parolası `.env`'e taşındı (D-008).
+  - Paketler 10.0.12'ye çıktı ve iki yüksek açık kapandı. NU1903/4 artık hata.
+  - "strict" rate limiter IP bazlı oldu (D-009).
+  - `DomainEvent` base record eklendi.
+  - `LoggingEmailSender` yalnızca Development'ta kayıtlı, başlangıçta kontrol var.
+  - Scrutor, Asp.Versioning ve OutputCache kaldırıldı.
+  - DECISIONS yasakları için 8 mimari test eklendi.
+  - CI workflow yazıldı.
+  - Testler 33'ten 46'ya çıktı, build 0 uyarı.
+- **Sürprizler:**
+  - `TestServer.SendAsync` gövdeyi algılamıyor. Testte `IHttpRequestBodyDetectionFeature` ayarlanıyor.
+  - Microsoft.AspNetCore.OpenApi generator'ü assembly'lerimize file-local tipler gömüyor. Y-29 testi bu yüzden `NovaCore.*` namespace'iyle sınırlı.
+  - `dotnet list --vulnerable` açık bulsa da exit 0 dönüyor (R-027).
+  - PowerShell 5.1'de commit mesajındaki çift tırnaklar düşüyor. Bu yüzden F0.3 mesajında `strict` tırnaksız kaldı. Artık `git commit -F <dosya>` kullanılıyor.
+- **Sonraki fazın bilmesi gerekenler:**
+  - Test factory'lerinde eager config için `CreateHost` + `ConfigureHostConfiguration` (R-026), ortam için `EnvironmentName` override edilir.
+  - Test factory'leri artık açık `ValidateScopes`/`ValidateOnBuild` ile kuruluyor.
+  - Kök CLAUDE.md'deki Mediator notu Y-01 ile çelişiyor ("Sonraya bırakılanlar").
+- **Bekleyen:**
+  - main'e merge onayı.
+  - Remote açılınca ilk CI koşusu (Q-03).
+- **Sıradaki:** merge'den sonra yeni oturumda `/novacore-phase 1`.
