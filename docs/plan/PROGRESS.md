@@ -162,13 +162,25 @@ Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-2
   - Her kural kasıtlı bir ihlalle kırmızıya döndürüldü (commit'lenmedi): AspNetCore'a Scalar paketi, AspNetCore → EF referansı, AspNetCore'da `typeof(Polly.ResiliencePipeline)`, `AppDomain.GetAssemblies()`, EF'e ASP.NET framework'ü, Scalar → EF referansı.
     - EF'e framework eklendiğinde restore NU1510 ile düştü: Binder ve Hosting.Abstractions o zaman framework'ten geleceği için "prune" edilir. Bu, ASP.NET'siz tasarımın (D-020 (1)) bu iki paketi neden açıkça istediğini de doğruluyor.
   - Tüm testler 56/56.
-- [x] F2a.5 Dokümanlar (hash bir sonraki commit'te)
+- [x] F2a.5 (13d6e64) Dokümanlar
   - README: mimari diyagramı, bağımlılık kuralları, çekirdek/proje tablosu, proje ağacı (`NovaCore.sln` yazıyordu, `.slnx` oldu), `Program.cs`, "Yeni modül ekleme" (artık `Program.cs`'e bir satır), cross-cutting tablosu, test, dağıtım (6 paket), paket/lisans tablosu, notlar.
   - Kök CLAUDE.md: Architecture bölümü paket haritasına göre yeniden yazıldı. Standards (Abstractions, Result, packable listesi, PublicApiAnalyzers koruması), Gotchas (erken okunan config artık iki metotta; modül öneki; yeniden adlandırmadan sonra eski DLL'ler) ve pack komutu güncellendi.
   - `src/BuildingBlocks/CLAUDE.md` (çekirdek, eklentiler, paket olmayan köprü), `src/Modules/CLAUDE.md` (modül ekleme adımları), `tests/CLAUDE.md` (yeni mimari ve host testleri), `src/PACKAGE.md` (paket tablosu), CHANGELOG.
   - Memory: `novacore-stack`, `novacore-project`, `novacore-security` ve `MEMORY.md` indeksi.
   - Kabul kriteri: `docs/plan` ve CHANGELOG'daki geçmiş kayıtlar dışında `Core.Web`, `Core.Infrastructure`, `Core.Abstractions`, `NovaCore.Core`, `ModuleLoader` ve `AddModules` geçmiyor (git grep, memory dahil).
-- [ ] F2a.6 (opsiyonel) İlk önizleme sürümü: yalnızca yerel pack (Q-23)
+- [x] F2a.6 (opsiyonel) İlk önizleme sürümü: yalnızca yerel pack (Q-23). Tag ve push yapılmadı.
+  - `dotnet pack NovaCore.slnx -c Release -o artifacts --version-suffix preview.1`: 6 `.nupkg` + 6 `.snupkg`, exit 0. `artifacts/` gitignore'da.
+
+    | Paket 0.1.0-preview.1 | lib/net10.0 | README | Lisans | Repository | nuspec bağımlılıkları | snupkg |
+    |---|---|---|---|---|---|---|
+    | NovaCore.Abstractions | dll + xml | ✓ | MIT | git + commit | yok | pdb ✓ |
+    | NovaCore.AspNetCore | dll + xml | ✓ | MIT | ✓ | NovaCore.Abstractions, AspNetCore.Authentication.JwtBearer, AspNetCore.OpenApi, Extensions.Caching.Hybrid, Extensions.Http.Resilience | pdb ✓ |
+    | NovaCore.EntityFrameworkCore | dll + xml | ✓ | MIT | ✓ | NovaCore.Abstractions, EntityFrameworkCore(.Relational), Extensions.Configuration.Binder, Extensions.Hosting.Abstractions | pdb ✓ |
+    | NovaCore.Serilog | dll + xml | ✓ | MIT | ✓ | Serilog.AspNetCore, Serilog.Sinks.Console, Serilog.Sinks.Seq | pdb ✓ |
+    | NovaCore.OpenTelemetry | dll + xml | ✓ | MIT | ✓ | OpenTelemetry.* (5) | pdb ✓ |
+    | NovaCore.Scalar | dll + xml | ✓ | MIT | ✓ | Scalar.AspNetCore | pdb ✓ |
+
+  - Çekirdek paketlerin nuspec'lerinde yalnızca Microsoft paketleri ve `NovaCore.Abstractions` var. Üçüncü taraf bağımlılıklar yalnızca eklentilerde. Modüller ve `NovaCore.FluentValidation` paketlenmedi. Api için bilinen kodsuz pack uyarısı devam ediyor (F1.3 notu).
 
 ### Faz 2b
 - [ ] F2b.1 Options pattern
