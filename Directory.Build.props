@@ -10,23 +10,41 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Deterministic>true</Deterministic>
+    <!--
+      Packable projects set GenerateDocumentationFile=true in their own .csproj, next to IsPackable: the SDK reads it
+      before Directory.Build.targets is imported (docs/plan/RESEARCH.md R-040).
+    -->
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Turned on in F1.2f, once the warnings exposed by AnalysisLevel and XML docs are fixed (docs/plan/DECISIONS.md D-010). -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <!--
       EXTEXP0018 : HybridCache APIs are still flagged [Experimental] in .NET 10 even though
                    the feature is GA / production-ready since .NET 9. We opt in knowingly.
-      CS1591     : missing XML doc comments (docs are off solution-wide).
     -->
     <!--
       RMG020: Mapperly "source member not mapped" — intentional for DTOs that deliberately drop
               audit/domain-event fields. Suppressed so honest, narrow DTOs don't spam warnings.
     -->
-    <NoWarn>$(NoWarn);EXTEXP0018;CS1591;RMG020</NoWarn>
-    <!-- NuGet audit: a high (NU1903) or critical (NU1904) vulnerability in any package, transitive included, fails restore. -->
+    <NoWarn>$(NoWarn);EXTEXP0018;RMG020</NoWarn>
+    <!--
+      NuGet audit: a high (NU1903) or critical (NU1904) vulnerability in any package, transitive included, fails restore.
+      Low (NU1901) and moderate (NU1902) stay warnings even under TreatWarningsAsErrors, so a newly published advisory
+      doesn't block unrelated local work; CI's vulnerable-package step fails on every severity (D-011).
+    -->
     <WarningsAsErrors>$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902</WarningsNotAsErrors>
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
     <AssemblyName>$(MSBuildProjectName)</AssemblyName>
+  </PropertyGroup>
+
+  <!--
+    Normalized source paths only on CI; locally they would stop the debugger from finding sources. Must be set here:
+    Roslyn derives DeterministicSourcePaths from it before Directory.Build.targets is imported (R-038, R-040).
+  -->
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
 </Project>

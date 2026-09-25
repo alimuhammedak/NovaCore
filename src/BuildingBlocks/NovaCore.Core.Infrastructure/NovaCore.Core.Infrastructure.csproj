@@ -6,6 +6,7 @@
   -->
   <PropertyGroup>
     <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>NovaCore cross-cutting infrastructure: ProblemDetails exception handling, HybridCache, EF Core auditing.</Description>
   </PropertyGroup>
 

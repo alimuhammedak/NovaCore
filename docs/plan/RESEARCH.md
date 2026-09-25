@@ -182,7 +182,7 @@ Biçim:
 ### R-032: IsPackable'a bağlı ayarlar props'ta mı, targets'ta mı? (2026-09-25, faz 1)
 - Bulgu: *"Directory.Build.props is imported early in Microsoft.Common.props, and properties defined later are unavailable to it. So, avoid referring to properties that aren't yet defined (and will evaluate to empty)."* Ayrıca *"Set dependent properties in .targets files, because they pick up customizations from individual projects."* NovaCore'da `IsPackable` her csproj'da tanımlı. Bu yüzden `Condition="'$(IsPackable)' == 'true'"` props'ta hep boş değer görür.
 - Kaynak: https://learn.microsoft.com/visualstudio/msbuild/customize-by-directory#directorybuildprops-and-directorybuildtargets · https://learn.microsoft.com/visualstudio/msbuild/customize-your-build#choose-between-adding-properties-to-a-props-or-targets-file
-- Sonuç: Q-14 → D-010. Koşullu grup `Directory.Build.targets`'ta.
+- Sonuç: Q-14 → D-010. Koşullu grup `Directory.Build.targets`'ta. Doc üretimi için yetmediği ortaya çıktı (R-040 → D-014).
 
 ### R-033: NuGet audit ve TreatWarningsAsErrors (2026-09-25, faz 1)
 - Bulgu: NuGet `TreatWarningsAsErrors`, `WarningsAsErrors`, `NoWarn` ve `WarningsNotAsErrors` özelliklerine uyar (*"TreatWarningsAsErrors: Treats all NuGet warnings as errors"*). Audit dokümanı: TWAE kullanılıyorsa *"you can use `<WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>` to prevent vulnerabilities discovered in the future from breaking your build."*
@@ -239,3 +239,22 @@ Biçim:
   - `.snupkg`: resmi dokümanda geçmiyor. GitHub topluluk tartışmasına göre (resmi değil) GitHub Packages sembol paketini desteklemiyor ve ikinci yüklemeyi "version conflict" ile reddediyor.
 - Kaynak: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry · https://github.com/orgs/community/discussions/38678 (topluluk kaynağı)
 - Sonuç: Q-17 → D-013. release.yml yalnızca `.nupkg` push eder (`--no-symbols`), `.snupkg` workflow artifact'i olarak saklanır.
+
+### R-040: Directory.Build.targets bazı özellikler için çok geç (2026-09-25, faz 1; gözlem + SDK kaynağı)
+- Bulgu: F1.1'de `GenerateDocumentationFile=true` targets'ta ayarlandı ve `-getProperty` true gösterdi, ama `DocumentationFile` boş kaldı, CS1591 de hiç çıkmadı.
+  - Nedeni: SDK `DocumentationFile`'ı `Sdks/Microsoft.NET.Sdk/targets/Microsoft.NET.Sdk.BeforeCommon.targets:301-313`'te `GenerateDocumentationFile`'a göre hesaplıyor. Bu dosya `-pp` çıktısında Directory.Build.targets'tan (satır ~11729) çok önce import ediliyor (satır ~2830).
+  - Aynı sorun `ContinuousIntegrationBuild` için de var: Roslyn `Microsoft.Managed.Core.targets:215` `DeterministicSourcePaths`'i ondan türetiyor ve bu dosya da önce geliyor (satır ~5204). `GITHUB_ACTIONS=true` ile değerlendirmede `DeterministicSourcePaths` boş çıktı.
+  - Paket metadata'sı (`PackageLicenseExpression`, `PackageReadmeFile`, `RepositoryUrl`, `IncludeSymbols`…) pack target'ları çalışırken okunuyor, targets'ta sorunsuz.
+  - `EnablePackageValidation` target koşulunda okunuyor, sorun yok. Ancak baseline `PackageDownload` item'ı `Microsoft.NET.ApiCompat.targets:18`'de değerlendirme anında okunuyor (import satır ~17801, targets'tan sonra), F5.4'te dikkat.
+  - SDK'da `BeforeMicrosoftNETSdkTargets` diye bir kanca var (`Sdk/Sdk.targets:13`); csproj gövdesinden sonra, BeforeCommon'dan önce import ediliyor.
+- Kaynak: yerel SDK 10.0.300 dosyaları ve `dotnet msbuild -pp`. R-032'deki MS Learn ifadesi ("imported after importing .targets files from NuGet packages") targets'ın SDK'nın kendi değerlendirme anı kararlarından sonra geldiğini de açıklıyor.
+- Sonuç: Q-18 → D-014 (D-010'un yerine). `GenerateDocumentationFile` packable csproj'larda, `ContinuousIntegrationBuild` props'ta. Targets'ta paket metadata'sı ve "packable ama doc yok" koruması kalıyor.
+
+### R-041: XML doc üretimi OpenAPI belgesini değiştiriyor (2026-09-25, faz 1)
+- Bulgu:
+  - .NET 10: *"At build-time, the OpenAPI package will leverage a source generator to discover XML comments in the current application assembly and any project references and emit source code to insert them into the document via an OpenAPI document transformer."*
+  - Kaynaklar: uygulama assembly'si ve *"Any projects referenced via `ProjectReferences` that have the `GenerateDocumentationFile` property set."*
+  - Kapatmak için generator Analyzers'tan çıkarılır.
+  - Gözlem: main ile F1.1 branch'inin `/openapi/v1.json` çıktıları karşılaştırıldı (geçici, commit'lenmemiş bir dump testiyle). Tek fark, iki `PagedList` şemasına Abstractions'taki `<summary>`'den gelen `"description"` alanı. Endpoint'ler, şema yapısı ve durum kodları aynı.
+- Kaynak: https://learn.microsoft.com/aspnet/core/release-notes/aspnetcore-10.0?view=aspnetcore-10.0#openapi · https://learn.microsoft.com/aspnet/core/fundamentals/openapi/openapi-comments?view=aspnetcore-10.0
+- Sonuç: Q-19. Kullanıcı kabul etti: yalnızca açıklama metni eklenir, API sözleşmesi değişmez. CHANGELOG'a "Changed" notu yazılacak.

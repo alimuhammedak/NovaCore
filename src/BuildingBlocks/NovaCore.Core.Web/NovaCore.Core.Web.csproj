@@ -6,6 +6,7 @@
   -->
   <PropertyGroup>
     <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>NovaCore web building blocks: modular host defaults, OpenAPI/Scalar, JWT auth, validation, observability.</Description>
   </PropertyGroup>
 

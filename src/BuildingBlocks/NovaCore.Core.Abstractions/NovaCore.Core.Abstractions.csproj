@@ -6,6 +6,7 @@
   -->
   <PropertyGroup>
     <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>NovaCore building blocks: Result, paging, base entities and messaging abstractions.</Description>
   </PropertyGroup>
 
