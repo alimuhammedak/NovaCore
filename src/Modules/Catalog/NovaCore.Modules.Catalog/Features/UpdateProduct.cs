@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using NovaCore.Abstractions.Results;
 using NovaCore.AspNetCore.Http;
 using NovaCore.AspNetCore.Authorization;
-using NovaCore.AspNetCore.Validation;
+using NovaCore.FluentValidation;
 using NovaCore.Modules.Catalog.Authorization;
 using NovaCore.Modules.Catalog.Infrastructure;
 

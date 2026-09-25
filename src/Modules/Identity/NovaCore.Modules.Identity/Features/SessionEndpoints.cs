@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
 using NovaCore.Abstractions.Identity;
-using NovaCore.AspNetCore.Validation;
+using NovaCore.FluentValidation;
 using NovaCore.Modules.Identity.Domain;
 using NovaCore.Modules.Identity.Services;
 

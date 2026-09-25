@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\BuildingBlocks\NovaCore.Serilog\NovaCore.Serilog.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\NovaCore.OpenTelemetry\NovaCore.OpenTelemetry.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\NovaCore.Scalar\NovaCore.Scalar.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\NovaCore.FluentValidation\NovaCore.FluentValidation.csproj" />
     <ProjectReference Include="..\..\Modules\Catalog\NovaCore.Modules.Catalog\NovaCore.Modules.Catalog.csproj" />
     <ProjectReference Include="..\..\Modules\Payments\NovaCore.Modules.Payments\NovaCore.Modules.Payments.csproj" />
     <ProjectReference Include="..\..\Modules\Identity\NovaCore.Modules.Identity\NovaCore.Modules.Identity.csproj" />

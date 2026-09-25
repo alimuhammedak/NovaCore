@@ -2,13 +2,12 @@
 
   <!--
     NovaCore.AspNetCore: the web composition layer. ServiceDefaults-style host wiring, the IModule system,
-    ProblemDetails exception handling and Result->HTTP, OpenAPI + Scalar, rate limiting, JWT auth, FluentValidation
-    filters and HybridCache.
+    ProblemDetails exception handling and Result->HTTP, OpenAPI, rate limiting, JWT auth and HybridCache.
   -->
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>NovaCore web building blocks: modular host defaults, OpenAPI/Scalar, JWT auth, validation, observability.</Description>
+    <Description>NovaCore web building blocks: modular host defaults, ProblemDetails, Result to HTTP, OpenAPI, JWT auth, permission authorization, rate limiting.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,8 +17,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
-    <PackageReference Include="FluentValidation" />
-    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />

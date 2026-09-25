@@ -13,7 +13,6 @@ using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
 using NovaCore.AspNetCore.OpenApi;
 using NovaCore.AspNetCore.Security;
-using NovaCore.AspNetCore.Validation;
 
 namespace NovaCore.AspNetCore.Web;
 
@@ -40,8 +39,6 @@ public static class CoreWebExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 
-        // Exception handlers run in registration order: validation first, catch-all last.
-        services.AddExceptionHandler<ValidationExceptionHandler>();
         services.AddCoreInfrastructure(builder.Configuration); // adds ProblemDetails + GlobalExceptionHandler + caching
 
         services.AddCoreAuthentication(builder.Configuration, builder.Environment);

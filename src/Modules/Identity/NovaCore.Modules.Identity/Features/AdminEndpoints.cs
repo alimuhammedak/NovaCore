@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using NovaCore.Abstractions.Identity;
 using NovaCore.Abstractions.Pagination;
 using NovaCore.AspNetCore.Authorization;
-using NovaCore.AspNetCore.Validation;
+using NovaCore.FluentValidation;
 using NovaCore.Modules.Identity.Authorization;
 using NovaCore.Modules.Identity.Domain;
 using NovaCore.Modules.Identity.Services;

@@ -2,7 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace NovaCore.AspNetCore.Validation;
+namespace NovaCore.FluentValidation;
 
 /// <summary>
 /// Endpoint filter that runs the registered FluentValidation <see cref="IValidator{T}"/> for the

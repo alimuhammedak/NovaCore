@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Routing;
 using NovaCore.Abstractions.Results;
 using NovaCore.AspNetCore.Http;
 using NovaCore.AspNetCore.Authorization;
-using NovaCore.AspNetCore.Validation;
+using NovaCore.FluentValidation;
 using NovaCore.Modules.Catalog.Contracts;
 using NovaCore.Modules.Payments.Authorization;
 using NovaCore.Modules.Payments.Domain;

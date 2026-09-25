@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using NovaCore.AspNetCore.Authorization;
-using NovaCore.AspNetCore.Validation;
+using NovaCore.FluentValidation;
 using NovaCore.Modules.Catalog.Authorization;
 using NovaCore.Modules.Catalog.Domain;
 using NovaCore.Modules.Catalog.Infrastructure;

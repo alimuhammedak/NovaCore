@@ -2,7 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 
-namespace NovaCore.AspNetCore.Validation;
+namespace NovaCore.FluentValidation;
 
 /// <summary>
 /// Catches a FluentValidation <see cref="ValidationException"/> thrown deeper in a handler (i.e. not

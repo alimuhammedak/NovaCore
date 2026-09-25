@@ -52,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     health checks and the HttpClient resilience handler.
   - New add-on `NovaCore.Scalar`: `app.MapCoreScalar()` maps the Scalar UI in Development. `UseCoreWeb` still maps the
     OpenAPI document but no longer the Scalar UI.
+  - `ValidationFilter<T>` and `ValidationExceptionHandler` (FluentValidation) moved to the non-packable
+    `NovaCore.FluentValidation` project, so the core packages depend on Microsoft packages only. `AddCoreWeb` no longer
+    registers the handler; the host calls `AddValidationExceptionHandler()`, which puts it ahead of the global handler.
+    .NET 10's built-in validation replaces this project in a later phase.
   - `NovaCore.Modules.Catalog.Contracts` is no longer packed. The Catalog module is sample code; only the building
     blocks are NuGet packages.
 - Logging goes through source-generated `[LoggerMessage]` methods (`GlobalExceptionHandler`, `DatabaseMigrationService`,

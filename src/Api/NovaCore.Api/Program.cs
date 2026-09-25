@@ -2,6 +2,7 @@ using NovaCore.AspNetCore.Hosting;
 using NovaCore.AspNetCore.Modules;
 using NovaCore.AspNetCore.Web;
 using NovaCore.EntityFrameworkCore.Persistence;
+using NovaCore.FluentValidation;
 using NovaCore.OpenTelemetry;
 using NovaCore.Scalar;
 using NovaCore.Serilog;
@@ -14,6 +15,7 @@ builder.AddCoreObservability(); // OpenTelemetry metrics + tracing, OTLP export 
 builder.AddCoreDefaults();   // health checks + resilient HttpClients
 builder.AddCoreWeb();        // ProblemDetails, OpenAPI, JWT auth, rate limiting, CORS
 builder.AddCorePersistence(); // audit interceptor, domain events, opt-in startup migrations (before the modules)
+builder.Services.AddValidationExceptionHandler(); // FluentValidation failures thrown in handlers -> 400 (D-019)
 builder.AddModules();        // discover every NovaCore.Modules.* IModule and register its services
 
 var app = builder.Build();

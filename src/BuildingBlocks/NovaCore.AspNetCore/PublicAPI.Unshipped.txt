@@ -99,12 +99,6 @@ NovaCore.AspNetCore.Security.SecurityHeadersExtensions
 NovaCore.AspNetCore.Security.SecurityHeadersMiddleware
 NovaCore.AspNetCore.Security.SecurityHeadersMiddleware.InvokeAsync(Microsoft.AspNetCore.Http.HttpContext! context) -> System.Threading.Tasks.Task!
 NovaCore.AspNetCore.Security.SecurityHeadersMiddleware.SecurityHeadersMiddleware(Microsoft.AspNetCore.Http.RequestDelegate! next) -> void
-NovaCore.AspNetCore.Validation.ValidationExceptionHandler
-NovaCore.AspNetCore.Validation.ValidationExceptionHandler.TryHandleAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext, System.Exception! exception, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
-NovaCore.AspNetCore.Validation.ValidationExceptionHandler.ValidationExceptionHandler(Microsoft.AspNetCore.Http.IProblemDetailsService! problemDetailsService) -> void
-NovaCore.AspNetCore.Validation.ValidationFilter<T>
-NovaCore.AspNetCore.Validation.ValidationFilter<T>.InvokeAsync(Microsoft.AspNetCore.Http.EndpointFilterInvocationContext! context, Microsoft.AspNetCore.Http.EndpointFilterDelegate! next) -> System.Threading.Tasks.ValueTask<object?>
-NovaCore.AspNetCore.Validation.ValidationFilter<T>.ValidationFilter() -> void
 NovaCore.AspNetCore.Web.CoreWebExtensions
 const NovaCore.AspNetCore.Auth.JwtOptions.SectionName = "Jwt" -> string!
 const NovaCore.AspNetCore.Authorization.PermissionPolicyProvider.PolicyPrefix = "perm:" -> string!
