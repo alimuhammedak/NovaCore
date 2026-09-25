@@ -113,7 +113,7 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
 - **Persistence:** each module owns a `DbContext` pinned to its own SQL Server schema
   (`catalog` / `payments` / `identity`, via `HasDefaultSchema`). Register through
   `services.AddModuleDbContext<TContext>(...)` (`NovaCore.EntityFrameworkCore`) — this also enrolls the context for
-  generic startup migration (`DatabaseMigrationService`, registered by `AddCorePersistence` when
+  generic startup migration (`DatabaseMigrationService`, registered by `AddCorePersistence`; it migrates only when
   `Database:ApplyMigrations` is true).
 
 - **Security** is a first-class subsystem: the `Identity` module (ASP.NET Core Identity + JWT/refresh +
@@ -157,6 +157,12 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   `#pragma`, `.editorconfig` severity, `[SuppressMessage]`) needs user approval (DECISIONS Y-10). The approved ones are
   listed under Gotchas.
 
+- **Configuration goes through validated options, never read at registration.** Bind a section with
+  `AddOptions<T>().BindConfiguration(section).ValidateOnStart()`, put the rules on the options type as DataAnnotations
+  with an `[OptionsValidator]` partial validator (rules attributes can't express go in `.Validate(...)`), and configure
+  framework options that depend on it with `AddOptions<TFramework>().Configure<IOptions<T>>(...)`. No
+  `configuration.GetValue`/`Get<T>` while registering services: values added after `CreateBuilder` (tests, hosts)
+  would be missed (docs/plan/RESEARCH.md R-048).
 - **Logging is source-generated** (CA1848 is an error): `[LoggerMessage]` partial methods, explicit `EventId`s unique
   within the assembly (SYSLIB1006). Default to instance methods on the class's primary-constructor `ILogger`. When an
   argument must be computed (CA1873), wrap the call in an `IsEnabled` guard and declare the methods as `this ILogger`
@@ -183,10 +189,6 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 
 ## Gotchas (learned the hard way)
 
-- **Eager config reads.** `AddCoreWeb` reads `RateLimiting:PermitLimit` and `Jwt:SigningKey`, and
-  `AddCorePersistence` reads `Database:ApplyMigrations`, *eagerly* during service registration. `WebApplicationFactory`'s in-memory
-  config is layered in too late to override these — set them as **environment variables** in tests, or
-  per factory via `CreateHost` + `ConfigureHostConfiguration` (see `tests/CLAUDE.md`).
 - **`WithTags` on a route group** needs `using Microsoft.AspNetCore.Http;` (not just `...Builder`).
 - **SQL Server, not Postgres:** use `EF.Functions.Like` (not `ILike`); `UseSqlServer`, not `UseNpgsql`.
 - **Two EF providers can't coexist** in one container. The test host swaps Identity to SQLite and must

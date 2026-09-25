@@ -40,17 +40,18 @@ connection so the full auth flow runs without a database. Two non-obvious requir
 The single SQLite connection is opened in the factory ctor and disposed in `Dispose` to keep the
 in-memory DB alive for the test class.
 
-## Config gotcha — use environment variables, not in-memory config
+## Test configuration — in-memory config is enough
 
-`RateLimiting:PermitLimit` and `Jwt:SigningKey` are read **eagerly** while the host builds services, before
-`WebApplicationFactory`'s `ConfigureAppConfiguration` is applied. Set them as **env vars in the factory
-constructor** (`RateLimiting__PermitLimit`, `Jwt__SigningKey` — `__` is the section separator). Tests bump
-the rate limit high so the many `/auth` calls don't trip the `"strict"` policy (which would return 429).
+The building blocks bind configuration through the options pattern and read it when the options are first built,
+not during registration (docs/plan/RESEARCH.md R-048). So `NovaCoreApiFactory`'s `ConfigureAppConfiguration` values
+(signing key, migrations off, seeding off, a high rate limit) reach the app like any other configuration. The high
+limit keeps the many `/auth` calls from tripping the `"strict"` policy (which would return 429). Don't set
+environment variables in tests: they are process-wide and race the other test classes.
 
-**One factory needs a different eager value?** Don't touch the env var (it is process-wide and races the
-other test classes). Subclass `NovaCoreApiFactory`, override `CreateHost` and add the value with
-`builder.ConfigureHostConfiguration(...)`: host configuration reaches `Program` as `args` and beats env vars
-(docs/plan/RESEARCH.md R-026). Example: `StrictRateLimitApiFactory`.
+**One factory needs a different value?** Subclass `NovaCoreApiFactory`, override `ConfigureWebHost`, call `base` and
+then add another `ConfigureAppConfiguration`: sources added later win. Examples: `StrictRateLimitApiFactory`, and the
+factory in `ConfigurationValidationTests`. Invalid values stop the host on start (`ValidateOnStart`), so a test can
+assert on `factory.Server` throwing.
 
 **Different environment?** Override `EnvironmentName` (default `Development`), e.g. `ProductionApiFactory`.
 

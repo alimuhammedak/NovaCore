@@ -207,8 +207,12 @@ Plan onayı (2026-09-25): kullanıcı kararı Q-24 (D-022, health uçları yaln�
     - Yeni `ConfigurationValidationTests` önce kırmızı görüldü (12/12): geçersiz değerler host'u ayarın adını veren bir mesajla durduruyor, factory'nin sonradan eklediği config options'a ulaşıyor, Development'ta boş anahtar geliştirme anahtarına düşüyor.
     - **Zorunlu yan değişiklik:** `StrictRateLimitApiFactory` `ConfigureHostConfiguration` yerine `ConfigureAppConfiguration` kullanıyor. Tembel okumada `args` (host config) factory'nin kendi `ConfigureAppConfiguration` değerine yeniliyordu.
     - 70/70.
-  - [ ] F2b.1b Database (devam ediyor)
-- [ ] F2b.2 Test host sadeleştirme
+  - [x] F2b.1b (7d525a0): `DatabaseMigrationService` her zaman kayıtlı; `Database:ApplyMigrations`'ı `StartAsync`'te `IOptions<DatabaseOptions>`'tan okuyor. `ValidateOnStart` bool olmayan bir değeri açılış hatasına çeviriyor. Servis `internal` oldu (D-021 (2)).
+    - EF paketinde `Microsoft.Extensions.Configuration.Binder` yerine `Microsoft.Extensions.Options.ConfigurationExtensions` 10.0.12 (CPM) var. Binder yalnızca `GetValue` için eklenmişti ve hâlâ transitive geliyor. `restore --force` temiz.
+    - Yeni `DatabaseMigrationServiceTests`: bayrak `AddCorePersistence`'tan sonra eklenen config'ten de okunuyor. `true` vakası önce kırmızı görüldü. `yes` değeri host'u durduruyor.
+    - 73/73.
+  - F2b.1 kabul kriteri: `NovaCore.AspNetCore` ve `NovaCore.EntityFrameworkCore`'da `GetValue`, `Get<T>` ya da `GetSection` yok. Geriye yalnızca `IModule.AddModule`'ün `IConfiguration` parametresi kalıyor; o modüllere verilen bir sözleşme, okuma değil.
+- [ ] F2b.2 Test host sadeleştirme (devam ediyor)
 - [ ] F2b.3 TimeProvider
 - [ ] F2b.4 Exception handling
 - [ ] F2b.5 Health

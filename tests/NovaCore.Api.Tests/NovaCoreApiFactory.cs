@@ -20,16 +20,7 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
     // A single open connection keeps the in-memory database alive for the factory's lifetime.
     private readonly SqliteConnection _identityConnection = new("DataSource=:memory:");
 
-    public NovaCoreApiFactory()
-    {
-        // These values are read EAGERLY while Program builds services (before WebApplicationFactory's
-        // in-memory config is layered in), so they must come from environment variables, which the
-        // host reads at CreateBuilder time. (__ is the config section separator.)
-        Environment.SetEnvironmentVariable("RateLimiting__PermitLimit", "1000000");
-        Environment.SetEnvironmentVariable("Jwt__SigningKey", "novacore-integration-test-signing-key-0123456789-abcdef");
-
-        _identityConnection.Open();
-    }
+    public NovaCoreApiFactory() => _identityConnection.Open();
 
     /// <summary>The host environment the app boots in. Override to test environment-specific wiring.</summary>
     protected virtual string EnvironmentName => Environments.Development;
