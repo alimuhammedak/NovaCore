@@ -73,11 +73,12 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
     - CA1816: `AuthFlowTests` sealed oldu, bu yetti.
     - CA1305: `ToString(CultureInfo.InvariantCulture)`.
     - Hiçbir test silinmedi, zayıflatılmadı ya da skip edilmedi. Debug build 0 uyarı, 46/46 yeşil.
-  - [x] F1.2f (HASH): `TreatWarningsAsErrors=true`.
+  - [x] F1.2f (83073e1): `TreatWarningsAsErrors=true`.
     - `restore --force` temiz.
     - `--no-incremental` Release ve Debug derlemeleri 0 uyarı, 0 hata.
     - 46/46 yeşil.
-- [ ] F1.3 Versiyon
+- [x] F1.3 (HASH): `VersionPrefix=0.1.0` (props). `dotnet pack` → `*.0.1.0.nupkg`, `--version-suffix preview.1` → `*.0.1.0-preview.1.nupkg` (4 paket + 4 snupkg). Ek paket yok.
+  - Gözlem: çözüm genelinde pack, `NovaCore.Api` için kodsuz bir uyarı veriyor ("packaging has been disabled"). Web SDK `WarnOnPackingNonPackableProject=true` ayarlıyor, modüllerde ve testlerde bu değer false. Pack başarısız olmuyor. Bastırılmadı (Y-10), "Sonraya bırakılanlar"a yazıldı.
 - [ ] F1.4 Public API takibi
 - [ ] F1.5 Pack doğrulaması
 - [ ] F1.6 Yayın akışı
