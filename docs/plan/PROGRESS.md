@@ -8,7 +8,7 @@
 | Faz | Durum | Branch | Başlangıç | Bitiş | Merge |
 |---|---|---|---|---|---|
 | 0 | ✅ tamam | `faz/0-stabilizasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
-| 1 | 🔄 devam ediyor | `faz/1-kutuphane-altyapisi` | 2026-09-25 | | |
+| 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | bekliyor (kullanıcı onayı) |
 | 2a | ⏳ başlamadı | | | | |
 | 2b | ⏳ başlamadı | | | | |
 | 2c | ⏳ başlamadı | | | | |
@@ -106,6 +106,23 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
     - Tag adımı bash ile denendi: `v0.1.0` → suffix boş, `v0.1.0-preview.1` → `preview.1`, `v0.2.0` → hata ve exit 1.
     - Build/test/pack zinciri boş ve `preview.1` suffix'le yerelde çalıştırıldı: 0/0, 46/46. Paket ve DLL informational version tutarlı (`0.1.0-preview.1+<sha>`).
     - Push çalıştırılmadı. actionlint indirilmedi. GitHub'ın kendi doğrulaması ilk push'ta görülecek.
+- Dokümanlar (0948d14): root CLAUDE.md (komutlar, standartlar, gotcha'lar), src/BuildingBlocks/CLAUDE.md, tests/CLAUDE.md, README (proje ağacı, dağıtım, paket tablosu), CHANGELOG (Added/Changed/Removed) ve memory `novacore-stack` güncellendi.
+- Faz doğrulaması (2026-09-25):
+  - `restore --force` temiz.
+  - `build -c Release --no-incremental`: 0 uyarı, 0 hata.
+  - `test`: 46/46.
+  - `pack -o artifacts`: exit 0, 8 dosya. Api için kodsuz uyarı var (F1.3 notu).
+  - `list package --vulnerable`: 0.
+  - 3 context'te `has-pending-model-changes`: değişiklik yok.
+- Faz sonu code review (xhigh), 9 bulgu:
+  - Düzeltildi (2aa4d60), hepsi `release.yml` ve `ResultHttpExtensions` içinde:
+    - (1) Tag suffix'i `${{ }}` ile doğrudan script'e giriyordu (script injection). Artık env ile geçiyor.
+    - (2) Suffix doğrulanmıyordu: `v0.1.0-` stable yayınlıyordu. Artık SemVer prerelease regex'i var. 8 tag durumu bash ile denendi, `$(…)` içeren tag reddediliyor.
+    - (3) `VersionPrefix` okunurken tüm stdout yakalanıyordu. Artık `tail -n 1`.
+    - (4) checkout `persist-credentials: false`.
+    - (5) `ToHttpResult(Result<T>, Func)` bölünürken null tolerance kaybolmuştu. Parametre yeniden `Func<T, IResult>?`, `?? Results.Ok` davranışı birebir geri geldi.
+  - CHANGELOG'a not düşüldü: `Result<T>.Failure(error)` artık `Result.Failure`'a bağlanıyor (kodda değişiklik yok, D-012'nin sonucu).
+  - "Sonraya bırakılanlar"a yazıldı: Stop hook'un izlemediği dosyalar, PublicApiAnalyzers referansının targets'a taşınması, template'e giren paket kimliği.
 
 ### Faz 2a
 - [ ] F2a.1 Çekirdek projeler
@@ -166,7 +183,7 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 |---|---|---|---|
 | Q-01 | Önceki oturumdan gelen "yapılmasın" listesi (DECISIONS → Y-13+) | Faz 0'dan önce | Kullanıcı araştırma istedi (2026-09-25). Öneri: [proposals/yapilmayacaklar-onerisi.md](proposals/yapilmayacaklar-onerisi.md). **Onaylandı** → DECISIONS Y-13…Y-43 (D-007). Hook'un yasaklı listesine EF InMemory ve Proxies eklendi, tam sürümlü paket referansı engelleniyor. F0.7 kapsamı genişletildi. |
 | Q-02 | LICENSE türü (öneri: MIT) | F0.1 | **MIT** (2026-09-25, kullanıcı) → D-006 |
-| Q-03 | GitHub remote/repo var mı? CI ve paket feed'i için | F0.8, F1.6 | ~~Henüz yok~~ → **Var** (2026-09-25, Faz 0 merge'ünden sonra, kullanıcı isteğiyle): `https://github.com/alimuhammedak/NovaCore`, **private**, yalnızca `main` push'landı. İlk CI koşusu (run 36098557732) yeşil. F1.6: remote artık var, paket feed'i ve yayın tetiklemesi F1.6'da ayrıca sorulmalı. |
+| Q-03 | GitHub remote/repo var mı? CI ve paket feed'i için | F0.8, F1.6 | ~~Henüz yok~~ → **Var** (2026-09-25, Faz 0 merge'ünden sonra, kullanıcı isteğiyle): `https://github.com/alimuhammedak/NovaCore`, **private**, yalnızca `main` push'landı. İlk CI koşusu (run 36098557732) yeşil. F1.6: remote artık var, paket feed'i ve yayın tetiklemesi F1.6'da ayrıca sorulmalı → **Q-17** (GitHub Packages, `v*` tag). |
 | Q-04 | Faz 3'e kadar Identity modülü aktif kullanılacak mı? (F0.9 yapılsın mı?) | Faz 0 başı | **Hayır.** Kullanıcı, plan bitene kadar Identity'yi hiç kullanmayacak (2026-09-25). **F0.9 atlanır.** F0.5'in (yalnızca Identity'ye ait) kaderi Q-05'te. |
 | Q-05 | F0.5 (LoggingEmailSender yalnızca dev) hâlâ yapılsın mı? Identity kullanılmayacak ve Faz 3b'de emekliye ayrılacak | Faz 0 başı | **Evet, yapılsın** (2026-09-25, kullanıcı). F0.5 planda olduğu gibi kalır. |
 | Q-06 | `docker-compose.yml:16`'da düz metin SA parolası var (Y-35). Baseline'a nasıl girsin? | F0.1 | **`.env`'e taşı** (2026-09-25, kullanıcı) → D-008. Baseline'a bu dosya girmez. |
@@ -197,32 +214,40 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 0, F0.7) Y-31 testi ApiExplorer'a dayanıyor. `Task<IResult>` dönen ve `Produces<T>` bildirmeyen handler'ların yanıt payload'ını göremez (Identity uç noktalarının çoğu böyle). ApiExplorer dışı endpoint'ler de kapsam dışı (health, `ExcludeFromDescription`). Handler'lar typed result'a (`Results<Ok<T>, …>`) geçerse kapsam kendiliğinden genişler.
 - (Faz 0, F0.6) Kök `CLAUDE.md` Standards bölümünde "If a mediator is ever truly needed, use MIT `martinothamar/Mediator`" yazıyor. Bu, DECISIONS Y-01 ile çelişiyor ("herhangi bir mediator veya request-dispatch soyutlaması" yasak). Öncelik DECISIONS'ta, ama not gelecekteki oturumları yanıltabilir. Cümle kaldırılmalı veya Y-01'e yönlendirilmeli.
 - (Faz 0) "strict" policy'nin tek tüketicisi Identity'nin `/api/v1/auth` grubu. Identity F3b.3'te emekliye ayrılınca policy'nin ve `StrictRateLimitTests`'in yeri yeniden değerlendirilmeli.
+- (Faz 1) **F2b.6'da yapılacak:** `.editorconfig`'teki geçici CA1848/CA1873 = `suggestion` satırları silinecek (D-011).
+- (Faz 1, F2a) `NovaCore.Modules.Catalog.Contracts` packable. ANALYSIS §4'teki paket haritasında yok. Örnek modülün sözleşmesi paket olmalı mı? 2a'da karar verilmeli. Packable kalırsa XML doc ve PublicAPI dosyaları da onunla gider.
+- (Faz 1, F2a.2) **Yeni packable projeler PublicAPI takibini sessizce atlayabilir.** `AdditionalFiles` ve doc koruması `Directory.Build.targets`'ta, ama `Microsoft.CodeAnalysis.PublicApiAnalyzers` referansı her csproj'da ayrı (PLAN F1.4 böyle istiyordu). F2a.2'deki 3 yeni pakete referans eklenmeli. Alternatif: referansı targets'a taşımak ya da bir koruma eklemek; bu PLAN'dan farklı bir yaklaşım olduğu için sorulmalı (code review bulgusu).
+- (Faz 1) **Stop hook değişiklik algılaması eksik:** `verify-on-stop.js` kök `Directory.Build.targets`'ı ve `*.txt` dosyalarını (PublicAPI) izlemiyor. Yalnızca bunlar değişirse build/test doğrulaması çalışmaz. Dosya korunan bir yolda, düzeltmek kullanıcı onayı ister (code review bulgusu).
+- (Faz 1, F5.1) **Template paket kimliğini taşıyor:** `dotnet new novacore`, `Directory.Build.targets`'ı (Authors = Muhammed Ali AK), `src/PACKAGE.md`'yi, `release.yml`'i ve PublicAPI dosyalarını kopyalıyor. `sourceName` değişimi yüzünden RepositoryUrl `github.com/alimuhammedak/<YeniAd>` oluyor (code review bulgusu).
+- (Faz 1, F2a) CA1711 (`IDomainEventHandler<T>`) ve CA1716 (`Error`) gerekçeli bastırıldı. 2a'da namespace'ler değişirken bu isimler de yeniden düşünülebilir.
+- (Faz 1, F2a.2) Serilog log kültürü: `formatProvider: null` Serilog'un varsayılanı. Logların culture-invariant olup olmayacağına NovaCore.Serilog'da karar verilmeli.
+- (Faz 1) Çözüm genelinde `dotnet pack`, `NovaCore.Api` için kodsuz bir uyarı veriyor: Web SDK `WarnOnPackingNonPackableProject=true` ayarlıyor. Pack başarısız olmuyor, uyarı bastırılmadı (Y-10). Kapatmak için Api csproj'da bu özellik `false` yapılabilir (kullanıcı onayıyla).
+- (Faz 1) `.snupkg` GitHub Packages'a gitmiyor (R-039), yalnızca workflow artifact'i. İleride nuget.org seçilirse sembol sunucusu kullanılabilir.
+- (Faz 1, F5.4) Package validation baseline'ı (`PackageValidationBaselineVersion`) `Microsoft.NET.ApiCompat.targets:18`'de değerlendirme anında okunuyor, import'u Directory.Build.targets'tan sonra geliyor. F5.4'te nereye yazılacağı doğrulanmalı (R-040).
+- (Faz 1) `NovaCore.Core.Web` paketinin nuspec bağımlılıklarında FluentValidation, Serilog, OpenTelemetry ve Scalar var (D-003 ihlali). F2a.2 ve F2c'nin işi.
 
 ## Son devir notu
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-25, Faz 0 bitti** ve kullanıcı onayıyla `faz/0-stabilizasyon` main'e merge edildi (`--no-ff`).
+**2026-09-25, Faz 1 bitti.** `faz/1-kutuphane-altyapisi` merge için kullanıcı onayı bekliyor. Branch henüz push'lanmadı.
 
 - **Yapılanlar:**
-  - Git kuruldu. Baseline `849a30d` main'de.
-  - LICENSE ve CHANGELOG eklendi. docker-compose SA parolası `.env`'e taşındı (D-008).
-  - Paketler 10.0.12'ye çıktı ve iki yüksek açık kapandı. NU1903/4 artık hata.
-  - "strict" rate limiter IP bazlı oldu (D-009).
-  - `DomainEvent` base record eklendi.
-  - `LoggingEmailSender` yalnızca Development'ta kayıtlı, başlangıçta kontrol var.
-  - Scrutor, Asp.Versioning ve OutputCache kaldırıldı.
-  - DECISIONS yasakları için 8 mimari test eklendi.
-  - CI workflow yazıldı.
-  - Testler 33'ten 46'ya çıktı, build 0 uyarı.
+  - Analyzer'lar `latest-recommended`, `EnforceCodeStyleInBuild` ve `TreatWarningsAsErrors` açık. 225 uyarı → 0.
+  - 4 packable projede XML doc, paket metadata'sı (MIT, ortak README, repo, snupkg, package validation) ve `VersionPrefix=0.1.0` var.
+  - PublicApiAnalyzers 5.6.0 ile public API takibi başladı. Tüm API `PublicAPI.Unshipped.txt`'de.
+  - `release.yml` yazıldı: `v*` tag → GitHub Packages. Tetiklenmedi.
+  - Kararlar D-011…D-015 (D-010'un yerine D-014), sorular Q-10…Q-20, araştırmalar R-032…R-043.
+  - Testler 46/46. Test eklenmedi ya da silinmedi.
 - **Sürprizler:**
-  - `TestServer.SendAsync` gövdeyi algılamıyor. Testte `IHttpRequestBodyDetectionFeature` ayarlanıyor.
-  - Microsoft.AspNetCore.OpenApi generator'ü assembly'lerimize file-local tipler gömüyor. Y-29 testi bu yüzden `NovaCore.*` namespace'iyle sınırlı.
-  - `dotnet list --vulnerable` açık bulsa da exit 0 dönüyor (R-027).
-  - PowerShell 5.1'de commit mesajındaki çift tırnaklar düşüyor. Bu yüzden F0.3 mesajında `strict` tırnaksız kaldı. Artık `git commit -F <dosya>` kullanılıyor.
-- **Sonraki fazın bilmesi gerekenler:**
-  - Test factory'lerinde eager config için `CreateHost` + `ConfigureHostConfiguration` (R-026), ortam için `EnvironmentName` override edilir.
-  - Test factory'leri artık açık `ValidateScopes`/`ValidateOnBuild` ile kuruluyor.
-  - Kök CLAUDE.md'deki Mediator notu Y-01 ile çelişiyor ("Sonraya bırakılanlar").
-- **Remote:** `alimuhammedak/NovaCore` (private) oluşturuldu, `main` push'landı. İlk CI koşusu yeşil, `jq` adımı da gerçek ortamda doğrulandı (Q-03).
-- **Sıradaki:** yeni oturumda `/novacore-phase 1`.
+  - `Directory.Build.targets`, `GenerateDocumentationFile` ve `ContinuousIntegrationBuild` için çok geç: SDK bunları önce okuyor (R-040).
+  - Doc üretimi OpenAPI belgesine açıklama ekliyor (R-041).
+  - PublicApiAnalyzers `AdditionalFiles`'ı kendisi eklemiyor. `dotnet format` code fix'i çözüm genelinde yalnızca ilk projeyi dolduruyor, proje proje çalıştırmak gerekiyor (R-042).
+  - RS0026 `ToHttpResult`'u overload'lara böldürdü (D-015).
+  - Web SDK packable olmayan Api için pack uyarısı veriyor.
+- **Sonraki fazın (2a) bilmesi gerekenler:**
+  - Yeni packable projeler (F2a.2) şunlara ihtiyaç duyar: csproj'da `GenerateDocumentationFile=true` (yoksa targets'taki koruma build'i durdurur), `Microsoft.CodeAnalysis.PublicApiAnalyzers` referansı (yoksa takip sessizce atlanır, "Sonraya bırakılanlar") ve `#nullable enable` başlıklı `PublicAPI.Shipped.txt`/`PublicAPI.Unshipped.txt`.
+  - Proje ve namespace taşımalarında PublicAPI satırları da değişir: RS0016/RS0017. Unshipped'i sıfırlayıp `dotnet format analyzers <csproj> --diagnostics RS0016 --severity warn` ile yeniden üretmek en hızlısı.
+  - `Catalog.Contracts`'ın packable kalıp kalmayacağı 2a'da karar ister.
+  - Onaylı bastırmalar root CLAUDE.md Gotchas'ta listeli. CA1848/CA1873 satırları F2b.6'da silinecek.
+- **Sıradaki:** merge onayı. Ardından yeni oturumda `/novacore-phase 2a`.
