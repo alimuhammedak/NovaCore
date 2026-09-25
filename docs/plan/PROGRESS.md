@@ -136,6 +136,7 @@ Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-2
   - [x] F2a.1b (8d5811a): Yeni `NovaCore.EntityFrameworkCore`: `AddModuleDbContext`, `AuditableEntityInterceptor`, `DatabaseMigrationService`, `DomainEventDispatcher` buraya taşındı. ASP.NET referansı yok. `Microsoft.Extensions.Hosting.Abstractions` ve `Microsoft.Extensions.Configuration.Binder` 10.0.12 CPM'e eklendi (R-045). Binder, bayrağın bugünkü gibi `GetValue<bool>` ile okunması için gerekli.
     - Yeni `builder.AddCorePersistence()` interceptor'ı, dispatcher'ı ve bayrağa bağlı migration servisini kaydediyor. `Program.cs` bunu modüllerden önce çağırıyor, böylece hosted service sırası (migration → seeder) korunuyor.
     - `dotnet format` RS0016 code fix'i yeni proje için PublicAPI satırı yazmadı ("workspace" uyarısı verdi). Tek yeni satır analyzer mesajındaki imzadan elle eklendi, taşınan 25 satırda yalnızca namespace değişti. 46/46.
+  - [x] F2a.1c (4faa61c): `NovaCore.Core.Web` → `NovaCore.AspNetCore` (`git mv`). Core.Infrastructure'da kalanlar (Caching, DependencyInjection, Exceptions, Http) bunun içine taşındı, Core.Infrastructure silindi. AspNetCore artık doğrudan Abstractions'ı referans alıyor, EntityFrameworkCore'u hiç almıyor. İki PublicAPI listesi birleştirildi, yalnızca namespace değişti. 46/46.
 - [ ] F2a.2 Eklenti paketleri (alt adımlar: 2a Serilog, 2b OpenTelemetry, 2c Scalar, 2d FluentValidation köprüsü, D-019)
 - [ ] F2a.3 Açık modül kaydı
 - [ ] F2a.4 Mimari testler

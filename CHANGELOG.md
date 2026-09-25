@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `NovaCore.Core.Web` and the rest of `NovaCore.Core.Infrastructure` (ProblemDetails exception handling, the
     `AppException` types, `ResultHttpExtensions`, `HybridCacheService`) → `NovaCore.AspNetCore`. The
     `NovaCore.Core.Infrastructure` package no longer exists.
+  - `NovaCore.Modules.Catalog.Contracts` is no longer packed. The Catalog module is sample code; only the building
+    blocks are NuGet packages.
 - Logging goes through source-generated `[LoggerMessage]` methods (`GlobalExceptionHandler`, `DatabaseMigrationService`,
   the Identity security audit log, seeder and development email sender). Levels and message templates are unchanged;
   every entry now carries an explicit event ID and event name.
