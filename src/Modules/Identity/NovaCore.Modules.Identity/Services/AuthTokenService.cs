@@ -32,11 +32,12 @@ public sealed class AuthTokenService(
     RoleManager<ApplicationRole> roleManager,
     ITokenService accessTokens,
     ISecurityAuditLogger audit,
-    IOptions<JwtOptions> jwtOptions) : IAuthTokenService
+    IOptions<JwtOptions> jwtOptions,
+    TimeProvider timeProvider) : IAuthTokenService
 {
     public async Task<AuthTokens> IssueAsync(ApplicationUser user, string? ip, CancellationToken cancellationToken = default)
     {
-        var (raw, entity) = CreateRefreshToken(user.Id, ip, family: null);
+        var (raw, entity) = CreateRefreshToken(user.Id, ip, family: null, timeProvider.GetUtcNow());
         dbContext.RefreshTokens.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -59,7 +60,8 @@ public sealed class AuthTokenService(
             return Error.Unauthorized("auth.refresh_token_reuse", "Refresh token reuse detected; all sessions were revoked.");
         }
 
-        if (token.IsExpired)
+        var now = timeProvider.GetUtcNow();
+        if (token.IsExpired(now))
             return Error.Unauthorized("auth.refresh_token_expired", "Refresh token has expired.");
 
         var user = await userManager.FindByIdAsync(token.UserId.ToString());
@@ -67,8 +69,8 @@ public sealed class AuthTokenService(
             return Error.Unauthorized("auth.invalid_refresh_token", "Invalid refresh token.");
 
         // Rotate: revoke current, mint a successor in the same family.
-        var (raw, successor) = CreateRefreshToken(user.Id, ip, token.Family);
-        token.RevokedAtUtc = DateTimeOffset.UtcNow;
+        var (raw, successor) = CreateRefreshToken(user.Id, ip, token.Family, now);
+        token.RevokedAtUtc = now;
         token.RevokedByIp = ip;
         token.ReasonRevoked = "rotated";
         token.ReplacedByTokenHash = successor.TokenHash;
@@ -92,7 +94,7 @@ public sealed class AuthTokenService(
 
     public async Task RevokeAllAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         await dbContext.RefreshTokens
             .Where(t => t.UserId == userId && t.RevokedAtUtc == null)
             .ExecuteUpdateAsync(set => set
@@ -102,7 +104,7 @@ public sealed class AuthTokenService(
 
     private async Task RevokeFamilyAsync(Guid family, string? ip, string reason, CancellationToken cancellationToken)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         await dbContext.RefreshTokens
             .Where(t => t.Family == family && t.RevokedAtUtc == null)
             .ExecuteUpdateAsync(set => set
@@ -111,7 +113,7 @@ public sealed class AuthTokenService(
                 .SetProperty(t => t.ReasonRevoked, reason), cancellationToken);
     }
 
-    private (string Raw, RefreshToken Entity) CreateRefreshToken(Guid userId, string? ip, Guid? family)
+    private (string Raw, RefreshToken Entity) CreateRefreshToken(Guid userId, string? ip, Guid? family, DateTimeOffset now)
     {
         var raw = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32)); // 256-bit, URL-safe
         var entity = new RefreshToken
@@ -119,8 +121,9 @@ public sealed class AuthTokenService(
             UserId = userId,
             TokenHash = Hash(raw),
             Family = family ?? Guid.CreateVersion7(),
+            CreatedAtUtc = now,
             CreatedByIp = ip,
-            ExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(jwtOptions.Value.RefreshTokenDays)
+            ExpiresAtUtc = now.AddDays(jwtOptions.Value.RefreshTokenDays)
         };
         return (raw, entity);
     }

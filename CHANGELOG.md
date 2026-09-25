@@ -82,6 +82,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** `JwtOptions` is registered as `IOptions<JwtOptions>` instead of a plain singleton, and
   `JwtTokenService` takes `IOptions<JwtOptions>`. `AddCoreAuthentication`, `AddCoreInfrastructure` and `AddCoreCaching`
   no longer take `IConfiguration` (nor `IHostEnvironment`); they read both from DI.
+- The time comes from an injected `TimeProvider` (`TimeProvider.System` unless the host registers another):
+  audit stamps, access-token `iat`/`exp`, refresh-token creation, expiry and revocation, user creation and the admin
+  lockout listing. Entities no longer default `CreatedAtUtc` to the current time; the code that creates them sets it.
+- **Breaking:** `AccessToken` carries `IssuedAtUtc`, and `ExpiresInSeconds` is the token's lifetime
+  (`ExpiresAtUtc - IssuedAtUtc`) instead of the time left when read. The token response's `expiresIn` is now the full
+  lifetime (e.g. 900 instead of 899). `JwtTokenService` and `AuditableEntityInterceptor` take a `TimeProvider`.
 - **Breaking:** `DatabaseMigrationService` is internal. `AddCorePersistence` always registers it and it reads
   `Database:ApplyMigrations` when the host starts. `NovaCore.EntityFrameworkCore` references
   `Microsoft.Extensions.Options.ConfigurationExtensions` instead of `Microsoft.Extensions.Configuration.Binder` (which

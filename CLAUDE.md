@@ -163,6 +163,10 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   framework options that depend on it with `AddOptions<TFramework>().Configure<IOptions<T>>(...)`. No
   `configuration.GetValue`/`Get<T>` while registering services: values added after `CreateBuilder` (tests, hosts)
   would be missed (docs/plan/RESEARCH.md R-048).
+- **Time comes from an injected `TimeProvider`**, never `DateTime(Offset).UtcNow`/`Now` (`SourceHygieneTests`
+  enforces it under `src/`). The building blocks register `TimeProvider.System` with `TryAddSingleton` next to their
+  consumers; tests swap in `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`). The one exception is the
+  `DomainEvent.OccurredOnUtc` default (DECISIONS D-021).
 - **Logging is source-generated** (CA1848 is an error): `[LoggerMessage]` partial methods, explicit `EventId`s unique
   within the assembly (SYSLIB1006). Default to instance methods on the class's primary-constructor `ILogger`. When an
   argument must be computed (CA1873), wrap the call in an `IsEnabled` guard and declare the methods as `this ILogger`

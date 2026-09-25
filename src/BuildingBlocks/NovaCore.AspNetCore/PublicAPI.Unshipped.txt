@@ -1,12 +1,14 @@
 #nullable enable
 NovaCore.AspNetCore.Auth.AccessToken
 NovaCore.AspNetCore.Auth.AccessToken.AccessToken() -> void
-NovaCore.AspNetCore.Auth.AccessToken.AccessToken(string! Token, System.DateTimeOffset ExpiresAtUtc) -> void
-NovaCore.AspNetCore.Auth.AccessToken.Deconstruct(out string! Token, out System.DateTimeOffset ExpiresAtUtc) -> void
+NovaCore.AspNetCore.Auth.AccessToken.AccessToken(string! Token, System.DateTimeOffset IssuedAtUtc, System.DateTimeOffset ExpiresAtUtc) -> void
+NovaCore.AspNetCore.Auth.AccessToken.Deconstruct(out string! Token, out System.DateTimeOffset IssuedAtUtc, out System.DateTimeOffset ExpiresAtUtc) -> void
 NovaCore.AspNetCore.Auth.AccessToken.Equals(NovaCore.AspNetCore.Auth.AccessToken other) -> bool
 NovaCore.AspNetCore.Auth.AccessToken.ExpiresAtUtc.get -> System.DateTimeOffset
 NovaCore.AspNetCore.Auth.AccessToken.ExpiresAtUtc.init -> void
 NovaCore.AspNetCore.Auth.AccessToken.ExpiresInSeconds.get -> int
+NovaCore.AspNetCore.Auth.AccessToken.IssuedAtUtc.get -> System.DateTimeOffset
+NovaCore.AspNetCore.Auth.AccessToken.IssuedAtUtc.init -> void
 NovaCore.AspNetCore.Auth.AccessToken.Token.get -> string!
 NovaCore.AspNetCore.Auth.AccessToken.Token.init -> void
 NovaCore.AspNetCore.Auth.AuthenticationExtensions
@@ -26,7 +28,7 @@ NovaCore.AspNetCore.Auth.JwtOptions.SigningKey.get -> string!
 NovaCore.AspNetCore.Auth.JwtOptions.SigningKey.set -> void
 NovaCore.AspNetCore.Auth.JwtTokenService
 NovaCore.AspNetCore.Auth.JwtTokenService.CreateAccessToken(System.Collections.Generic.IReadOnlyCollection<System.Security.Claims.Claim!>! claims) -> NovaCore.AspNetCore.Auth.AccessToken
-NovaCore.AspNetCore.Auth.JwtTokenService.JwtTokenService(Microsoft.Extensions.Options.IOptions<NovaCore.AspNetCore.Auth.JwtOptions!>! options) -> void
+NovaCore.AspNetCore.Auth.JwtTokenService.JwtTokenService(Microsoft.Extensions.Options.IOptions<NovaCore.AspNetCore.Auth.JwtOptions!>! options, System.TimeProvider! timeProvider) -> void
 NovaCore.AspNetCore.Authorization.AuthorizationExtensions
 NovaCore.AspNetCore.Authorization.HasPermissionAttribute
 NovaCore.AspNetCore.Authorization.HasPermissionAttribute.HasPermissionAttribute(string! permission) -> void

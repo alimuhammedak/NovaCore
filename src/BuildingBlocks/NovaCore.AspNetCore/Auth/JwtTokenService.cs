@@ -6,8 +6,11 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace NovaCore.AspNetCore.Auth;
 
-/// <summary>Creates HS256-signed JWT access tokens using the configured <see cref="JwtOptions"/>.</summary>
-public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenService
+/// <summary>
+/// Creates HS256-signed JWT access tokens using the configured <see cref="JwtOptions"/>, stamped with the time from the
+/// injected <see cref="TimeProvider"/>.
+/// </summary>
+public sealed class JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProvider) : ITokenService
 {
     private static readonly JsonWebTokenHandler Handler = new();
 
@@ -15,7 +18,7 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenServic
     public AccessToken CreateAccessToken(IReadOnlyCollection<Claim> claims)
     {
         var jwt = options.Value;
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var expires = now.AddMinutes(jwt.AccessTokenMinutes);
 
         var identity = new ClaimsIdentity(claims);
@@ -37,6 +40,6 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenServic
             SigningCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256)
         });
 
-        return new AccessToken(token, expires);
+        return new AccessToken(token, now, expires);
     }
 }

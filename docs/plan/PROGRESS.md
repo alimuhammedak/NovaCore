@@ -212,8 +212,10 @@ Plan onayı (2026-09-25): kullanıcı kararı Q-24 (D-022, health uçları yaln�
     - Yeni `DatabaseMigrationServiceTests`: bayrak `AddCorePersistence`'tan sonra eklenen config'ten de okunuyor. `true` vakası önce kırmızı görüldü. `yes` değeri host'u durduruyor.
     - 73/73.
   - F2b.1 kabul kriteri: `NovaCore.AspNetCore` ve `NovaCore.EntityFrameworkCore`'da `GetValue`, `Get<T>` ya da `GetSection` yok. Geriye yalnızca `IModule.AddModule`'ün `IConfiguration` parametresi kalıyor; o modüllere verilen bir sözleşme, okuma değil.
-- [ ] F2b.2 Test host sadeleştirme (devam ediyor)
-- [ ] F2b.3 TimeProvider
+- [x] F2b.2 (3c3202f): `NovaCoreApiFactory`'deki iki `Environment.SetEnvironmentVariable` satırı silindi. Testler env var olmadan 73/73 yeşil. `git grep SetEnvironmentVariable -- tests src` boş.
+  - `tests/CLAUDE.md`'deki "Config gotcha" bölümü "in-memory config is enough" olarak yeniden yazıldı. Farklı bir değer için subclass'ta `ConfigureWebHost` + `ConfigureAppConfiguration` kullanılıyor.
+  - Kök `CLAUDE.md`: Gotchas'tan "Eager config reads" silindi. Standards'a config kuralı eklendi: doğrulanan options, kayıt anında okuma yok. Memory `novacore-security` güncellendi.
+- [ ] F2b.3 TimeProvider (devam ediyor)
 - [ ] F2b.4 Exception handling
 - [ ] F2b.5 Health
 - [x] F2b.6 (194b754) LoggerMessage → Faz 2a'da yapıldı (D-017)
