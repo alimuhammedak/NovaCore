@@ -4,9 +4,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using NovaCore.Abstractions.Results;
-using NovaCore.Core.Infrastructure.Http;
-using NovaCore.Core.Web.Authorization;
-using NovaCore.Core.Web.Validation;
+using NovaCore.AspNetCore.Http;
+using NovaCore.AspNetCore.Authorization;
+using NovaCore.AspNetCore.Validation;
 using NovaCore.Modules.Catalog.Authorization;
 using NovaCore.Modules.Catalog.Infrastructure;
 

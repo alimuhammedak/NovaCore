@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.Core.Web\NovaCore.Core.Web.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.AspNetCore\NovaCore.AspNetCore.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.EntityFrameworkCore\NovaCore.EntityFrameworkCore.csproj" />
   </ItemGroup>
 

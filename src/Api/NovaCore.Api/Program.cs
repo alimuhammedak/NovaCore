@@ -1,6 +1,6 @@
-using NovaCore.Core.Web.Hosting;
-using NovaCore.Core.Web.Modules;
-using NovaCore.Core.Web.Web;
+using NovaCore.AspNetCore.Hosting;
+using NovaCore.AspNetCore.Modules;
+using NovaCore.AspNetCore.Web;
 using NovaCore.EntityFrameworkCore.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);

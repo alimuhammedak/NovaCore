@@ -2,7 +2,7 @@ namespace NovaCore.Abstractions.Results;
 
 /// <summary>
 /// Outcome of an operation that can fail in expected ways. Zero dependencies, no exceptions
-/// for control flow. Convert to an HTTP response once, at the edge (see Core.Infrastructure).
+/// for control flow. Convert to an HTTP response once, at the edge (see NovaCore.AspNetCore).
 /// </summary>
 public class Result
 {

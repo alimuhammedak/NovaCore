@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `AuditableEntityInterceptor`, `DatabaseMigrationService` and `DomainEventDispatcher`, moved out of
     `NovaCore.Core.Infrastructure`. Hosts register them with the new `builder.AddCorePersistence()`, called before the
     modules; `AddCoreWeb`/`AddCoreInfrastructure` no longer do.
+  - `NovaCore.Core.Web` and the rest of `NovaCore.Core.Infrastructure` (ProblemDetails exception handling, the
+    `AppException` types, `ResultHttpExtensions`, `HybridCacheService`) → `NovaCore.AspNetCore`. The
+    `NovaCore.Core.Infrastructure` package no longer exists.
 - Logging goes through source-generated `[LoggerMessage]` methods (`GlobalExceptionHandler`, `DatabaseMigrationService`,
   the Identity security audit log, seeder and development email sender). Levels and message templates are unchanged;
   every entry now carries an explicit event ID and event name.

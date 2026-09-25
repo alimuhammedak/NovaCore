@@ -2,7 +2,7 @@
 
   <!--
     Catalog module: a vertical-slice business module. Owns its domain, its DbContext (schema
-    "catalog"), its endpoints. References Core.Web for the host plumbing and its own Contracts.
+    "catalog"), its endpoints. References NovaCore.AspNetCore and NovaCore.EntityFrameworkCore for the host plumbing and its own Contracts.
   -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.Core.Web\NovaCore.Core.Web.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.AspNetCore\NovaCore.AspNetCore.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.EntityFrameworkCore\NovaCore.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\NovaCore.Modules.Catalog.Contracts\NovaCore.Modules.Catalog.Contracts.csproj" />
   </ItemGroup>

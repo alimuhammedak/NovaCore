@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using NovaCore.Abstractions.Pagination;
-using NovaCore.Core.Web.Authorization;
+using NovaCore.AspNetCore.Authorization;
 using NovaCore.Modules.Catalog.Authorization;
 using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Catalog.Mapping;
