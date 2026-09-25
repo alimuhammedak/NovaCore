@@ -39,14 +39,18 @@ Biçim: `- [x] F0.3 (abc1234): not`
 ### Faz 1
 Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstractions 67, Infrastructure 22, Web 43, Catalog.Contracts 0), CA1848/CA1873 38, CA1707 42 (testler), CA1000 3, CA1305 3, CA1859 2, CA1711/CA1716/CA1725/CA1822/CA1816 1'er. IDE uyarısı yok. F1.2 bu yüzden alt adımlara bölündü (PLAN F1.2 izin veriyor). TreatWarningsAsErrors F1.2f'ye kaydı (Q-10).
 
-- [x] F1.1 (HASH): `AnalysisLevel=latest-recommended` ve `EnforceCodeStyleInBuild=true` açıldı, TWAE F1.2f'ye kadar false (D-014). `WarningsNotAsErrors=NU1901;NU1902` (D-011).
+- [x] F1.1 (e947640): `AnalysisLevel=latest-recommended` ve `EnforceCodeStyleInBuild=true` açıldı, TWAE F1.2f'ye kadar false (D-014). `WarningsNotAsErrors=NU1901;NU1902` (D-011).
   - **Sapma:** `GenerateDocumentationFile` targets'ta etkisiz (R-040) → 4 packable csproj'a taşındı (Q-18, D-014). `ContinuousIntegrationBuild` props'ta.
   - Yeni `Directory.Build.targets`: paket metadata'sı (MIT, `src/PACKAGE.md` → README.md, repo, snupkg, package validation) ve "packable ama doc yok" koruması. Koruma önce kırmızı görüldü.
   - `CS1591` artık hiçbir yerde bastırılmıyor (packable olmayanlar doc üretmediği için gerek yok).
   - Release build 225 uyarı, deneme envanteriyle birebir aynı (R-036). 46/46 yeşil.
   - OpenAPI belgesine XML açıklamaları giriyor (R-041, Q-19: kabul).
 - [ ] F1.2 Uyarıların düzeltilmesi
-  - [ ] F1.2a Core.Abstractions (XML doc, CA1000 düzeltmesi, CA1711/CA1716 gerekçeli bastırma)
+  - [x] F1.2a (HASH): Core.Abstractions 0 uyarı.
+    - 67 XML doc eklendi. Doc'lardaki iddialar kodla karşılaştırıldı (HTTP eşlemesi, audit damgası, cache varsayılanları).
+    - CA1000: `Result<T>.Success/Failure` internal oldu, `PagedList<T>.Empty` silindi (D-012).
+    - CA1711/CA1716 gerekçeli `[SuppressMessage]` ile bastırıldı (D-011).
+    - Toplam uyarı 225 → 153. 46/46 yeşil.
   - [ ] F1.2b Core.Infrastructure (XML doc, CA1848/CA1873 geçici `suggestion`)
   - [ ] F1.2c Core.Web (XML doc, CA1305)
   - [ ] F1.2d Modüller (CA1725)
