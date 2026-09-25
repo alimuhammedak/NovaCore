@@ -215,8 +215,16 @@ Plan onayı (2026-09-25): kullanıcı kararı Q-24 (D-022, health uçları yaln�
 - [x] F2b.2 (3c3202f): `NovaCoreApiFactory`'deki iki `Environment.SetEnvironmentVariable` satırı silindi. Testler env var olmadan 73/73 yeşil. `git grep SetEnvironmentVariable -- tests src` boş.
   - `tests/CLAUDE.md`'deki "Config gotcha" bölümü "in-memory config is enough" olarak yeniden yazıldı. Farklı bir değer için subclass'ta `ConfigureWebHost` + `ConfigureAppConfiguration` kullanılıyor.
   - Kök `CLAUDE.md`: Gotchas'tan "Eager config reads" silindi. Standards'a config kuralı eklendi: doğrulanan options, kayıt anında okuma yok. Memory `novacore-security` güncellendi.
-- [ ] F2b.3 TimeProvider (devam ediyor)
-- [ ] F2b.4 Exception handling
+- [x] F2b.3 (9c3b0e5): `TimeProvider.System` tüketicinin kaydedildiği yerde `TryAddSingleton` ile kayıtlı: `AddCoreAuthentication`, `AddCorePersistence`, `AddModuleDbContext`. Audit interceptor, `JwtTokenService` ve Identity'deki token servisi, kayıt, seeder ve admin listesi saati buradan alıyor.
+  - Public API (0.x, D-021 (5)): `AccessToken` `IssuedAtUtc` taşıyor. `ExpiresInSeconds` artık token'ın ömrü (`expires_in` 899 → 900). `JwtTokenService` ve `AuditableEntityInterceptor` `TimeProvider` alıyor.
+  - `RefreshToken.IsExpired/IsActive` `now` parametreli metot oldu. `ApplicationUser` ve `RefreshToken` üzerindeki `CreatedAtUtc = UtcNow` varsayılanları kalktı, oluşturan kod set ediyor. `has-pending-model-changes` üç context'te "No changes".
+  - Tek istisna: `DomainEvent.OccurredOnUtc` varsayılanı (D-021 (6)).
+  - Testler (ilk ikisi önce kırmızı görüldü):
+    - `SourceHygieneTests.Source_reads_the_time_from_TimeProvider`: 12 satır yakaladı. Mevcut TODO testiyle aynı dosya taraması paylaşılıyor.
+    - `RefreshTokenExpiryTests`: `FakeTimeProvider` ile süre aşılınca 401 ve `auth.refresh_token_expired`.
+    - `JwtTokenServiceTests` ve `AuditableEntityInterceptorTests`: önce derlenmedi, sonra yeşil.
+  - Test paketi `Microsoft.Extensions.TimeProvider.Testing` 10.10.0 (MIT, yalnızca test projesi). 77/77.
+- [ ] F2b.4 Exception handling (devam ediyor; commit sonrası işlenecek)
 - [ ] F2b.5 Health
 - [x] F2b.6 (194b754) LoggerMessage → Faz 2a'da yapıldı (D-017)
 

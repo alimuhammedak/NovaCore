@@ -110,8 +110,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LoggingEmailSender`, which writes email bodies (including confirmation tokens) to the log, is registered only in
   Development. In any other environment the host fails at startup with a clear error unless a real `IEmailSender` is
   registered.
+- `GlobalExceptionHandler` sends only `AppException` messages to the client. Other exceptions it maps to a 4xx status
+  (`ArgumentException`, `FormatException`, `UnauthorizedAccessException`, `KeyNotFoundException`) keep their status
+  code, but their message (which can carry connection strings, paths or other internals) is only logged.
 
 ### Fixed
+
+- The ProblemDetails `instance` member is a URI reference, the request path (e.g. `/api/v1/products/42`), instead of
+  `"GET /api/v1/products/42"`. The query string is left out.
 
 - The `"strict"` rate-limit policy (used by `/api/v1/auth`) is now partitioned per client IP. Before, it was a single
   shared counter, so one client could exhaust it and lock every other client out of login.

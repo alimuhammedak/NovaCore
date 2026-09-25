@@ -16,12 +16,14 @@ public static class InfrastructureServiceCollectionExtensions
     /// <returns><paramref name="services"/>, for chaining.</returns>
     public static IServiceCollection AddCoreInfrastructure(this IServiceCollection services)
     {
-        // RFC 9457 ProblemDetails, enriched with a correlation id every response carries.
+        // RFC 9457 ProblemDetails, enriched with a correlation id every response carries. "instance" is a URI reference
+        // (R-051): the request path, without the query string, which may carry secrets.
         services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
         {
+            var request = context.HttpContext.Request;
             var traceId = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
             context.ProblemDetails.Extensions["traceId"] = traceId;
-            context.ProblemDetails.Instance ??= $"{context.HttpContext.Request.Method} {context.HttpContext.Request.Path}";
+            context.ProblemDetails.Instance ??= request.PathBase.Add(request.Path).ToUriComponent();
         });
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
