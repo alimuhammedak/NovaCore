@@ -10,7 +10,7 @@ namespace NovaCore.Core.Infrastructure.Persistence;
 /// registered via <see cref="PersistenceExtensions.AddModuleDbContext{TContext}"/>. Opt-in
 /// (see <c>Database:ApplyMigrations</c>) so test hosts and DB-less runs are never blocked.
 /// </summary>
-public sealed class DatabaseMigrationService(
+public sealed partial class DatabaseMigrationService(
     IServiceProvider serviceProvider,
     IEnumerable<ModuleDbContextDescriptor> contexts,
     ILogger<DatabaseMigrationService> logger) : IHostedService
@@ -24,12 +24,18 @@ public sealed class DatabaseMigrationService(
             await using var scope = serviceProvider.CreateAsyncScope();
             var context = (DbContext)scope.ServiceProvider.GetRequiredService(descriptor.ContextType);
 
-            logger.LogInformation("Applying migrations for {Context}...", descriptor.ContextType.Name);
+            LogApplyingMigrations(descriptor.ContextType.Name);
             await context.Database.MigrateAsync(cancellationToken);
-            logger.LogInformation("{Context} is up to date.", descriptor.ContextType.Name);
+            LogMigrationsApplied(descriptor.ContextType.Name);
         }
     }
 
     /// <inheritdoc />
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    [LoggerMessage(EventId = 11, Level = LogLevel.Information, Message = "Applying migrations for {Context}...")]
+    private partial void LogApplyingMigrations(string context);
+
+    [LoggerMessage(EventId = 12, Level = LogLevel.Information, Message = "{Context} is up to date.")]
+    private partial void LogMigrationsApplied(string context);
 }

@@ -15,7 +15,7 @@ namespace NovaCore.Core.Infrastructure.Exceptions;
 /// nothing is lost. To restore the old framework diagnostics, configure
 /// <c>UseExceptionHandler(new ExceptionHandlerOptions { SuppressDiagnosticsCallback = _ => false })</c>.
 /// </remarks>
-public sealed class GlobalExceptionHandler(
+public sealed partial class GlobalExceptionHandler(
     IProblemDetailsService problemDetailsService,
     ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
@@ -28,9 +28,9 @@ public sealed class GlobalExceptionHandler(
         var (status, title, type) = Map(exception);
 
         if (status >= StatusCodes.Status500InternalServerError)
-            logger.LogError(exception, "Unhandled exception: {Message}", exception.Message);
+            LogUnhandledException(exception, exception.Message);
         else
-            logger.LogWarning("Handled {ErrorType}: {Message}", type, exception.Message);
+            LogHandledException(type, exception.Message);
 
         httpContext.Response.StatusCode = status;
 
@@ -62,4 +62,10 @@ public sealed class GlobalExceptionHandler(
         OperationCanceledException => (499 /* client closed request */, "Request cancelled", ErrorType.Failure),
         _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred", ErrorType.Failure)
     };
+
+    [LoggerMessage(EventId = 1, Level = LogLevel.Error, Message = "Unhandled exception: {Message}")]
+    private partial void LogUnhandledException(Exception exception, string message);
+
+    [LoggerMessage(EventId = 2, Level = LogLevel.Warning, Message = "Handled {ErrorType}: {Message}")]
+    private partial void LogHandledException(ErrorType errorType, string message);
 }

@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged.
 - The OpenAPI document now includes descriptions taken from the XML docs of the packable projects (for example on the
   `PagedList` schemas). .NET 10's OpenAPI source generator picks them up automatically.
+- Logging goes through source-generated `[LoggerMessage]` methods (`GlobalExceptionHandler`, `DatabaseMigrationService`,
+  the Identity security audit log, seeder and development email sender). Levels and message templates are unchanged;
+  every entry now carries an explicit event ID and event name.
 
 ### Removed
 

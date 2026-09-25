@@ -299,3 +299,12 @@ Biçim:
 - Bulgu: *"Multiple implementations can be added, and they're called in the order registered."* Middleware handler'ları sırayla dener ve ilk `true` dönende durur. `AddExceptionHandler<T>` handler'ı singleton olarak kaydediyor.
 - Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/error-handling?view=aspnetcore-10.0#iexceptionhandler · https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.exceptionhandlerservicecollectionextensions.addexceptionhandler
 - Sonuç: D-019. `ValidationExceptionHandler` ayrı projeye taşınınca `GlobalExceptionHandler`'dan önce kalmalı. Kaydını servis listesinin başına eklemek, host'taki çağrı sırasından bağımsız olarak bunu sağlar.
+
+### R-047: CA1873 hangi `IsEnabled` guard'ını kabul ediyor? (2026-09-25, faz 2a; analyzer kaynağı + gözlem)
+- Bulgu:
+  - F2b.6'da `SecurityAuditLogger.UserRegistered` içindeki `Mask(email)` argümanı (Information seviyesi, metot çağrısı) CA1873 verdi. `IsEnabled` guard'ı eklemek, hem instance hem de static `[LoggerMessage]` metodunda uyarıyı kaldırmadı.
+  - Nedeni analyzer kaynağında (`AvoidPotentiallyExpensiveCallWhenLogging.cs`, `IsGuardedByIsEnabled`): guard ancak `AreInvocationsOnSameInstance` doğruysa geçerli sayılıyor, yani `IsEnabled` ile log çağrısının alıcısı (receiver) aynı sembol olmalı. Instance bir `[LoggerMessage]` metodunun alıcısı `this`, static bir metodun ise yok. Extension metotta alıcı ilk argüman oluyor, yani `logger`.
+  - Aynı kaynağa göre kural varsayılan olarak yalnızca Information ve altını denetliyor (`max_log_level` seçeneği). Bu yüzden Warning seviyesindeki `LoginFailed`/`Mask` ve Error seviyesindeki `string.Join` çağrıları işaretlenmedi. Yerel SDK 10.0.300 da böyle davrandı.
+  - `this ILogger` extension biçimindeki `static partial class` ile kural guard'ı tanıdı ve build 0 uyarı verdi. Bu biçim MS'in kendi source-generation örneklerinde de var.
+- Kaynak: https://github.com/dotnet/sdk/blob/main/src/Microsoft.CodeAnalysis.NetAnalyzers/src/Microsoft.CodeAnalysis.NetAnalyzers/Microsoft.NetCore.Analyzers/Performance/AvoidPotentiallyExpensiveCallWhenLogging.cs · https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1873 · https://learn.microsoft.com/dotnet/core/extensions/logging/source-generation#basic-usage · yerel build (SDK 10.0.300)
+- Sonuç: F2b.6. `SecurityAuditLogger`'ın log tanımları `SecurityAuditLog` (internal static partial, `this ILogger` extension) sınıfında, `UserRegistered` guard'lı. Bastırma yapılmadı (Y-44). Diğer sınıflar R-044'teki instance biçimini kullanıyor.

@@ -16,7 +16,7 @@ namespace NovaCore.Modules.Identity.Services;
 /// Seeds the two baseline roles and their permission claims (collected from every module's
 /// <see cref="IPermissionDefinitionProvider"/>), plus an optional initial admin. Idempotent.
 /// </summary>
-public sealed class IdentityDataSeeder(
+public sealed partial class IdentityDataSeeder(
     RoleManager<ApplicationRole> roleManager,
     UserManager<ApplicationUser> userManager,
     IEnumerable<IPermissionDefinitionProvider> permissionProviders,
@@ -55,8 +55,7 @@ public sealed class IdentityDataSeeder(
             var created = await roleManager.CreateAsync(role);
             if (!created.Succeeded)
             {
-                logger.LogError("Identity seed: could not create role {Role}: {Errors}",
-                    roleName, string.Join(", ", created.Errors.Select(e => e.Description)));
+                LogRoleNotCreated(roleName, string.Join(", ", created.Errors.Select(e => e.Description)));
                 return;
             }
         }
@@ -77,7 +76,7 @@ public sealed class IdentityDataSeeder(
 
         if (string.IsNullOrWhiteSpace(options.AdminEmail) || string.IsNullOrWhiteSpace(options.AdminPassword))
         {
-            logger.LogWarning("Identity seed: Identity:Seed:AdminEmail/AdminPassword not set — skipping admin user.");
+            LogAdminCredentialsMissing();
             return;
         }
 
@@ -95,18 +94,29 @@ public sealed class IdentityDataSeeder(
         var result = await userManager.CreateAsync(admin, options.AdminPassword);
         if (!result.Succeeded)
         {
-            logger.LogError("Identity seed: could not create admin user: {Errors}",
-                string.Join(", ", result.Errors.Select(e => e.Description)));
+            LogAdminNotCreated(string.Join(", ", result.Errors.Select(e => e.Description)));
             return;
         }
 
         await userManager.AddToRoleAsync(admin, AdministratorRole);
-        logger.LogInformation("Identity seed: created admin user {Email}.", options.AdminEmail);
+        LogAdminCreated(options.AdminEmail);
     }
+
+    [LoggerMessage(EventId = 21, Level = LogLevel.Error, Message = "Identity seed: could not create role {Role}: {Errors}")]
+    private partial void LogRoleNotCreated(string role, string errors);
+
+    [LoggerMessage(EventId = 22, Level = LogLevel.Warning, Message = "Identity seed: Identity:Seed:AdminEmail/AdminPassword not set — skipping admin user.")]
+    private partial void LogAdminCredentialsMissing();
+
+    [LoggerMessage(EventId = 23, Level = LogLevel.Error, Message = "Identity seed: could not create admin user: {Errors}")]
+    private partial void LogAdminNotCreated(string errors);
+
+    [LoggerMessage(EventId = 24, Level = LogLevel.Information, Message = "Identity seed: created admin user {Email}.")]
+    private partial void LogAdminCreated(string email);
 }
 
 /// <summary>Runs <see cref="IdentityDataSeeder"/> on startup when <c>Identity:Seed:SeedOnStartup</c> is true.</summary>
-public sealed class IdentitySeederHostedService(
+public sealed partial class IdentitySeederHostedService(
     IServiceProvider serviceProvider,
     IOptions<IdentitySeedOptions> options,
     ILogger<IdentitySeederHostedService> logger) : IHostedService
@@ -116,11 +126,14 @@ public sealed class IdentitySeederHostedService(
         if (!options.Value.SeedOnStartup)
             return;
 
-        logger.LogInformation("Identity seed: running startup seeding...");
+        LogSeeding();
         await using var scope = serviceProvider.CreateAsyncScope();
         var seeder = scope.ServiceProvider.GetRequiredService<IdentityDataSeeder>();
         await seeder.SeedAsync(cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    [LoggerMessage(EventId = 25, Level = LogLevel.Information, Message = "Identity seed: running startup seeding...")]
+    private partial void LogSeeding();
 }

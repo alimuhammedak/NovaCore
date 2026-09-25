@@ -143,6 +143,11 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   `#pragma`, `.editorconfig` severity, `[SuppressMessage]`) needs user approval (DECISIONS Y-10). The approved ones are
   listed under Gotchas.
 
+- **Logging is source-generated** (CA1848 is an error): `[LoggerMessage]` partial methods, explicit `EventId`s unique
+  within the assembly (SYSLIB1006). Default to instance methods on the class's primary-constructor `ILogger`. When an
+  argument must be computed (CA1873), wrap the call in an `IsEnabled` guard and declare the methods as `this ILogger`
+  extensions: CA1873 only accepts a guard on the same receiver (`SecurityAuditLogger`, RESEARCH R-047).
+
 - **Packable projects are NuGet packages** (Core.Abstractions, Core.Infrastructure, Core.Web, Catalog.Contracts):
   - Every public member needs an XML doc comment (CS1591).
   - The `.csproj` sets `<GenerateDocumentationFile>true</GenerateDocumentationFile>` next to `IsPackable`;
@@ -175,9 +180,7 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   - `Directory.Build.props`: `NoWarn` `EXTEXP0018` (HybridCache is GA but flagged experimental) and `RMG020`
     (Mapperly intentional source-member drops). `WarningsNotAsErrors` `NU1901;NU1902` (low/moderate advisories stay
     warnings; high/critical fail restore; CI fails on any).
-  - `.editorconfig`: CA1848/CA1873 are `suggestion` only until F2b.6 converts logging to `[LoggerMessage]`. F2b.6
-    runs as the first step of Phase 2a (D-017) and deletes those lines. CA1707 is off for `tests/**.cs` (test names
-    are sentences).
+  - `.editorconfig`: CA1707 is off for `tests/**.cs` (test names are sentences).
   - `[SuppressMessage]` with justification on `Error` (CA1716) and `IDomainEventHandler<T>` (CA1711).
 - **`Directory.Build.targets` is too late for some properties.** The SDK computes `DocumentationFile` (from
   `GenerateDocumentationFile`) and Roslyn `DeterministicSourcePaths` (from `ContinuousIntegrationBuild`) before it is
