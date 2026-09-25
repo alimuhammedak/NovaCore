@@ -308,3 +308,34 @@ Biçim:
   - `this ILogger` extension biçimindeki `static partial class` ile kural guard'ı tanıdı ve build 0 uyarı verdi. Bu biçim MS'in kendi source-generation örneklerinde de var.
 - Kaynak: https://github.com/dotnet/sdk/blob/main/src/Microsoft.CodeAnalysis.NetAnalyzers/src/Microsoft.CodeAnalysis.NetAnalyzers/Microsoft.NetCore.Analyzers/Performance/AvoidPotentiallyExpensiveCallWhenLogging.cs · https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1873 · https://learn.microsoft.com/dotnet/core/extensions/logging/source-generation#basic-usage · yerel build (SDK 10.0.300)
 - Sonuç: F2b.6. `SecurityAuditLogger`'ın log tanımları `SecurityAuditLog` (internal static partial, `this ILogger` extension) sınıfında, `UserRegistered` guard'lı. Bastırma yapılmadı (Y-44). Diğer sınıflar R-044'teki instance biçimini kullanıyor.
+
+## Faz 2b araştırması (2026-09-25)
+
+### R-048: Options pattern: source-generated doğrulama, ValidateOnStart, bağımlı Configure (2026-09-25, faz 2b)
+- Bulgu:
+  - `[OptionsValidator]` işaretli boş bir `partial class : IValidateOptions<T>` için generator DataAnnotations niteliklerinden reflection'sız bir validator üretir. Generator *"automatically enabled by default when your project references Microsoft.Extensions.Options version 8 or later, or when building an ASP.NET application"*. Yerelde doğrulandı: `Microsoft.AspNetCore.App.Ref/10.0.8/analyzers/dotnet/cs/Microsoft.Extensions.Options.SourceGeneration.dll` var, yani `NovaCore.AspNetCore` paket eklemeden kullanabiliyor. Validator'ı ayrıca `AddSingleton<IValidateOptions<T>, TValidator>()` ile kaydetmek gerekiyor.
+  - `ValidateOnStart()` doğrulamayı ilk kullanımdan host açılışına taşıyor. Bağlama (`BindConfiguration`) da options ilk oluşturulurken yapıldığı için, bağlanamayan bir değer de (ör. bool'a `"yes"`) açılışta hata veriyor.
+  - `AddOptions<T>(name).Configure<TDep1, TDep2>(...)` kaydı bir `ConfigureNamedOptions<T, TDep1, TDep2>`'dir, yani `IConfigureNamedOptions<T>`. Başka bir options'a ya da servise bağlı yapılandırma kayıt anında değil, options ilk istendiğinde çalışır.
+  - .NET 8'den beri rate limiter middleware'i `AddRateLimiter` kaydını zorunlu tutuyor: *"If AddRateLimiter is not called on app startup, ASP.NET Core throws an informative error"*. Bu yüzden `AddRateLimiter` çağrısı kalır, limitlere bağlı kısım `AddOptions<RateLimiterOptions>().Configure<IOptions<...>>` ile eklenir. MS rate-limit örneği ise options'ı kayıt anında `Bind` ile okuyor. Bu, P1-2'deki sorunun ta kendisi olduğu için örnek izlenmedi.
+- Kaynak: https://learn.microsoft.com/dotnet/core/extensions/options-validation-generator · https://learn.microsoft.com/dotnet/core/extensions/options#options-validation · https://learn.microsoft.com/aspnet/core/breaking-changes/8/addratelimiter-requirement · https://learn.microsoft.com/aspnet/core/performance/rate-limit?view=aspnetcore-10.0 · yerel targeting pack
+- Sonuç: F2b.1a/1b, D-021.
+
+### R-049: DbContext health check ve health uçlarının korunması (2026-09-25, faz 2b)
+- Bulgu:
+  - `AddDbContextCheck<TContext>(name, failureStatus, tags, customTestQuery)` EF Core'un `CanConnectAsync`'ini çağırır. Kontrolün adı varsayılan olarak `TContext` tipinin adıdır. Paket `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`; 10.0.12 nuspec'ine göre MIT lisanslı, yalnızca `Microsoft.Extensions.Diagnostics.HealthChecks(.Abstractions)` ve `Microsoft.EntityFrameworkCore.Relational`'a bağlı (ASP.NET yok).
+  - `CanConnectAsync`: *"Any exceptions thrown when attempting to connect are caught and not propagated to the application, except for the ones indicating cancellation."*
+  - `RequireHost` için MS uyarısı: *"API that relies on the Host header, such as HttpRequest.Host and RequireHost, are subject to potential spoofing by clients."* Önerilen yollar `ConnectionInfo.LocalPort` kontrolü, host filtering ya da `RequireAuthorization`. Readiness için MS örneği `Predicate = healthCheck => healthCheck.Tags.Contains("ready")` kullanıyor.
+- Kaynak: https://learn.microsoft.com/aspnet/core/host-and-deploy/health-checks?view=aspnetcore-10.0#entity-framework-core-dbcontext-probe · https://learn.microsoft.com/aspnet/core/host-and-deploy/health-checks?view=aspnetcore-10.0#use-health-checks-routing · https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.storage.relationaldatabasecreator.canconnectasync?view=efcore-10.0 · NuGet önbelleğindeki nuspec
+- Sonuç: F2b.5. Koruma yöntemi kullanıcıya soruldu: Q-24 → D-022 (yalnızca Development).
+
+### R-050: TimeProvider ve FakeTimeProvider (2026-09-25, faz 2b)
+- Bulgu:
+  - *"Always inject TimeProvider as a dependency rather than using DateTime or DateTimeOffset directly."* `FakeTimeProvider` `Microsoft.Extensions.TimeProvider.Testing` paketinde. Varsayılan başlangıç zamanı 2000-01-01 UTC, `new FakeTimeProvider(start)` ile değiştirilebiliyor. `Advance` saati ileri alıyor.
+  - ASP.NET Core 8'den beri kimlik doğrulama ve Identity bileşenleri `ISystemClock` yerine `TimeProvider` kullanıyor: *"It can be set directly or by registering a provider in the dependency injection container."* Yani DI'a kaydedilen bir `TimeProvider` Identity'nin kendi zaman hesaplarını da etkileyebilir. Testte sahte saat gerçek "şimdi" ile başlatılır ki JWT doğrulaması (gerçek saat) ile çelişmesin.
+- Kaynak: https://learn.microsoft.com/dotnet/core/extensions/timeprovider-testing · https://learn.microsoft.com/aspnet/core/breaking-changes/8/isystemclock-obsolete?view=aspnetcore-10.0
+- Sonuç: F2b.3, D-021.
+
+### R-051: ProblemDetails `instance` alanı (2026-09-25, faz 2b)
+- Bulgu: `ProblemDetails.Instance`: *"A URI reference that identifies the specific occurrence of the problem."* NovaCore bugün `"{Method} {Path}"` yazıyor (`InfrastructureServiceCollectionExtensions.cs:25`, ör. `"GET /api/v1/products/42"`). Bu değer bir URI reference değil: HTTP metodu ve boşluk içeriyor. İsteğin yolu (`PathBase + Path`, `PathString.ToUriComponent()` ile kodlanmış) göreli bir URI reference'tır. Query string dahil edilmez, çünkü istemcinin gönderdiği secret'ları yanıta geri yansıtabilir (Y-35).
+- Kaynak: https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.problemdetails.instance?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/fundamentals/error-handling?view=aspnetcore-10.0#customizeproblemdetails-operation
+- Sonuç: F2b.4.

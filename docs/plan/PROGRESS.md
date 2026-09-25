@@ -10,7 +10,7 @@
 | 0 | ✅ tamam | `faz/0-stabilizasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2a | ✅ tamam | `faz/2a-paket-yapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
-| 2b | ⏳ başlamadı | | | | |
+| 2b | 🔄 devam ediyor | `faz/2b-konfigurasyon` | 2026-09-25 | | |
 | 2c | ⏳ başlamadı | | | | |
 | 3a | ⏳ başlamadı | | | | |
 | 3b | ⏳ başlamadı | | | | |
@@ -198,7 +198,11 @@ Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-2
   - Atlandı (aşağıda "Sonraya bırakılanlar"a yazıldı): namespace gölgeleme, Y-05 csproj testinin kör noktaları, test yardımcılarındaki tekrar, `LoginFailed`'da guard'sız maskeleme, DECISIONS'ta satır sırası.
 
 ### Faz 2b
-- [ ] F2b.1 Options pattern
+Plan onayı (2026-09-25): kullanıcı kararı Q-24 (D-022, health uçları yalnızca Development). Model kararları D-021, araştırmalar R-048…R-051. F2b.1, F2b.1a (NovaCore.AspNetCore) ve F2b.1b (NovaCore.EntityFrameworkCore) olarak bölündü. Başlangıçta main'deki `/openapi/v1.json` faz sonu karşılaştırması için dışarıya kaydedildi (29.460 bayt, commit'lenmedi).
+
+- [ ] F2b.1 Options pattern (alt adımlar: 1a AspNetCore, 1b EntityFrameworkCore)
+  - [ ] F2b.1a Jwt, RateLimiting, Cors, Cache
+  - [ ] F2b.1b Database
 - [ ] F2b.2 Test host sadeleştirme
 - [ ] F2b.3 TimeProvider
 - [ ] F2b.4 Exception handling
@@ -269,6 +273,7 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-21 | F2a.3: açık kayıtta `IModule.IsEnabled` ne olsun? | F2a.3 | **Kaldır** (2026-09-25, kullanıcı; Y-19) → D-018 |
 | Q-22 | F2a.4'teki Y-05 testi, FluentValidation F2c'ye kadar çekirdekte kaldığı için kırmızı kalıyor. Nasıl çözülsün? | F2a.4 | **Ayrı, paketlenmeyen `NovaCore.FluentValidation` projesi**, F2c.1'de silinir (2026-09-25, kullanıcı) → D-019 |
 | Q-23 | F2a.6: `0.1.0-preview.1` yayımlansın mı? | F2a.6 | **Yalnızca yerel pack ve içerik kontrolü.** Tag ve push yok, yayın kararı sonraya kalır (2026-09-25, kullanıcı) |
+| Q-24 | F2b.5: `/health` ve `/alive` production'da nasıl korunsun? (yalnızca dev / yönetim portu (LocalPort) / yetkilendirme) | F2b.5 | **Yalnızca Development** (2026-09-25, kullanıcı; R-049) → D-022 |
 
 ## Sonraya bırakılanlar
 
