@@ -8,7 +8,7 @@
 | Faz | Durum | Branch | Başlangıç | Bitiş | Merge |
 |---|---|---|---|---|---|
 | 0 | ✅ tamam | `faz/0-stabilizasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
-| 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | bekliyor (kullanıcı onayı) |
+| 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2a | ⏳ başlamadı | | | | |
 | 2b | ⏳ başlamadı | | | | |
 | 2c | ⏳ başlamadı | | | | |
@@ -230,7 +230,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-25, Faz 1 bitti.** `faz/1-kutuphane-altyapisi` merge için kullanıcı onayı bekliyor. Branch henüz push'lanmadı.
+**2026-09-25, Faz 1 bitti** ve kullanıcı onayıyla `faz/1-kutuphane-altyapisi` main'e merge edildi (`--no-ff`), `main` push'landı.
 
 - **Yapılanlar:**
   - Analyzer'lar `latest-recommended`, `EnforceCodeStyleInBuild` ve `TreatWarningsAsErrors` açık. 225 uyarı → 0.
@@ -250,4 +250,4 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - Proje ve namespace taşımalarında PublicAPI satırları da değişir: RS0016/RS0017. Unshipped'i sıfırlayıp `dotnet format analyzers <csproj> --diagnostics RS0016 --severity warn` ile yeniden üretmek en hızlısı.
   - `Catalog.Contracts`'ın packable kalıp kalmayacağı 2a'da karar ister.
   - Onaylı bastırmalar root CLAUDE.md Gotchas'ta listeli. CA1848/CA1873 satırları F2b.6'da silinecek.
-- **Sıradaki:** merge onayı. Ardından yeni oturumda `/novacore-phase 2a`.
+- **Sıradaki:** yeni oturumda `/novacore-phase 2a`.
