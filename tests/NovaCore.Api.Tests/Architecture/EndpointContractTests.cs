@@ -38,7 +38,7 @@ public class EndpointContractTests(NovaCoreApiFactory factory) : IClassFixture<N
         Assert.Empty(violations);
     }
 
-    private static IEnumerable<Type> DomainTypesIn(Type? root)
+    private static HashSet<Type> DomainTypesIn(Type? root)
     {
         var found = new HashSet<Type>();
         var visited = new HashSet<Type>();

@@ -61,12 +61,18 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
       - Neden: `null` Serilog'un kendi varsayılanı ve kültürü render anında çözer. `CurrentCulture` ise kültürü açılış anında sabitlerdi, bu da ince bir davranış farkı olurdu.
       - CA1305 açık `null`'ı kabul ediyor (derlemeyle doğrulandı).
     - Toplam uyarı 93 → 48. 46/46 yeşil.
-  - [x] F1.2d (HASH): Modüller 0 uyarı.
+  - [x] F1.2d (772328f): Modüller 0 uyarı.
     - `IdentityDbContext.OnModelCreating` parametresi `modelBuilder` → `builder` (CA1725, base imzasına uyum).
     - `has-pending-model-changes` (Identity) değişiklik görmüyor.
     - Identity'deki CA1848/CA1873 F1.2b'deki `.editorconfig` ayarıyla kapandı.
     - Toplam uyarı 48 → 47. Kalanların hepsi testlerde. 46/46 yeşil.
-  - [ ] F1.2e Testler (CA1707 tests/ için kapalı, küçük düzeltmeler)
+  - [x] F1.2e (HASH): Testler 0 uyarı.
+    - `.editorconfig` `[tests/**.cs]` için CA1707 = none (D-011).
+    - CA1859: iki yardımcı somut tip döndürüyor.
+    - CA1822: `LoginAsync` static oldu.
+    - CA1816: `AuthFlowTests` sealed oldu, bu yetti.
+    - CA1305: `ToString(CultureInfo.InvariantCulture)`.
+    - Hiçbir test silinmedi, zayıflatılmadı ya da skip edilmedi. Debug build 0 uyarı, 46/46 yeşil.
   - [ ] F1.2f TreatWarningsAsErrors=true
 - [ ] F1.3 Versiyon
 - [ ] F1.4 Public API takibi
