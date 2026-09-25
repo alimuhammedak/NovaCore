@@ -37,7 +37,10 @@ public sealed class RefreshTokenExpiryTests(FakeClockApiFactory factory)
         var users = services.GetRequiredService<UserManager<ApplicationUser>>();
         if (await users.FindByEmailAsync(Email) is null)
         {
-            var user = new ApplicationUser { UserName = Email, Email = Email, EmailConfirmed = true };
+            var user = new ApplicationUser
+            {
+                UserName = Email, Email = Email, EmailConfirmed = true, CreatedAtUtc = factory.Clock.GetUtcNow()
+            };
             Assert.True((await users.CreateAsync(user, Password)).Succeeded);
             await users.AddToRoleAsync(user, IdentityDataSeeder.UserRole);
         }

@@ -16,7 +16,7 @@ public sealed class RefreshToken
     /// <summary>Lineage id shared by every token produced through rotation from one login.</summary>
     public Guid Family { get; set; }
 
-    public DateTimeOffset CreatedAtUtc { get; set; }
+    public required DateTimeOffset CreatedAtUtc { get; set; }
     public string? CreatedByIp { get; set; }
     public DateTimeOffset ExpiresAtUtc { get; set; }
 

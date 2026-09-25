@@ -24,6 +24,7 @@ public class ConfigurationValidationTests
     [InlineData("Development", "Jwt:Issuer", "", "Issuer")]
     [InlineData("Development", "Jwt:AccessTokenMinutes", "0", "AccessTokenMinutes")]
     [InlineData("Development", "Jwt:RefreshTokenDays", "0", "RefreshTokenDays")]
+    [InlineData("Development", "Jwt:RefreshTokenDays", "3000000", "RefreshTokenDays")]
     [InlineData("Development", "Cors:AllowedOrigins:0", "*", "Cors:AllowedOrigins")]
     [InlineData("Development", "Cors:AllowedOrigins:0", "app.example.com", "Cors:AllowedOrigins")]
     [InlineData("Development", "Cache:DefaultExpiration", "00:00:00", "Cache:DefaultExpiration")]

@@ -357,7 +357,7 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
   "Identity":      { "Seed": { "SeedOnStartup": false, "AdminEmail": "admin@novacore.local", "AdminPassword": "" } },
   "Cache":         { "DefaultExpiration": "00:05:00" },
   "RateLimiting":  { "PermitLimit": 100, "WindowSeconds": 60 },   // /auth grubu 1/10'unu kullanır ("strict")
-  "Cors":          { "AllowedOrigins": [] },        // boş = dev'de hepsine izin
+  "Cors":          { "AllowedOrigins": [] },        // boş = her ortamda her origin'e izin (credentials olmadan)
   "Seq":           { "ServerUrl": "" }              // dolu = Seq'e log gönder
 }
 ```
@@ -365,6 +365,18 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
 
 > **Üretim:** `Jwt:SigningKey` zorunludur (≥32 bayt). Development'ta yoksa otomatik dev anahtarı üretilir.
 > Gizli değerler için `dotnet user-secrets` kullanın.
+
+Bu bölümler options pattern ile bağlanır ve **uygulama açılırken doğrulanır** (`ValidateOnStart`). Geçersiz bir değer
+host'u, ayarın adını veren bir hatayla durdurur:
+
+- `Jwt`: `Issuer`/`Audience` boş olamaz, `SigningKey` en az 32 bayt (Development dışında zorunlu),
+  `AccessTokenMinutes` ≥ 1, `RefreshTokenDays` 1–36.500.
+- `RateLimiting`: `PermitLimit` ve `WindowSeconds` ≥ 1. `Cache:DefaultExpiration` pozitif bir süre.
+- `Cors:AllowedOrigins`: her giriş çıplak bir origin olmalı (`https://app.example.com`): yol, sondaki `/` ve `*` yok.
+- `Database:ApplyMigrations`: `true`/`false`.
+
+Değerler kayıt anında değil, ilk kullanımda okunur. Bu yüzden `CreateBuilder`'dan sonra eklenen config (ör. testlerde
+`ConfigureAppConfiguration`) da geçerlidir.
 
 ---
 

@@ -26,7 +26,7 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
 
     // The SQLite contexts get their own EF internal provider: the app still registers SQL Server, and EF forbids two
     // providers in one container.
-    private readonly IServiceProvider _sqliteServices = new ServiceCollection()
+    private readonly ServiceProvider _sqliteServices = new ServiceCollection()
         .AddEntityFrameworkSqlite()
         .BuildServiceProvider();
 
@@ -66,9 +66,7 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
                 ["Database:ApplyMigrations"] = "false",
                 ["Identity:Seed:SeedOnStartup"] = "false",
                 // Keep the rate limiter wired but out of the way of the many auth calls the tests make.
-                ["RateLimiting:PermitLimit"] = "100000",
-                ["ConnectionStrings:Database"] =
-                    "Server=localhost;Database=NovaCore_Test;Trusted_Connection=True;TrustServerCertificate=True;Encrypt=True;"
+                ["RateLimiting:PermitLimit"] = "100000"
             });
         });
 
@@ -112,6 +110,7 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
             _identityConnection.Dispose();
             _catalogConnection.Dispose();
             _paymentsConnection.Dispose();
+            _sqliteServices.Dispose();
         }
 
         base.Dispose(disposing);

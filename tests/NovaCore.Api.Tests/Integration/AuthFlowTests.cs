@@ -149,7 +149,7 @@ public sealed class AuthFlowTests(NovaCoreApiFactory factory) : IClassFixture<No
         if (await users.FindByEmailAsync(email) is not null)
             return;
 
-        var user = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true };
+        var user = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true, CreatedAtUtc = DateTimeOffset.UtcNow };
         var created = await users.CreateAsync(user, password);
         Assert.True(created.Succeeded, string.Join(", ", created.Errors.Select(e => e.Description)));
         await users.AddToRoleAsync(user, role);

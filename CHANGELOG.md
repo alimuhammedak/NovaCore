@@ -75,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Cache` and `Database` are read when first used rather than at registration, so configuration added after `CreateBuilder` (for
   example by `WebApplicationFactory`) now applies. Invalid values stop startup with a message naming the setting:
   - a missing `Jwt:SigningKey` outside Development, or one shorter than 32 bytes;
-  - an empty `Jwt:Issuer`/`Jwt:Audience`, or non-positive token lifetimes;
+  - an empty `Jwt:Issuer`/`Jwt:Audience`, non-positive token lifetimes, or `Jwt:RefreshTokenDays` above 36,500;
   - a non-positive `RateLimiting:PermitLimit`/`WindowSeconds` or `Cache:DefaultExpiration`;
   - a `Cors:AllowedOrigins` entry that is not a bare origin (`*`, or one with a path or trailing slash);
   - a `Database:ApplyMigrations` value that is not a boolean.
@@ -84,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no longer take `IConfiguration` (nor `IHostEnvironment`); they read both from DI.
 - The time comes from an injected `TimeProvider` (`TimeProvider.System` unless the host registers another):
   audit stamps, access-token `iat`/`exp`, refresh-token creation, expiry and revocation, user creation and the admin
-  lockout listing. Entities no longer default `CreatedAtUtc` to the current time; the code that creates them sets it.
+  lockout listing. Entities no longer default `CreatedAtUtc` to the current time; it is `required`, and the code that
+  creates them sets it.
 - **Breaking:** `AccessToken` carries `IssuedAtUtc`, and `ExpiresInSeconds` is the token's lifetime
   (`ExpiresAtUtc - IssuedAtUtc`) instead of the time left when read. The token response's `expiresIn` is now the full
   lifetime (e.g. 900 instead of 899). `JwtTokenService` and `AuditableEntityInterceptor` take a `TimeProvider`.

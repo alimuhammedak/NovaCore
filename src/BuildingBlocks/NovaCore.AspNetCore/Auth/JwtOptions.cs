@@ -31,8 +31,11 @@ public sealed class JwtOptions
     [Range(1, int.MaxValue)]
     public int AccessTokenMinutes { get; set; } = 15;
 
-    /// <summary>Refresh token absolute lifetime. Rotated on every use; reuse triggers family revocation.</summary>
-    [Range(1, int.MaxValue)]
+    /// <summary>
+    /// Refresh token absolute lifetime, 1 to 36,500 days. Rotated on every use; reuse triggers family revocation.
+    /// </summary>
+    // The ceiling (a century) keeps "now + lifetime" far inside DateTimeOffset's range; int.MaxValue days would overflow.
+    [Range(1, 36_500)]
     public int RefreshTokenDays { get; set; } = 7;
 }
 
