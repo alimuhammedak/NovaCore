@@ -71,16 +71,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Logging goes through source-generated `[LoggerMessage]` methods (`GlobalExceptionHandler`, `DatabaseMigrationService`,
   the Identity security audit log, seeder and development email sender). Levels and message templates are unchanged;
   every entry now carries an explicit event ID and event name.
-- Configuration goes through the options pattern and is validated when the host starts. `Jwt`, `RateLimiting`, `Cors`
-  and `Cache` are read when first used rather than at registration, so configuration added after `CreateBuilder` (for
+- Configuration goes through the options pattern and is validated when the host starts. `Jwt`, `RateLimiting`, `Cors`,
+  `Cache` and `Database` are read when first used rather than at registration, so configuration added after `CreateBuilder` (for
   example by `WebApplicationFactory`) now applies. Invalid values stop startup with a message naming the setting:
   - a missing `Jwt:SigningKey` outside Development, or one shorter than 32 bytes;
   - an empty `Jwt:Issuer`/`Jwt:Audience`, or non-positive token lifetimes;
   - a non-positive `RateLimiting:PermitLimit`/`WindowSeconds` or `Cache:DefaultExpiration`;
-  - a `Cors:AllowedOrigins` entry that is not a bare origin (`*`, or one with a path or trailing slash).
+  - a `Cors:AllowedOrigins` entry that is not a bare origin (`*`, or one with a path or trailing slash);
+  - a `Database:ApplyMigrations` value that is not a boolean.
 - **Breaking:** `JwtOptions` is registered as `IOptions<JwtOptions>` instead of a plain singleton, and
   `JwtTokenService` takes `IOptions<JwtOptions>`. `AddCoreAuthentication`, `AddCoreInfrastructure` and `AddCoreCaching`
   no longer take `IConfiguration` (nor `IHostEnvironment`); they read both from DI.
+- **Breaking:** `DatabaseMigrationService` is internal. `AddCorePersistence` always registers it and it reads
+  `Database:ApplyMigrations` when the host starts. `NovaCore.EntityFrameworkCore` references
+  `Microsoft.Extensions.Options.ConfigurationExtensions` instead of `Microsoft.Extensions.Configuration.Binder` (which
+  still comes transitively).
 
 ### Removed
 

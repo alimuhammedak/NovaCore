@@ -27,6 +27,7 @@ public class ConfigurationValidationTests
     [InlineData("Development", "Cors:AllowedOrigins:0", "*", "Cors:AllowedOrigins")]
     [InlineData("Development", "Cors:AllowedOrigins:0", "app.example.com", "Cors:AllowedOrigins")]
     [InlineData("Development", "Cache:DefaultExpiration", "00:00:00", "Cache:DefaultExpiration")]
+    [InlineData("Development", "Database:ApplyMigrations", "yes", "Database:ApplyMigrations")]
     public async Task Invalid_configuration_stops_the_host_at_startup(
         string environment, string key, string value, string expectedInMessage)
     {

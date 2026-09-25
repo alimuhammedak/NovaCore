@@ -49,11 +49,11 @@
 
   <ItemGroup>
     <!--
-      Hosting and configuration abstractions for NovaCore.EntityFrameworkCore, which has no ASP.NET Core dependency.
+      Hosting abstractions and options binding for NovaCore.EntityFrameworkCore, which has no ASP.NET Core dependency.
       Same 10.0.12 servicing patch that EF Core 10.0.12 depends on.
     -->
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>

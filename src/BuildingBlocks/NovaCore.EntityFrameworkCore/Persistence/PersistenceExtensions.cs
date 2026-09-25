@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -16,8 +15,9 @@ public static class PersistenceExtensions
 {
     /// <summary>
     /// Registers the persistence services every module DbContext relies on: the audit-stamping interceptor, the
-    /// in-process domain-event dispatcher and, when <c>Database:ApplyMigrations</c> is true, startup migrations.
-    /// Call it before registering the modules, so the migrations run before any module's own hosted services.
+    /// in-process domain-event dispatcher and the startup migrations, which run only when
+    /// <c>Database:ApplyMigrations</c> is true. Call it before registering the modules, so the migrations run before any
+    /// module's own hosted services.
     /// </summary>
     /// <param name="builder">The host application builder.</param>
     /// <returns><paramref name="builder"/>, for chaining.</returns>
@@ -31,10 +31,13 @@ public static class PersistenceExtensions
         // In-process domain-event dispatch — no commercial mediator required.
         services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
 
-        // Opt-in: apply every module's EF Core migrations on startup. Off by default so test hosts
-        // and DB-less runs never block. Enable with Database:ApplyMigrations=true once SQL Server is reachable.
-        if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations"))
-            services.AddHostedService<DatabaseMigrationService>();
+        // Opt-in: apply every module's EF Core migrations on startup. Off by default so test hosts and DB-less runs
+        // never block. Enable with Database:ApplyMigrations=true once SQL Server is reachable. The service is always
+        // registered and reads the flag when the host starts; ValidateOnStart surfaces a value that isn't a bool.
+        services.AddOptions<DatabaseOptions>()
+            .BindConfiguration(DatabaseOptions.SectionName)
+            .ValidateOnStart();
+        services.AddHostedService<DatabaseMigrationService>();
 
         return builder;
     }

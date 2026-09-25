@@ -201,8 +201,13 @@ Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-2
 Plan onayı (2026-09-25): kullanıcı kararı Q-24 (D-022, health uçları yalnızca Development). Model kararları D-021, araştırmalar R-048…R-051. F2b.1, F2b.1a (NovaCore.AspNetCore) ve F2b.1b (NovaCore.EntityFrameworkCore) olarak bölündü. Başlangıçta main'deki `/openapi/v1.json` faz sonu karşılaştırması için dışarıya kaydedildi (29.460 bayt, commit'lenmedi).
 
 - [ ] F2b.1 Options pattern (alt adımlar: 1a AspNetCore, 1b EntityFrameworkCore)
-  - [ ] F2b.1a Jwt, RateLimiting, Cors, Cache (devam ediyor)
-  - [ ] F2b.1b Database
+  - [x] F2b.1a (a73cd47): `Jwt`, `RateLimiting`, `Cors` ve `Cache` artık `AddOptions<T>().BindConfiguration().ValidateOnStart()` ile kayıtlı. `JwtBearerOptions`, `RateLimiterOptions`, `CorsOptions` ve `HybridCacheOptions` bu options'lardan `Configure<IOptions<...>>` ile, ilk kullanıldıklarında yapılandırılıyor (R-048).
+    - Doğrulama: `JwtOptions` ve `RateLimitingOptions` için `[OptionsValidator]` source-gen. Nitelikle ifade edilemeyen üç kural `.Validate` ile: UTF-8 anahtar uzunluğu, çıplak CORS origin'i, pozitif cache süresi. Development anahtarı `PostConfigure<IHostEnvironment>`'ta.
+    - Public API (0.x, D-021): `AddCoreAuthentication`, `AddCoreInfrastructure` ve `AddCoreCaching` `IConfiguration` almıyor. `JwtTokenService` `IOptions<JwtOptions>` alıyor. Identity'deki `AuthTokenService` de öyle.
+    - Yeni `ConfigurationValidationTests` önce kırmızı görüldü (12/12): geçersiz değerler host'u ayarın adını veren bir mesajla durduruyor, factory'nin sonradan eklediği config options'a ulaşıyor, Development'ta boş anahtar geliştirme anahtarına düşüyor.
+    - **Zorunlu yan değişiklik:** `StrictRateLimitApiFactory` `ConfigureHostConfiguration` yerine `ConfigureAppConfiguration` kullanıyor. Tembel okumada `args` (host config) factory'nin kendi `ConfigureAppConfiguration` değerine yeniliyordu.
+    - 70/70.
+  - [ ] F2b.1b Database (devam ediyor)
 - [ ] F2b.2 Test host sadeleştirme
 - [ ] F2b.3 TimeProvider
 - [ ] F2b.4 Exception handling
