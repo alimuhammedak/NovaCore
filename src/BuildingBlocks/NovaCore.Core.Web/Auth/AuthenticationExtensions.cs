@@ -8,6 +8,7 @@ using NovaCore.Core.Web.Identity;
 
 namespace NovaCore.Core.Web.Auth;
 
+/// <summary>Service registration for JWT bearer authentication.</summary>
 public static class AuthenticationExtensions
 {
     /// <summary>

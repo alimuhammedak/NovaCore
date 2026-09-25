@@ -7,9 +7,16 @@ namespace NovaCore.Core.Web.Identity;
 /// </summary>
 public static class NovaClaims
 {
+    /// <summary>The user id (<c>sub</c>).</summary>
     public const string Subject = "sub";
+
+    /// <summary>The user name (<c>name</c>).</summary>
     public const string Name = "name";
+
+    /// <summary>The email address (<c>email</c>).</summary>
     public const string Email = "email";
+
+    /// <summary>A role the user belongs to (<c>role</c>). Emitted once per role.</summary>
     public const string Role = "role";
 
     /// <summary>Fine-grained permission claim, e.g. <c>catalog:products:create</c>. Emitted once per permission.</summary>

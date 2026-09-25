@@ -5,8 +5,10 @@ using NovaCore.Core.Web.Identity;
 namespace NovaCore.Core.Web.Authorization;
 
 /// <summary>Requires the caller to hold a specific fine-grained permission.</summary>
+/// <param name="permission">The permission name, e.g. <c>catalog:products:create</c>.</param>
 public sealed class PermissionRequirement(string permission) : IAuthorizationRequirement
 {
+    /// <summary>The permission the caller must hold.</summary>
     public string Permission { get; } = permission;
 }
 
@@ -16,6 +18,7 @@ public sealed class PermissionRequirement(string permission) : IAuthorizationReq
 /// </summary>
 public sealed class PermissionAuthorizationHandler : AuthorizationHandler<PermissionRequirement>
 {
+    /// <inheritdoc />
     protected override Task HandleRequirementAsync(
         AuthorizationHandlerContext context, PermissionRequirement requirement)
     {
@@ -36,17 +39,23 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
 /// </summary>
 public sealed class PermissionPolicyProvider : IAuthorizationPolicyProvider
 {
+    /// <summary>The prefix that marks a policy name as a permission policy.</summary>
     public const string PolicyPrefix = "perm:";
 
     private readonly DefaultAuthorizationPolicyProvider _fallback;
 
+    /// <summary>Creates the provider; non-permission policies go to the default provider built from <paramref name="options"/>.</summary>
+    /// <param name="options">The authorization options.</param>
     public PermissionPolicyProvider(IOptions<AuthorizationOptions> options) =>
         _fallback = new DefaultAuthorizationPolicyProvider(options);
 
+    /// <inheritdoc />
     public Task<AuthorizationPolicy> GetDefaultPolicyAsync() => _fallback.GetDefaultPolicyAsync();
 
+    /// <inheritdoc />
     public Task<AuthorizationPolicy?> GetFallbackPolicyAsync() => _fallback.GetFallbackPolicyAsync();
 
+    /// <inheritdoc />
     public Task<AuthorizationPolicy?> GetPolicyAsync(string policyName)
     {
         if (!policyName.StartsWith(PolicyPrefix, StringComparison.OrdinalIgnoreCase))
@@ -65,5 +74,7 @@ public sealed class PermissionPolicyProvider : IAuthorizationPolicyProvider
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public sealed class HasPermissionAttribute : AuthorizeAttribute
 {
+    /// <summary>Requires <paramref name="permission"/> on the decorated class or method.</summary>
+    /// <param name="permission">The permission name, e.g. <c>catalog:products:create</c>.</param>
     public HasPermissionAttribute(string permission) => Policy = PermissionPolicyProvider.PolicyPrefix + permission;
 }

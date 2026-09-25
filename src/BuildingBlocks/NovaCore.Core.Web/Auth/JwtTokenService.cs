@@ -10,6 +10,7 @@ public sealed class JwtTokenService(JwtOptions options) : ITokenService
 {
     private static readonly JsonWebTokenHandler Handler = new();
 
+    /// <inheritdoc />
     public AccessToken CreateAccessToken(IReadOnlyCollection<Claim> claims)
     {
         var now = DateTimeOffset.UtcNow;

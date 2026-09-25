@@ -10,6 +10,8 @@ namespace NovaCore.Core.Web.Security;
 /// </summary>
 public sealed class SecurityHeadersMiddleware(RequestDelegate next)
 {
+    /// <summary>Registers the headers to be added when the response starts, then calls the next middleware.</summary>
+    /// <param name="context">The current request.</param>
     public async Task InvokeAsync(HttpContext context)
     {
         context.Response.OnStarting(static state =>
@@ -38,8 +40,12 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
     }
 }
 
+/// <summary>Adds <see cref="SecurityHeadersMiddleware"/> to the pipeline.</summary>
 public static class SecurityHeadersExtensions
 {
+    /// <summary>Adds <see cref="SecurityHeadersMiddleware"/> to the pipeline.</summary>
+    /// <param name="app">The application builder.</param>
+    /// <returns><paramref name="app"/>, for chaining.</returns>
     public static IApplicationBuilder UseSecurityHeaders(this IApplicationBuilder app) =>
         app.UseMiddleware<SecurityHeadersMiddleware>();
 }

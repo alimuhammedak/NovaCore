@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace NovaCore.Core.Web.Modules;
 
+/// <summary>Registers and maps the application's <see cref="IModule"/>s.</summary>
 public static class ModuleExtensions
 {
     /// <summary>
