@@ -34,6 +34,19 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
     /// <summary>The host environment the app boots in. Override to test environment-specific wiring.</summary>
     protected virtual string EnvironmentName => Environments.Development;
 
+    // DECISIONS Y-26: captive dependencies and root-resolved scoped services fail the host build in every environment,
+    // not only in Development where they are on by default (R-029).
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        builder.UseDefaultServiceProvider(options =>
+        {
+            options.ValidateScopes = true;
+            options.ValidateOnBuild = true;
+        });
+
+        return base.CreateHost(builder);
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(EnvironmentName);
