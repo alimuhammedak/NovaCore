@@ -56,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `NovaCore.FluentValidation` project, so the core packages depend on Microsoft packages only. `AddCoreWeb` no longer
     registers the handler; the host calls `AddValidationExceptionHandler()`, which puts it ahead of the global handler.
     .NET 10's built-in validation replaces this project in a later phase.
+- **Breaking:** modules are registered explicitly with `builder.AddModule<TModule>()` and mapped in that order.
+  `AddModules()` and the assembly-scanning `ModuleLoader` are removed, and so is `IModule.IsEnabled` (it was never
+  configurable): leave a module out by not adding it.
   - `NovaCore.Modules.Catalog.Contracts` is no longer packed. The Catalog module is sample code; only the building
     blocks are NuGet packages.
 - Logging goes through source-generated `[LoggerMessage]` methods (`GlobalExceptionHandler`, `DatabaseMigrationService`,

@@ -87,11 +87,9 @@ NovaCore.AspNetCore.Identity.HttpContextCurrentUser.UserName.get -> string?
 NovaCore.AspNetCore.Identity.NovaClaims
 NovaCore.AspNetCore.Modules.IModule
 NovaCore.AspNetCore.Modules.IModule.AddModule(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-NovaCore.AspNetCore.Modules.IModule.IsEnabled(Microsoft.Extensions.Configuration.IConfiguration! configuration) -> bool
 NovaCore.AspNetCore.Modules.IModule.MapEndpoints(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
 NovaCore.AspNetCore.Modules.IModule.Name.get -> string!
 NovaCore.AspNetCore.Modules.ModuleExtensions
-NovaCore.AspNetCore.Modules.ModuleLoader
 NovaCore.AspNetCore.OpenApi.BearerSecuritySchemeTransformer
 NovaCore.AspNetCore.OpenApi.BearerSecuritySchemeTransformer.BearerSecuritySchemeTransformer() -> void
 NovaCore.AspNetCore.OpenApi.BearerSecuritySchemeTransformer.TransformAsync(Microsoft.OpenApi.OpenApiDocument! document, Microsoft.AspNetCore.OpenApi.OpenApiDocumentTransformerContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
@@ -133,9 +131,8 @@ static NovaCore.AspNetCore.Http.ResultHttpExtensions.ToHttpResult(this NovaCore.
 static NovaCore.AspNetCore.Http.ResultHttpExtensions.ToHttpResult(this NovaCore.Abstractions.Results.Result! result, int successStatusCode) -> Microsoft.AspNetCore.Http.IResult!
 static NovaCore.AspNetCore.Http.ResultHttpExtensions.ToHttpResult<T>(this NovaCore.Abstractions.Results.Result<T>! result) -> Microsoft.AspNetCore.Http.IResult!
 static NovaCore.AspNetCore.Http.ResultHttpExtensions.ToHttpResult<T>(this NovaCore.Abstractions.Results.Result<T>! result, System.Func<T, Microsoft.AspNetCore.Http.IResult!>? onSuccess) -> Microsoft.AspNetCore.Http.IResult!
-static NovaCore.AspNetCore.Modules.ModuleExtensions.AddModules(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder, params string![]! assemblyPrefixes) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
+static NovaCore.AspNetCore.Modules.ModuleExtensions.AddModule<TModule>(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static NovaCore.AspNetCore.Modules.ModuleExtensions.MapModules(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
-static NovaCore.AspNetCore.Modules.ModuleLoader.Discover(params string![]! assemblyPrefixes) -> System.Collections.Generic.IReadOnlyList<NovaCore.AspNetCore.Modules.IModule!>!
 static NovaCore.AspNetCore.Security.SecurityHeadersExtensions.UseSecurityHeaders(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
 static NovaCore.AspNetCore.Web.CoreWebExtensions.AddCoreWeb(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static NovaCore.AspNetCore.Web.CoreWebExtensions.UseCoreWeb(this Microsoft.AspNetCore.Builder.WebApplication! app) -> Microsoft.AspNetCore.Builder.WebApplication!

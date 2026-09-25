@@ -8,19 +8,18 @@ namespace NovaCore.AspNetCore.Modules;
 public static class ModuleExtensions
 {
     /// <summary>
-    /// Discovers every enabled <see cref="IModule"/> and registers its services. Each module instance
-    /// is also added to DI so <see cref="MapModules"/> can map endpoints from the exact same instances.
+    /// Registers <typeparamref name="TModule"/>'s services and adds the module instance to DI, so
+    /// <see cref="MapModules"/> maps endpoints from the exact same instance. Modules are mapped in the order they are added.
     /// </summary>
-    public static IHostApplicationBuilder AddModules(this IHostApplicationBuilder builder, params string[] assemblyPrefixes)
+    /// <typeparam name="TModule">The module to add.</typeparam>
+    /// <param name="builder">The host application builder.</param>
+    /// <returns><paramref name="builder"/>, for chaining.</returns>
+    public static IHostApplicationBuilder AddModule<TModule>(this IHostApplicationBuilder builder)
+        where TModule : class, IModule, new()
     {
-        foreach (var module in ModuleLoader.Discover(assemblyPrefixes))
-        {
-            if (!module.IsEnabled(builder.Configuration))
-                continue;
-
-            module.AddModule(builder.Services, builder.Configuration);
-            builder.Services.AddSingleton(module);
-        }
+        var module = new TModule();
+        module.AddModule(builder.Services, builder.Configuration);
+        builder.Services.AddSingleton<IModule>(module);
 
         return builder;
     }

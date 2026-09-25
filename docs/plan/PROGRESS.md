@@ -145,6 +145,9 @@ Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-2
   - [x] F2a.2b (af888ea): Yeni `NovaCore.OpenTelemetry` (`OpenTelemetryHostingExtensions.AddCoreObservability`). `AddCoreDefaults`'ta artık yalnızca health ve resilience var. `service.version` hâlâ NovaCore assembly sürümü (0.1.0.0), artık eklentiden okunuyor. 46/46.
   - [x] F2a.2c (3f4efcf): Yeni `NovaCore.Scalar` (`app.MapCoreScalar()`, yalnızca Development, başlık ve tema aynı). `UseCoreWeb` yalnızca OpenAPI belgesini map'liyor.
     - Yeni test `Scalar_ui_is_served_in_development`: taşımadan önce yeşildi. Scalar çekirdekten çıkıp host henüz bağlanmamışken kırmızıya döndü, bağlandıktan sonra yeniden yeşil. 47/47.
+  - [x] F2a.2d (d308fc4): `ValidationFilter<T>` ve `ValidationExceptionHandler` paketlenmeyen `NovaCore.FluentValidation` projesine taşındı (D-019). Handler'ı host `AddValidationExceptionHandler()` ile kaydediyor; bu metot kaydı listenin başına ekliyor (R-046).
+    - Yeni test `Validation_exception_handler_runs_before_the_global_handler`: taşımadan önce yeşildi, kayıt sona eklenecek şekilde değiştirilince kırmızıya döndü (commit'lenmedi). 48/48.
+  - F2a.2 kabul kriteri: `NovaCore.AspNetCore`'un doğrudan paketleri artık yalnızca `Microsoft.AspNetCore.OpenApi`, `Microsoft.AspNetCore.Authentication.JwtBearer`, `Microsoft.Extensions.Http.Resilience`, `Microsoft.Extensions.Caching.Hybrid` (ve `PrivateAssets=all` PublicApiAnalyzers). Serilog, OpenTelemetry, Scalar ve FluentValidation çekirdekte yok.
 - [ ] F2a.3 Açık modül kaydı
 - [ ] F2a.4 Mimari testler
 - [ ] F2a.5 Dokümanlar

@@ -21,7 +21,7 @@ namespace NovaCore.Modules.Identity;
 
 /// <summary>
 /// The Identity module: ASP.NET Core Identity (hardened) + JWT/refresh tokens + 2FA + admin. Owns the
-/// <c>identity</c> schema. Discovered and wired automatically like any other module.
+/// <c>identity</c> schema. Added by the host with <c>AddModule&lt;IdentityModule&gt;()</c> like any other module.
 /// </summary>
 public sealed class IdentityModule : IModule
 {

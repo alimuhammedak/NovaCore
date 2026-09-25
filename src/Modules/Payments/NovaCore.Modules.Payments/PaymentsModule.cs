@@ -16,7 +16,7 @@ namespace NovaCore.Modules.Payments;
 
 /// <summary>
 /// The Payments module — the "add a payments module" scenario from the design. Drop in the project,
-/// implement <see cref="IModule"/>, reference it from the host. No central wiring file changes.
+/// implement <see cref="IModule"/>, reference it from the host and add it with <c>AddModule&lt;PaymentsModule&gt;()</c>.
 /// </summary>
 public sealed class PaymentsModule : IModule
 {

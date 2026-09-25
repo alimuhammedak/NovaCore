@@ -17,7 +17,7 @@ using NovaCore.Modules.Catalog.Internal;
 namespace NovaCore.Modules.Catalog;
 
 /// <summary>
-/// The Catalog module. Discovered automatically by the host — registers its own DbContext, public
+/// The Catalog module. Added by the host with <c>AddModule&lt;CatalogModule&gt;()</c> — registers its own DbContext, public
 /// contract and validators, and maps its endpoints under <c>/api/v1/products</c>.
 /// </summary>
 public sealed class CatalogModule : IModule
