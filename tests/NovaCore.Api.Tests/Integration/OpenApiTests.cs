@@ -23,4 +23,15 @@ public class OpenApiTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreAp
         // The bearer security scheme transformer should have registered the scheme.
         Assert.Contains("Bearer", json);
     }
+
+    [Fact]
+    public async Task Scalar_ui_is_served_in_development()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/scalar/v1");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+    }
 }

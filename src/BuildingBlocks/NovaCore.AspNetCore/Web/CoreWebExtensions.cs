@@ -14,7 +14,6 @@ using NovaCore.AspNetCore.Identity;
 using NovaCore.AspNetCore.OpenApi;
 using NovaCore.AspNetCore.Security;
 using NovaCore.AspNetCore.Validation;
-using Scalar.AspNetCore;
 
 namespace NovaCore.AspNetCore.Web;
 
@@ -76,13 +75,9 @@ public static class CoreWebExtensions
         if (!app.Environment.IsDevelopment())
             app.UseHsts();
 
+        // The OpenAPI document, in Development only. The Scalar UI over it is the NovaCore.Scalar add-on (MapCoreScalar).
         if (app.Environment.IsDevelopment())
-        {
             app.MapOpenApi();
-            app.MapScalarApiReference(options => options
-                .WithTitle("NovaCore API")
-                .WithTheme(ScalarTheme.Mars));
-        }
 
         app.UseCors(CorsPolicyName);
         app.UseRateLimiter();

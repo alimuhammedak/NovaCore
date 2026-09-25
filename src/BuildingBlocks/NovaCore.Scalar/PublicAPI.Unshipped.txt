@@ -1,0 +1,3 @@
+#nullable enable
+NovaCore.Scalar.ScalarEndpointExtensions
+static NovaCore.Scalar.ScalarEndpointExtensions.MapCoreScalar(this Microsoft.AspNetCore.Builder.WebApplication! app) -> Microsoft.AspNetCore.Builder.WebApplication!
