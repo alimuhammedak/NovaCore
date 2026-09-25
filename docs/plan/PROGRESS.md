@@ -55,13 +55,17 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
     - 22 XML doc eklendi, interface implementasyonlarında `<inheritdoc />`.
     - `.editorconfig`: CA1848/CA1873 = `suggestion`, "F2b.6'da sil" yorumuyla (D-011). Identity'deki 32 uyarıyı da kapsıyor.
     - Toplam uyarı 153 → 93. 46/46 yeşil.
-  - [x] F1.2c (HASH): Core.Web 0 uyarı.
+  - [x] F1.2c (a264e70): Core.Web 0 uyarı.
     - 43 XML doc eklendi.
     - CA1305 (Serilog `Console`/`Seq`): planda `CultureInfo.CurrentCulture` yazıyordu, bunun yerine açık `formatProvider: null` kullanıldı.
       - Neden: `null` Serilog'un kendi varsayılanı ve kültürü render anında çözer. `CurrentCulture` ise kültürü açılış anında sabitlerdi, bu da ince bir davranış farkı olurdu.
       - CA1305 açık `null`'ı kabul ediyor (derlemeyle doğrulandı).
     - Toplam uyarı 93 → 48. 46/46 yeşil.
-  - [ ] F1.2d Modüller (CA1725)
+  - [x] F1.2d (HASH): Modüller 0 uyarı.
+    - `IdentityDbContext.OnModelCreating` parametresi `modelBuilder` → `builder` (CA1725, base imzasına uyum).
+    - `has-pending-model-changes` (Identity) değişiklik görmüyor.
+    - Identity'deki CA1848/CA1873 F1.2b'deki `.editorconfig` ayarıyla kapandı.
+    - Toplam uyarı 48 → 47. Kalanların hepsi testlerde. 46/46 yeşil.
   - [ ] F1.2e Testler (CA1707 tests/ için kapalı, küçük düzeltmeler)
   - [ ] F1.2f TreatWarningsAsErrors=true
 - [ ] F1.3 Versiyon
