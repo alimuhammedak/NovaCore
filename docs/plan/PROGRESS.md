@@ -9,7 +9,7 @@
 |---|---|---|---|---|---|
 | 0 | ✅ tamam | `faz/0-stabilizasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
-| 2a | ✅ tamam | `faz/2a-paket-yapisi` | 2026-09-25 | 2026-09-25 | merge onayı bekleniyor |
+| 2a | ✅ tamam | `faz/2a-paket-yapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2b | ⏳ başlamadı | | | | |
 | 2c | ⏳ başlamadı | | | | |
 | 3a | ⏳ başlamadı | | | | |
@@ -308,7 +308,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-25, Faz 2a bitti.** `faz/2a-paket-yapisi` branch'i hazır; main'e merge için kullanıcı onayı bekleniyor.
+**2026-09-25, Faz 2a bitti** ve kullanıcı onayıyla `faz/2a-paket-yapisi` main'e merge edildi (`--no-ff`), `main` push'landı.
 
 - **Yapılanlar:**
   - F2b.6 (öne alındı, D-017): logging `[LoggerMessage]`'a çevrildi. `.editorconfig`'teki geçici CA1848/CA1873 satırları silindi.
@@ -333,5 +333,5 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - `DatabaseMigrationService` ile Identity seeder'ın başlama sırası `Program.cs`'teki çağrı sırasına bağlı (`AddCorePersistence` modüllerden önce).
   - `ModuleRegistrationTests` endpoint listesini sabitliyor. Bir endpoint eklenir ya da değişirse beklenen liste güncellenir.
   - F2c.1 `NovaCore.FluentValidation`'ı silecek ve Y-20 testini modülleri de kapsayacak şekilde genişletecek ("Sonraya bırakılanlar").
-- **Bekleyen:** merge onayı (`faz/2a-paket-yapisi` → `main`). Önizleme yayını ayrıca kullanıcı kararı.
+- **Bekleyen:** önizleme yayını (tag + GitHub Packages) ayrı bir kullanıcı kararı.
 - **Sıradaki:** yeni oturumda `/novacore-phase 2b`.
