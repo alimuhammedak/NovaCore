@@ -133,7 +133,6 @@ static NovaCore.AspNetCore.DependencyInjection.InfrastructureServiceCollectionEx
 static NovaCore.AspNetCore.Exceptions.NotFoundException.For(string! entity, object! key) -> NovaCore.AspNetCore.Exceptions.NotFoundException!
 static NovaCore.AspNetCore.Hosting.HostingExtensions.AddCoreDefaults(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static NovaCore.AspNetCore.Hosting.HostingExtensions.AddCoreHealthChecks(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
-static NovaCore.AspNetCore.Hosting.HostingExtensions.AddCoreLogging(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static NovaCore.AspNetCore.Hosting.HostingExtensions.AddCoreObservability(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static NovaCore.AspNetCore.Hosting.HostingExtensions.MapDefaultEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
 static NovaCore.AspNetCore.Http.ResultHttpExtensions.Problem(NovaCore.Abstractions.Results.Error error) -> Microsoft.AspNetCore.Http.IResult!

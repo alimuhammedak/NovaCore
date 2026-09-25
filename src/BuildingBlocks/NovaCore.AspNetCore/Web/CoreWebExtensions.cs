@@ -15,7 +15,6 @@ using NovaCore.AspNetCore.OpenApi;
 using NovaCore.AspNetCore.Security;
 using NovaCore.AspNetCore.Validation;
 using Scalar.AspNetCore;
-using Serilog;
 
 namespace NovaCore.AspNetCore.Web;
 
@@ -69,7 +68,6 @@ public static class CoreWebExtensions
     public static WebApplication UseCoreWeb(this WebApplication app)
     {
         app.UseSecurityHeaders();            // defensive response headers first, so every response carries them
-        app.UseSerilogRequestLogging();
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 

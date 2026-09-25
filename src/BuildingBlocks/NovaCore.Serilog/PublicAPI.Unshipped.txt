@@ -1,0 +1,3 @@
+#nullable enable
+NovaCore.Serilog.SerilogHostingExtensions
+static NovaCore.Serilog.SerilogHostingExtensions.AddCoreLogging(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!

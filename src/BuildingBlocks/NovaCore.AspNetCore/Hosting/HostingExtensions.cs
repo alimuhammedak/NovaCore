@@ -9,57 +9,26 @@ using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Serilog;
-using Serilog.Events;
 
 namespace NovaCore.AspNetCore.Hosting;
 
 /// <summary>
-/// The NovaCore take on Aspire's "ServiceDefaults": one call wires structured logging (Serilog),
-/// observability (OpenTelemetry traces + metrics), health checks and resilient HttpClients.
+/// The NovaCore take on Aspire's "ServiceDefaults": one call wires observability (OpenTelemetry traces + metrics),
+/// health checks and resilient HttpClients. Structured logging is the NovaCore.Serilog add-on's <c>AddCoreLogging</c>.
 /// </summary>
 public static class HostingExtensions
 {
     /// <summary>
-    /// Adds logging, observability and health checks (see the <c>AddCore*</c> methods below) and the standard
-    /// resilience handler on every HttpClient.
+    /// Adds observability and health checks (see the <c>AddCore*</c> methods below) and the standard resilience handler
+    /// on every HttpClient.
     /// </summary>
     public static IHostApplicationBuilder AddCoreDefaults(this IHostApplicationBuilder builder)
     {
-        builder.AddCoreLogging();
         builder.AddCoreObservability();
         builder.AddCoreHealthChecks();
 
         // Every outbound HttpClient gets standard retry/circuit-breaker/timeout behaviour.
         builder.Services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler());
-
-        return builder;
-    }
-
-    /// <summary>
-    /// Replaces the default logging with Serilog: console output, plus Seq when <c>Seq:ServerUrl</c> is configured.
-    /// </summary>
-    public static IHostApplicationBuilder AddCoreLogging(this IHostApplicationBuilder builder)
-    {
-        builder.Services.AddSerilog((services, configuration) =>
-        {
-            // formatProvider: null is Serilog's own default; it is spelled out only for CA1305, so behaviour is unchanged.
-            // Whether logs should be culture-invariant is decided in F2a.2 (NovaCore.Serilog).
-            configuration
-                .MinimumLevel.Information()
-                .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
-                .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
-                .Enrich.FromLogContext()
-                .Enrich.WithProperty("Application", builder.Environment.ApplicationName)
-                .WriteTo.Console(
-                    outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}",
-                    formatProvider: null);
-
-            // Logs ship to Seq only when a server URL is configured — never a hard dependency.
-            var seqUrl = builder.Configuration["Seq:ServerUrl"];
-            if (!string.IsNullOrWhiteSpace(seqUrl))
-                configuration.WriteTo.Seq(seqUrl, apiKey: builder.Configuration["Seq:ApiKey"], formatProvider: null);
-        });
 
         return builder;
     }
