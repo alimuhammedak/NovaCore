@@ -9,7 +9,7 @@
 |---|---|---|---|---|---|
 | 0 | ✅ tamam | `faz/0-stabilizasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
-| 2a | 🔄 devam ediyor | `faz/2a-paket-yapisi` | 2026-09-25 | | |
+| 2a | ✅ tamam | `faz/2a-paket-yapisi` | 2026-09-25 | 2026-09-25 | merge onayı bekleniyor |
 | 2b | ⏳ başlamadı | | | | |
 | 2c | ⏳ başlamadı | | | | |
 | 3a | ⏳ başlamadı | | | | |
@@ -181,6 +181,21 @@ Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-2
     | NovaCore.Scalar | dll + xml | ✓ | MIT | ✓ | Scalar.AspNetCore | pdb ✓ |
 
   - Çekirdek paketlerin nuspec'lerinde yalnızca Microsoft paketleri ve `NovaCore.Abstractions` var. Üçüncü taraf bağımlılıklar yalnızca eklentilerde. Modüller ve `NovaCore.FluentValidation` paketlenmedi. Api için bilinen kodsuz pack uyarısı devam ediyor (F1.3 notu).
+- Faz doğrulaması (2026-09-25):
+  - `restore --force`: temiz.
+  - `build -c Release --no-incremental`: 0 uyarı, 0 hata.
+  - `test`: 56/56 (code review düzeltmelerinden sonra 58/58).
+  - `list package --vulnerable --include-transitive`: 13 projenin hepsi temiz.
+  - `has-pending-model-changes` (3 context): değişiklik yok.
+  - Çekirdek paketlerin tüm transitive kapanışında üçüncü taraf paket olarak yalnızca Polly var. `dotnet nuget why`'a göre tek yolu `Microsoft.Extensions.Http.Resilience` → `Microsoft.Extensions.Resilience` (D-020 (6)).
+  - OpenAPI: faz başında main'den alınan `/openapi/v1.json` ile faz sonundaki belge **bayt bayt aynı** (29.460 bayt).
+  - Smoke run (`dotnet run`, Development, DB'siz): `/alive`, `/health` 200; `/scalar/v1` 200; `/api/v1/products` 401 ve security header'lar yerinde. Konsolda her istek için Serilog `RequestLoggingMiddleware` satırı var.
+- Faz sonu code review (xhigh), 9 bulgu:
+  - Düzeltildi (review düzeltme commit'i):
+    - (1) `AddModuleDbContext` artık `AuditableEntityInterceptor`'ı da `TryAddScoped` ile kaydediyor (`AddCorePersistence` de `TryAddScoped`). Böylece `AddCorePersistence` çağrılmayan ya da geç çağrılan bir host'ta modül DbContext'i ilk sorguda patlamıyor. F2a.1b'deki bölünmenin getirdiği yeni bir hata yolunu kapatıyor. Yeni test önce kırmızı görüldü ("No service for type AuditableEntityInterceptor").
+    - (2) `AddModule<TModule>()` aynı modül ikinci kez eklenirse kayıt anında hata veriyor. Eski tarayıcı modülleri assembly adına göre tekilleştiriyordu. İkinci ekleme bütün endpoint'leri iki kez map'ler ve ilk istekte ambiguous route hatası verirdi. Yeni test önce kırmızı görüldü.
+    - (3) `CoreWebExtensions` XML dokümanı hâlâ "OpenAPI + Scalar" ve "exception handlers" diyordu, düzeltildi.
+  - Atlandı (aşağıda "Sonraya bırakılanlar"a yazıldı): namespace gölgeleme, Y-05 csproj testinin kör noktaları, test yardımcılarındaki tekrar, `LoginFailed`'da guard'sız maskeleme, DECISIONS'ta satır sırası.
 
 ### Faz 2b
 - [ ] F2b.1 Options pattern
@@ -188,7 +203,7 @@ Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-2
 - [ ] F2b.3 TimeProvider
 - [ ] F2b.4 Exception handling
 - [ ] F2b.5 Health
-- [ ] F2b.6 LoggerMessage → Faz 2a'nın başına alındı (D-017)
+- [x] F2b.6 (194b754) LoggerMessage → Faz 2a'da yapıldı (D-017)
 
 ### Faz 2c
 - [ ] F2c.1 Validation
@@ -276,6 +291,12 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - ~~(Faz 1, F2a.2) Serilog log kültürü:~~ → F2a.2a'da karar verildi: `null` korunuyor, 2a'da davranış değişmiyor (D-020 (8)). Eski not: `formatProvider: null` Serilog'un varsayılanı. Logların culture-invariant olup olmayacağına NovaCore.Serilog'da karar verilmeli.
 - (Faz 1) Çözüm genelinde `dotnet pack`, `NovaCore.Api` için kodsuz bir uyarı veriyor: Web SDK `WarnOnPackingNonPackableProject=true` ayarlıyor. Pack başarısız olmuyor, uyarı bastırılmadı (Y-10). Kapatmak için Api csproj'da bu özellik `false` yapılabilir (kullanıcı onayıyla).
 - (Faz 2a, F2a.5) Kök CLAUDE.md Standards'taki "0 warnings" maddesi bastırma için hâlâ "DECISIONS Y-10" diyor. Y-10'un yerini Y-44 aldı (D-016), ifade de değişti: yalnızca MS'in "When to suppress" iznine dayanan kalıcı bastırma. Tek kelimelik ama bir kuralı değiştiriyor, 2a kapsamı dışı.
+- (Faz 2a, code review) `NovaCore.FluentValidation`, `NovaCore.Serilog`, `NovaCore.OpenTelemetry` ve `NovaCore.Scalar` namespace'leri, `NovaCore.*` altındaki kodda üçüncü taraf kök namespace'leri gölgeliyor. Örneğin bir modülde kısmen nitelenmiş `FluentValidation.Results.X` artık `NovaCore.FluentValidation`'a bağlanıp derlenmez, `global::` gerekir. Bugünkü kod dosya başındaki using'lerle çalışıyor. Namespace adları D-020 (4)'te seçildi; değiştirmek public API kararı.
+- (Faz 2a, code review) `PackageDependencyTests`'in csproj kontrolü `Directory.Build.*` ya da `GlobalPackageReference` ile eklenen paketleri görmüyor. `Include` yerine `Update` kullanan bir `PackageReference`'ta NRE veriyor. `bin/obj` altındaki csproj'ları da dışlamıyor. Assembly düzeyindeki test kısmen telafi ediyor.
+- (Faz 2a, code review) `ExplicitRegistrationTests` ile `SourceHygieneTests` aynı "src altındaki .cs dosyaları, bin/obj hariç" kodunu tekrar ediyor. `Solution`'a bir yardımcı taşınabilir. Bu mevcut bir testi değiştireceği için 2a'da yapılmadı.
+- (Faz 2a, code review) `SecurityAuditLogger.LoginFailed` maskeyi guard'sız hesaplıyor, `UserRegistered` ise guard'lı. CA1873 varsayılan olarak yalnızca Information ve altına bakıyor (R-047). Davranış F2b.6'dan önceki gibi. Identity F3b.3'te emekliye ayrılacak.
+- (Faz 2a, code review) DECISIONS'ta D-018…D-020 satırları D-017'nin üstüne eklendi, tablo ID sırasında değil. Düzeltmek korunan dosyada yalnızca biçimsel bir düzenleme.
+- (Faz 2a) Kodsuz Api pack uyarısı, Y-10 → Y-44 notu ve mediator cümlesi hâlâ açık (yukarıdaki maddeler).
 - (Faz 1) `.snupkg` GitHub Packages'a gitmiyor (R-039), yalnızca workflow artifact'i. İleride nuget.org seçilirse sembol sunucusu kullanılabilir.
 - (Faz 1, F5.4) Package validation baseline'ı (`PackageValidationBaselineVersion`) `Microsoft.NET.ApiCompat.targets:18`'de değerlendirme anında okunuyor, import'u Directory.Build.targets'tan sonra geliyor. F5.4'te nereye yazılacağı doğrulanmalı (R-040).
 - ~~(Faz 1) `NovaCore.Core.Web` paketinin nuspec bağımlılıklarında FluentValidation, Serilog, OpenTelemetry ve Scalar var (D-003 ihlali). F2a.2 ve F2c'nin işi.~~ → F2a.2'de çözüldü (Serilog/OTel/Scalar eklentilere, FluentValidation `NovaCore.FluentValidation`'a taşındı), F2a.4 testleri koruyor.
@@ -287,32 +308,30 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-25, Faz 1 bitti** ve kullanıcı onayıyla `faz/1-kutuphane-altyapisi` main'e merge edildi (`--no-ff`), `main` push'landı.
+**2026-09-25, Faz 2a bitti.** `faz/2a-paket-yapisi` branch'i hazır; main'e merge için kullanıcı onayı bekleniyor.
 
 - **Yapılanlar:**
-  - Analyzer'lar `latest-recommended`, `EnforceCodeStyleInBuild` ve `TreatWarningsAsErrors` açık. 225 uyarı → 0.
-  - 4 packable projede XML doc, paket metadata'sı (MIT, ortak README, repo, snupkg, package validation) ve `VersionPrefix=0.1.0` var.
-  - PublicApiAnalyzers 5.6.0 ile public API takibi başladı. Tüm API `PublicAPI.Unshipped.txt`'de.
-  - `release.yml` yazıldı: `v*` tag → GitHub Packages. Tetiklenmedi.
-  - Kararlar D-011…D-015 (D-010'un yerine D-014), sorular Q-10…Q-20, araştırmalar R-032…R-043.
-  - Testler 46/46. Test eklenmedi ya da silinmedi.
+  - F2b.6 (öne alındı, D-017): logging `[LoggerMessage]`'a çevrildi. `.editorconfig`'teki geçici CA1848/CA1873 satırları silindi.
+  - Paket haritası (ANALYSIS §4) uygulandı:
+    - Çekirdek: `NovaCore.Abstractions`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore`.
+    - Eklentiler: `NovaCore.Serilog`, `NovaCore.OpenTelemetry`, `NovaCore.Scalar`.
+    - Paketlenmeyen `NovaCore.FluentValidation` (D-019).
+    - `Catalog.Contracts` artık paket değil.
+  - Modüller açıkça kaydediliyor (`AddModule<TModule>()`), `IModule.IsEnabled` yok (D-018). `Program.cs` her şeyi açıkça ekliyor.
+  - Yeni testler: `PackageDependencyTests` (Y-05 + bağımlılık yönü), `ExplicitRegistrationTests` (Y-20, çekirdek kısmı), `ModuleRegistrationTests`, `ExceptionHandlerOrderTests`, Scalar UI testi ve iki review testi. 46 → 58.
+  - Davranış korundu: OpenAPI belgesi main ile bayt bayt aynı, 24 modül endpoint'i ve sırası testle sabit.
+  - Yerel `0.1.0-preview.1` pack yapıldı (6 paket). Tag ve push yok (Q-23).
+  - Kararlar: D-018, D-019 (kullanıcı), D-020 (model). Araştırmalar: R-044…R-047.
 - **Sürprizler:**
-  - `Directory.Build.targets`, `GenerateDocumentationFile` ve `ContinuousIntegrationBuild` için çok geç: SDK bunları önce okuyor (R-040).
-  - Doc üretimi OpenAPI belgesine açıklama ekliyor (R-041).
-  - PublicApiAnalyzers `AdditionalFiles`'ı kendisi eklemiyor. `dotnet format` code fix'i çözüm genelinde yalnızca ilk projeyi dolduruyor, proje proje çalıştırmak gerekiyor (R-042).
-  - RS0026 `ToHttpResult`'u overload'lara böldürdü (D-015).
-  - Web SDK packable olmayan Api için pack uyarısı veriyor.
-- **Sonraki fazın (2a) bilmesi gerekenler:**
-  - Yeni packable projeler (F2a.2) şunlara ihtiyaç duyar: csproj'da `GenerateDocumentationFile=true` (yoksa targets'taki koruma build'i durdurur), `Microsoft.CodeAnalysis.PublicApiAnalyzers` referansı (yoksa takip sessizce atlanır, "Sonraya bırakılanlar") ve `#nullable enable` başlıklı `PublicAPI.Shipped.txt`/`PublicAPI.Unshipped.txt`.
-  - Proje ve namespace taşımalarında PublicAPI satırları da değişir: RS0016/RS0017. Unshipped'i sıfırlayıp `dotnet format analyzers <csproj> --diagnostics RS0016 --severity warn` ile yeniden üretmek en hızlısı.
-  - `Catalog.Contracts`'ın packable kalıp kalmayacağı 2a'da karar ister.
-  - Onaylı bastırmalar root CLAUDE.md Gotchas'ta listeli. CA1848/CA1873 satırları F2b.6'da silinecek.
-- **Süreç değişikliği (2026-09-25, faz sonrası, kullanıcı geri bildirimi):**
-  - D-016 (D-005'in yerine): teknik kararları model verir. MS dokümanı söylüyorsa o uygulanır, söylemiyorsa maliyet hesaplanır, karar kaydedilir ve raporlanır.
-  - Kullanıcıya yalnızca D/Y çelişkisi, PLAN'ın kullanıcıya bıraktığı ürün kararları, Microsoft dışı paket ve dışa dönük işlemler sorulur.
-  - Y-44 (Y-10'un yerine): bastırma yalnızca MS'in "When to suppress" iznine dayanan kalıcı durumda yapılır.
-  - Y-45: geçici kod veya geçici bastırma yok.
-  - D-017: F2b.6 Faz 2a'nın ilk adımı.
-  - Skill §2–§5 ve kök CLAUDE.md buna göre güncellendi.
-  - **Bekleyen:** hook'un DECISIONS'ı append-only yapması. Auto mod sınıflandırıcısı modelin hook dosyalarını düzenlemesini engelliyor; kullanıcı kararına bırakıldı. O zamana kadar DECISIONS düzenlemeleri onay sorar, D-kayıtları adım başına tek düzenlemede toplanır.
-- **Sıradaki:** yeni oturumda `/novacore-phase 2a`. İlk adım F2b.6 (D-017).
+  - CA1873 `IsEnabled` guard'ını yalnızca log çağrısıyla aynı alıcıdaysa tanıyor. Bu yüzden `SecurityAuditLog` `this ILogger` extension biçiminde (R-047).
+  - Bir proje yeniden adlandırılınca test/Api `bin`'inde eski DLL kalıyor ve mimari testler onu da yükler. `bin/obj` silinmeli (kök CLAUDE.md Gotchas).
+  - `dotnet format` RS0016 code fix'i yeni bir projede satır yazmadı. PublicAPI satırları analyzer mesajından elle eklendi.
+  - Inline bash heredoc'larda ters bölüler yarıya iniyor. Windows yolları içeren script'ler dosyaya yazılıp çalıştırılmalı.
+- **Sonraki fazın (2b) bilmesi gerekenler:**
+  - Erken okunan config: `RateLimiting:PermitLimit` ve `Jwt:SigningKey` `AddCoreWeb`'de (NovaCore.AspNetCore), `Database:ApplyMigrations` artık `AddCorePersistence`'ta (NovaCore.EntityFrameworkCore). F2b.1 ikisini de Options'a çevirecek. `Microsoft.Extensions.Configuration.Binder` EF paketinde zaten var.
+  - F2b.6 bitti; 2b'nin adım listesinde "öne alındı" olarak işaretli.
+  - `DatabaseMigrationService` ile Identity seeder'ın başlama sırası `Program.cs`'teki çağrı sırasına bağlı (`AddCorePersistence` modüllerden önce).
+  - `ModuleRegistrationTests` endpoint listesini sabitliyor. Bir endpoint eklenir ya da değişirse beklenen liste güncellenir.
+  - F2c.1 `NovaCore.FluentValidation`'ı silecek ve Y-20 testini modülleri de kapsayacak şekilde genişletecek ("Sonraya bırakılanlar").
+- **Bekleyen:** merge onayı (`faz/2a-paket-yapisi` → `main`). Önizleme yayını ayrıca kullanıcı kararı.
+- **Sıradaki:** yeni oturumda `/novacore-phase 2b`.
