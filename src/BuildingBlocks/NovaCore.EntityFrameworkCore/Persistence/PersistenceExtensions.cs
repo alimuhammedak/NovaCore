@@ -13,6 +13,9 @@ public sealed record ModuleDbContextDescriptor(Type ContextType);
 /// <summary>Service registration for module-owned DbContexts.</summary>
 public static class PersistenceExtensions
 {
+    // The readiness tag, as in the health-check guidance (R-049): /health includes these checks.
+    private const string ReadyTag = "ready";
+
     /// <summary>
     /// Registers the persistence services every module DbContext relies on: the audit-stamping interceptor, the
     /// in-process domain-event dispatcher and the startup migrations, which run only when
@@ -44,7 +47,8 @@ public static class PersistenceExtensions
     }
 
     /// <summary>
-    /// Registers a module's DbContext <em>and</em> advertises it for generic startup migration.
+    /// Registers a module's DbContext, advertises it for generic startup migration and adds a health check (named after
+    /// the context and tagged <c>ready</c>) that reports whether its database can be reached.
     /// Each module keeps its own context (and its own schema) — the modular-monolith boundary at the DB level.
     /// Also registers <see cref="AuditableEntityInterceptor"/> (and the <see cref="TimeProvider"/> it stamps with), which
     /// module contexts add to their options, so the context resolves whether or not the host has called
@@ -63,6 +67,7 @@ public static class PersistenceExtensions
         services.AddSingleton(new ModuleDbContextDescriptor(typeof(TContext)));
         services.TryAddScoped<AuditableEntityInterceptor>();
         services.TryAddSingleton(TimeProvider.System);
+        services.AddHealthChecks().AddDbContextCheck<TContext>(tags: [ReadyTag]);
         return services;
     }
 }

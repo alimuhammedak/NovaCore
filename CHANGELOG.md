@@ -88,6 +88,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** `AccessToken` carries `IssuedAtUtc`, and `ExpiresInSeconds` is the token's lifetime
   (`ExpiresAtUtc - IssuedAtUtc`) instead of the time left when read. The token response's `expiresIn` is now the full
   lifetime (e.g. 900 instead of 899). `JwtTokenService` and `AuditableEntityInterceptor` take a `TimeProvider`.
+- **Breaking:** `/health` and `/alive` are mapped in Development only (`MapDefaultEndpoints`). A production host that
+  needs probes maps its own health endpoints.
+- Every module DbContext registered with `AddModuleDbContext` gets a database health check (`AddDbContextCheck`, named
+  after the context, tagged `ready`), so `/health` reports `Unhealthy` when a module database can't be reached.
+  `NovaCore.EntityFrameworkCore` references `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`.
 - **Breaking:** `DatabaseMigrationService` is internal. `AddCorePersistence` always registers it and it reads
   `Database:ApplyMigrations` when the host starts. `NovaCore.EntityFrameworkCore` references
   `Microsoft.Extensions.Options.ConfigurationExtensions` instead of `Microsoft.Extensions.Configuration.Binder` (which

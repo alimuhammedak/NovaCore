@@ -55,8 +55,8 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 
 | Uç nokta | Açıklama |
 |---|---|
-| `GET /health` | Readiness (tüm health check'ler) |
-| `GET /alive` | Liveness (yalnızca "live" etiketli) |
+| `GET /health` | Readiness: tüm health check'ler, her modülün DB bağlantısı dahil (yalnızca Development) |
+| `GET /alive` | Liveness: yalnızca "live" etiketli (yalnızca Development) |
 | `GET /openapi/v1.json` | OpenAPI 3.1 dokümanı |
 | `/scalar/v1` | Scalar API arayüzü (yalnızca Development) |
 | `POST /api/v1/auth/register` · `login` · `refresh` · `logout` · `me` | Kimlik doğrulama akışı (bkz. [Güvenlik](#güvenlik--yetkilendirme)) |
@@ -65,8 +65,13 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 | `/api/v1/products` | Catalog modülü (CRUD, permission korumalı) |
 | `/api/v1/payments` | Payments modülü (Catalog'a contract üzerinden bağlı) |
 
-> SQL Server olmadan da uygulama açılır ve `/health`, `/openapi`, validation/401 kapıları çalışır.
-> DB'ye dokunan endpoint'ler düzgün bir **RFC 9457 ProblemDetails** ile yanıt verir.
+> SQL Server olmadan da uygulama açılır ve `/openapi`, validation/401 kapıları çalışır. `/health` bu durumda
+> `Unhealthy` (503) döner, çünkü modül veritabanlarına ulaşamaz. DB'ye dokunan endpoint'ler düzgün bir
+> **RFC 9457 ProblemDetails** ile yanıt verir.
+>
+> `/health` ve `/alive` yalnızca Development'ta map'lenir (DECISIONS D-022). Production'da probe gerekiyorsa host
+> kendi `MapHealthChecks` kaydını yapar. `RequireHost` Host header'ına güvendiği için sahtelenebilir; port kontrolü
+> `ConnectionInfo.LocalPort` ile yapılmalıdır.
 
 ### 5 dakikada yeni proje (template)
 ```bash
@@ -184,7 +189,7 @@ app.UseSerilogRequestLogging();                    // istek başına bir log sat
 app.UseCoreWeb();                                  // security headers, exception handling, auth, rate limiter, OpenAPI (Development)
 app.MapCoreScalar();                               // Scalar UI (Development)
 app.MapModules();                                  // modüllerin endpoint'leri
-app.MapDefaultEndpoints();                         // /health, /alive
+app.MapDefaultEndpoints();                         // /health, /alive (Development)
 
 app.Run();
 ```
@@ -267,7 +272,7 @@ HTTP/mesaj kuyruğuna döner.
 | **Auth** | ASP.NET Core Identity + JWT/refresh + permission-based | bkz. [Güvenlik & Yetkilendirme](#güvenlik--yetkilendirme) |
 | **Auditing** | EF Core `SaveChangesInterceptor` | `AuditableEntityInterceptor` — CreatedBy/ModifiedAt merkezî |
 | **Rate limiting** | Yerleşik `AddRateLimiter` | IP bazlı fixed-window + `"strict"` adlı policy |
-| **Health** | Yerleşik Health Checks | `/health` + `/alive` |
+| **Health** | Yerleşik Health Checks + `AddDbContextCheck` | `/health` (her modül DB'si, "ready" etiketi) + `/alive`, yalnızca Development |
 | **API docs** | `Microsoft.AspNetCore.OpenApi` + Scalar | Bearer security scheme transformer ile; Scalar UI `NovaCore.Scalar` eklentisinde (`MapCoreScalar`) |
 | **Modül kaydı** | Açık kayıt | `builder.AddModule<TModule>()` (assembly taraması yok) |
 | **Result** | Result pattern | Sıfır-bağımlılık `Result<T>` + `ToHttpResult()` |

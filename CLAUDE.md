@@ -98,7 +98,8 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
 - **The host composes everything explicitly** (`src/Api/NovaCore.Api/Program.cs`): the add-ons (`AddCoreLogging`,
   `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`,
   `AddValidationExceptionHandler`), then one `builder.AddModule<TModule>()` per module; after `Build`,
-  `UseSerilogRequestLogging`, `UseCoreWeb`, `MapCoreScalar`, `MapModules`, `MapDefaultEndpoints`. Nothing is found by
+  `UseSerilogRequestLogging`, `UseCoreWeb`, `MapCoreScalar`, `MapModules`, `MapDefaultEndpoints` (health endpoints,
+  Development only, D-022). Nothing is found by
   assembly scanning (Y-20, `ExplicitRegistrationTests`).
 
 - **Modules are self-contained.** Each `IModule` registers its own services + DbContext + permissions and maps its

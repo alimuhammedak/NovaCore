@@ -224,8 +224,10 @@ Plan onayı (2026-09-25): kullanıcı kararı Q-24 (D-022, health uçları yaln�
     - `RefreshTokenExpiryTests`: `FakeTimeProvider` ile süre aşılınca 401 ve `auth.refresh_token_expired`.
     - `JwtTokenServiceTests` ve `AuditableEntityInterceptorTests`: önce derlenmedi, sonra yeşil.
   - Test paketi `Microsoft.Extensions.TimeProvider.Testing` 10.10.0 (MIT, yalnızca test projesi). 77/77.
-- [ ] F2b.4 Exception handling (devam ediyor; commit sonrası işlenecek)
-- [ ] F2b.5 Health
+- [x] F2b.4 (b2fe948): `GlobalExceptionHandler` `detail`'e yalnızca `AppException` mesajını yazıyor. `ArgumentException`, `FormatException`, `UnauthorizedAccessException` ve `KeyNotFoundException` 4xx durum kodunu koruyor ama mesaj yalnızca log'a gidiyor (Y-35). Status eşlemesi değişmedi.
+  - ProblemDetails `instance` artık bir URI reference: `PathBase + Path` (`ToUriComponent`), query yok (R-051). Eskiden `"GET /path"` yazıyordu.
+  - Yeni `GlobalExceptionHandlerTests` handler'ı `AddCoreInfrastructure`'ın ProblemDetails yapılandırmasıyla çalıştırıyor. 4xx'e eşlenen dört tip ve `instance` önce kırmızı görüldü; 500 ve AppException zaten doğruydu. 84/84.
+- [ ] F2b.5 Health (devam ediyor; commit sonrası işlenecek)
 - [x] F2b.6 (194b754) LoggerMessage → Faz 2a'da yapıldı (D-017)
 
 ### Faz 2c

@@ -38,9 +38,18 @@ public static class HostingExtensions
         return builder;
     }
 
-    /// <summary>Maps <c>/health</c> (readiness — all checks) and <c>/alive</c> (liveness — tagged "live").</summary>
+    /// <summary>
+    /// In Development, maps <c>/health</c> (readiness — all checks, including each module database) and <c>/alive</c>
+    /// (liveness — tagged "live"). Other environments get neither: a host that needs probes there maps its own.
+    /// </summary>
     public static IEndpointRouteBuilder MapDefaultEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        // The endpoints reveal the app's state and every /health request reaches every database, so they stay out of
+        // non-Development environments (docs/plan/DECISIONS.md D-022). A production host can map its own, e.g. behind
+        // a check on ConnectionInfo.LocalPort; RequireHost alone trusts the spoofable Host header (R-049).
+        if (!endpoints.ServiceProvider.GetRequiredService<IHostEnvironment>().IsDevelopment())
+            return endpoints;
+
         endpoints.MapHealthChecks("/health");
 
         endpoints.MapHealthChecks("/alive", new HealthCheckOptions
