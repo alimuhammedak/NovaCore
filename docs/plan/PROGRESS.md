@@ -10,7 +10,7 @@
 | 0 | ✅ tamam | `faz/0-stabilizasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2a | ✅ tamam | `faz/2a-paket-yapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
-| 2b | ✅ tamam | `faz/2b-konfigurasyon` | 2026-09-25 | 2026-09-25 | |
+| 2b | ✅ tamam | `faz/2b-konfigurasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2c | ⏳ başlamadı | | | | |
 | 3a | ⏳ başlamadı | | | | |
 | 3b | ⏳ başlamadı | | | | |
@@ -364,7 +364,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-25, Faz 2b bitti.** Branch `faz/2b-konfigurasyon`. main'e merge kullanıcı onayı bekliyor.
+**2026-09-25, Faz 2b bitti** ve kullanıcı onayıyla `faz/2b-konfigurasyon` main'e merge edildi (`--no-ff`), `main` push'landı.
 
 - **Yapılanlar:**
   - Config (F2b.1a/1b): `Jwt`, `RateLimiting`, `Cors`, `Cache` ve `Database` artık `BindConfiguration` + `ValidateOnStart` ile bağlanan doğrulanmış options. `[OptionsValidator]` source-gen kullanılıyor, nitelikle ifade edilemeyen kurallar `.Validate` ile. Framework options'ları (`JwtBearerOptions`, `RateLimiterOptions`, `CorsOptions`, `HybridCacheOptions`) `Configure<IOptions<T>>` ile ilk kullanımda yapılandırılıyor. `DatabaseMigrationService` her zaman kayıtlı ve internal.
@@ -384,5 +384,5 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - F2c.3: `ICacheService`/`HybridCacheService` kalkacak. `CacheOptions` (`Cache:DefaultExpiration`) ve `HybridCacheOptions` yapılandırması `AddCoreCaching`'te duruyor; `AddHybridCache` doğrudan kullanılınca da korunmalı.
   - Yeni config eklenecekse kök CLAUDE.md Standards'taki kural geçerli: options + `ValidateOnStart`, kayıt anında okuma yok.
   - Açık "Sonraya bırakılanlar" maddeleri: `BadHttpRequestException` → 500, health check timeout, test yardımcılarındaki tekrar, OTel'in erken okuması.
-- **Bekleyen:** `faz/2b-konfigurasyon` → `main` merge onayı. Önizleme yayını (tag + GitHub Packages) hâlâ ayrı bir kullanıcı kararı.
-- **Sıradaki:** merge'den sonra yeni oturumda `/novacore-phase 2c`.
+- **Bekleyen:** önizleme yayını (tag + GitHub Packages) ayrı bir kullanıcı kararı.
+- **Sıradaki:** yeni oturumda `/novacore-phase 2c`.
