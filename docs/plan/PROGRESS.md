@@ -85,7 +85,7 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
   - **Sapma:** RS0026 → `ToHttpResult` 4 overload'a bölündü (Q-20, D-015). Çağrılar aynen derleniyor.
   - Kabul denemesi: geçici bir public üye RS0016 hatası verdi, commit'lenmedi.
   - Build 0/0, 46/46 yeşil.
-- [x] F1.5 (HASH): `dotnet pack NovaCore.slnx -c Release -o artifacts` exit 0. 4 `.nupkg` + 4 `.snupkg` üretildi. Package validation hatasız. `artifacts/` gitignore'da, ağaç temiz.
+- [x] F1.5 (ae0a3f8): `dotnet pack NovaCore.slnx -c Release -o artifacts` exit 0. 4 `.nupkg` + 4 `.snupkg` üretildi. Package validation hatasız. `artifacts/` gitignore'da, ağaç temiz.
 
   | Paket | lib/net10.0 | README.md | Lisans | Repository | snupkg |
   |---|---|---|---|---|---|
@@ -99,7 +99,13 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
   - ProjectReference'lar `0.1.0` bağımlılığına dönüşüyor.
   - Gözlem: `NovaCore.Core.Web` paketi FluentValidation, Serilog, OpenTelemetry ve Scalar'a bağımlı. Bu D-003 ile çelişiyor ama zaten F2a.2 ve F2c'nin işi, dokunulmadı.
   - Api için kodsuz pack uyarısı devam ediyor (F1.3 notu).
-- [ ] F1.6 Yayın akışı
+- [x] F1.6 (HASH): `.github/workflows/release.yml` yazıldı, **tetiklenmedi** (tag yok, push yok).
+  - Akış: `v*` tag → checkout@v7, setup-dotnet@v6 → tag/VersionPrefix kontrolü → restore → build (`-p:VersionSuffix`) → test → pack (`--no-build`) → upload-artifact@v7 (nupkg + snupkg) → yalnızca `.nupkg` GitHub Packages'a (`--no-symbols --skip-duplicate`) (D-013, R-043).
+  - Doğrulama:
+    - PyYAML ayrıştırması ve yapı kontrolü geçti (trigger, permissions, 9 adım).
+    - Tag adımı bash ile denendi: `v0.1.0` → suffix boş, `v0.1.0-preview.1` → `preview.1`, `v0.2.0` → hata ve exit 1.
+    - Build/test/pack zinciri boş ve `preview.1` suffix'le yerelde çalıştırıldı: 0/0, 46/46. Paket ve DLL informational version tutarlı (`0.1.0-preview.1+<sha>`).
+    - Push çalıştırılmadı. actionlint indirilmedi. GitHub'ın kendi doğrulaması ilk push'ta görülecek.
 
 ### Faz 2a
 - [ ] F2a.1 Çekirdek projeler

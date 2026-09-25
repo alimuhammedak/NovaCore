@@ -266,3 +266,13 @@ Biçim:
   - RS0026 (ApiDesign): aynı isimli iki public overload'un ikisi de opsiyonel parametre taşıyınca hata veriyor. Roslyn kuralı: *"Only one overload may have optional parameters"*, bu overload en çok parametreye sahip olmalı. Gerekçe, sonradan parametre eklemenin kaynak ve ikili uyumluluğu bozması.
 - Kaynak: `~/.nuget/packages/microsoft.codeanalysis.publicapianalyzers/5.6.0/buildTransitive/` · https://github.com/dotnet/roslyn/blob/main/docs/Adding%20Optional%20Parameters%20in%20Public%20API.md
 - Sonuç: F1.4. Q-20 → D-015: `ToHttpResult` overload'lara bölündü.
+
+### R-043: GitHub Actions'tan GitHub Packages'a push (2026-09-25, faz 1)
+- Bulgu:
+  - GitHub'ın .NET rehberindeki örnek: `permissions: packages: write`, `setup-dotnet` içinde `source-url: https://nuget.pkg.github.com/<owner>/index.json` ve `NUGET_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}`, sonra `dotnet nuget push`.
+  - NuGet registry sayfasında push için `--api-key` + `--source` biçimi de var.
+  - `source-url` feed'i setup-dotnet'in yazdığı nuget.config'e ekler, yani restore'da ikinci bir kaynak olur. NovaCore CPM kullanıyor ve package source mapping yok. Bu durumda NuGet'in NU1507 uyarısını vermesi beklenir ve TWAE bunu restore hatasına çevirir (R-033).
+  - **Bu bir çıkarımdır, CI'da denenmedi.**
+  - Güncel sürümler (GitHub releases API): `actions/upload-artifact` v7.0.1, `actions/checkout` v7.0.1, `actions/setup-dotnet` v6.0.0.
+- Kaynak: https://docs.github.com/en/actions/tutorials/build-and-test-code/net · https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry · https://api.github.com/repos/actions/upload-artifact/releases/latest
+- Sonuç: F1.6. `release.yml` feed'i yalnızca push adımında `--source` + `--api-key GITHUB_TOKEN` ile veriyor, restore kaynaklarına dokunmuyor. Feed sahibi `${{ github.repository_owner }}` (bu repo için `alimuhammedak`, D-013).
