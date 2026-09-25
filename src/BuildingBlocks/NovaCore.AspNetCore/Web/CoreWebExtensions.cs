@@ -17,8 +17,8 @@ using NovaCore.AspNetCore.Security;
 namespace NovaCore.AspNetCore.Web;
 
 /// <summary>
-/// The web-layer composition root: ProblemDetails, exception handling, OpenAPI + Scalar, JWT auth,
-/// rate limiting and CORS — all behind two calls.
+/// The web-layer composition root: ProblemDetails, exception handling, the OpenAPI document, JWT auth,
+/// permission authorization, rate limiting and CORS — all behind two calls. The Scalar UI is the NovaCore.Scalar add-on.
 /// </summary>
 public static class CoreWebExtensions
 {
@@ -26,8 +26,8 @@ public static class CoreWebExtensions
     public const string CorsPolicyName = "novacore";
 
     /// <summary>
-    /// Registers the web services: ProblemDetails and exception handlers, OpenAPI, JWT authentication, permission
-    /// authorization, rate limiting and CORS.
+    /// Registers the web services: ProblemDetails and the global exception handler, OpenAPI, JWT authentication,
+    /// permission authorization, rate limiting and CORS.
     /// </summary>
     public static IHostApplicationBuilder AddCoreWeb(this IHostApplicationBuilder builder)
     {

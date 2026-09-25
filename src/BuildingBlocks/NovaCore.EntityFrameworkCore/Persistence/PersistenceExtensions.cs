@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using NovaCore.Abstractions.Messaging;
 using NovaCore.EntityFrameworkCore.Messaging;
@@ -25,7 +26,7 @@ public static class PersistenceExtensions
         var services = builder.Services;
 
         // Audit stamping runs inside the unit of work; scoped so it sees the request's ICurrentUser.
-        services.AddScoped<AuditableEntityInterceptor>();
+        services.TryAddScoped<AuditableEntityInterceptor>();
 
         // In-process domain-event dispatch — no commercial mediator required.
         services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
@@ -41,6 +42,8 @@ public static class PersistenceExtensions
     /// <summary>
     /// Registers a module's DbContext <em>and</em> advertises it for generic startup migration.
     /// Each module keeps its own context (and its own schema) — the modular-monolith boundary at the DB level.
+    /// Also registers <see cref="AuditableEntityInterceptor"/>, which module contexts add to their options, so the
+    /// context resolves whether or not the host has called <see cref="AddCorePersistence"/> yet.
     /// </summary>
     /// <typeparam name="TContext">The module's DbContext.</typeparam>
     /// <param name="services">The service collection.</param>
@@ -53,6 +56,7 @@ public static class PersistenceExtensions
     {
         services.AddDbContext<TContext>(configure);
         services.AddSingleton(new ModuleDbContextDescriptor(typeof(TContext)));
+        services.TryAddScoped<AuditableEntityInterceptor>();
         return services;
     }
 }

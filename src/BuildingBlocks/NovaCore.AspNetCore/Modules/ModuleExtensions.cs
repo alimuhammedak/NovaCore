@@ -14,9 +14,15 @@ public static class ModuleExtensions
     /// <typeparam name="TModule">The module to add.</typeparam>
     /// <param name="builder">The host application builder.</param>
     /// <returns><paramref name="builder"/>, for chaining.</returns>
+    /// <exception cref="InvalidOperationException"><typeparamref name="TModule"/> has already been added.</exception>
     public static IHostApplicationBuilder AddModule<TModule>(this IHostApplicationBuilder builder)
         where TModule : class, IModule, new()
     {
+        // Adding a module twice would register its services twice and map every endpoint twice, which only surfaces as
+        // an ambiguous route on the first request.
+        if (builder.Services.Any(service => service.ServiceType == typeof(IModule) && service.ImplementationInstance is TModule))
+            throw new InvalidOperationException($"The module {typeof(TModule).Name} has already been added.");
+
         var module = new TModule();
         module.AddModule(builder.Services, builder.Configuration);
         builder.Services.AddSingleton<IModule>(module);

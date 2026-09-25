@@ -63,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** modules are registered explicitly with `builder.AddModule<TModule>()` and mapped in that order.
   `AddModules()` and the assembly-scanning `ModuleLoader` are removed, and so is `IModule.IsEnabled` (it was never
   configurable): leave a module out by not adding it.
+  Adding the same module twice throws at registration.
+- `AddModuleDbContext` also registers `AuditableEntityInterceptor` (if not already registered), so a module's context
+  resolves even before the host calls `AddCorePersistence`.
   - `NovaCore.Modules.Catalog.Contracts` is no longer packed. The Catalog module is sample code; only the building
     blocks are NuGet packages.
 - Logging goes through source-generated `[LoggerMessage]` methods (`GlobalExceptionHandler`, `DatabaseMigrationService`,
