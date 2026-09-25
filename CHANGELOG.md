@@ -14,11 +14,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and helper types, DI scope validation, domain types in endpoint signatures, TODO/FIXME in `src/`).
 - GitHub Actions CI (`.github/workflows/ci.yml`): restore with NuGet audit, Release build, tests, EF Core
   pending-model-changes check for the three contexts, and a vulnerable-package check.
+- NuGet package metadata for the four packable projects: MIT license expression, a shared package README
+  (`src/PACKAGE.md`), repository URL, XML documentation, `.snupkg` symbol packages and package validation. Version
+  `0.1.0` (`VersionPrefix`).
+- XML documentation for every public member of `NovaCore.Core.Abstractions`, `NovaCore.Core.Infrastructure` and
+  `NovaCore.Core.Web`.
+- Public API tracking with `Microsoft.CodeAnalysis.PublicApiAnalyzers` (`PublicAPI.Shipped.txt`/`PublicAPI.Unshipped.txt`
+  per package).
+- Release workflow (`.github/workflows/release.yml`): on a `v*` tag matching `VersionPrefix`, packs and pushes to
+  GitHub Packages.
+
+### Changed
+
+- Every project builds with the `latest-recommended` analyzers, `EnforceCodeStyleInBuild` and `TreatWarningsAsErrors`.
+  Low and moderate NuGet advisories (NU1901/NU1902) stay warnings.
+- **Breaking:** `Result<T>.Success(T)` and `Result<T>.Failure(Error)` are no longer public. Use `Result.Success<T>(value)`,
+  `Result.Failure<T>(error)` or the implicit conversions.
+- **Breaking (binary):** `ResultHttpExtensions.ToHttpResult` no longer has optional parameters. It has four overloads:
+  `(Result)`, `(Result, int)`, `(Result<T>)`, `(Result<T>, Func<T, IResult>)`. Existing source compiles unchanged.
+- The OpenAPI document now includes descriptions taken from the XML docs of the packable projects (for example on the
+  `PagedList` schemas). .NET 10's OpenAPI source generator picks them up automatically.
 
 ### Removed
 
 - Unused dependencies and wiring: `Scrutor` (never called), `Asp.Versioning.Http` + `AddApiVersioning` (no endpoint used a
   version set), `AddOutputCache`/`UseOutputCache` (no policy or endpoint used it).
+- **Breaking:** `PagedList<T>.Empty(int)` (it had no callers).
 
 ### Security
 

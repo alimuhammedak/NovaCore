@@ -99,7 +99,7 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
   - ProjectReference'lar `0.1.0` bağımlılığına dönüşüyor.
   - Gözlem: `NovaCore.Core.Web` paketi FluentValidation, Serilog, OpenTelemetry ve Scalar'a bağımlı. Bu D-003 ile çelişiyor ama zaten F2a.2 ve F2c'nin işi, dokunulmadı.
   - Api için kodsuz pack uyarısı devam ediyor (F1.3 notu).
-- [x] F1.6 (HASH): `.github/workflows/release.yml` yazıldı, **tetiklenmedi** (tag yok, push yok).
+- [x] F1.6 (6ea455b): `.github/workflows/release.yml` yazıldı, **tetiklenmedi** (tag yok, push yok).
   - Akış: `v*` tag → checkout@v7, setup-dotnet@v6 → tag/VersionPrefix kontrolü → restore → build (`-p:VersionSuffix`) → test → pack (`--no-build`) → upload-artifact@v7 (nupkg + snupkg) → yalnızca `.nupkg` GitHub Packages'a (`--no-symbols --skip-duplicate`) (D-013, R-043).
   - Doğrulama:
     - PyYAML ayrıştırması ve yapı kontrolü geçti (trigger, permissions, 9 adım).

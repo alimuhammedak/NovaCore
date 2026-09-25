@@ -34,3 +34,10 @@ so keep it **module-agnostic**: nothing here may reference `NovaCore.Modules.*`.
   ergonomics via `RequirePermission(...)` / `[HasPermission]` rather than hand-rolled `[Authorize(Roles=)]`.
 - These projects are `IsPackable=true`; avoid leaking app-specific assumptions (connection strings,
   concrete modules) into them.
+- **They are NuGet packages, so their public surface is tracked:**
+  - Every public member has an XML doc comment. The docs also appear in consumers' OpenAPI documents (R-041), so
+    describe behaviour and keep the claims true to the code.
+  - `PublicAPI.Unshipped.txt` must list every public API (RS0016/RS0017).
+  - No two public overloads with optional parameters (RS0026). `ToHttpResult` has four plain overloads for this reason.
+  - `Result<T>`'s own `Success`/`Failure` are internal (CA1000). Callers use `Result.Success<T>(…)`/`Result.Failure<T>(…)`
+    or the implicit conversions.

@@ -119,7 +119,8 @@ BuildingBlocks (Core.Web → Core.Infrastructure → Core.Abstractions)
 
 ```
 NovaCore.sln
-├── Directory.Build.props          # tüm projeler: net10.0, nullable, NoWarn
+├── Directory.Build.props          # tüm projeler: net10.0, nullable, analyzer'lar, TreatWarningsAsErrors, VersionPrefix
+├── Directory.Build.targets        # IsPackable projeler: paket metadata'sı, README, PublicAPI dosyaları, doc koruması
 ├── Directory.Packages.props       # merkezî paket sürümleri (CPM)
 ├── docker-compose.yml             # opsiyonel SQL Server + Seq + Jaeger
 ├── .template.config/template.json # `dotnet new novacore`
@@ -380,9 +381,14 @@ dotnet test
 2. **Lokal/özel NuGet paketi (BuildingBlocks için):** yalnızca stabil çekirdeği versiyonlu paketleyip
    bir bug fix'i tüm projelere yayın.
    ```bash
-   dotnet pack src/BuildingBlocks/NovaCore.Core.Web -c Release -o ./artifacts
+   dotnet pack NovaCore.slnx -c Release -o ./artifacts                               # 0.1.0
+   dotnet pack NovaCore.slnx -c Release -o ./artifacts --version-suffix preview.1    # 0.1.0-preview.1
    # artifacts/ klasörünü lokal feed olarak ekleyin, sonra: dotnet add package NovaCore.Core.Web
    ```
+   - Sürüm `Directory.Build.props`'taki `VersionPrefix`'ten gelir. API kararlı olana kadar 0.x kalır.
+   - Her paket XML dokümanını, `src/PACKAGE.md`'den gelen README'yi, MIT lisans ifadesini ve repo linkini taşır. Yanında bir `.snupkg` sembol paketi üretilir.
+   - Public API `PublicAPI.*.txt` dosyalarında izlenir. İzlenmeyen bir değişiklik build'i kırar.
+   - Yayın `.github/workflows/release.yml` ile yapılır. `VersionPrefix` ile eşleşen bir `v*` tag'i (ör. `v0.1.0-preview.1`) GitHub Packages'a push eder.
 
 ---
 
@@ -398,6 +404,7 @@ dotnet test
 | Microsoft.AspNetCore.OpenApi / Caching.Hybrid / JwtBearer | Microsoft-yerleşik | **MIT** |
 | Microsoft.AspNetCore.Identity.EntityFrameworkCore | Kullanıcı/rol deposu | **MIT** |
 | Microsoft.EntityFrameworkCore.SqlServer | EF Core sağlayıcı | **MIT** |
+| Microsoft.CodeAnalysis.PublicApiAnalyzers | Public API takibi (yalnızca build, pakete girmez) | **MIT** |
 
 > ⚠️ **MediatR (v13+) ve AutoMapper (v15+) artık ticari** (Lucky Penny). NovaCore bunları kullanmaz.
 > Pipeline behavior gerçekten gerekirse MIT lisanslı `martinothamar/Mediator` eklenebilir.

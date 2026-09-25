@@ -50,3 +50,6 @@ other test classes). Subclass `NovaCoreApiFactory`, override `CreateHost` and ad
 **Different environment?** Override `EnvironmentName` (default `Development`), e.g. `ProductionApiFactory`.
 
 `xUnit1051` (CancellationToken) is `NoWarn`'d for these simple `HttpClient` tests.
+
+Warnings are errors here too. Test names are sentences with underscores (`Refresh_rotates_the_refresh_token`), so
+`.editorconfig` turns CA1707 off for `tests/**.cs` only (DECISIONS D-011). Every other analyzer rule applies.
