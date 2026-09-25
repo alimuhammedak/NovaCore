@@ -19,22 +19,32 @@ jobs:
       DOTNET_CLI_TELEMETRY_OPTOUT: true
 
     steps:
+      # The token isn't left in .git/config while restore, build and tests run; the push step passes it explicitly.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
       # Fails before anything is built if the tag and Directory.Build.props disagree, so a package can never ship under
-      # a version the code doesn't declare.
+      # a version the code doesn't declare. The suffix must be a SemVer prerelease (dot-separated [0-9A-Za-z-] parts):
+      # a tag can contain shell metacharacters, and 'v0.1.0-' must not silently publish a stable 0.1.0.
       - name: Resolve version from tag
         id: version
         run: |
           tag="${GITHUB_REF_NAME#v}"
           prefix="${tag%%-*}"
           suffix=""
-          if [[ "$tag" == *-* ]]; then suffix="${tag#*-}"; fi
-          expected="$(dotnet msbuild src/BuildingBlocks/NovaCore.Core.Abstractions/NovaCore.Core.Abstractions.csproj -getProperty:VersionPrefix)"
+          if [[ "$tag" == *-* ]]; then
+            suffix="${tag#*-}"
+            if [[ ! "$suffix" =~ ^[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*$ ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME has an invalid prerelease suffix '$suffix'."
+              exit 1
+            fi
+          fi
+          expected="$(dotnet msbuild src/BuildingBlocks/NovaCore.Core.Abstractions/NovaCore.Core.Abstractions.csproj -getProperty:VersionPrefix | tail -n 1 | tr -d '\r')"
           if [[ "$prefix" != "$expected" ]]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match VersionPrefix $expected in Directory.Build.props."
             exit 1
@@ -45,14 +55,19 @@ jobs:
         run: dotnet restore NovaCore.slnx
 
       # The suffix is passed to build too, so the assemblies' informational version matches the package version.
+      # It reaches the shell through env, never through ${{ }} interpolation into the script.
       - name: Build
-        run: dotnet build NovaCore.slnx -c Release --no-restore -p:VersionSuffix=${{ steps.version.outputs.suffix }}
+        env:
+          VERSION_SUFFIX: ${{ steps.version.outputs.suffix }}
+        run: dotnet build NovaCore.slnx -c Release --no-restore "-p:VersionSuffix=$VERSION_SUFFIX"
 
       - name: Test
         run: dotnet test NovaCore.slnx -c Release --no-build
 
       - name: Pack
-        run: dotnet pack NovaCore.slnx -c Release --no-build -o artifacts -p:VersionSuffix=${{ steps.version.outputs.suffix }}
+        env:
+          VERSION_SUFFIX: ${{ steps.version.outputs.suffix }}
+        run: dotnet pack NovaCore.slnx -c Release --no-build -o artifacts "-p:VersionSuffix=$VERSION_SUFFIX"
 
       - uses: actions/upload-artifact@v7
         with:

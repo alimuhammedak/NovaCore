@@ -29,9 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Every project builds with the `latest-recommended` analyzers, `EnforceCodeStyleInBuild` and `TreatWarningsAsErrors`.
   Low and moderate NuGet advisories (NU1901/NU1902) stay warnings.
 - **Breaking:** `Result<T>.Success(T)` and `Result<T>.Failure(Error)` are no longer public. Use `Result.Success<T>(value)`,
-  `Result.Failure<T>(error)` or the implicit conversions.
+  `Result.Failure<T>(error)` or the implicit conversions. Note that `Result<T>.Failure(error)` still compiles, but it now
+  binds to the inherited `Result.Failure(Error)` and returns a non-generic `Result`.
 - **Breaking (binary):** `ResultHttpExtensions.ToHttpResult` no longer has optional parameters. It has four overloads:
-  `(Result)`, `(Result, int)`, `(Result<T>)`, `(Result<T>, Func<T, IResult>)`. Existing source compiles unchanged.
+  `(Result)`, `(Result, int)`, `(Result<T>)`, `(Result<T>, Func<T, IResult>?)`. Existing source compiles and behaves
+  unchanged.
 - The OpenAPI document now includes descriptions taken from the XML docs of the packable projects (for example on the
   `PagedList` schemas). .NET 10's OpenAPI source generator picks them up automatically.
 
