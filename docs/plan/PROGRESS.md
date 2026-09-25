@@ -201,7 +201,7 @@ Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-2
 Plan onayı (2026-09-25): kullanıcı kararı Q-24 (D-022, health uçları yalnızca Development). Model kararları D-021, araştırmalar R-048…R-051. F2b.1, F2b.1a (NovaCore.AspNetCore) ve F2b.1b (NovaCore.EntityFrameworkCore) olarak bölündü. Başlangıçta main'deki `/openapi/v1.json` faz sonu karşılaştırması için dışarıya kaydedildi (29.460 bayt, commit'lenmedi).
 
 - [ ] F2b.1 Options pattern (alt adımlar: 1a AspNetCore, 1b EntityFrameworkCore)
-  - [ ] F2b.1a Jwt, RateLimiting, Cors, Cache
+  - [ ] F2b.1a Jwt, RateLimiting, Cors, Cache (devam ediyor)
   - [ ] F2b.1b Database
 - [ ] F2b.2 Test host sadeleştirme
 - [ ] F2b.3 TimeProvider

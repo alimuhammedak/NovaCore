@@ -1,10 +1,12 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using NovaCore.Abstractions.Identity;
 using NovaCore.AspNetCore.DependencyInjection;
@@ -39,23 +41,15 @@ public static class CoreWebExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 
-        services.AddCoreInfrastructure(builder.Configuration); // adds ProblemDetails + GlobalExceptionHandler + caching
+        services.AddCoreInfrastructure(); // adds ProblemDetails + GlobalExceptionHandler + caching
 
-        services.AddCoreAuthentication(builder.Configuration, builder.Environment);
+        services.AddCoreAuthentication();
         services.AddCoreAuthorization(); // permission-based policy provider + handler
 
         services.AddOpenApi(options => options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 
-        AddRateLimiting(services, builder.Configuration);
-
-        services.AddCors(options => options.AddPolicy(CorsPolicyName, policy =>
-        {
-            var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-            if (origins.Length > 0)
-                policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
-            else
-                policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-        }));
+        AddRateLimiting(services);
+        AddCors(services);
 
         return builder;
     }
@@ -85,14 +79,22 @@ public static class CoreWebExtensions
         return app;
     }
 
-    private static void AddRateLimiting(IServiceCollection services, IConfiguration configuration)
+    // Configuration is read when the options are first built, not here: values layered in after CreateBuilder (e.g. by
+    // WebApplicationFactory) still apply, and invalid values fail on start (docs/plan/RESEARCH.md R-048).
+    private static void AddRateLimiting(IServiceCollection services)
     {
-        var permitLimit = configuration.GetValue<int?>("RateLimiting:PermitLimit") ?? 100;
-        var windowSeconds = configuration.GetValue<int?>("RateLimiting:WindowSeconds") ?? 60;
+        services.AddOptions<RateLimitingOptions>()
+            .BindConfiguration(RateLimitingOptions.SectionName)
+            .ValidateOnStart();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<RateLimitingOptions>, RateLimitingOptionsValidator>());
 
-        services.AddRateLimiter(options =>
+        services.AddRateLimiter(options => options.RejectionStatusCode = StatusCodes.Status429TooManyRequests);
+
+        services.AddOptions<RateLimiterOptions>().Configure<IOptions<RateLimitingOptions>>((options, limits) =>
         {
-            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            var permitLimit = limits.Value.PermitLimit;
+            var window = TimeSpan.FromSeconds(limits.Value.WindowSeconds);
 
             // Global fixed-window limiter partitioned by caller IP.
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
@@ -101,7 +103,7 @@ public static class CoreWebExtensions
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = permitLimit,
-                        Window = TimeSpan.FromSeconds(windowSeconds),
+                        Window = window,
                         QueueLimit = 0
                     }));
 
@@ -113,9 +115,32 @@ public static class CoreWebExtensions
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = Math.Max(1, permitLimit / 10),
-                        Window = TimeSpan.FromSeconds(windowSeconds),
+                        Window = window,
                         QueueLimit = 0
                     }));
         });
+    }
+
+    private static void AddCors(IServiceCollection services)
+    {
+        services.AddOptions<CorsOriginsOptions>()
+            .BindConfiguration(CorsOriginsOptions.SectionName)
+            .Validate(
+                cors => cors.AllowedOrigins.All(CorsOriginsOptions.IsOrigin),
+                "Cors:AllowedOrigins entries must be origins such as https://app.example.com: scheme and host (and port), "
+                + "no path, no trailing slash and no '*'.")
+            .ValidateOnStart();
+
+        services.AddCors();
+
+        services.AddOptions<CorsOptions>().Configure<IOptions<CorsOriginsOptions>>((options, cors) =>
+            options.AddPolicy(CorsPolicyName, policy =>
+            {
+                var origins = cors.Value.AllowedOrigins;
+                if (origins.Length > 0)
+                    policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+                else
+                    policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+            }));
     }
 }

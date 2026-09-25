@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NovaCore.Abstractions.Results;
 using NovaCore.AspNetCore.Auth;
 using NovaCore.AspNetCore.Identity;
@@ -31,7 +32,7 @@ public sealed class AuthTokenService(
     RoleManager<ApplicationRole> roleManager,
     ITokenService accessTokens,
     ISecurityAuditLogger audit,
-    JwtOptions jwtOptions) : IAuthTokenService
+    IOptions<JwtOptions> jwtOptions) : IAuthTokenService
 {
     public async Task<AuthTokens> IssueAsync(ApplicationUser user, string? ip, CancellationToken cancellationToken = default)
     {
@@ -119,7 +120,7 @@ public sealed class AuthTokenService(
             TokenHash = Hash(raw),
             Family = family ?? Guid.CreateVersion7(),
             CreatedByIp = ip,
-            ExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(jwtOptions.RefreshTokenDays)
+            ExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(jwtOptions.Value.RefreshTokenDays)
         };
         return (raw, entity);
     }
