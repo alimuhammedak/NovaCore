@@ -1,4 +1,4 @@
-namespace NovaCore.Core.Abstractions.Identity;
+namespace NovaCore.Abstractions.Identity;
 
 /// <summary>
 /// Ambient information about the caller of the current request. Implemented over HttpContext in the

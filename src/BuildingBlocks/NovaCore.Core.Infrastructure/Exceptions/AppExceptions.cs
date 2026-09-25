@@ -1,4 +1,4 @@
-using NovaCore.Core.Abstractions.Results;
+using NovaCore.Abstractions.Results;
 
 namespace NovaCore.Core.Infrastructure.Exceptions;
 

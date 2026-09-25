@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using NovaCore.Core.Abstractions.Identity;
+using NovaCore.Abstractions.Identity;
 using NovaCore.Core.Infrastructure.DependencyInjection;
 using NovaCore.Core.Infrastructure.Persistence;
 using NovaCore.Core.Web.Auth;

@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Caching.Hybrid;
-using NovaCore.Core.Abstractions.Caching;
+using NovaCore.Abstractions.Caching;
 
 namespace NovaCore.Core.Infrastructure.Caching;
 

@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Http;
-using NovaCore.Core.Abstractions.Results;
+using NovaCore.Abstractions.Results;
 
 namespace NovaCore.Core.Infrastructure.Http;
 

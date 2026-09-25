@@ -1,4 +1,4 @@
-namespace NovaCore.Core.Abstractions.Pagination;
+namespace NovaCore.Abstractions.Pagination;
 
 /// <summary>
 /// A normalized paging request. Clamps page/size into sane bounds so a hostile or careless

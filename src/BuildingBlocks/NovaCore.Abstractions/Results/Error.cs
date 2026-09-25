@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace NovaCore.Core.Abstractions.Results;
+namespace NovaCore.Abstractions.Results;
 
 /// <summary>
 /// The category of a failure. Maps cleanly onto an HTTP status code at the edge,

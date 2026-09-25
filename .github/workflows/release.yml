@@ -44,7 +44,7 @@ jobs:
               exit 1
             fi
           fi
-          expected="$(dotnet msbuild src/BuildingBlocks/NovaCore.Core.Abstractions/NovaCore.Core.Abstractions.csproj -getProperty:VersionPrefix | tail -n 1 | tr -d '\r')"
+          expected="$(dotnet msbuild src/BuildingBlocks/NovaCore.Abstractions/NovaCore.Abstractions.csproj -getProperty:VersionPrefix | tail -n 1 | tr -d '\r')"
           if [[ "$prefix" != "$expected" ]]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match VersionPrefix $expected in Directory.Build.props."
             exit 1

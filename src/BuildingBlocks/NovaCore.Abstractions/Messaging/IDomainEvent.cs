@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace NovaCore.Core.Abstractions.Messaging;
+namespace NovaCore.Abstractions.Messaging;
 
 /// <summary>
 /// Something that happened inside a module that other handlers may care about.

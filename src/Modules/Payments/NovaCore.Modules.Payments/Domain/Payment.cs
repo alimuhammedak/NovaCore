@@ -1,4 +1,4 @@
-using NovaCore.Core.Abstractions.Entities;
+using NovaCore.Abstractions.Entities;
 
 namespace NovaCore.Modules.Payments.Domain;
 

@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
-using NovaCore.Core.Abstractions.Identity;
+using NovaCore.Abstractions.Identity;
 
 namespace NovaCore.Core.Web.Identity;
 

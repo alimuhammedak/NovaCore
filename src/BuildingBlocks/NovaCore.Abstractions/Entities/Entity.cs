@@ -1,6 +1,6 @@
-using NovaCore.Core.Abstractions.Messaging;
+using NovaCore.Abstractions.Messaging;
 
-namespace NovaCore.Core.Abstractions.Entities;
+namespace NovaCore.Abstractions.Entities;
 
 /// <summary>
 /// Base class for entities. Carries identity and a buffer of domain events that are dispatched

@@ -1,4 +1,4 @@
-namespace NovaCore.Core.Abstractions.Entities;
+namespace NovaCore.Abstractions.Entities;
 
 /// <summary>
 /// Entities that should be stamped with creation/modification audit data automatically.

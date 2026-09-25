@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using NovaCore.Core.Abstractions.Entities;
-using NovaCore.Core.Abstractions.Identity;
+using NovaCore.Abstractions.Entities;
+using NovaCore.Abstractions.Identity;
 
 namespace NovaCore.Core.Infrastructure.Persistence;
 

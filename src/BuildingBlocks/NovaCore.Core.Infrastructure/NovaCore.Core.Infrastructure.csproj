@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NovaCore.Core.Abstractions\NovaCore.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\NovaCore.Abstractions\NovaCore.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

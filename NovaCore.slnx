@@ -4,7 +4,7 @@
     <Project Path="src/Api/NovaCore.Api/NovaCore.Api.csproj" />
   </Folder>
   <Folder Name="/src/BuildingBlocks/">
-    <Project Path="src/BuildingBlocks/NovaCore.Core.Abstractions/NovaCore.Core.Abstractions.csproj" />
+    <Project Path="src/BuildingBlocks/NovaCore.Abstractions/NovaCore.Abstractions.csproj" />
     <Project Path="src/BuildingBlocks/NovaCore.Core.Infrastructure/NovaCore.Core.Infrastructure.csproj" />
     <Project Path="src/BuildingBlocks/NovaCore.Core.Web/NovaCore.Core.Web.csproj" />
   </Folder>

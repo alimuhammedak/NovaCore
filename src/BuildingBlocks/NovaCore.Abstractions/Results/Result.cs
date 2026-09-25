@@ -1,4 +1,4 @@
-namespace NovaCore.Core.Abstractions.Results;
+namespace NovaCore.Abstractions.Results;
 
 /// <summary>
 /// Outcome of an operation that can fail in expected ways. Zero dependencies, no exceptions

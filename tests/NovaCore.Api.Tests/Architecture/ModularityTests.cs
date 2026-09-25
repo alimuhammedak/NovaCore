@@ -1,4 +1,4 @@
-using NovaCore.Core.Abstractions.Results;
+using NovaCore.Abstractions.Results;
 using NovaCore.Core.Web.Modules;
 using NovaCore.Modules.Catalog;
 using NovaCore.Modules.Payments;

@@ -127,7 +127,9 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
 ### Faz 2a
 Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-23. Model kararları D-020, araştırmalar R-044…R-046. Başlangıçta main'deki `/openapi/v1.json` faz sonu karşılaştırması için dışarıya kaydedildi (commit'lenmedi). Taban: build 0 uyarı, 46/46.
 
-- [ ] F2b.6 (öne alındı, D-017): `[LoggerMessage]` dönüşümü (GlobalExceptionHandler, DatabaseMigrationService, SecurityAuditLogger, IdentityDataSeeder, LoggingEmailSender) ve `.editorconfig`'teki geçici CA1848/CA1873 satırlarının silinmesi. **Faz 2a'nın ilk adımı.**
+- [x] F2b.6 (194b754, öne alındı, D-017): 6 sınıf `[LoggerMessage]`'a çevrildi, `.editorconfig`'teki geçici CA1848/CA1873 satırları silindi. Seviye ve mesaj şablonları aynı, EventId'ler açık ve assembly içinde benzersiz (R-044).
+  - **Sürpriz:** CA1873 yalnızca `UserRegistered`'daki `Mask(email)` argümanını işaretledi (Information seviyesi; kural varsayılan olarak Information ve altını denetliyor). `IsEnabled` guard'ı instance ve static `[LoggerMessage]` metotlarında tanınmadı, çünkü analyzer guard ile log çağrısının aynı alıcıda (receiver) olmasını istiyor (R-047). Çözüm: audit log tanımları `this ILogger` extension biçiminde (`SecurityAuditLog`). Bastırma yok.
+  - Kök CLAUDE.md'ye Standards → "Logging is source-generated" maddesi eklendi, Gotchas'taki CA1848 maddesi silindi. CHANGELOG'a "Changed" notu yazıldı. `--no-incremental` build 0/0, 46/46.
 - [ ] F2a.1 Çekirdek projeler (alt adımlar: 1a Abstractions, 1b EntityFrameworkCore, 1c AspNetCore, 1d Catalog.Contracts paketlenmez)
 - [ ] F2a.2 Eklenti paketleri (alt adımlar: 2a Serilog, 2b OpenTelemetry, 2c Scalar, 2d FluentValidation köprüsü, D-019)
 - [ ] F2a.3 Açık modül kaydı

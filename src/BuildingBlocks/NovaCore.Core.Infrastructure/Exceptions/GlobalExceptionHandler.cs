@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using NovaCore.Core.Abstractions.Results;
+using NovaCore.Abstractions.Results;
 
 namespace NovaCore.Core.Infrastructure.Exceptions;
 

@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using NovaCore.Core.Abstractions.Messaging;
+using NovaCore.Abstractions.Messaging;
 
 namespace NovaCore.Core.Infrastructure.Messaging;
 

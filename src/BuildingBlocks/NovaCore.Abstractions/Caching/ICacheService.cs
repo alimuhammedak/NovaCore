@@ -1,4 +1,4 @@
-namespace NovaCore.Core.Abstractions.Caching;
+namespace NovaCore.Abstractions.Caching;
 
 /// <summary>
 /// A thin, transport-agnostic caching seam. The default implementation wraps .NET's HybridCache

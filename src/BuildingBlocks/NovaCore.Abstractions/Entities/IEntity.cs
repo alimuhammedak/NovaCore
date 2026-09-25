@@ -1,4 +1,4 @@
-namespace NovaCore.Core.Abstractions.Entities;
+namespace NovaCore.Abstractions.Entities;
 
 /// <summary>Marker for a persistable entity.</summary>
 public interface IEntity;

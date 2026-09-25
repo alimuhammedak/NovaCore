@@ -1,4 +1,4 @@
-namespace NovaCore.Core.Abstractions.Pagination;
+namespace NovaCore.Abstractions.Pagination;
 
 /// <summary>A single page of results plus the metadata a client needs to navigate.</summary>
 /// <typeparam name="T">The type of the items.</typeparam>
