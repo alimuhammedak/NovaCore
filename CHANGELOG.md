@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per package).
 - Release workflow (`.github/workflows/release.yml`): on a `v*` tag matching `VersionPrefix`, packs and pushes to
   GitHub Packages.
+- Architecture tests for the package map: the core packages depend on Microsoft packages only and point one way
+  (Abstractions ← AspNetCore / EntityFrameworkCore, add-ons → AspNetCore), and the building blocks never scan
+  assemblies. Host wiring tests pin the module order and endpoints, the exception-handler order and the Scalar UI.
+- `Directory.Build.targets` fails the build of a packable project that does not reference PublicApiAnalyzers.
 
 ### Changed
 

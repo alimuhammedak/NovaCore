@@ -71,7 +71,7 @@ dotnet ef database update     --project src/Modules/<M>/NovaCore.Modules.<M> --s
 dotnet new install .
 dotnet new novacore -n MyProject
 
-# NuGet packages (the four IsPackable projects) → artifacts/ (git-ignored). Version: VersionPrefix in Directory.Build.props.
+# NuGet packages (the six IsPackable building blocks) → artifacts/ (git-ignored). Version: VersionPrefix in Directory.Build.props.
 dotnet pack NovaCore.slnx -c Release -o artifacts [--version-suffix preview.1]
 ```
 
@@ -86,26 +86,38 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
 
 **Hybrid: modular monolith (macro) + vertical slice (micro) + a thin shared core.** Read these together:
 
-- **Dependency direction (one way):** `Api` → `Modules.*` → `Core.Web` → `Core.Infrastructure` →
-  `Core.Abstractions` → BCL. `Api` is a ~15-line composition root (`src/Api/NovaCore.Api/Program.cs`):
-  `AddCoreDefaults()` + `AddCoreWeb()` + `AddModules()`, then `UseCoreWeb()` + `MapModules()` + `MapDefaultEndpoints()`.
+- **Packages (`src/BuildingBlocks/`, ANALYSIS §4):** three **core** packages that depend on the BCL and Microsoft
+  packages only (D-003) — `NovaCore.Abstractions` (BCL only), `NovaCore.AspNetCore` and `NovaCore.EntityFrameworkCore`
+  — plus optional **add-on** packages for third-party libraries: `NovaCore.Serilog`, `NovaCore.OpenTelemetry`,
+  `NovaCore.Scalar`. `NovaCore.FluentValidation` is a non-packable bridge until .NET 10 validation replaces it (D-019).
 
-- **Modules are auto-discovered, not centrally registered.** `ModuleLoader` (Core.Web) scans deploy-dir
-  assemblies named `NovaCore.Modules.*` for `IModule` implementations. Each `IModule` registers its own
-  services + DbContext + permissions and maps its own endpoints. **Adding a module = new project +
-  implement `IModule` + reference it from `Api`. No other file changes.** (See `src/Modules/CLAUDE.md`.)
+- **Dependency direction (one way):** `Api` → `Modules.*` → `NovaCore.AspNetCore` / `NovaCore.EntityFrameworkCore`
+  → `NovaCore.Abstractions` → BCL. AspNetCore and EntityFrameworkCore never reference each other; add-ons reference
+  at most AspNetCore/Abstractions. Enforced by `PackageDependencyTests`.
 
-- **Cross-cutting lives in the core, owned by `Core.Web`:** `AddCoreDefaults` (Serilog + OpenTelemetry +
-  health + HttpClient resilience), `AddCoreWeb`/`UseCoreWeb` (ProblemDetails + exception handlers,
-  OpenAPI + Scalar, JWT auth, permission authz, rate limiter, CORS, security headers).
+- **The host composes everything explicitly** (`src/Api/NovaCore.Api/Program.cs`): the add-ons (`AddCoreLogging`,
+  `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`,
+  `AddValidationExceptionHandler`), then one `builder.AddModule<TModule>()` per module; after `Build`,
+  `UseSerilogRequestLogging`, `UseCoreWeb`, `MapCoreScalar`, `MapModules`, `MapDefaultEndpoints`. Nothing is found by
+  assembly scanning (Y-20, `ExplicitRegistrationTests`).
+
+- **Modules are self-contained.** Each `IModule` registers its own services + DbContext + permissions and maps its
+  own endpoints. **Adding a module = new project + implement `IModule` + reference it from `Api` + one
+  `builder.AddModule<TModule>()` line in `Program.cs`.** Modules map their endpoints in that order. (See
+  `src/Modules/CLAUDE.md`.)
+
+- **Cross-cutting lives in the core:** `AddCoreDefaults` (health + HttpClient resilience) and
+  `AddCoreWeb`/`UseCoreWeb` (ProblemDetails + exception handlers, OpenAPI document, JWT auth, permission authz, rate
+  limiter, CORS, security headers) in `NovaCore.AspNetCore`; logging, tracing and the Scalar UI are add-ons.
 
 - **Persistence:** each module owns a `DbContext` pinned to its own SQL Server schema
   (`catalog` / `payments` / `identity`, via `HasDefaultSchema`). Register through
-  `services.AddModuleDbContext<TContext>(...)` (Core.Infrastructure) — this also enrolls the context for
-  generic startup migration (`DatabaseMigrationService`, gated by `Database:ApplyMigrations`).
+  `services.AddModuleDbContext<TContext>(...)` (`NovaCore.EntityFrameworkCore`) — this also enrolls the context for
+  generic startup migration (`DatabaseMigrationService`, registered by `AddCorePersistence` when
+  `Database:ApplyMigrations` is true).
 
 - **Security** is a first-class subsystem: the `Identity` module (ASP.NET Core Identity + JWT/refresh +
-  2FA + admin) plus permission-based-authorization infrastructure in `Core.Web`. See
+  2FA + admin) plus permission-based-authorization infrastructure in `NovaCore.AspNetCore`. See
   `src/Modules/NovaCore.Modules.Identity/CLAUDE.md` before touching auth.
 
 ---
@@ -121,14 +133,16 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 - **No mediator / no CQRS dispatcher.** Handlers receive dependencies directly from minimal-API DI
   (`sade CQRS`). Don't introduce a request-dispatch abstraction.
 
-- **`Core.Abstractions` stays framework-free** (BCL only — no ASP.NET, no EF). Enforced by
-  `ModularityTests`. Put anything needing the framework in `Core.Infrastructure`/`Core.Web`.
+- **`NovaCore.Abstractions` stays framework-free** (BCL only — no ASP.NET, no EF), and the core packages depend on
+  Microsoft packages only; third-party libraries go into an add-on package. Enforced by `ModularityTests` and
+  `PackageDependencyTests`. Put anything needing ASP.NET Core in `NovaCore.AspNetCore` and anything needing EF Core in
+  `NovaCore.EntityFrameworkCore`.
 
 - **Modules never reference each other directly.** Cross-module calls go through a `*.Contracts` project
   (in-process interface, e.g. `IProductCatalog`) or a domain event — never another module's DbContext.
 
-- **Expected failures → `Result`/`Result<T>` + `.ToHttpResult()`** (Core.Infrastructure). Reserve
-  exceptions for the genuinely exceptional. Domain exceptions live in `Core.Infrastructure/Exceptions`.
+- **Expected failures → `Result`/`Result<T>` + `.ToHttpResult()`** (`NovaCore.AspNetCore`). Reserve
+  exceptions for the genuinely exceptional. Domain exceptions live in `NovaCore.AspNetCore/Exceptions`.
 
 - **Endpoints are guarded by permissions, not ad-hoc role checks:**
   `endpoint.RequirePermission("module:resource:action")`. Declare a module's permissions via
@@ -148,10 +162,11 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   argument must be computed (CA1873), wrap the call in an `IsEnabled` guard and declare the methods as `this ILogger`
   extensions: CA1873 only accepts a guard on the same receiver (`SecurityAuditLogger`, RESEARCH R-047).
 
-- **Packable projects are NuGet packages** (Core.Abstractions, Core.Infrastructure, Core.Web, Catalog.Contracts):
+- **Packable projects are NuGet packages** (the three core packages and the three add-ons in `src/BuildingBlocks`):
   - Every public member needs an XML doc comment (CS1591).
-  - The `.csproj` sets `<GenerateDocumentationFile>true</GenerateDocumentationFile>` next to `IsPackable`;
-    `Directory.Build.targets` fails the build without it.
+  - The `.csproj` sets `<GenerateDocumentationFile>true</GenerateDocumentationFile>` next to `IsPackable` and references
+    `Microsoft.CodeAnalysis.PublicApiAnalyzers` (`PrivateAssets="all"`); `Directory.Build.targets` fails the build
+    without either. Add `PublicAPI.Shipped.txt`/`PublicAPI.Unshipped.txt` starting with `#nullable enable`.
   - A public API change fails the build (RS0016/RS0017) until `PublicAPI.Unshipped.txt` is updated: use the IDE code
     fix or `dotnet format analyzers <csproj> --diagnostics RS0016 --severity warn`. `PublicAPI.Shipped.txt` stays
     empty until the first release is declared (F5.4).
@@ -168,8 +183,8 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 
 ## Gotchas (learned the hard way)
 
-- **Eager config reads.** `AddCoreWeb` reads `RateLimiting:PermitLimit`, `Jwt:SigningKey`, and
-  `Database:ApplyMigrations` *eagerly* during service registration. `WebApplicationFactory`'s in-memory
+- **Eager config reads.** `AddCoreWeb` reads `RateLimiting:PermitLimit` and `Jwt:SigningKey`, and
+  `AddCorePersistence` reads `Database:ApplyMigrations`, *eagerly* during service registration. `WebApplicationFactory`'s in-memory
   config is layered in too late to override these — set them as **environment variables** in tests, or
   per factory via `CreateHost` + `ConfigureHostConfiguration` (see `tests/CLAUDE.md`).
 - **`WithTags` on a route group** needs `using Microsoft.AspNetCore.Http;` (not just `...Builder`).
@@ -187,8 +202,10 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   imported. Set those in the `.csproj` or `Directory.Build.props` (RESEARCH R-040).
 - **XML docs reach the OpenAPI document.** .NET 10's OpenAPI source generator copies XML comments from projects with
   `GenerateDocumentationFile` into schema descriptions. Doc comments on packable types are user-visible API docs (R-041).
-- **Module discovery** is reflection-based (incompatible with NativeAOT) and keys off the assembly name
-  prefix `NovaCore.Modules.*` — keep that prefix for any new module.
+- **Keep the `NovaCore.Modules.*` assembly-name prefix** for any new module: modules are registered explicitly, but
+  the architecture tests find modules (and check their boundaries) by that prefix.
+- **Renaming or moving a project leaves stale DLLs** in `tests/**/bin` and `src/Api/**/bin`, and the architecture
+  tests load every `NovaCore.*.dll` there. Delete those `bin`/`obj` folders after a rename; CI starts clean.
 
 ---
 

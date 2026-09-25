@@ -151,7 +151,7 @@ Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-2
 - [x] F2a.3 (6f7828e): `ModuleLoader` ve `AddModules()` silindi, yerine `builder.AddModule<TModule>()` geldi. `IModule.IsEnabled` kaldırıldı (D-018). `Program.cs` modülleri eski sırayla ekliyor: Catalog, Identity, Payments.
   - Yeni `ModuleRegistrationTests` modül sırasını ve 24 modül endpoint'ini (HTTP metodu + route) sabitliyor. Liste, reflection sürümü çalışan host'tan çıkarıldı. Test o sürüme karşı yeşildi, geçişten sonra da yeşil. Sıra değiştirilince iki test de kırmızıya döndü (commit'lenmedi).
   - Modüllerin XML yorumlarındaki "otomatik keşfedilir" ifadeleri düzeltildi. `Program.cs` bölümlere ayrıldı (eklentiler / çekirdek / modüller). 50/50.
-- [x] F2a.4 Mimari testler (hash bir sonraki commit'te)
+- [x] F2a.4 (c3d599e) Mimari testler
   - `PackageDependencyTests` (Y-05, D-003, ANALYSIS §4), 5 test:
     - Çekirdek csproj'larda doğrudan paketler yalnızca `Microsoft.*`/`System.*` (`PrivateAssets=all` hariç).
     - Çekirdek assembly'ler yalnızca Microsoft/BCL assembly'lerine ve Abstractions'a bağlanıyor. Bu, transitive olarak gelen bir üçüncü taraf tipinin (ör. Polly) kodda kullanılmasını yakalar.
@@ -162,7 +162,12 @@ Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-2
   - Her kural kasıtlı bir ihlalle kırmızıya döndürüldü (commit'lenmedi): AspNetCore'a Scalar paketi, AspNetCore → EF referansı, AspNetCore'da `typeof(Polly.ResiliencePipeline)`, `AppDomain.GetAssemblies()`, EF'e ASP.NET framework'ü, Scalar → EF referansı.
     - EF'e framework eklendiğinde restore NU1510 ile düştü: Binder ve Hosting.Abstractions o zaman framework'ten geleceği için "prune" edilir. Bu, ASP.NET'siz tasarımın (D-020 (1)) bu iki paketi neden açıkça istediğini de doğruluyor.
   - Tüm testler 56/56.
-- [ ] F2a.5 Dokümanlar
+- [x] F2a.5 Dokümanlar (hash bir sonraki commit'te)
+  - README: mimari diyagramı, bağımlılık kuralları, çekirdek/proje tablosu, proje ağacı (`NovaCore.sln` yazıyordu, `.slnx` oldu), `Program.cs`, "Yeni modül ekleme" (artık `Program.cs`'e bir satır), cross-cutting tablosu, test, dağıtım (6 paket), paket/lisans tablosu, notlar.
+  - Kök CLAUDE.md: Architecture bölümü paket haritasına göre yeniden yazıldı. Standards (Abstractions, Result, packable listesi, PublicApiAnalyzers koruması), Gotchas (erken okunan config artık iki metotta; modül öneki; yeniden adlandırmadan sonra eski DLL'ler) ve pack komutu güncellendi.
+  - `src/BuildingBlocks/CLAUDE.md` (çekirdek, eklentiler, paket olmayan köprü), `src/Modules/CLAUDE.md` (modül ekleme adımları), `tests/CLAUDE.md` (yeni mimari ve host testleri), `src/PACKAGE.md` (paket tablosu), CHANGELOG.
+  - Memory: `novacore-stack`, `novacore-project`, `novacore-security` ve `MEMORY.md` indeksi.
+  - Kabul kriteri: `docs/plan` ve CHANGELOG'daki geçmiş kayıtlar dışında `Core.Web`, `Core.Infrastructure`, `Core.Abstractions`, `NovaCore.Core`, `ModuleLoader` ve `AddModules` geçmiyor (git grep, memory dahil).
 - [ ] F2a.6 (opsiyonel) İlk önizleme sürümü: yalnızca yerel pack (Q-23)
 
 ### Faz 2b
@@ -258,6 +263,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 1, F2a) CA1711 (`IDomainEventHandler<T>`) ve CA1716 (`Error`) gerekçeli bastırıldı. 2a'da namespace'ler değişirken bu isimler de yeniden düşünülebilir.
 - ~~(Faz 1, F2a.2) Serilog log kültürü:~~ → F2a.2a'da karar verildi: `null` korunuyor, 2a'da davranış değişmiyor (D-020 (8)). Eski not: `formatProvider: null` Serilog'un varsayılanı. Logların culture-invariant olup olmayacağına NovaCore.Serilog'da karar verilmeli.
 - (Faz 1) Çözüm genelinde `dotnet pack`, `NovaCore.Api` için kodsuz bir uyarı veriyor: Web SDK `WarnOnPackingNonPackableProject=true` ayarlıyor. Pack başarısız olmuyor, uyarı bastırılmadı (Y-10). Kapatmak için Api csproj'da bu özellik `false` yapılabilir (kullanıcı onayıyla).
+- (Faz 2a, F2a.5) Kök CLAUDE.md Standards'taki "0 warnings" maddesi bastırma için hâlâ "DECISIONS Y-10" diyor. Y-10'un yerini Y-44 aldı (D-016), ifade de değişti: yalnızca MS'in "When to suppress" iznine dayanan kalıcı bastırma. Tek kelimelik ama bir kuralı değiştiriyor, 2a kapsamı dışı.
 - (Faz 1) `.snupkg` GitHub Packages'a gitmiyor (R-039), yalnızca workflow artifact'i. İleride nuget.org seçilirse sembol sunucusu kullanılabilir.
 - (Faz 1, F5.4) Package validation baseline'ı (`PackageValidationBaselineVersion`) `Microsoft.NET.ApiCompat.targets:18`'de değerlendirme anında okunuyor, import'u Directory.Build.targets'tan sonra geliyor. F5.4'te nereye yazılacağı doğrulanmalı (R-040).
 - ~~(Faz 1) `NovaCore.Core.Web` paketinin nuspec bağımlılıklarında FluentValidation, Serilog, OpenTelemetry ve Scalar var (D-003 ihlali). F2a.2 ve F2c'nin işi.~~ → F2a.2'de çözüldü (Serilog/OTel/Scalar eklentilere, FluentValidation `NovaCore.FluentValidation`'a taşındı), F2a.4 testleri koruyor.

@@ -12,12 +12,17 @@ Stack: **xUnit v3** (test projects are `OutputType=Exe`). Run a single test with
   DB-free tests (health, OpenAPI, security headers, 401/validation gates) need no seeding. DB-backed tests
   (`AuthFlowTests`) implement `IAsyncLifetime` and seed via `IdentityDataSeeder` + `UserManager`.
 - **Architecture** (`Architecture/`) — `ModularityTests` enforce boundaries (Payments → only
-  Catalog.Contracts; Core.Abstractions has no ASP.NET/EF reference). The testable bans in
+  Catalog.Contracts; `NovaCore.Abstractions` has no ASP.NET/EF reference). The testable bans in
   `docs/plan/DECISIONS.md` are tests too: banned packages anywhere in the dependency graph (Y-01/32/33),
-  module references only via `*.Contracts` and no extra per-module projects (Y-08/17), no
-  `IRepository`/`IUnitOfWork` or `*Helper`/`*Util`/`*Manager` types (Y-15/29), scope + build validation
-  on the test host (Y-26), no `*.Domain` types in endpoint signatures via ApiExplorer (Y-31), no
-  TODO/FIXME under `src/` (Y-38). `Solution` locates the repo root and first-party assemblies.
+  core packages on Microsoft packages only plus the one-way package direction (Y-05, `PackageDependencyTests`, which
+  reads the `src/BuildingBlocks` csproj files and the built assemblies), module references only via `*.Contracts`
+  and no extra per-module projects (Y-08/17), no `IRepository`/`IUnitOfWork` or `*Helper`/`*Util`/`*Manager` types
+  (Y-15/29), no assembly scanning in the building blocks (Y-20), scope + build validation on the test host (Y-26),
+  no `*.Domain` types in endpoint signatures via ApiExplorer (Y-31), no TODO/FIXME under `src/` (Y-38). `Solution`
+  locates the repo root and first-party assemblies.
+- **Host wiring** (`Integration/`) — `ModuleRegistrationTests` pin the module order and every module endpoint;
+  `ExceptionHandlerOrderTests` pins the validation handler ahead of the global one. Update the expected list when you
+  add or change an endpoint.
   **Keep these green** — they are the guardrails for the whole design; never weaken one to pass (Y-10).
 
 ## How the test host works (and why)
