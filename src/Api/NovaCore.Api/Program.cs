@@ -2,13 +2,15 @@ using NovaCore.AspNetCore.Hosting;
 using NovaCore.AspNetCore.Modules;
 using NovaCore.AspNetCore.Web;
 using NovaCore.EntityFrameworkCore.Persistence;
+using NovaCore.OpenTelemetry;
 using NovaCore.Serilog;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddCoreLogging();    // structured logging (Serilog: console, Seq when configured)
-builder.AddCoreDefaults();   // OpenTelemetry + health + resilient HttpClients
+builder.AddCoreObservability(); // OpenTelemetry metrics + tracing, OTLP export when configured
+builder.AddCoreDefaults();   // health checks + resilient HttpClients
 builder.AddCoreWeb();        // ProblemDetails, OpenAPI + Scalar, JWT auth, rate limiting, CORS
 builder.AddCorePersistence(); // audit interceptor, domain events, opt-in startup migrations (before the modules)
 builder.AddModules();        // discover every NovaCore.Modules.* IModule and register its services

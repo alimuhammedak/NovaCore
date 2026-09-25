@@ -1,62 +1,29 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
-using OpenTelemetry;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 
 namespace NovaCore.AspNetCore.Hosting;
 
 /// <summary>
-/// The NovaCore take on Aspire's "ServiceDefaults": one call wires observability (OpenTelemetry traces + metrics),
-/// health checks and resilient HttpClients. Structured logging is the NovaCore.Serilog add-on's <c>AddCoreLogging</c>.
+/// The NovaCore take on Aspire's "ServiceDefaults": one call wires health checks and resilient HttpClients. Logging
+/// and observability are add-ons: <c>AddCoreLogging</c> (NovaCore.Serilog) and <c>AddCoreObservability</c>
+/// (NovaCore.OpenTelemetry).
 /// </summary>
 public static class HostingExtensions
 {
     /// <summary>
-    /// Adds observability and health checks (see the <c>AddCore*</c> methods below) and the standard resilience handler
-    /// on every HttpClient.
+    /// Adds the health checks (see <see cref="AddCoreHealthChecks"/>) and the standard resilience handler on every
+    /// HttpClient.
     /// </summary>
     public static IHostApplicationBuilder AddCoreDefaults(this IHostApplicationBuilder builder)
     {
-        builder.AddCoreObservability();
         builder.AddCoreHealthChecks();
 
         // Every outbound HttpClient gets standard retry/circuit-breaker/timeout behaviour.
         builder.Services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler());
-
-        return builder;
-    }
-
-    /// <summary>
-    /// Adds OpenTelemetry metrics and tracing for ASP.NET Core, HttpClient and the runtime, exported over OTLP when
-    /// <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> is configured.
-    /// </summary>
-    public static IHostApplicationBuilder AddCoreObservability(this IHostApplicationBuilder builder)
-    {
-        var otel = builder.Services.AddOpenTelemetry();
-
-        otel.ConfigureResource(resource => resource.AddService(
-            serviceName: builder.Environment.ApplicationName,
-            serviceVersion: typeof(HostingExtensions).Assembly.GetName().Version?.ToString()));
-
-        otel.WithMetrics(metrics => metrics
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddRuntimeInstrumentation());
-
-        otel.WithTracing(tracing => tracing
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation());
-
-        // Export over OTLP only when an endpoint is configured (e.g. an OTel collector / Aspire dashboard).
-        if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
-            otel.UseOtlpExporter();
 
         return builder;
     }
