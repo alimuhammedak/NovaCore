@@ -258,3 +258,11 @@ Biçim:
   - Gözlem: main ile F1.1 branch'inin `/openapi/v1.json` çıktıları karşılaştırıldı (geçici, commit'lenmemiş bir dump testiyle). Tek fark, iki `PagedList` şemasına Abstractions'taki `<summary>`'den gelen `"description"` alanı. Endpoint'ler, şema yapısı ve durum kodları aynı.
 - Kaynak: https://learn.microsoft.com/aspnet/core/release-notes/aspnetcore-10.0?view=aspnetcore-10.0#openapi · https://learn.microsoft.com/aspnet/core/fundamentals/openapi/openapi-comments?view=aspnetcore-10.0
 - Sonuç: Q-19. Kullanıcı kabul etti: yalnızca açıklama metni eklenir, API sözleşmesi değişmez. CHANGELOG'a "Changed" notu yazılacak.
+
+### R-042: PublicApiAnalyzers kurulumu: AdditionalFiles ve RS0026 (2026-09-25, faz 1)
+- Bulgu:
+  - 5.6.0 paketinin `buildTransitive/*.props|targets` dosyaları `PublicAPI.*.txt`'yi `AdditionalFiles` olarak **eklemiyor**. Yalnızca global analyzer config ve `CodeAnalysisTreatWarningsAsErrors` ayarını yapıyorlar. R-037'deki "files will be added" ifadesi dosyaları oluşturan IDE code fix'ini anlatıyor. Bu yüzden item'lar `Directory.Build.targets`'a eklendi.
+  - Unshipped listesi `dotnet format analyzers <proj> --diagnostics RS0016 --severity warn` ile, analyzer'ın kendi code fix'iyle üretildi. Çözüm genelinde tek çağrı yalnızca ilk projeyi doldurdu, diğerleri proje proje çalıştırıldı. Record'ların derleyicinin ürettiği `Equals(object)`/`ToString()` üyeleri `~` (oblivious) ile yazıldı.
+  - RS0026 (ApiDesign): aynı isimli iki public overload'un ikisi de opsiyonel parametre taşıyınca hata veriyor. Roslyn kuralı: *"Only one overload may have optional parameters"*, bu overload en çok parametreye sahip olmalı. Gerekçe, sonradan parametre eklemenin kaynak ve ikili uyumluluğu bozması.
+- Kaynak: `~/.nuget/packages/microsoft.codeanalysis.publicapianalyzers/5.6.0/buildTransitive/` · https://github.com/dotnet/roslyn/blob/main/docs/Adding%20Optional%20Parameters%20in%20Public%20API.md
+- Sonuç: F1.4. Q-20 → D-015: `ToHttpResult` overload'lara bölündü.

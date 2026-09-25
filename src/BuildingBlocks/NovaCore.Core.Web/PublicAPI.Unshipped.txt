@@ -1,0 +1,123 @@
+#nullable enable
+const NovaCore.Core.Web.Auth.JwtOptions.SectionName = "Jwt" -> string!
+const NovaCore.Core.Web.Authorization.PermissionPolicyProvider.PolicyPrefix = "perm:" -> string!
+const NovaCore.Core.Web.Identity.HttpContextCurrentUser.SuperAdminRole = "Administrator" -> string!
+const NovaCore.Core.Web.Identity.NovaClaims.Email = "email" -> string!
+const NovaCore.Core.Web.Identity.NovaClaims.Name = "name" -> string!
+const NovaCore.Core.Web.Identity.NovaClaims.Permission = "permission" -> string!
+const NovaCore.Core.Web.Identity.NovaClaims.Role = "role" -> string!
+const NovaCore.Core.Web.Identity.NovaClaims.Subject = "sub" -> string!
+const NovaCore.Core.Web.OpenApi.BearerSecuritySchemeTransformer.SchemeId = "Bearer" -> string!
+const NovaCore.Core.Web.Web.CoreWebExtensions.CorsPolicyName = "novacore" -> string!
+NovaCore.Core.Web.Auth.AccessToken
+NovaCore.Core.Web.Auth.AccessToken.AccessToken() -> void
+NovaCore.Core.Web.Auth.AccessToken.AccessToken(string! Token, System.DateTimeOffset ExpiresAtUtc) -> void
+NovaCore.Core.Web.Auth.AccessToken.Deconstruct(out string! Token, out System.DateTimeOffset ExpiresAtUtc) -> void
+NovaCore.Core.Web.Auth.AccessToken.Equals(NovaCore.Core.Web.Auth.AccessToken other) -> bool
+NovaCore.Core.Web.Auth.AccessToken.ExpiresAtUtc.get -> System.DateTimeOffset
+NovaCore.Core.Web.Auth.AccessToken.ExpiresAtUtc.init -> void
+NovaCore.Core.Web.Auth.AccessToken.ExpiresInSeconds.get -> int
+NovaCore.Core.Web.Auth.AccessToken.Token.get -> string!
+NovaCore.Core.Web.Auth.AccessToken.Token.init -> void
+NovaCore.Core.Web.Auth.AuthenticationExtensions
+NovaCore.Core.Web.Auth.ITokenService
+NovaCore.Core.Web.Auth.ITokenService.CreateAccessToken(System.Collections.Generic.IReadOnlyCollection<System.Security.Claims.Claim!>! claims) -> NovaCore.Core.Web.Auth.AccessToken
+NovaCore.Core.Web.Auth.JwtOptions
+NovaCore.Core.Web.Auth.JwtOptions.AccessTokenMinutes.get -> int
+NovaCore.Core.Web.Auth.JwtOptions.AccessTokenMinutes.set -> void
+NovaCore.Core.Web.Auth.JwtOptions.Audience.get -> string!
+NovaCore.Core.Web.Auth.JwtOptions.Audience.set -> void
+NovaCore.Core.Web.Auth.JwtOptions.Issuer.get -> string!
+NovaCore.Core.Web.Auth.JwtOptions.Issuer.set -> void
+NovaCore.Core.Web.Auth.JwtOptions.JwtOptions() -> void
+NovaCore.Core.Web.Auth.JwtOptions.RefreshTokenDays.get -> int
+NovaCore.Core.Web.Auth.JwtOptions.RefreshTokenDays.set -> void
+NovaCore.Core.Web.Auth.JwtOptions.SigningKey.get -> string!
+NovaCore.Core.Web.Auth.JwtOptions.SigningKey.set -> void
+NovaCore.Core.Web.Auth.JwtTokenService
+NovaCore.Core.Web.Auth.JwtTokenService.CreateAccessToken(System.Collections.Generic.IReadOnlyCollection<System.Security.Claims.Claim!>! claims) -> NovaCore.Core.Web.Auth.AccessToken
+NovaCore.Core.Web.Auth.JwtTokenService.JwtTokenService(NovaCore.Core.Web.Auth.JwtOptions! options) -> void
+NovaCore.Core.Web.Authorization.AuthorizationExtensions
+NovaCore.Core.Web.Authorization.HasPermissionAttribute
+NovaCore.Core.Web.Authorization.HasPermissionAttribute.HasPermissionAttribute(string! permission) -> void
+NovaCore.Core.Web.Authorization.IPermissionDefinitionProvider
+NovaCore.Core.Web.Authorization.IPermissionDefinitionProvider.GetPermissions() -> System.Collections.Generic.IReadOnlyCollection<NovaCore.Core.Web.Authorization.PermissionDefinition!>!
+NovaCore.Core.Web.Authorization.PermissionAuthorizationHandler
+NovaCore.Core.Web.Authorization.PermissionAuthorizationHandler.PermissionAuthorizationHandler() -> void
+NovaCore.Core.Web.Authorization.PermissionDefinition
+NovaCore.Core.Web.Authorization.PermissionDefinition.<Clone>$() -> NovaCore.Core.Web.Authorization.PermissionDefinition!
+NovaCore.Core.Web.Authorization.PermissionDefinition.Deconstruct(out string! Name, out string! DisplayName, out string! Group) -> void
+NovaCore.Core.Web.Authorization.PermissionDefinition.DisplayName.get -> string!
+NovaCore.Core.Web.Authorization.PermissionDefinition.DisplayName.init -> void
+NovaCore.Core.Web.Authorization.PermissionDefinition.Equals(NovaCore.Core.Web.Authorization.PermissionDefinition? other) -> bool
+NovaCore.Core.Web.Authorization.PermissionDefinition.Group.get -> string!
+NovaCore.Core.Web.Authorization.PermissionDefinition.Group.init -> void
+NovaCore.Core.Web.Authorization.PermissionDefinition.Name.get -> string!
+NovaCore.Core.Web.Authorization.PermissionDefinition.Name.init -> void
+NovaCore.Core.Web.Authorization.PermissionDefinition.PermissionDefinition(string! Name, string! DisplayName, string! Group) -> void
+NovaCore.Core.Web.Authorization.PermissionPolicyProvider
+NovaCore.Core.Web.Authorization.PermissionPolicyProvider.GetDefaultPolicyAsync() -> System.Threading.Tasks.Task<Microsoft.AspNetCore.Authorization.AuthorizationPolicy!>!
+NovaCore.Core.Web.Authorization.PermissionPolicyProvider.GetFallbackPolicyAsync() -> System.Threading.Tasks.Task<Microsoft.AspNetCore.Authorization.AuthorizationPolicy?>!
+NovaCore.Core.Web.Authorization.PermissionPolicyProvider.GetPolicyAsync(string! policyName) -> System.Threading.Tasks.Task<Microsoft.AspNetCore.Authorization.AuthorizationPolicy?>!
+NovaCore.Core.Web.Authorization.PermissionPolicyProvider.PermissionPolicyProvider(Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Authorization.AuthorizationOptions!>! options) -> void
+NovaCore.Core.Web.Authorization.PermissionRequirement
+NovaCore.Core.Web.Authorization.PermissionRequirement.Permission.get -> string!
+NovaCore.Core.Web.Authorization.PermissionRequirement.PermissionRequirement(string! permission) -> void
+NovaCore.Core.Web.Hosting.HostingExtensions
+NovaCore.Core.Web.Identity.HttpContextCurrentUser
+NovaCore.Core.Web.Identity.HttpContextCurrentUser.Email.get -> string?
+NovaCore.Core.Web.Identity.HttpContextCurrentUser.HasPermission(string! permission) -> bool
+NovaCore.Core.Web.Identity.HttpContextCurrentUser.HttpContextCurrentUser(Microsoft.AspNetCore.Http.IHttpContextAccessor! httpContextAccessor) -> void
+NovaCore.Core.Web.Identity.HttpContextCurrentUser.IsAuthenticated.get -> bool
+NovaCore.Core.Web.Identity.HttpContextCurrentUser.IsInRole(string! role) -> bool
+NovaCore.Core.Web.Identity.HttpContextCurrentUser.Permissions.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+NovaCore.Core.Web.Identity.HttpContextCurrentUser.Roles.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+NovaCore.Core.Web.Identity.HttpContextCurrentUser.UserId.get -> string?
+NovaCore.Core.Web.Identity.HttpContextCurrentUser.UserName.get -> string?
+NovaCore.Core.Web.Identity.NovaClaims
+NovaCore.Core.Web.Modules.IModule
+NovaCore.Core.Web.Modules.IModule.AddModule(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+NovaCore.Core.Web.Modules.IModule.IsEnabled(Microsoft.Extensions.Configuration.IConfiguration! configuration) -> bool
+NovaCore.Core.Web.Modules.IModule.MapEndpoints(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+NovaCore.Core.Web.Modules.IModule.Name.get -> string!
+NovaCore.Core.Web.Modules.ModuleExtensions
+NovaCore.Core.Web.Modules.ModuleLoader
+NovaCore.Core.Web.OpenApi.BearerSecuritySchemeTransformer
+NovaCore.Core.Web.OpenApi.BearerSecuritySchemeTransformer.BearerSecuritySchemeTransformer() -> void
+NovaCore.Core.Web.OpenApi.BearerSecuritySchemeTransformer.TransformAsync(Microsoft.OpenApi.OpenApiDocument! document, Microsoft.AspNetCore.OpenApi.OpenApiDocumentTransformerContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NovaCore.Core.Web.Security.SecurityHeadersExtensions
+NovaCore.Core.Web.Security.SecurityHeadersMiddleware
+NovaCore.Core.Web.Security.SecurityHeadersMiddleware.InvokeAsync(Microsoft.AspNetCore.Http.HttpContext! context) -> System.Threading.Tasks.Task!
+NovaCore.Core.Web.Security.SecurityHeadersMiddleware.SecurityHeadersMiddleware(Microsoft.AspNetCore.Http.RequestDelegate! next) -> void
+NovaCore.Core.Web.Validation.ValidationExceptionHandler
+NovaCore.Core.Web.Validation.ValidationExceptionHandler.TryHandleAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext, System.Exception! exception, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
+NovaCore.Core.Web.Validation.ValidationExceptionHandler.ValidationExceptionHandler(Microsoft.AspNetCore.Http.IProblemDetailsService! problemDetailsService) -> void
+NovaCore.Core.Web.Validation.ValidationFilter<T>
+NovaCore.Core.Web.Validation.ValidationFilter<T>.InvokeAsync(Microsoft.AspNetCore.Http.EndpointFilterInvocationContext! context, Microsoft.AspNetCore.Http.EndpointFilterDelegate! next) -> System.Threading.Tasks.ValueTask<object?>
+NovaCore.Core.Web.Validation.ValidationFilter<T>.ValidationFilter() -> void
+NovaCore.Core.Web.Web.CoreWebExtensions
+override NovaCore.Core.Web.Auth.AccessToken.GetHashCode() -> int
+override NovaCore.Core.Web.Authorization.PermissionDefinition.Equals(object? obj) -> bool
+override NovaCore.Core.Web.Authorization.PermissionDefinition.GetHashCode() -> int
+override NovaCore.Core.Web.Authorization.PermissionDefinition.ToString() -> string!
+static NovaCore.Core.Web.Auth.AccessToken.operator !=(NovaCore.Core.Web.Auth.AccessToken left, NovaCore.Core.Web.Auth.AccessToken right) -> bool
+static NovaCore.Core.Web.Auth.AccessToken.operator ==(NovaCore.Core.Web.Auth.AccessToken left, NovaCore.Core.Web.Auth.AccessToken right) -> bool
+static NovaCore.Core.Web.Auth.AuthenticationExtensions.AddCoreAuthentication(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, Microsoft.Extensions.Hosting.IHostEnvironment! environment) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static NovaCore.Core.Web.Authorization.AuthorizationExtensions.AddCoreAuthorization(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static NovaCore.Core.Web.Authorization.AuthorizationExtensions.AddPermissionDefinitions<TProvider>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static NovaCore.Core.Web.Authorization.AuthorizationExtensions.RequirePermission<TBuilder>(this TBuilder builder, string! permission) -> TBuilder
+static NovaCore.Core.Web.Authorization.PermissionDefinition.operator !=(NovaCore.Core.Web.Authorization.PermissionDefinition? left, NovaCore.Core.Web.Authorization.PermissionDefinition? right) -> bool
+static NovaCore.Core.Web.Authorization.PermissionDefinition.operator ==(NovaCore.Core.Web.Authorization.PermissionDefinition? left, NovaCore.Core.Web.Authorization.PermissionDefinition? right) -> bool
+static NovaCore.Core.Web.Hosting.HostingExtensions.AddCoreDefaults(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
+static NovaCore.Core.Web.Hosting.HostingExtensions.AddCoreHealthChecks(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
+static NovaCore.Core.Web.Hosting.HostingExtensions.AddCoreLogging(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
+static NovaCore.Core.Web.Hosting.HostingExtensions.AddCoreObservability(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
+static NovaCore.Core.Web.Hosting.HostingExtensions.MapDefaultEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+static NovaCore.Core.Web.Modules.ModuleExtensions.AddModules(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder, params string![]! assemblyPrefixes) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
+static NovaCore.Core.Web.Modules.ModuleExtensions.MapModules(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+static NovaCore.Core.Web.Modules.ModuleLoader.Discover(params string![]! assemblyPrefixes) -> System.Collections.Generic.IReadOnlyList<NovaCore.Core.Web.Modules.IModule!>!
+static NovaCore.Core.Web.Security.SecurityHeadersExtensions.UseSecurityHeaders(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
+static NovaCore.Core.Web.Web.CoreWebExtensions.AddCoreWeb(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
+static NovaCore.Core.Web.Web.CoreWebExtensions.UseCoreWeb(this Microsoft.AspNetCore.Builder.WebApplication! app) -> Microsoft.AspNetCore.Builder.WebApplication!
+~override NovaCore.Core.Web.Auth.AccessToken.Equals(object obj) -> bool
+~override NovaCore.Core.Web.Auth.AccessToken.ToString() -> string

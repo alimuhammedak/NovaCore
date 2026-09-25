@@ -18,6 +18,12 @@
 
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)src/PACKAGE.md" Pack="true" PackagePath="README.md" Visible="false" />
+    <!--
+      The public API baseline read by Microsoft.CodeAnalysis.PublicApiAnalyzers. The package doesn't add these itself
+      (checked in its buildTransitive files, R-037). Everything goes to Unshipped until a release is declared (F5.4).
+    -->
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>
 
   <!--
