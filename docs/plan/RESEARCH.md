@@ -140,3 +140,37 @@ Biçim:
 - Bulgu: İstek başına HttpClient oluşturulursa socket tükenir. Factory ile oluşturulan client'lar kısa ömürlüdür; typed client singleton'a enjekte edilmemeli.
 - Kaynak: https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines · https://learn.microsoft.com/dotnet/core/extensions/httpclient-factory-troubleshooting
 - Sonuç: Ö-18
+
+---
+
+## Faz 0 araştırması (2026-09-25)
+
+### R-026: Test host'ta erken okunan config'i ezmek (2026-09-25, faz 0)
+- Bulgu: `WebApplicationFactory.CreateHost(IHostBuilder)` override'ında `ConfigureHostConfiguration` ile eklenen değerler *"will be enumerated before the entry point is called, and the configurations will be passed to the entry point via `args`"*. Command-line config en yüksek önceliğe sahip olduğu için env var'ı da ezer. `ConfigureAppConfiguration` ile eklenenler ise yalnızca `Build` sonrasında görünür. Bu, `AddCoreWeb`'in eager okumalarının (tests/CLAUDE.md) nedenini de açıklıyor. `Program.cs` `CreateBuilder(args)` çağırdığı için yöntem burada çalışır.
+- Kaynak: https://learn.microsoft.com/aspnet/core/test/integration-tests?view=aspnetcore-10.0#customize-the-webapplicationfactory-with-test-configurations · https://learn.microsoft.com/dotnet/core/extensions/configuration#alternative-hosting-approach
+- Sonuç: F0.3 (düşük limitli test host'u, env var yarışı olmadan), F0.5 (Production ortamlı test host'u).
+
+### R-027: `dotnet list package --vulnerable` çıkış kodu (2026-09-25, faz 0)
+- Bulgu: Yerelde gözlendi: komut iki yüksek açık listelediği hâlde exit 0 döndü. `--format json` çıktısında her paket için `vulnerabilities` dizisi var (`projects[].frameworks[].topLevelPackages[]/transitivePackages[]`). CI'da açık varken kırmızı olması için çıktı ayrıştırılmalı. Microsoft dokümanında çıkış koduna dair bir ifade bulamadım. Bu bir gözlemdir.
+- Kaynak: yerel çalıştırma, SDK 10.0.300 (2026-09-25)
+- Sonuç: F0.8 (`--format json` + `jq -e`).
+
+### R-028: Faz 0 başındaki açıklar (2026-09-25, faz 0)
+- Bulgu: GHSA-v5pm-xwqc-g5wc: `Microsoft.OpenApi` `>= 2.0.0-preview.11, <= 2.7.4` sürümleri etkileniyor, 2.7.5'te yamalı. Kaynağı `Microsoft.AspNetCore.OpenApi` 10.0.8. GHSA-2m69-gcr7-jv3q: `SQLitePCLRaw.lib.e_sqlite3` `<= 2.1.11` etkileniyor. Kaynağı `Microsoft.EntityFrameworkCore.Sqlite` 10.0.4. nuspec'lere göre `Microsoft.AspNetCore.OpenApi` 10.0.12 `Microsoft.OpenApi [2.12.0, 3.0.0)`, `Microsoft.EntityFrameworkCore.Sqlite` 10.0.12 `SQLitePCLRaw.bundle_e_sqlite3 2.1.12` istiyor. Top-level güncelleme ikisini de kapatmalı, transitive pinning gerekmemeli (R-014).
+- Kaynak: https://api.github.com/advisories/GHSA-v5pm-xwqc-g5wc · https://api.github.com/advisories/GHSA-2m69-gcr7-jv3q · https://api.nuget.org/v3-flatcontainer/ (nuspec)
+- Sonuç: F0.2
+
+### R-029: ValidateScopes / ValidateOnBuild varsayılanları (2026-09-25, faz 0)
+- Bulgu: *"ValidateScopes and ValidateOnBuild are enabled by default in the Development environment but disabled in other environments."* .NET 9'dan beri HostBuilder için de geçerli. Varsayılana güvenmek yerine açıkça ayarlamak için `UseDefaultServiceProvider` kullanılır.
+- Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis?view=aspnetcore-10.0#validatescopes-and-validateonbuild · https://learn.microsoft.com/aspnet/core/breaking-changes/9/hostbuilder-validation
+- Sonuç: F0.7 (Y-26)
+
+### R-030: Ortam adı IConfiguration'da (2026-09-25, faz 0)
+- Bulgu: `HostDefaults.EnvironmentKey` (`"environment"`) *"The configuration key used to set EnvironmentName"*. WebApplicationBuilder'ın config'i command-line, `DOTNET_` ve `ASPNETCORE_` host kaynaklarını içerir, bu yüzden `ASPNETCORE_ENVIRONMENT` ve `--environment` bu anahtara düşer. Ayarlanmamışsa değer null olur ve ortam varsayılan olarak Production kabul edilir.
+- Kaynak: https://learn.microsoft.com/dotnet/api/microsoft.extensions.hosting.hostdefaults.environmentkey · https://learn.microsoft.com/aspnet/core/fundamentals/configuration/?view=aspnetcore-10.0#default-host-configuration-sources
+- Sonuç: F0.5 (Q-08). `IModule.AddModule` ortam almadığı için Identity modülü ortamı buradan okur. Testle doğrulanır.
+
+### R-031: GitHub Actions sürümleri (2026-09-25, faz 0)
+- Bulgu: GitHub releases API'ye göre `actions/checkout` en son v7.0.1 (2026-07-20), `actions/setup-dotnet` en son v6.0.0 (2026-07-16).
+- Kaynak: https://api.github.com/repos/actions/checkout/releases/latest · https://api.github.com/repos/actions/setup-dotnet/releases/latest
+- Sonuç: F0.8

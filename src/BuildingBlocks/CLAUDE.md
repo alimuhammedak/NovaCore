@@ -9,7 +9,8 @@ so keep it **module-agnostic**: nothing here may reference `NovaCore.Modules.*`.
 
 - **`NovaCore.Core.Abstractions`** — BCL only. **No `FrameworkReference`, no NuGet, no ASP.NET, no EF.**
   Home of `Result`/`Result<T>`/`Error`, `PagedList<T>`/`PaginationRequest`, `Entity`/`AuditableEntity`,
-  `IDomainEvent`, `ICacheService`, `ICurrentUser`. The "stays framework-free" rule is enforced by an
+  `IDomainEvent` (events derive from the `DomainEvent` record, which fixes `EventId`/`OccurredOnUtc` at
+  creation), `ICacheService`, `ICurrentUser`. The "stays framework-free" rule is enforced by an
   architecture test — if a new type needs the framework, it does **not** belong here.
 
 - **`NovaCore.Core.Infrastructure`** — cross-cutting *implementations* that need the ASP.NET/EF surface

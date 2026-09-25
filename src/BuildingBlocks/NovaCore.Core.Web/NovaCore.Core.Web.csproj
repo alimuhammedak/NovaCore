@@ -2,7 +2,7 @@
 
   <!--
     Core.Web: the web composition layer. ServiceDefaults-style host wiring, the IModule system,
-    OpenAPI + Scalar, rate limiting, output cache, JWT auth and FluentValidation filters.
+    OpenAPI + Scalar, rate limiting, JWT auth and FluentValidation filters.
   -->
   <PropertyGroup>
     <IsPackable>true</IsPackable>
@@ -17,7 +17,6 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Scalar.AspNetCore" />
-    <PackageReference Include="Asp.Versioning.Http" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />

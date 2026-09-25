@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using NovaCore.Modules.Identity.Infrastructure;
 
 namespace NovaCore.Api.Tests;
@@ -14,7 +15,7 @@ namespace NovaCore.Api.Tests;
 /// The Identity store is swapped to a shared in-memory SQLite database so the full auth flow
 /// (register/login/refresh/permissions) can be exercised without a real SQL Server.
 /// </summary>
-public sealed class NovaCoreApiFactory : WebApplicationFactory<Program>
+public class NovaCoreApiFactory : WebApplicationFactory<Program>
 {
     // A single open connection keeps the in-memory database alive for the factory's lifetime.
     private readonly SqliteConnection _identityConnection = new("DataSource=:memory:");
@@ -30,9 +31,25 @@ public sealed class NovaCoreApiFactory : WebApplicationFactory<Program>
         _identityConnection.Open();
     }
 
+    /// <summary>The host environment the app boots in. Override to test environment-specific wiring.</summary>
+    protected virtual string EnvironmentName => Environments.Development;
+
+    // DECISIONS Y-26: captive dependencies and root-resolved scoped services fail the host build in every environment,
+    // not only in Development where they are on by default (R-029).
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        builder.UseDefaultServiceProvider(options =>
+        {
+            options.ValidateScopes = true;
+            options.ValidateOnBuild = true;
+        });
+
+        return base.CreateHost(builder);
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Development");
+        builder.UseEnvironment(EnvironmentName);
 
         builder.ConfigureAppConfiguration((_, configuration) =>
         {

@@ -6,7 +6,7 @@ ile organize edilmiş iş modülleri.
 
 > **Lisans felsefesi:** MediatR ve AutoMapper artık ticari (Lucky Penny). NovaCore bunları **kullanmaz**.
 > Yerine: sade CQRS (mediator yok), **Mapperly** (Apache-2.0), **FluentValidation** (Apache-2.0),
-> **Scrutor** (MIT), **Scalar** (MIT) ve Microsoft-yerleşik bileşenler. Çekirdekteki her paket MIT/Apache.
+> **Scalar** (MIT) ve Microsoft-yerleşik bileşenler. Çekirdekteki her paket MIT/Apache.
 
 ---
 
@@ -109,7 +109,7 @@ BuildingBlocks (Core.Web → Core.Infrastructure → Core.Abstractions)
 | `IModule` keşif/kayıt altyapısı | DbContext'ler + migration'lar |
 | HybridCache sarmalayıcı (`ICacheService`) | İş kuralları, validator'lar |
 | Serilog + OpenTelemetry + Health (`AddCoreDefaults`) | Modüle özel konfigürasyon |
-| OpenAPI + Scalar, rate limiting, output cache, CORS | |
+| OpenAPI + Scalar, rate limiting, CORS | |
 | JWT bearer auth + permission-based authz altyapısı | Identity *modülü* (users/roles/tokens) |
 | Auditing interceptor, domain-event dispatcher | |
 
@@ -126,7 +126,7 @@ NovaCore.sln
 │
 ├── src/
 │   ├── BuildingBlocks/
-│   │   ├── NovaCore.Core.Abstractions/   # Result, PagedList, Entity, IDomainEvent, ICacheService, ICurrentUser
+│   │   ├── NovaCore.Core.Abstractions/   # Result, PagedList, Entity, IDomainEvent/DomainEvent, ICacheService, ICurrentUser
 │   │   ├── NovaCore.Core.Infrastructure/ # GlobalExceptionHandler, Result→HTTP, HybridCache, auditing, migration
 │   │   └── NovaCore.Core.Web/            # IModule, AddCoreDefaults/AddCoreWeb, JWT, OpenAPI+Scalar, validation
 │   │
@@ -151,7 +151,7 @@ NovaCore.sln
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddCoreDefaults();   // Serilog + OpenTelemetry + health + resilient HttpClients
-builder.AddCoreWeb();        // ProblemDetails, OpenAPI+Scalar, JWT auth, rate limit, output cache, CORS
+builder.AddCoreWeb();        // ProblemDetails, OpenAPI+Scalar, JWT auth, rate limit, CORS
 builder.AddModules();        // tüm NovaCore.Modules.* IModule'lerini bulur ve kaydeder
 
 var app = builder.Build();
@@ -240,10 +240,9 @@ HTTP/mesaj kuyruğuna döner.
 | **Auth** | ASP.NET Core Identity + JWT/refresh + permission-based | bkz. [Güvenlik & Yetkilendirme](#güvenlik--yetkilendirme) |
 | **Auditing** | EF Core `SaveChangesInterceptor` | `AuditableEntityInterceptor` — CreatedBy/ModifiedAt merkezî |
 | **Rate limiting** | Yerleşik `AddRateLimiter` | IP bazlı fixed-window + `"strict"` adlı policy |
-| **Output cache** | Yerleşik `AddOutputCache` | `AddCoreWeb` içinde |
 | **Health** | Yerleşik Health Checks | `/health` + `/alive` |
 | **API docs** | `Microsoft.AspNetCore.OpenApi` + Scalar | Bearer security scheme transformer ile |
-| **DI keşfi** | Scrutor / reflection | `ModuleLoader` (assembly tarama) |
+| **Modül keşfi** | Reflection | `ModuleLoader` (assembly tarama) |
 | **Result** | Result pattern | Sıfır-bağımlılık `Result<T>` + `ToHttpResult()` |
 
 `Result<T>` **beklenen** hatalar (NotFound/Validation/Conflict) için; gerçek istisnai durumlar için
@@ -303,7 +302,8 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
 - **Seed:** roller (`Administrator`, `User`) + tüm modül izinleri + opsiyonel admin (parola user-secrets ile).
 
 > **Üretimde mutlaka:** `Jwt:SigningKey` ayarla (≥32 bayt, user-secrets/env), TLS/HTTPS'i edge'de zorla,
-> gerçek bir `IEmailSender` (SMTP/SendGrid) tak, admin parolasını güçlü ver.
+> gerçek bir `IEmailSender` (SMTP/SendGrid) tak, admin parolasını güçlü ver. `LoggingEmailSender` yalnızca
+> Development'ta kayıtlıdır. Diğer ortamlarda `IEmailSender` kayıtlı değilse uygulama açılışta anlamlı bir hatayla durur.
 
 **Kaynaklar:** [OWASP Authentication CS](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) ·
 [OWASP Password Storage CS](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) ·
@@ -392,11 +392,9 @@ dotnet test
 |---|---|---|
 | Mapperly (Riok) | Object mapping (source-gen) | **Apache-2.0** |
 | FluentValidation | Validation | **Apache-2.0** |
-| Scrutor | DI assembly scanning | **MIT** |
 | Scalar.AspNetCore | OpenAPI arayüzü | **MIT** |
 | Serilog.AspNetCore | Structured logging | **Apache-2.0** |
 | OpenTelemetry.* | Observability | **Apache-2.0** |
-| Asp.Versioning.Http | API versioning | **MIT** |
 | Microsoft.AspNetCore.OpenApi / Caching.Hybrid / JwtBearer | Microsoft-yerleşik | **MIT** |
 | Microsoft.AspNetCore.Identity.EntityFrameworkCore | Kullanıcı/rol deposu | **MIT** |
 | Microsoft.EntityFrameworkCore.SqlServer | EF Core sağlayıcı | **MIT** |

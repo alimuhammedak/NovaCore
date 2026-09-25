@@ -43,7 +43,8 @@ completed phases update this file.
 
 ```bash
 # Build / test
-dotnet build                                  # whole solution (NovaCore.slnx); 0 warnings is the bar
+dotnet build                                  # whole solution (NovaCore.slnx); 0 warnings is the bar, but see below
+dotnet restore NovaCore.slnx --force          # incremental builds skip restore, so NuGet audit (NU19xx) stays hidden without this
 dotnet build -c Release
 dotnet test                                   # all tests (no SQL Server needed — Identity runs on SQLite)
 dotnet test --filter "FullyQualifiedName~AuthFlowTests.Refresh_rotates_the_refresh_token"   # single test
@@ -82,7 +83,7 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
 
 - **Cross-cutting lives in the core, owned by `Core.Web`:** `AddCoreDefaults` (Serilog + OpenTelemetry +
   health + HttpClient resilience), `AddCoreWeb`/`UseCoreWeb` (ProblemDetails + exception handlers,
-  OpenAPI + Scalar, JWT auth, permission authz, rate limiter, output cache, CORS, security headers).
+  OpenAPI + Scalar, JWT auth, permission authz, rate limiter, CORS, security headers).
 
 - **Persistence:** each module owns a `DbContext` pinned to its own SQL Server schema
   (`catalog` / `payments` / `identity`, via `HasDefaultSchema`). Register through
@@ -101,7 +102,7 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 
 - **Packages: MIT/Apache (or Microsoft built-in) ONLY.** **Never add MediatR, AutoMapper, or
   FluentAssertions** — they are now commercial. Use: Mapperly (mapping), FluentValidation (validation),
-  Scrutor (DI scan), Scalar (OpenAPI UI). If a mediator is ever truly needed, use MIT `martinothamar/Mediator`.
+  Scalar (OpenAPI UI). If a mediator is ever truly needed, use MIT `martinothamar/Mediator`.
 
 - **No mediator / no CQRS dispatcher.** Handlers receive dependencies directly from minimal-API DI
   (`sade CQRS`). Don't introduce a request-dispatch abstraction.
@@ -135,8 +136,8 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 
 - **Eager config reads.** `AddCoreWeb` reads `RateLimiting:PermitLimit`, `Jwt:SigningKey`, and
   `Database:ApplyMigrations` *eagerly* during service registration. `WebApplicationFactory`'s in-memory
-  config is layered in too late to override these — set them as **environment variables** in tests
-  (see `tests/CLAUDE.md`).
+  config is layered in too late to override these — set them as **environment variables** in tests, or
+  per factory via `CreateHost` + `ConfigureHostConfiguration` (see `tests/CLAUDE.md`).
 - **`WithTags` on a route group** needs `using Microsoft.AspNetCore.Http;` (not just `...Builder`).
 - **SQL Server, not Postgres:** use `EF.Functions.Like` (not `ILike`); `UseSqlServer`, not `UseNpgsql`.
 - **Two EF providers can't coexist** in one container. The test host swaps Identity to SQLite and must

@@ -6,8 +6,18 @@ namespace NovaCore.Core.Abstractions.Messaging;
 /// </summary>
 public interface IDomainEvent
 {
-    Guid EventId => Guid.CreateVersion7();
-    DateTimeOffset OccurredOnUtc => DateTimeOffset.UtcNow;
+    Guid EventId { get; }
+    DateTimeOffset OccurredOnUtc { get; }
+}
+
+/// <summary>
+/// Base for domain events: <see cref="EventId"/> and <see cref="OccurredOnUtc"/> are captured once, when the
+/// event is created, so every reader (handlers, logs, a future outbox) sees the same values.
+/// </summary>
+public abstract record DomainEvent : IDomainEvent
+{
+    public Guid EventId { get; init; } = Guid.CreateVersion7();
+    public DateTimeOffset OccurredOnUtc { get; init; } = DateTimeOffset.UtcNow;
 }
 
 /// <summary>Handles a specific <see cref="IDomainEvent"/>. Resolved and invoked by the dispatcher.</summary>

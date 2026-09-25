@@ -23,6 +23,8 @@
               audit/domain-event fields. Suppressed so honest, narrow DTOs don't spam warnings.
     -->
     <NoWarn>$(NoWarn);EXTEXP0018;CS1591;RMG020</NoWarn>
+    <!-- NuGet audit: a high (NU1903) or critical (NU1904) vulnerability in any package, transitive included, fails restore. -->
+    <WarningsAsErrors>$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
     <AssemblyName>$(MSBuildProjectName)</AssemblyName>
   </PropertyGroup>
