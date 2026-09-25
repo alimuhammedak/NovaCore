@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # NuGet audit runs here: high/critical advisories (NU1903/NU1904), transitive included, are errors
+      # (Directory.Build.props).
+      - name: Restore
+        run: dotnet restore NovaCore.slnx
+
+      - name: Build
+        run: dotnet build NovaCore.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test NovaCore.slnx -c Release --no-build
+
+      # Each module owns a DbContext; a model change without a migration fails here.
+      - name: EF Core model matches migrations
+        run: |
+          dotnet tool restore
+          for module in Catalog Payments Identity; do
+            project="src/Modules/$module/NovaCore.Modules.$module"
+            dotnet ef migrations has-pending-model-changes \
+              --project "$project" --startup-project "$project" --context "${module}DbContext" \
+              --configuration Release --no-build
+          done
+
+      # `dotnet list package --vulnerable` exits 0 even when it finds advisories (docs/plan/RESEARCH.md R-027),
+      # so its JSON output is checked instead. Any severity fails the build.
+      - name: No vulnerable packages
+        run: |
+          dotnet list NovaCore.slnx package --vulnerable --include-transitive --format json > vulnerable.json
+          jq -e '[.projects[].frameworks[]? | (.topLevelPackages // [])[], (.transitivePackages // [])[]] | length == 0' vulnerable.json \
+            || { cat vulnerable.json; exit 1; }

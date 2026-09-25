@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - MIT `LICENSE` and this changelog.
+- Architecture tests for the testable bans in `docs/plan/DECISIONS.md` (banned packages, module boundaries, repository
+  and helper types, DI scope validation, domain types in endpoint signatures, TODO/FIXME in `src/`).
+- GitHub Actions CI (`.github/workflows/ci.yml`): restore with NuGet audit, Release build, tests, EF Core
+  pending-model-changes check for the three contexts, and a vulnerable-package check.
 
 ### Removed
 
