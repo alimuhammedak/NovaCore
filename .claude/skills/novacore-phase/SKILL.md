@@ -16,7 +16,9 @@ NovaCore uzun, çok oturumlu bir yeniden yapılanmadan geçiyor. Önceki bir den
 2. "devam" komutu hiçbir bilgi taşımıyordu.
 3. Kontrol noktası yoktu.
 
-Bu prosedürün her adımı bu üç nedenden birine karşılık gelir. Kısaca: **gerçeği her seferinde dosyadan oku, kapsamı yazılı olarak onaylat, küçük ve doğrulanmış adımlarla ilerle, bilmediğin şeyi kaynağından araştır, emin olmadığında sor, faz bitince dur.**
+Bu prosedürün her adımı bu üç nedenden birine karşılık gelir. Kısaca: **gerçeği her seferinde dosyadan oku, kapsamı yazılı olarak onaylat, küçük ve doğrulanmış adımlarla ilerle, bilmediğin şeyi kaynağından araştır, teknik kararı kendin ver ve kaydet, faz bitince dur.**
+
+Kapsam disiplini sıkıdır, soru sayısı düşüktür (D-016). Kullanıcı bir mühendis gibi düşünmeni ister. Microsoft dokümanı bir şey söylüyorsa öyle yap. Söylemiyorsa maliyeti (uygulama + bakım + risk) hesapla, mantıklı olanı seç ve kaydet. Bariz şeyleri sorma, geçici kod bırakma (Y-45).
 
 Kullanıcı Türkçe konuşur. Raporlar ve sorular Türkçe yazılır.
 
@@ -50,7 +52,8 @@ Ardından şunları kontrol et. Biri başarısızsa **dur ve kullanıcıya bildi
   - yazılacak veya değişecek testler,
   - kabul kriteri.
 - **Bu fazda yapılmayacaklar:** PLAN'daki faz notu ve DECISIONS'taki ilgili Y-maddeleri, açıkça listelenmiş olarak.
-- **Belirsizlikler:** PLAN'ın net söylemediği her nokta. Bunları `AskUserQuestion` ile sor. Her seçenekte önerini ve kaynağını belirt.
+- **Kendi vereceğin kararlar:** PLAN'ın net söylemediği teknik noktalar. Her biri için seçtiğin çözümü, kaynağını ve kısa maliyet gerekçesini plana yaz; kullanıcı planı onaylarken bunları da görür. Bunları `AskUserQuestion` ile sorma.
+- **Kullanıcının kararları:** Yalnızca §4'teki "sor" satırına uyan noktalar (D/Y çelişkisi, PLAN'ın kullanıcıya bıraktığı ürün kararı, Microsoft dışı paket, dışa dönük işlem). Bunları `AskUserQuestion` ile sor; her seçenekte önerini ve kaynağını belirt.
 
 Kullanıcı onaylamadan hiçbir dosyayı değiştirme. Onaydan sonra:
 
@@ -67,7 +70,7 @@ Her adım için aynı döngü:
 4. **Doğrula:** `dotnet build NovaCore.slnx` ve `dotnet test NovaCore.slnx`. Paket değiştiyse `dotnet restore NovaCore.slnx --force` da çalıştır. Kırmızıysa düzelt. Düzeltme kapsam dışına taşıyorsa §4.
 5. **Commit:** `faz<id>(<adım-id>): <özet>`, sonuna oturumun attribution satırını ekle. Sadece o adımın dosyalarını stage'le (`git add <yol>`); `git add -A` kullanma.
 6. **Kaydet:** PROGRESS'te `- [x] <adım-id> (<kısa-hash>): <kısa not>`.
-7. **Bilgilendir:** Kullanıcıya tek satır yaz, ör. "F0.3 tamam: strict limiter IP bazlı, 2 yeni test." Plan onaylandığı için adımlar arasında onay beklemen gerekmez. Ama §4 devreye girerse dur.
+7. **Bilgilendir:** Kullanıcıya tek satır yaz, ör. "F0.3 tamam: strict limiter IP bazlı, 2 yeni test." Adımda kendi aldığın bir karar varsa aynı satıra ekle. Plan onaylandığı için adımlar arasında onay bekleme. Yalnızca §4'teki "sor" durumunda dur.
 
 Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'yi ve PLAN'daki faz bölümünü **yeniden oku**. Kapsam için konuşma özetine güvenme.
 
@@ -83,31 +86,35 @@ Faz tek oturuma sığmayacak kadar büyükse bir adım sınırında dur. PROGRES
 - Bilmediğin veya emin olmadığın bir API ya da davranış.
 
 **Ne yapılır:**
-1. **Dur.** Tahminle ilerleme. Uydurma bir API, paket sürümü ya da davranış, sessiz bir hatadan daha pahalıdır.
+1. **Tahminle ilerleme.** Uydurma bir API, paket sürümü ya da davranış, sessiz bir hatadan daha pahalıdır.
 2. **Araştır.** Birincil kaynağa git:
    - Microsoft teknolojileri için Microsoft Learn MCP: önce `microsoft_docs_search`, sayfa önemliyse `microsoft_docs_fetch`, kod örneği için `microsoft_code_sample_search`. Araçlar yüklü değilse ToolSearch ile yükle.
    - Diğer paketler için resmi repo veya doküman (WebFetch).
+   - SDK davranışı için SDK'nın kendi dosyalarına ve `dotnet msbuild -pp`/`-getProperty` çıktısına bak (R-040 böyle bulundu).
    - Kaynak bulamazsan bunu açıkça söyle.
+   - Konu başka bir fazsa o fazın PLAN bölümünü ve PROGRESS'teki durumunu oku.
 3. **Kaydet.** `docs/plan/RESEARCH.md`'ye R-kaydı ekle: soru, bulgu, URL, sonuç.
-4. **Sınıflandır:**
+4. **Sınıflandır ve uygula (D-016):**
 
    | Durum | Ne yapılır |
    |---|---|
-   | Adımın kendi dosyasında, adımı tamamlamak için gereken küçük bir düzeltme (ör. derleme hatası) | Uygula, PROGRESS notuna yaz |
-   | Yeni paket, public API değişikliği, yeni proje veya dosya, silme, başka bir fazın işi, bir D/Y kaydıyla çelişki, PLAN'dan farklı yaklaşım | **`AskUserQuestion`**: seçenekler, önerin ve kaynak (R-ID). Onaylanırsa DECISIONS'a D-kaydı ekle (hook onay isteyecek) |
-   | Kapsam dışı ama değerli | PROGRESS → "Sonraya bırakılanlar" listesine yaz, **dokunma** |
-   | Yapılmayacaklar listesindeki bir şey gerekli görünüyor | **Uygulama.** Gerekçeyi ve kaynağı göster, sor |
+   | Adımı tamamlamak için gereken düzeltme; kaynağın net söylediği yol; planlanan yaklaşımın teknik olarak çalışmaması; analyzer veya MS kuralının gerektirdiği public API değişikliği (yayımlanmamış 0.x paket); adım için gereken yeni dosya | **Kendin karar ver ve uygula.** Kalıcıysa DECISIONS'a D-kaydı ekle (ekleme onay istemez), PROGRESS notuna ve adım satırına yaz, CHANGELOG'a işle. Faz raporunda "Kendi aldığım kararlar" altında listele. |
+   | Başka bir fazın işi ve şimdi gerekli | O fazı oku. Toplamda şimdi yapmak daha ucuzsa **eksiksiz** yap (D-kaydı, adım ID'si korunur); değilse dokunma. Geçici çözüm yok (Y-45). |
+   | Kapsam dışı ama değerli, şimdi gerekli değil | PROGRESS → "Sonraya bırakılanlar" listesine yaz, **dokunma** (Y-09). |
+   | Uyarı çıktı | Önce düzelt. Düzeltme yerine bastırmak ancak MS dokümanının o kural için "When to suppress" bölümünün açıkça izin verdiği kalıcı durumda olur, gerekçe ve kaynakla (Y-44). Geçici bastırma yok. |
+   | **Sor (`AskUserQuestion`):** bir D/Y kaydıyla çelişki ya da onu yeniden açma; PLAN'ın kullanıcıya bıraktığı ürün veya sahiplik kararı; Microsoft dışı yeni paket; mevcut bir D/Y satırını değiştirmek; merge, push, tag, yayın, silme | Seçenekler, önerin, kaynak (R-ID). |
+   | Yapılmayacaklar listesindeki bir şey gerekli görünüyor | **Uygulama.** Gerekçeyi ve kaynağı göster, sor. |
 
-   Bir soru veya öneri sunarken Y-40…Y-43 geçerlidir:
+   Soru sorarken ya da kullanıcıya öneri sunarken Y-40…Y-43 geçerlidir:
    - Her seçenek bu kod tabanındaki somut soruna (dosya/satır) bağlanır.
    - En az bir daha basit alternatif ve neden yetmediği yazılır.
    - Kaynağı (R-ID) belirtilir.
    - 2–3 gerçekten farklı seçenek sunulur.
    - Reddedilmiş bir yaklaşım başka bir isimle geri getirilmez.
 
-   Modelin "en tipik" cevaba kayma eğilimi var (R-022). Tek seçenekli bir öneri ya da "best practice" gerekçesi bu eğilimin işaretidir.
+   Modelin "en tipik" cevaba kayma eğilimi var (R-022). Kendi verdiğin kararda da aynı disiplin geçerli: kaydederken bu kod tabanındaki somut sorunu, daha basit alternatifi ve kaynağı yaz. "Best practice" gerekçe değildir.
 
-**Hook'lar.** Yeni NuGet paketi veya korunan bir dosyanın (PLAN, DECISIONS, `.claude/settings.json`, `.claude/hooks/`) düzenlenmesi hook tarafından kullanıcı onayına düşer. Stop hook ise build veya test kırmızıyken durmanı engeller. Bunlar kasıtlı güvenlik ağlarıdır. **Atlatmaya çalışma.** Başka bir araç, dosya yolu ya da komut deneme. Hook bir işlemi durdurduysa nedenini kullanıcıya açıkla.
+**Hook'lar.** Allowlist dışındaki yeni NuGet paketleri ve PLAN, DECISIONS, `.claude/settings.json`, `.claude/hooks/` düzenlemeleri hook tarafından kullanıcı onayına düşer. DECISIONS'a yeni kayıt eklemek D-016'ya göre önceden onaylıdır, ama hook yine de sorar. Kullanıcıyı yormamak için bir adımdaki D-kayıtlarını tek bir düzenlemede topla. Stop hook ise build veya test kırmızıyken durmanı engeller. Bunlar kasıtlı güvenlik ağlarıdır. **Atlatmaya çalışma.** Başka bir araç, dosya yolu ya da komut deneme. Hook bir işlemi durdurduysa nedenini kullanıcıya açıkla.
 
 ## 5. Faz sonu
 
@@ -133,8 +140,11 @@ Faz tek oturuma sığmayacak kadar büyükse bir adım sınırında dur. PROGRES
 ### Doğrulama
 - `komut` → geçti/kaldı (özet)
 
-### Sapmalar ve kararlar
-- R-xxx / D-xxx / Q-xxx: kısa açıklama (yoksa "yok")
+### Kendi aldığım kararlar
+- D-xxx / R-xxx: ne, neden (kaynak / maliyet). Yoksa "yok".
+
+### Kullanıcıya sorulanlar
+- Q-xxx: soru → cevap. Yoksa "yok".
 
 ### Sonraya bırakılanlar (bu fazda eklenenler)
 - ...

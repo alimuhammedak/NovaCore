@@ -125,6 +125,7 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
   - "Sonraya bırakılanlar"a yazıldı: Stop hook'un izlemediği dosyalar, PublicApiAnalyzers referansının targets'a taşınması, template'e giren paket kimliği.
 
 ### Faz 2a
+- [ ] F2b.6 (öne alındı, D-017): `[LoggerMessage]` dönüşümü (GlobalExceptionHandler, DatabaseMigrationService, SecurityAuditLogger, IdentityDataSeeder, LoggingEmailSender) ve `.editorconfig`'teki geçici CA1848/CA1873 satırlarının silinmesi. **Faz 2a'nın ilk adımı.**
 - [ ] F2a.1 Çekirdek projeler
 - [ ] F2a.2 Eklenti paketleri
 - [ ] F2a.3 Açık modül kaydı
@@ -138,7 +139,7 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
 - [ ] F2b.3 TimeProvider
 - [ ] F2b.4 Exception handling
 - [ ] F2b.5 Health
-- [ ] F2b.6 LoggerMessage
+- [ ] F2b.6 LoggerMessage → Faz 2a'nın başına alındı (D-017)
 
 ### Faz 2c
 - [ ] F2c.1 Validation
@@ -214,7 +215,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 0, F0.7) Y-31 testi ApiExplorer'a dayanıyor. `Task<IResult>` dönen ve `Produces<T>` bildirmeyen handler'ların yanıt payload'ını göremez (Identity uç noktalarının çoğu böyle). ApiExplorer dışı endpoint'ler de kapsam dışı (health, `ExcludeFromDescription`). Handler'lar typed result'a (`Results<Ok<T>, …>`) geçerse kapsam kendiliğinden genişler.
 - (Faz 0, F0.6) Kök `CLAUDE.md` Standards bölümünde "If a mediator is ever truly needed, use MIT `martinothamar/Mediator`" yazıyor. Bu, DECISIONS Y-01 ile çelişiyor ("herhangi bir mediator veya request-dispatch soyutlaması" yasak). Öncelik DECISIONS'ta, ama not gelecekteki oturumları yanıltabilir. Cümle kaldırılmalı veya Y-01'e yönlendirilmeli.
 - (Faz 0) "strict" policy'nin tek tüketicisi Identity'nin `/api/v1/auth` grubu. Identity F3b.3'te emekliye ayrılınca policy'nin ve `StrictRateLimitTests`'in yeri yeniden değerlendirilmeli.
-- (Faz 1) **F2b.6'da yapılacak:** `.editorconfig`'teki geçici CA1848/CA1873 = `suggestion` satırları silinecek (D-011).
+- (Faz 1) ~~F2b.6'da yapılacak: `.editorconfig`'teki geçici CA1848/CA1873 satırları silinecek.~~ → F2b.6 Faz 2a'nın ilk adımı oldu (D-017), Faz 2a adım listesinde.
 - (Faz 1, F2a) `NovaCore.Modules.Catalog.Contracts` packable. ANALYSIS §4'teki paket haritasında yok. Örnek modülün sözleşmesi paket olmalı mı? 2a'da karar verilmeli. Packable kalırsa XML doc ve PublicAPI dosyaları da onunla gider.
 - (Faz 1, F2a.2) **Yeni packable projeler PublicAPI takibini sessizce atlayabilir.** `AdditionalFiles` ve doc koruması `Directory.Build.targets`'ta, ama `Microsoft.CodeAnalysis.PublicApiAnalyzers` referansı her csproj'da ayrı (PLAN F1.4 böyle istiyordu). F2a.2'deki 3 yeni pakete referans eklenmeli. Alternatif: referansı targets'a taşımak ya da bir koruma eklemek; bu PLAN'dan farklı bir yaklaşım olduğu için sorulmalı (code review bulgusu).
 - (Faz 1) **Stop hook değişiklik algılaması eksik:** `verify-on-stop.js` kök `Directory.Build.targets`'ı ve `*.txt` dosyalarını (PublicAPI) izlemiyor. Yalnızca bunlar değişirse build/test doğrulaması çalışmaz. Dosya korunan bir yolda, düzeltmek kullanıcı onayı ister (code review bulgusu).
@@ -250,4 +251,12 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - Proje ve namespace taşımalarında PublicAPI satırları da değişir: RS0016/RS0017. Unshipped'i sıfırlayıp `dotnet format analyzers <csproj> --diagnostics RS0016 --severity warn` ile yeniden üretmek en hızlısı.
   - `Catalog.Contracts`'ın packable kalıp kalmayacağı 2a'da karar ister.
   - Onaylı bastırmalar root CLAUDE.md Gotchas'ta listeli. CA1848/CA1873 satırları F2b.6'da silinecek.
-- **Sıradaki:** yeni oturumda `/novacore-phase 2a`.
+- **Süreç değişikliği (2026-09-25, faz sonrası, kullanıcı geri bildirimi):**
+  - D-016 (D-005'in yerine): teknik kararları model verir. MS dokümanı söylüyorsa o uygulanır, söylemiyorsa maliyet hesaplanır, karar kaydedilir ve raporlanır.
+  - Kullanıcıya yalnızca D/Y çelişkisi, PLAN'ın kullanıcıya bıraktığı ürün kararları, Microsoft dışı paket ve dışa dönük işlemler sorulur.
+  - Y-44 (Y-10'un yerine): bastırma yalnızca MS'in "When to suppress" iznine dayanan kalıcı durumda yapılır.
+  - Y-45: geçici kod veya geçici bastırma yok.
+  - D-017: F2b.6 Faz 2a'nın ilk adımı.
+  - Skill §2–§5 ve kök CLAUDE.md buna göre güncellendi.
+  - **Bekleyen:** hook'un DECISIONS'ı append-only yapması. Auto mod sınıflandırıcısı modelin hook dosyalarını düzenlemesini engelliyor; kullanıcı kararına bırakıldı. O zamana kadar DECISIONS düzenlemeleri onay sorar, D-kayıtları adım başına tek düzenlemede toplanır.
+- **Sıradaki:** yeni oturumda `/novacore-phase 2a`. İlk adım F2b.6 (D-017).

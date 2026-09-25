@@ -26,14 +26,23 @@ completed phases update this file.
   anything (design, naming, even a color), offer 2–3 genuinely different options with trade-offs and a
   project-specific recommendation. "Best practice"/"commonly done" is never a reason on its own. Never
   re-propose a rejected approach under a new name; say "I propose reopening Y-xx" instead.
-- **Something not in the plan?** Don't guess. Research the primary source (Microsoft Learn MCP:
-  `microsoft_docs_search` / `microsoft_docs_fetch` / `microsoft_code_sample_search`), log it in
-  `docs/plan/RESEARCH.md`, and if it affects scope, public API, dependencies or a recorded decision, ask
-  the user with `AskUserQuestion`. Out-of-scope findings go to PROGRESS.md → "Sonraya bırakılanlar".
-- **Hooks are guardrails, not obstacles** (`.claude/settings.json`): new NuGet packages and edits to
-  protected files (`PLAN.md`, `DECISIONS.md`, `.claude/settings.json`, `.claude/hooks/`) require user
-  approval; banned packages are denied; the Stop hook blocks finishing while build/tests are red. Don't
-  try to route around them.
+- **Make technical decisions yourself (DECISIONS D-016).** Don't guess: research the primary source
+  (Microsoft Learn MCP: `microsoft_docs_search` / `microsoft_docs_fetch` / `microsoft_code_sample_search`;
+  SDK files and `dotnet msbuild -pp`). If Microsoft's docs say how to do it, do it that way. If they don't,
+  weigh cost (implementation + maintenance + risk) and pick the sensible option. Then log it (RESEARCH R-entry,
+  a new DECISIONS D-entry if it lasts, PROGRESS note) and report it; don't ask. Writing plan docs needs no
+  permission.
+- **Ask (`AskUserQuestion`) only for the user's decisions:** contradicting or reopening a D/Y record, a
+  product/ownership choice the PLAN leaves to the user, a new non-Microsoft package, or an outward/irreversible
+  action (merge, push, tag, publish, delete).
+- **Another phase's topic?** Read that phase in PLAN.md first. Do the proper work now if it's needed now and
+  cheaper overall (record a D-entry); otherwise leave the code alone and note it in PROGRESS →
+  "Sonraya bırakılanlar". **No temporary code or suppressions** ("remove in phase X"); they get forgotten (Y-45).
+- **Hooks are guardrails, not obstacles** (`.claude/settings.json`): new non-allowlisted NuGet packages and edits
+  to `PLAN.md`, `DECISIONS.md`, `.claude/settings.json` and `.claude/hooks/` trigger a user approval prompt.
+  `DECISIONS.md` prompts even for a new entry; policy-wise new entries are pre-approved (D-016), so batch them
+  into one edit per phase step. Banned packages are denied, and the Stop hook blocks finishing while build/tests
+  are red. Don't try to route around them. The auto-mode classifier also blocks the model from editing hooks.
 - Outside the restructuring (a quick question, a one-off fix the user asks for), work normally, but still
   respect DECISIONS.md.
 
@@ -166,8 +175,9 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   - `Directory.Build.props`: `NoWarn` `EXTEXP0018` (HybridCache is GA but flagged experimental) and `RMG020`
     (Mapperly intentional source-member drops). `WarningsNotAsErrors` `NU1901;NU1902` (low/moderate advisories stay
     warnings; high/critical fail restore; CI fails on any).
-  - `.editorconfig`: CA1848/CA1873 are `suggestion` until F2b.6 converts logging to `[LoggerMessage]`, then delete
-    those lines. CA1707 is off for `tests/**.cs` (test names are sentences).
+  - `.editorconfig`: CA1848/CA1873 are `suggestion` only until F2b.6 converts logging to `[LoggerMessage]`. F2b.6
+    runs as the first step of Phase 2a (D-017) and deletes those lines. CA1707 is off for `tests/**.cs` (test names
+    are sentences).
   - `[SuppressMessage]` with justification on `Error` (CA1716) and `IDomainEventHandler<T>` (CA1711).
 - **`Directory.Build.targets` is too late for some properties.** The SDK computes `DocumentationFile` (from
   `GenerateDocumentationFile`) and Roslyn `DeterministicSourcePaths` (from `ContinuousIntegrationBuild`) before it is
