@@ -9,7 +9,7 @@
 |---|---|---|---|---|---|
 | 0 | ✅ tamam | `faz/0-stabilizasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
-| 2a | ⏳ başlamadı | | | | |
+| 2a | 🔄 devam ediyor | `faz/2a-paket-yapisi` | 2026-09-25 | | |
 | 2b | ⏳ başlamadı | | | | |
 | 2c | ⏳ başlamadı | | | | |
 | 3a | ⏳ başlamadı | | | | |
@@ -125,13 +125,15 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
   - "Sonraya bırakılanlar"a yazıldı: Stop hook'un izlemediği dosyalar, PublicApiAnalyzers referansının targets'a taşınması, template'e giren paket kimliği.
 
 ### Faz 2a
+Plan onayı (2026-09-25): kullanıcı kararları Q-21 (D-018), Q-22 (D-019), Q-23. Model kararları D-020, araştırmalar R-044…R-046. Başlangıçta main'deki `/openapi/v1.json` faz sonu karşılaştırması için dışarıya kaydedildi (commit'lenmedi). Taban: build 0 uyarı, 46/46.
+
 - [ ] F2b.6 (öne alındı, D-017): `[LoggerMessage]` dönüşümü (GlobalExceptionHandler, DatabaseMigrationService, SecurityAuditLogger, IdentityDataSeeder, LoggingEmailSender) ve `.editorconfig`'teki geçici CA1848/CA1873 satırlarının silinmesi. **Faz 2a'nın ilk adımı.**
-- [ ] F2a.1 Çekirdek projeler
-- [ ] F2a.2 Eklenti paketleri
+- [ ] F2a.1 Çekirdek projeler (alt adımlar: 1a Abstractions, 1b EntityFrameworkCore, 1c AspNetCore, 1d Catalog.Contracts paketlenmez)
+- [ ] F2a.2 Eklenti paketleri (alt adımlar: 2a Serilog, 2b OpenTelemetry, 2c Scalar, 2d FluentValidation köprüsü, D-019)
 - [ ] F2a.3 Açık modül kaydı
 - [ ] F2a.4 Mimari testler
 - [ ] F2a.5 Dokümanlar
-- [ ] F2a.6 (opsiyonel) İlk önizleme sürümü
+- [ ] F2a.6 (opsiyonel) İlk önizleme sürümü: yalnızca yerel pack (Q-23)
 
 ### Faz 2b
 - [ ] F2b.1 Options pattern
@@ -202,6 +204,9 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-19 | F1.1: doc üretimi OpenAPI belgesine XML açıklamaları ekliyor (R-041). Faz "davranış değişikliği yok" diyor. | F1.1 | **Kabul, kaydet** (2026-09-25, kullanıcı): yalnızca açıklama metni, API sözleşmesi aynı. CHANGELOG'a "Changed" notu. |
 | Q-20 | F1.4: RS0026, `ToHttpResult`'un iki overload'u da opsiyonel parametreli. | F1.4 | **Overload'lara böl** (2026-09-25, kullanıcı, R-042) → D-015 |
 | Q-17 | Sürüm tag'den nasıl türetilsin, feed ne? | F1.3, F1.6 | **Tag + props kontrolü.** GitHub Packages (`alimuhammedak`), yalnızca `.nupkg`. `.snupkg` artifact olarak saklanır (2026-09-25, kullanıcı, R-039) → D-013 |
+| Q-21 | F2a.3: açık kayıtta `IModule.IsEnabled` ne olsun? | F2a.3 | **Kaldır** (2026-09-25, kullanıcı; Y-19) → D-018 |
+| Q-22 | F2a.4'teki Y-05 testi, FluentValidation F2c'ye kadar çekirdekte kaldığı için kırmızı kalıyor. Nasıl çözülsün? | F2a.4 | **Ayrı, paketlenmeyen `NovaCore.FluentValidation` projesi**, F2c.1'de silinir (2026-09-25, kullanıcı) → D-019 |
+| Q-23 | F2a.6: `0.1.0-preview.1` yayımlansın mı? | F2a.6 | **Yalnızca yerel pack ve içerik kontrolü.** Tag ve push yok, yayın kararı sonraya kalır (2026-09-25, kullanıcı) |
 
 ## Sonraya bırakılanlar
 
