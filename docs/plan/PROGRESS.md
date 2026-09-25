@@ -45,7 +45,7 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
   - `CS1591` artık hiçbir yerde bastırılmıyor (packable olmayanlar doc üretmediği için gerek yok).
   - Release build 225 uyarı, deneme envanteriyle birebir aynı (R-036). 46/46 yeşil.
   - OpenAPI belgesine XML açıklamaları giriyor (R-041, Q-19: kabul).
-- [ ] F1.2 Uyarıların düzeltilmesi
+- [x] F1.2 Uyarıların düzeltilmesi (alt adımlar aşağıda): 225 uyarı → 0, TWAE açık.
   - [x] F1.2a (8905aea): Core.Abstractions 0 uyarı.
     - 67 XML doc eklendi. Doc'lardaki iddialar kodla karşılaştırıldı (HTTP eşlemesi, audit damgası, cache varsayılanları).
     - CA1000: `Result<T>.Success/Failure` internal oldu, `PagedList<T>.Empty` silindi (D-012).
@@ -66,14 +66,17 @@ Başlangıçtaki deneme derlemesi (R-036): packable projelerde CS1591 132 (Abstr
     - `has-pending-model-changes` (Identity) değişiklik görmüyor.
     - Identity'deki CA1848/CA1873 F1.2b'deki `.editorconfig` ayarıyla kapandı.
     - Toplam uyarı 48 → 47. Kalanların hepsi testlerde. 46/46 yeşil.
-  - [x] F1.2e (HASH): Testler 0 uyarı.
+  - [x] F1.2e (599cf2a): Testler 0 uyarı.
     - `.editorconfig` `[tests/**.cs]` için CA1707 = none (D-011).
     - CA1859: iki yardımcı somut tip döndürüyor.
     - CA1822: `LoginAsync` static oldu.
     - CA1816: `AuthFlowTests` sealed oldu, bu yetti.
     - CA1305: `ToString(CultureInfo.InvariantCulture)`.
     - Hiçbir test silinmedi, zayıflatılmadı ya da skip edilmedi. Debug build 0 uyarı, 46/46 yeşil.
-  - [ ] F1.2f TreatWarningsAsErrors=true
+  - [x] F1.2f (HASH): `TreatWarningsAsErrors=true`.
+    - `restore --force` temiz.
+    - `--no-incremental` Release ve Debug derlemeleri 0 uyarı, 0 hata.
+    - 46/46 yeşil.
 - [ ] F1.3 Versiyon
 - [ ] F1.4 Public API takibi
 - [ ] F1.5 Pack doğrulaması

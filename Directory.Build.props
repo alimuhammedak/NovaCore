@@ -17,8 +17,8 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <!-- Turned on in F1.2f, once the warnings exposed by AnalysisLevel and XML docs are fixed (docs/plan/DECISIONS.md D-010). -->
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- 0 warnings is enforced, not just aimed for. Suppressing a warning needs user approval (docs/plan/DECISIONS.md Y-10). -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!--
       EXTEXP0018 : HybridCache APIs are still flagged [Experimental] in .NET 10 even though
                    the feature is GA / production-ready since .NET 9. We opt in knowingly.
