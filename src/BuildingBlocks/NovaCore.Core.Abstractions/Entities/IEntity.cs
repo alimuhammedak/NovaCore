@@ -4,7 +4,9 @@ namespace NovaCore.Core.Abstractions.Entities;
 public interface IEntity;
 
 /// <summary>An entity with a strongly-typed identity.</summary>
+/// <typeparam name="TId">The type of the identity.</typeparam>
 public interface IEntity<out TId> : IEntity
 {
+    /// <summary>The entity's identity.</summary>
     TId Id { get; }
 }

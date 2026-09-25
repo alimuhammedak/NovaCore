@@ -9,6 +9,7 @@ namespace NovaCore.Core.Infrastructure.Caching;
 /// </summary>
 public sealed class HybridCacheService(HybridCache cache) : ICacheService
 {
+    /// <inheritdoc />
     public ValueTask<T> GetOrCreateAsync<T>(
         string key,
         Func<CancellationToken, ValueTask<T>> factory,
@@ -22,6 +23,7 @@ public sealed class HybridCacheService(HybridCache cache) : ICacheService
             tags,
             cancellationToken);
 
+    /// <inheritdoc />
     public ValueTask SetAsync<T>(
         string key,
         T value,
@@ -30,9 +32,11 @@ public sealed class HybridCacheService(HybridCache cache) : ICacheService
         CancellationToken cancellationToken = default) =>
         cache.SetAsync(key, value, ToEntryOptions(options), tags, cancellationToken);
 
+    /// <inheritdoc />
     public ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default) =>
         cache.RemoveAsync(key, cancellationToken);
 
+    /// <inheritdoc />
     public ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken = default) =>
         cache.RemoveByTagAsync(tag, cancellationToken);
 

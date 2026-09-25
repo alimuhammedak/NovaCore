@@ -9,10 +9,35 @@ namespace NovaCore.Core.Infrastructure.Http;
 /// </summary>
 public static class ResultHttpExtensions
 {
-    public static IResult ToHttpResult(this Result result, int successStatusCode = StatusCodes.Status204NoContent) =>
+    // Overloads instead of optional parameters: only one overload of a public method may take optional parameters, or
+    // adding one later breaks callers (RS0026, docs/plan/DECISIONS.md D-015).
+
+    /// <summary>Converts a result without a value into an HTTP response: 204 No Content on success.</summary>
+    /// <param name="result">The result to convert.</param>
+    /// <returns>An empty 204 response on success, otherwise ProblemDetails.</returns>
+    public static IResult ToHttpResult(this Result result) =>
+        result.ToHttpResult(StatusCodes.Status204NoContent);
+
+    /// <summary>Converts a result without a value into an HTTP response.</summary>
+    /// <param name="result">The result to convert.</param>
+    /// <param name="successStatusCode">The status code for a successful result.</param>
+    /// <returns>An empty response with <paramref name="successStatusCode"/> on success, otherwise ProblemDetails.</returns>
+    public static IResult ToHttpResult(this Result result, int successStatusCode) =>
         result.IsSuccess ? Results.StatusCode(successStatusCode) : Problem(result.Error);
 
-    public static IResult ToHttpResult<T>(this Result<T> result, Func<T, IResult>? onSuccess = null) =>
+    /// <summary>Converts a result carrying a value into an HTTP response: 200 OK with the value on success.</summary>
+    /// <typeparam name="T">The type of the value.</typeparam>
+    /// <param name="result">The result to convert.</param>
+    /// <returns>200 OK with the value on success, otherwise ProblemDetails.</returns>
+    public static IResult ToHttpResult<T>(this Result<T> result) =>
+        result.IsSuccess ? Results.Ok(result.Value) : Problem(result.Error);
+
+    /// <summary>Converts a result carrying a value into an HTTP response built by <paramref name="onSuccess"/>.</summary>
+    /// <typeparam name="T">The type of the value.</typeparam>
+    /// <param name="result">The result to convert.</param>
+    /// <param name="onSuccess">Builds the success response from the value, e.g. a 201 Created; null returns 200 OK with the value.</param>
+    /// <returns>The response from <paramref name="onSuccess"/> on success, otherwise ProblemDetails.</returns>
+    public static IResult ToHttpResult<T>(this Result<T> result, Func<T, IResult>? onSuccess) =>
         result.IsSuccess
             ? onSuccess?.Invoke(result.Value) ?? Results.Ok(result.Value)
             : Problem(result.Error);

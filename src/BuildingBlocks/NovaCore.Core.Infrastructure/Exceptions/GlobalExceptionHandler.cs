@@ -19,6 +19,7 @@ public sealed class GlobalExceptionHandler(
     IProblemDetailsService problemDetailsService,
     ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
+    /// <inheritdoc />
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,

@@ -20,6 +20,10 @@ namespace NovaCore.Core.Web.Hosting;
 /// </summary>
 public static class HostingExtensions
 {
+    /// <summary>
+    /// Adds logging, observability and health checks (see the <c>AddCore*</c> methods below) and the standard
+    /// resilience handler on every HttpClient.
+    /// </summary>
     public static IHostApplicationBuilder AddCoreDefaults(this IHostApplicationBuilder builder)
     {
         builder.AddCoreLogging();
@@ -32,28 +36,38 @@ public static class HostingExtensions
         return builder;
     }
 
+    /// <summary>
+    /// Replaces the default logging with Serilog: console output, plus Seq when <c>Seq:ServerUrl</c> is configured.
+    /// </summary>
     public static IHostApplicationBuilder AddCoreLogging(this IHostApplicationBuilder builder)
     {
         builder.Services.AddSerilog((services, configuration) =>
         {
+            // formatProvider: null is Serilog's own default; it is spelled out only for CA1305, so behaviour is unchanged.
+            // Whether logs should be culture-invariant is decided in F2a.2 (NovaCore.Serilog).
             configuration
                 .MinimumLevel.Information()
                 .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
                 .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
                 .Enrich.FromLogContext()
                 .Enrich.WithProperty("Application", builder.Environment.ApplicationName)
-                .WriteTo.Console(outputTemplate:
-                    "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}");
+                .WriteTo.Console(
+                    outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}",
+                    formatProvider: null);
 
             // Logs ship to Seq only when a server URL is configured — never a hard dependency.
             var seqUrl = builder.Configuration["Seq:ServerUrl"];
             if (!string.IsNullOrWhiteSpace(seqUrl))
-                configuration.WriteTo.Seq(seqUrl, apiKey: builder.Configuration["Seq:ApiKey"]);
+                configuration.WriteTo.Seq(seqUrl, apiKey: builder.Configuration["Seq:ApiKey"], formatProvider: null);
         });
 
         return builder;
     }
 
+    /// <summary>
+    /// Adds OpenTelemetry metrics and tracing for ASP.NET Core, HttpClient and the runtime, exported over OTLP when
+    /// <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> is configured.
+    /// </summary>
     public static IHostApplicationBuilder AddCoreObservability(this IHostApplicationBuilder builder)
     {
         var otel = builder.Services.AddOpenTelemetry();
@@ -78,6 +92,7 @@ public static class HostingExtensions
         return builder;
     }
 
+    /// <summary>Adds the health-check services with a liveness check tagged <c>live</c>.</summary>
     public static IHostApplicationBuilder AddCoreHealthChecks(this IHostApplicationBuilder builder)
     {
         builder.Services.AddHealthChecks()

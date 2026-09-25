@@ -9,8 +9,10 @@ namespace NovaCore.Core.Web.OpenApi;
 /// </summary>
 public sealed class BearerSecuritySchemeTransformer : IOpenApiDocumentTransformer
 {
+    /// <summary>The key of the scheme under <c>components.securitySchemes</c>.</summary>
     public const string SchemeId = "Bearer";
 
+    /// <inheritdoc />
     public Task TransformAsync(
         OpenApiDocument document,
         OpenApiDocumentTransformerContext context,

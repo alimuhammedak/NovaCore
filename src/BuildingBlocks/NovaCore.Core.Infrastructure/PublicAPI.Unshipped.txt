@@ -1,0 +1,54 @@
+#nullable enable
+NovaCore.Core.Infrastructure.Caching.HybridCacheService
+NovaCore.Core.Infrastructure.Caching.HybridCacheService.GetOrCreateAsync<T>(string! key, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! factory, NovaCore.Core.Abstractions.Caching.CacheEntryOptions? options = null, System.Collections.Generic.IReadOnlyCollection<string!>? tags = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
+NovaCore.Core.Infrastructure.Caching.HybridCacheService.HybridCacheService(Microsoft.Extensions.Caching.Hybrid.HybridCache! cache) -> void
+NovaCore.Core.Infrastructure.Caching.HybridCacheService.RemoveAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+NovaCore.Core.Infrastructure.Caching.HybridCacheService.RemoveByTagAsync(string! tag, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+NovaCore.Core.Infrastructure.Caching.HybridCacheService.SetAsync<T>(string! key, T value, NovaCore.Core.Abstractions.Caching.CacheEntryOptions? options = null, System.Collections.Generic.IReadOnlyCollection<string!>? tags = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+NovaCore.Core.Infrastructure.DependencyInjection.InfrastructureServiceCollectionExtensions
+NovaCore.Core.Infrastructure.Exceptions.AppException
+NovaCore.Core.Infrastructure.Exceptions.AppException.AppException(string! message, NovaCore.Core.Abstractions.Results.ErrorType type) -> void
+NovaCore.Core.Infrastructure.Exceptions.AppException.Type.get -> NovaCore.Core.Abstractions.Results.ErrorType
+NovaCore.Core.Infrastructure.Exceptions.ConflictException
+NovaCore.Core.Infrastructure.Exceptions.ConflictException.ConflictException(string! message) -> void
+NovaCore.Core.Infrastructure.Exceptions.ForbiddenException
+NovaCore.Core.Infrastructure.Exceptions.ForbiddenException.ForbiddenException(string! message = "You are not allowed to perform this action.") -> void
+NovaCore.Core.Infrastructure.Exceptions.GlobalExceptionHandler
+NovaCore.Core.Infrastructure.Exceptions.GlobalExceptionHandler.GlobalExceptionHandler(Microsoft.AspNetCore.Http.IProblemDetailsService! problemDetailsService, Microsoft.Extensions.Logging.ILogger<NovaCore.Core.Infrastructure.Exceptions.GlobalExceptionHandler!>! logger) -> void
+NovaCore.Core.Infrastructure.Exceptions.GlobalExceptionHandler.TryHandleAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext, System.Exception! exception, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
+NovaCore.Core.Infrastructure.Exceptions.NotFoundException
+NovaCore.Core.Infrastructure.Exceptions.NotFoundException.NotFoundException(string! message) -> void
+NovaCore.Core.Infrastructure.Http.ResultHttpExtensions
+NovaCore.Core.Infrastructure.Messaging.DomainEventDispatcher
+NovaCore.Core.Infrastructure.Messaging.DomainEventDispatcher.DispatchAsync(System.Collections.Generic.IEnumerable<NovaCore.Core.Abstractions.Messaging.IDomainEvent!>! domainEvents, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+NovaCore.Core.Infrastructure.Messaging.DomainEventDispatcher.DomainEventDispatcher(System.IServiceProvider! serviceProvider) -> void
+NovaCore.Core.Infrastructure.Persistence.AuditableEntityInterceptor
+NovaCore.Core.Infrastructure.Persistence.AuditableEntityInterceptor.AuditableEntityInterceptor(NovaCore.Core.Abstractions.Identity.ICurrentUser! currentUser) -> void
+NovaCore.Core.Infrastructure.Persistence.DatabaseMigrationService
+NovaCore.Core.Infrastructure.Persistence.DatabaseMigrationService.DatabaseMigrationService(System.IServiceProvider! serviceProvider, System.Collections.Generic.IEnumerable<NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor!>! contexts, Microsoft.Extensions.Logging.ILogger<NovaCore.Core.Infrastructure.Persistence.DatabaseMigrationService!>! logger) -> void
+NovaCore.Core.Infrastructure.Persistence.DatabaseMigrationService.StartAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NovaCore.Core.Infrastructure.Persistence.DatabaseMigrationService.StopAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor
+NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor.<Clone>$() -> NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor!
+NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor.ContextType.get -> System.Type!
+NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor.ContextType.init -> void
+NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor.Deconstruct(out System.Type! ContextType) -> void
+NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor.Equals(NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor? other) -> bool
+NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor.ModuleDbContextDescriptor(System.Type! ContextType) -> void
+NovaCore.Core.Infrastructure.Persistence.PersistenceExtensions
+override NovaCore.Core.Infrastructure.Persistence.AuditableEntityInterceptor.SavingChanges(Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData! eventData, Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result) -> Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>
+override NovaCore.Core.Infrastructure.Persistence.AuditableEntityInterceptor.SavingChangesAsync(Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData! eventData, Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>>
+override NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor.Equals(object? obj) -> bool
+override NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor.GetHashCode() -> int
+override NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor.ToString() -> string!
+static NovaCore.Core.Infrastructure.DependencyInjection.InfrastructureServiceCollectionExtensions.AddCoreCaching(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static NovaCore.Core.Infrastructure.DependencyInjection.InfrastructureServiceCollectionExtensions.AddCoreInfrastructure(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static NovaCore.Core.Infrastructure.Exceptions.NotFoundException.For(string! entity, object! key) -> NovaCore.Core.Infrastructure.Exceptions.NotFoundException!
+static NovaCore.Core.Infrastructure.Http.ResultHttpExtensions.Problem(NovaCore.Core.Abstractions.Results.Error error) -> Microsoft.AspNetCore.Http.IResult!
+static NovaCore.Core.Infrastructure.Http.ResultHttpExtensions.ToHttpResult(this NovaCore.Core.Abstractions.Results.Result! result) -> Microsoft.AspNetCore.Http.IResult!
+static NovaCore.Core.Infrastructure.Http.ResultHttpExtensions.ToHttpResult(this NovaCore.Core.Abstractions.Results.Result! result, int successStatusCode) -> Microsoft.AspNetCore.Http.IResult!
+static NovaCore.Core.Infrastructure.Http.ResultHttpExtensions.ToHttpResult<T>(this NovaCore.Core.Abstractions.Results.Result<T>! result) -> Microsoft.AspNetCore.Http.IResult!
+static NovaCore.Core.Infrastructure.Http.ResultHttpExtensions.ToHttpResult<T>(this NovaCore.Core.Abstractions.Results.Result<T>! result, System.Func<T, Microsoft.AspNetCore.Http.IResult!>? onSuccess) -> Microsoft.AspNetCore.Http.IResult!
+static NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor.operator !=(NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor? left, NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor? right) -> bool
+static NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor.operator ==(NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor? left, NovaCore.Core.Infrastructure.Persistence.ModuleDbContextDescriptor? right) -> bool
+static NovaCore.Core.Infrastructure.Persistence.PersistenceExtensions.AddModuleDbContext<TContext>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<System.IServiceProvider!, Microsoft.EntityFrameworkCore.DbContextOptionsBuilder!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

@@ -16,7 +16,7 @@ namespace NovaCore.Api.Tests.Integration;
 /// End-to-end security tests against the real host with a seeded in-memory Identity store: login,
 /// the rotating-refresh-token flow, OWASP reuse detection, and permission enforcement.
 /// </summary>
-public class AuthFlowTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>, IAsyncLifetime
+public sealed class AuthFlowTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>, IAsyncLifetime
 {
     private const string AdminEmail = "admin@novacore.test";
     private const string AdminPassword = "Admin!Passw0rd-2026";
@@ -130,7 +130,7 @@ public class AuthFlowTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreA
         Assert.Equal(HttpStatusCode.Forbidden, manage.StatusCode);
     }
 
-    private async Task<TokenPair> LoginAsync(HttpClient client, string email, string password)
+    private static async Task<TokenPair> LoginAsync(HttpClient client, string email, string password)
     {
         var response = await client.PostAsJsonAsync("/api/v1/auth/login", new { email, password });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

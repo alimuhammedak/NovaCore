@@ -6,7 +6,12 @@
   -->
   <PropertyGroup>
     <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Public contracts exposed by the Catalog module to other modules.</Description>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
 
 </Project>

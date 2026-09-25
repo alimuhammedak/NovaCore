@@ -43,7 +43,7 @@ completed phases update this file.
 
 ```bash
 # Build / test
-dotnet build                                  # whole solution (NovaCore.slnx); 0 warnings is the bar, but see below
+dotnet build                                  # whole solution (NovaCore.slnx); TreatWarningsAsErrors: any warning fails the build
 dotnet restore NovaCore.slnx --force          # incremental builds skip restore, so NuGet audit (NU19xx) stays hidden without this
 dotnet build -c Release
 dotnet test                                   # all tests (no SQL Server needed — Identity runs on SQLite)
@@ -61,9 +61,14 @@ dotnet ef database update     --project src/Modules/<M>/NovaCore.Modules.<M> --s
 # Scaffold a fresh project from this repo (it is a `dotnet new` template)
 dotnet new install .
 dotnet new novacore -n MyProject
+
+# NuGet packages (the four IsPackable projects) → artifacts/ (git-ignored). Version: VersionPrefix in Directory.Build.props.
+dotnet pack NovaCore.slnx -c Release -o artifacts [--version-suffix preview.1]
 ```
 
-There is no separate lint step (`EnforceCodeStyleInBuild=false`); `dotnet format` is available but optional.
+There is no separate lint step: every build runs the `latest-recommended` analyzers with `EnforceCodeStyleInBuild=true`
+and `TreatWarningsAsErrors=true`. `dotnet format` is available but optional. Publishing is `.github/workflows/release.yml`
+on a `v*` tag that must match `VersionPrefix` (GitHub Packages).
 The connection string targets a **local SQL Server via Windows auth** (`appsettings.json`).
 
 ---
@@ -122,7 +127,22 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 
 - **Central Package Management:** versions live ONLY in `Directory.Packages.props`. `*.csproj` use
   versionless `<PackageReference>`. Common build props are in `Directory.Build.props` (net10.0, nullable,
-  implicit usings); per-project csproj stay tiny.
+  implicit usings, analyzers, version); package metadata for `IsPackable` projects is in `Directory.Build.targets`;
+  per-project csproj stay tiny.
+
+- **0 warnings is enforced** (`TreatWarningsAsErrors`). Fix a warning; don't suppress it. Suppressing (`NoWarn`,
+  `#pragma`, `.editorconfig` severity, `[SuppressMessage]`) needs user approval (DECISIONS Y-10). The approved ones are
+  listed under Gotchas.
+
+- **Packable projects are NuGet packages** (Core.Abstractions, Core.Infrastructure, Core.Web, Catalog.Contracts):
+  - Every public member needs an XML doc comment (CS1591).
+  - The `.csproj` sets `<GenerateDocumentationFile>true</GenerateDocumentationFile>` next to `IsPackable`;
+    `Directory.Build.targets` fails the build without it.
+  - A public API change fails the build (RS0016/RS0017) until `PublicAPI.Unshipped.txt` is updated: use the IDE code
+    fix or `dotnet format analyzers <csproj> --diagnostics RS0016 --severity warn`. `PublicAPI.Shipped.txt` stays
+    empty until the first release is declared (F5.4).
+  - Only one public overload of a method may take optional parameters (RS0026); prefer plain overloads.
+  - Keep types `internal` unless consumers need them (DECISIONS Y-23).
 
 - **Vertical slice:** one feature = one file (request + response + validator + route + handler together)
   under a module's `Features/`. Don't spread a feature across layered folders.
@@ -142,8 +162,18 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 - **SQL Server, not Postgres:** use `EF.Functions.Like` (not `ILike`); `UseSqlServer`, not `UseNpgsql`.
 - **Two EF providers can't coexist** in one container. The test host swaps Identity to SQLite and must
   give it its own internal service provider (see `tests/CLAUDE.md`).
-- **Suppressed-by-design warnings** (`Directory.Build.props`): `EXTEXP0018` (HybridCache is GA but flagged
-  experimental), `RMG020` (Mapperly intentional source-member drops), `CS1591` (XML docs off).
+- **Suppressed-by-design warnings** (all user-approved, DECISIONS D-011):
+  - `Directory.Build.props`: `NoWarn` `EXTEXP0018` (HybridCache is GA but flagged experimental) and `RMG020`
+    (Mapperly intentional source-member drops). `WarningsNotAsErrors` `NU1901;NU1902` (low/moderate advisories stay
+    warnings; high/critical fail restore; CI fails on any).
+  - `.editorconfig`: CA1848/CA1873 are `suggestion` until F2b.6 converts logging to `[LoggerMessage]`, then delete
+    those lines. CA1707 is off for `tests/**.cs` (test names are sentences).
+  - `[SuppressMessage]` with justification on `Error` (CA1716) and `IDomainEventHandler<T>` (CA1711).
+- **`Directory.Build.targets` is too late for some properties.** The SDK computes `DocumentationFile` (from
+  `GenerateDocumentationFile`) and Roslyn `DeterministicSourcePaths` (from `ContinuousIntegrationBuild`) before it is
+  imported. Set those in the `.csproj` or `Directory.Build.props` (RESEARCH R-040).
+- **XML docs reach the OpenAPI document.** .NET 10's OpenAPI source generator copies XML comments from projects with
+  `GenerateDocumentationFile` into schema descriptions. Doc comments on packable types are user-visible API docs (R-041).
 - **Module discovery** is reflection-based (incompatible with NativeAOT) and keys off the assembly name
   prefix `NovaCore.Modules.*` — keep that prefix for any new module.
 

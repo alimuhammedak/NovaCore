@@ -174,3 +174,105 @@ Biçim:
 - Bulgu: GitHub releases API'ye göre `actions/checkout` en son v7.0.1 (2026-07-20), `actions/setup-dotnet` en son v6.0.0 (2026-07-16).
 - Kaynak: https://api.github.com/repos/actions/checkout/releases/latest · https://api.github.com/repos/actions/setup-dotnet/releases/latest
 - Sonuç: F0.8
+
+---
+
+## Faz 1 araştırması (2026-09-25)
+
+### R-032: IsPackable'a bağlı ayarlar props'ta mı, targets'ta mı? (2026-09-25, faz 1)
+- Bulgu: *"Directory.Build.props is imported early in Microsoft.Common.props, and properties defined later are unavailable to it. So, avoid referring to properties that aren't yet defined (and will evaluate to empty)."* Ayrıca *"Set dependent properties in .targets files, because they pick up customizations from individual projects."* NovaCore'da `IsPackable` her csproj'da tanımlı. Bu yüzden `Condition="'$(IsPackable)' == 'true'"` props'ta hep boş değer görür.
+- Kaynak: https://learn.microsoft.com/visualstudio/msbuild/customize-by-directory#directorybuildprops-and-directorybuildtargets · https://learn.microsoft.com/visualstudio/msbuild/customize-your-build#choose-between-adding-properties-to-a-props-or-targets-file
+- Sonuç: Q-14 → D-010. Koşullu grup `Directory.Build.targets`'ta. Doc üretimi için yetmediği ortaya çıktı (R-040 → D-014).
+
+### R-033: NuGet audit ve TreatWarningsAsErrors (2026-09-25, faz 1)
+- Bulgu: NuGet `TreatWarningsAsErrors`, `WarningsAsErrors`, `NoWarn` ve `WarningsNotAsErrors` özelliklerine uyar (*"TreatWarningsAsErrors: Treats all NuGet warnings as errors"*). Audit dokümanı: TWAE kullanılıyorsa *"you can use `<WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>` to prevent vulnerabilities discovered in the future from breaking your build."*
+- Kaynak: https://learn.microsoft.com/nuget/reference/errors-and-warnings · https://learn.microsoft.com/nuget/concepts/auditing-packages#running-a-security-audit-with-restore · https://learn.microsoft.com/nuget/reference/errors-and-warnings/nu1901-nu1904
+- Sonuç: Q-16 → D-011. `WarningsNotAsErrors=NU1901;NU1902`. NU1903/NU1904 F0.2'deki gibi hata kalır.
+
+### R-034: CA1000, CA1711, CA1716 ne zaman bastırılabilir? (2026-09-25, faz 1)
+- Bulgu:
+  - CA1000: *"Do not suppress a warning from this rule."* Düzeltme: static üyeyi kaldırmak ya da instance üyeye çevirmek. Varsayılan olarak yalnızca dışarıdan görünen tiplere bakar.
+  - CA1711: *"Do not suppress a warning from this rule unless the suffix has an unambiguous meaning in the application domain."*
+  - CA1716: *"You can suppress a warning from this rule if you're sure that the identifier won't confuse users of the API, and that the library is usable in all available languages in .NET."* `Error`, VB'deki `Error` anahtar kelimesi yüzünden işaretleniyor. VB'de `[Error]` ile kullanılabilir.
+  - Üçü de "Enabled by default in .NET 10: No". `latest-recommended` ile açılıyorlar.
+- Kaynak: https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1000 · https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1711 · https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1716
+- Sonuç: Q-13 → D-012. CA1000 düzeltildi. CA1711 ("domain event handler" alan dilinde net) ve CA1716 (NovaCore C#-only) gerekçeli bastırıldı.
+
+### R-035: Test adlarında alt çizgi (2026-09-25, faz 1)
+- Bulgu: Microsoft'un "Unit testing best practices" dokümanı, test adının üç parçadan oluşmasını öneriyor (metot, senaryo, beklenen davranış). Örnekler alt çizgiyle yazılmış: `Add_SingleNumber_ReturnsSameNumber`.
+- Kaynak: https://learn.microsoft.com/dotnet/core/testing/unit-testing-best-practices#follow-test-naming-standards
+- Sonuç: Q-12 → D-011. CA1707 yalnızca `tests/**.cs` için kapalı.
+
+### R-036: Faz 1 deneme derlemesi uyarı envanteri (2026-09-25, faz 1; gözlem)
+- Bulgu: `dotnet build -c Release` + `AnalysisLevel=latest-recommended`, `EnforceCodeStyleInBuild=true`, tüm projelerde `GenerateDocumentationFile=true`, `NoWarn`'dan CS1591 çıkarılmış hâlde (ayrı bir `--artifacts-path`'e) çalıştırıldı. Tekilleştirilmiş uyarılar:
+  - Packable projelerde CS1591 132 (Abstractions 67, Infrastructure 22, Web 43, Catalog.Contracts 0).
+  - CA1848 24 + CA1873 14 (Core.Infrastructure 6, Identity 32).
+  - CA1707 42 (yalnızca testler).
+  - CA1000 3, CA1305 3, CA1859 2. CA1711, CA1716, CA1725, CA1822, CA1816 1'er.
+  - IDE (code style) uyarısı yok: `.editorconfig`'teki kurallar `suggestion` seviyesinde.
+- Kaynak: yerel çalıştırma, SDK 10.0.300.
+- Sonuç: F1.2 alt adımlara bölündü (F1.2a–f). Q-10…Q-13.
+
+### R-037: Microsoft.CodeAnalysis.PublicApiAnalyzers (2026-09-25, faz 1)
+- Bulgu:
+  - NuGet flat-container'a göre son stabil sürüm **5.6.0**. Sonraki `5.11.0-1.26425.128` prerelease.
+  - Dokümana göre 3.3.x ve sonrasında *"Text files `PublicAPI.Shipped.txt` and `PublicAPI.Unshipped.txt` will be added to each project in scope, if they do not already exist."*
+  - Nullable takibi için dosyaların başına `#nullable enable` yazılır.
+  - Mevcut API'yi toplu belgelemek için code fix proje veya çözüm genelinde uygulanabilir.
+  - Mevcut bir projede Shipped/Unshipped ayrımı için açık bir yönerge yok.
+- Kaynak: https://api.nuget.org/v3-flatcontainer/microsoft.codeanalysis.publicapianalyzers/index.json · https://github.com/dotnet/roslyn/blob/main/src/RoslynAnalyzers/PublicApiAnalyzers/PublicApiAnalyzers.Help.md
+- Sonuç: F1.4. Hiçbir sürüm yayımlanmadığı için tüm API Unshipped'e girer, Shipped'e taşıma F5.4'te. Dosyaların `AdditionalFiles` olarak otomatik eklenip eklenmediği paketin build dosyasından doğrulanacak.
+
+### R-038: Paket metadata'sı: README ve ContinuousIntegrationBuild (2026-09-25, faz 1)
+- Bulgu:
+  - `PackageReadmeFile` pakete göre yol verir. Dosyanın ayrıca `<None Include="…" Pack="true" PackagePath="…"/>` ile pakete konması gerekir. Yalnızca Markdown desteklenir.
+  - `ContinuousIntegrationBuild` yalnızca CI'da açılmalı, çünkü yerelde normalize yollar debugger'ın kaynak bulmasını engeller. GitHub Actions için örnek: `<PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">`.
+  - Library guidance: Source Link, sembol yayını ve deterministic build *"CONSIDER"* seviyesinde öneriliyor.
+- Kaynak: https://learn.microsoft.com/nuget/reference/msbuild-targets#packagereadmefile · https://learn.microsoft.com/dotnet/core/project-sdk/msbuild-props#continuousintegrationbuild · https://learn.microsoft.com/dotnet/standard/library-guidance/sourcelink
+- Sonuç: F1.1 (Q-15 → D-013).
+
+### R-039: GitHub Packages NuGet feed'i (2026-09-25, faz 1)
+- Bulgu:
+  - Feed adresi `https://nuget.pkg.github.com/NAMESPACE/index.json`. Actions içinde `GITHUB_TOKEN` kullanılabilir.
+  - Özel bir repodan paket kurmak için tüketici en az `read:packages` kapsamlı PAT (classic) kullanır.
+  - İlk yayında paketin görünürlüğü varsayılan olarak private.
+  - `.snupkg`: resmi dokümanda geçmiyor. GitHub topluluk tartışmasına göre (resmi değil) GitHub Packages sembol paketini desteklemiyor ve ikinci yüklemeyi "version conflict" ile reddediyor.
+- Kaynak: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry · https://github.com/orgs/community/discussions/38678 (topluluk kaynağı)
+- Sonuç: Q-17 → D-013. release.yml yalnızca `.nupkg` push eder (`--no-symbols`), `.snupkg` workflow artifact'i olarak saklanır.
+
+### R-040: Directory.Build.targets bazı özellikler için çok geç (2026-09-25, faz 1; gözlem + SDK kaynağı)
+- Bulgu: F1.1'de `GenerateDocumentationFile=true` targets'ta ayarlandı ve `-getProperty` true gösterdi, ama `DocumentationFile` boş kaldı, CS1591 de hiç çıkmadı.
+  - Nedeni: SDK `DocumentationFile`'ı `Sdks/Microsoft.NET.Sdk/targets/Microsoft.NET.Sdk.BeforeCommon.targets:301-313`'te `GenerateDocumentationFile`'a göre hesaplıyor. Bu dosya `-pp` çıktısında Directory.Build.targets'tan (satır ~11729) çok önce import ediliyor (satır ~2830).
+  - Aynı sorun `ContinuousIntegrationBuild` için de var: Roslyn `Microsoft.Managed.Core.targets:215` `DeterministicSourcePaths`'i ondan türetiyor ve bu dosya da önce geliyor (satır ~5204). `GITHUB_ACTIONS=true` ile değerlendirmede `DeterministicSourcePaths` boş çıktı.
+  - Paket metadata'sı (`PackageLicenseExpression`, `PackageReadmeFile`, `RepositoryUrl`, `IncludeSymbols`…) pack target'ları çalışırken okunuyor, targets'ta sorunsuz.
+  - `EnablePackageValidation` target koşulunda okunuyor, sorun yok. Ancak baseline `PackageDownload` item'ı `Microsoft.NET.ApiCompat.targets:18`'de değerlendirme anında okunuyor (import satır ~17801, targets'tan sonra), F5.4'te dikkat.
+  - SDK'da `BeforeMicrosoftNETSdkTargets` diye bir kanca var (`Sdk/Sdk.targets:13`); csproj gövdesinden sonra, BeforeCommon'dan önce import ediliyor.
+- Kaynak: yerel SDK 10.0.300 dosyaları ve `dotnet msbuild -pp`. R-032'deki MS Learn ifadesi ("imported after importing .targets files from NuGet packages") targets'ın SDK'nın kendi değerlendirme anı kararlarından sonra geldiğini de açıklıyor.
+- Sonuç: Q-18 → D-014 (D-010'un yerine). `GenerateDocumentationFile` packable csproj'larda, `ContinuousIntegrationBuild` props'ta. Targets'ta paket metadata'sı ve "packable ama doc yok" koruması kalıyor.
+
+### R-041: XML doc üretimi OpenAPI belgesini değiştiriyor (2026-09-25, faz 1)
+- Bulgu:
+  - .NET 10: *"At build-time, the OpenAPI package will leverage a source generator to discover XML comments in the current application assembly and any project references and emit source code to insert them into the document via an OpenAPI document transformer."*
+  - Kaynaklar: uygulama assembly'si ve *"Any projects referenced via `ProjectReferences` that have the `GenerateDocumentationFile` property set."*
+  - Kapatmak için generator Analyzers'tan çıkarılır.
+  - Gözlem: main ile F1.1 branch'inin `/openapi/v1.json` çıktıları karşılaştırıldı (geçici, commit'lenmemiş bir dump testiyle). Tek fark, iki `PagedList` şemasına Abstractions'taki `<summary>`'den gelen `"description"` alanı. Endpoint'ler, şema yapısı ve durum kodları aynı.
+- Kaynak: https://learn.microsoft.com/aspnet/core/release-notes/aspnetcore-10.0?view=aspnetcore-10.0#openapi · https://learn.microsoft.com/aspnet/core/fundamentals/openapi/openapi-comments?view=aspnetcore-10.0
+- Sonuç: Q-19. Kullanıcı kabul etti: yalnızca açıklama metni eklenir, API sözleşmesi değişmez. CHANGELOG'a "Changed" notu yazılacak.
+
+### R-042: PublicApiAnalyzers kurulumu: AdditionalFiles ve RS0026 (2026-09-25, faz 1)
+- Bulgu:
+  - 5.6.0 paketinin `buildTransitive/*.props|targets` dosyaları `PublicAPI.*.txt`'yi `AdditionalFiles` olarak **eklemiyor**. Yalnızca global analyzer config ve `CodeAnalysisTreatWarningsAsErrors` ayarını yapıyorlar. R-037'deki "files will be added" ifadesi dosyaları oluşturan IDE code fix'ini anlatıyor. Bu yüzden item'lar `Directory.Build.targets`'a eklendi.
+  - Unshipped listesi `dotnet format analyzers <proj> --diagnostics RS0016 --severity warn` ile, analyzer'ın kendi code fix'iyle üretildi. Çözüm genelinde tek çağrı yalnızca ilk projeyi doldurdu, diğerleri proje proje çalıştırıldı. Record'ların derleyicinin ürettiği `Equals(object)`/`ToString()` üyeleri `~` (oblivious) ile yazıldı.
+  - RS0026 (ApiDesign): aynı isimli iki public overload'un ikisi de opsiyonel parametre taşıyınca hata veriyor. Roslyn kuralı: *"Only one overload may have optional parameters"*, bu overload en çok parametreye sahip olmalı. Gerekçe, sonradan parametre eklemenin kaynak ve ikili uyumluluğu bozması.
+- Kaynak: `~/.nuget/packages/microsoft.codeanalysis.publicapianalyzers/5.6.0/buildTransitive/` · https://github.com/dotnet/roslyn/blob/main/docs/Adding%20Optional%20Parameters%20in%20Public%20API.md
+- Sonuç: F1.4. Q-20 → D-015: `ToHttpResult` overload'lara bölündü.
+
+### R-043: GitHub Actions'tan GitHub Packages'a push (2026-09-25, faz 1)
+- Bulgu:
+  - GitHub'ın .NET rehberindeki örnek: `permissions: packages: write`, `setup-dotnet` içinde `source-url: https://nuget.pkg.github.com/<owner>/index.json` ve `NUGET_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}`, sonra `dotnet nuget push`.
+  - NuGet registry sayfasında push için `--api-key` + `--source` biçimi de var.
+  - `source-url` feed'i setup-dotnet'in yazdığı nuget.config'e ekler, yani restore'da ikinci bir kaynak olur. NovaCore CPM kullanıyor ve package source mapping yok. Bu durumda NuGet'in NU1507 uyarısını vermesi beklenir ve TWAE bunu restore hatasına çevirir (R-033).
+  - **Bu bir çıkarımdır, CI'da denenmedi.**
+  - Güncel sürümler (GitHub releases API): `actions/upload-artifact` v7.0.1, `actions/checkout` v7.0.1, `actions/setup-dotnet` v6.0.0.
+- Kaynak: https://docs.github.com/en/actions/tutorials/build-and-test-code/net · https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry · https://api.github.com/repos/actions/upload-artifact/releases/latest
+- Sonuç: F1.6. `release.yml` feed'i yalnızca push adımında `--source` + `--api-key GITHUB_TOKEN` ile veriyor, restore kaynaklarına dokunmuyor. Feed sahibi `${{ github.repository_owner }}` (bu repo için `alimuhammedak`, D-013).

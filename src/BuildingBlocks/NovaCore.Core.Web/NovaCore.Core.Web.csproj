@@ -6,6 +6,7 @@
   -->
   <PropertyGroup>
     <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>NovaCore web building blocks: modular host defaults, OpenAPI/Scalar, JWT auth, validation, observability.</Description>
   </PropertyGroup>
 
@@ -28,6 +29,7 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

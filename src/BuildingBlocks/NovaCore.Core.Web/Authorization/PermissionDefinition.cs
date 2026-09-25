@@ -10,5 +10,6 @@ public sealed record PermissionDefinition(string Name, string DisplayName, strin
 /// </summary>
 public interface IPermissionDefinitionProvider
 {
+    /// <summary>The permissions this module owns.</summary>
     IReadOnlyCollection<PermissionDefinition> GetPermissions();
 }

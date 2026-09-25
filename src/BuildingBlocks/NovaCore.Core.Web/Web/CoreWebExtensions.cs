@@ -26,8 +26,13 @@ namespace NovaCore.Core.Web.Web;
 /// </summary>
 public static class CoreWebExtensions
 {
+    /// <summary>The name of the CORS policy registered by <see cref="AddCoreWeb"/>.</summary>
     public const string CorsPolicyName = "novacore";
 
+    /// <summary>
+    /// Registers the web services: ProblemDetails and exception handlers, OpenAPI, JWT authentication, permission
+    /// authorization, rate limiting and CORS, plus startup migrations when <c>Database:ApplyMigrations</c> is true.
+    /// </summary>
     public static IHostApplicationBuilder AddCoreWeb(this IHostApplicationBuilder builder)
     {
         var services = builder.Services;
@@ -66,6 +71,7 @@ public static class CoreWebExtensions
         return builder;
     }
 
+    /// <summary>Adds the middleware that pairs with <see cref="AddCoreWeb"/>, in the order it must run.</summary>
     public static WebApplication UseCoreWeb(this WebApplication app)
     {
         app.UseSecurityHeaders();            // defensive response headers first, so every response carries them

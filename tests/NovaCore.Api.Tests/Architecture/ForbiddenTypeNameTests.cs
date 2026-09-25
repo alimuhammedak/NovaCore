@@ -31,7 +31,7 @@ public class ForbiddenTypeNameTests
 
     // Only NovaCore's own namespaces: source generators (e.g. Microsoft.AspNetCore.OpenApi's XML-comment support) emit
     // file-local types of their own into our assemblies.
-    private static IEnumerable<Type> FirstPartyTypes()
+    private static List<Type> FirstPartyTypes()
     {
         var types = Solution.ProductionAssemblies
             .SelectMany(assembly => assembly.GetTypes())

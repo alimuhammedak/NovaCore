@@ -11,6 +11,7 @@ namespace NovaCore.Core.Web.Validation;
 /// </summary>
 public sealed class ValidationExceptionHandler(IProblemDetailsService problemDetailsService) : IExceptionHandler
 {
+    /// <inheritdoc />
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {

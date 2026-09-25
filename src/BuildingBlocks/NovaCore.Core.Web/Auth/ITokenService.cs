@@ -12,5 +12,6 @@ public interface ITokenService
 /// <summary>A freshly minted access token and when it expires.</summary>
 public readonly record struct AccessToken(string Token, DateTimeOffset ExpiresAtUtc)
 {
+    /// <summary>Seconds left until <see cref="ExpiresAtUtc"/>, measured now; never negative.</summary>
     public int ExpiresInSeconds => (int)Math.Max(0, (ExpiresAtUtc - DateTimeOffset.UtcNow).TotalSeconds);
 }

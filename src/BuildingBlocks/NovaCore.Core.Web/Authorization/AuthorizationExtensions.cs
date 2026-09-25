@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace NovaCore.Core.Web.Authorization;
 
+/// <summary>Service registration and endpoint conventions for permission-based authorization.</summary>
 public static class AuthorizationExtensions
 {
     /// <summary>

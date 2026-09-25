@@ -12,12 +12,12 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder builder)
     {
         // base first — Identity configures its own entities; then our overrides (last-one-wins).
-        base.OnModelCreating(modelBuilder);
+        base.OnModelCreating(builder);
 
-        modelBuilder.HasDefaultSchema(Schema);
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
+        builder.HasDefaultSchema(Schema);
+        builder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
     }
 }

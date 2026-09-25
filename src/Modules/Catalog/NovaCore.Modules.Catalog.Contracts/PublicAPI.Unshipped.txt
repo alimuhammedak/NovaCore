@@ -1,0 +1,23 @@
+#nullable enable
+NovaCore.Modules.Catalog.Contracts.IProductCatalog
+NovaCore.Modules.Catalog.Contracts.IProductCatalog.GetProductAsync(System.Guid productId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NovaCore.Modules.Catalog.Contracts.ProductInfo?>!
+NovaCore.Modules.Catalog.Contracts.ProductInfo
+NovaCore.Modules.Catalog.Contracts.ProductInfo.<Clone>$() -> NovaCore.Modules.Catalog.Contracts.ProductInfo!
+NovaCore.Modules.Catalog.Contracts.ProductInfo.Deconstruct(out System.Guid Id, out string! Name, out decimal Price, out int Stock, out bool IsActive) -> void
+NovaCore.Modules.Catalog.Contracts.ProductInfo.Equals(NovaCore.Modules.Catalog.Contracts.ProductInfo? other) -> bool
+NovaCore.Modules.Catalog.Contracts.ProductInfo.Id.get -> System.Guid
+NovaCore.Modules.Catalog.Contracts.ProductInfo.Id.init -> void
+NovaCore.Modules.Catalog.Contracts.ProductInfo.IsActive.get -> bool
+NovaCore.Modules.Catalog.Contracts.ProductInfo.IsActive.init -> void
+NovaCore.Modules.Catalog.Contracts.ProductInfo.Name.get -> string!
+NovaCore.Modules.Catalog.Contracts.ProductInfo.Name.init -> void
+NovaCore.Modules.Catalog.Contracts.ProductInfo.Price.get -> decimal
+NovaCore.Modules.Catalog.Contracts.ProductInfo.Price.init -> void
+NovaCore.Modules.Catalog.Contracts.ProductInfo.ProductInfo(System.Guid Id, string! Name, decimal Price, int Stock, bool IsActive) -> void
+NovaCore.Modules.Catalog.Contracts.ProductInfo.Stock.get -> int
+NovaCore.Modules.Catalog.Contracts.ProductInfo.Stock.init -> void
+override NovaCore.Modules.Catalog.Contracts.ProductInfo.Equals(object? obj) -> bool
+override NovaCore.Modules.Catalog.Contracts.ProductInfo.GetHashCode() -> int
+override NovaCore.Modules.Catalog.Contracts.ProductInfo.ToString() -> string!
+static NovaCore.Modules.Catalog.Contracts.ProductInfo.operator !=(NovaCore.Modules.Catalog.Contracts.ProductInfo? left, NovaCore.Modules.Catalog.Contracts.ProductInfo? right) -> bool
+static NovaCore.Modules.Catalog.Contracts.ProductInfo.operator ==(NovaCore.Modules.Catalog.Contracts.ProductInfo? left, NovaCore.Modules.Catalog.Contracts.ProductInfo? right) -> bool

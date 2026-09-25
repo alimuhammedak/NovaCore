@@ -1,3 +1,4 @@
+using System.Globalization;
 using NovaCore.Core.Abstractions.Pagination;
 using Xunit;
 
@@ -44,7 +45,7 @@ public class PaginationTests
     {
         var page = new PagedList<int>([1, 2], page: 1, pageSize: 2, totalCount: 2);
 
-        var mapped = page.Map(x => x.ToString());
+        var mapped = page.Map(x => x.ToString(CultureInfo.InvariantCulture));
 
         Assert.Equal(["1", "2"], mapped.Items);
         Assert.Equal(page.TotalCount, mapped.TotalCount);

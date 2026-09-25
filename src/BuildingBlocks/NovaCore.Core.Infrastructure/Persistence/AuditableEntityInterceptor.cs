@@ -12,6 +12,7 @@ namespace NovaCore.Core.Infrastructure.Persistence;
 /// </summary>
 public sealed class AuditableEntityInterceptor(ICurrentUser currentUser) : SaveChangesInterceptor
 {
+    /// <inheritdoc />
     public override InterceptionResult<int> SavingChanges(
         DbContextEventData eventData, InterceptionResult<int> result)
     {
@@ -19,6 +20,7 @@ public sealed class AuditableEntityInterceptor(ICurrentUser currentUser) : SaveC
         return base.SavingChanges(eventData, result);
     }
 
+    /// <inheritdoc />
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
     {

@@ -1,0 +1,38 @@
+<Project>
+
+  <!--
+    Package metadata for packable projects (the NuGet packages). It depends on IsPackable, which each .csproj sets, so
+    it lives here: Directory.Build.props is imported before the project body and would only ever see an empty value
+    (docs/plan/RESEARCH.md R-032). These properties are read when pack runs, so setting them this late is fine.
+  -->
+  <PropertyGroup Condition="'$(IsPackable)' == 'true'">
+    <Authors>Muhammed Ali AK</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/alimuhammedak/NovaCore</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)src/PACKAGE.md" Pack="true" PackagePath="README.md" Visible="false" />
+    <!--
+      The public API baseline read by Microsoft.CodeAnalysis.PublicApiAnalyzers. The package doesn't add these itself
+      (checked in its buildTransitive files, R-037). Everything goes to Unshipped until a release is declared (F5.4).
+    -->
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+
+  <!--
+    XML docs can't be switched on from here (the SDK has already computed DocumentationFile, R-040), so each packable
+    .csproj sets GenerateDocumentationFile itself. This check stops a new package from shipping without docs.
+  -->
+  <Target Name="NovaCoreRequirePackageDocumentation" BeforeTargets="CoreCompile"
+          Condition="'$(IsPackable)' == 'true' And '$(DocumentationFile)' == ''">
+    <Error Text="$(MSBuildProjectName) is packable but generates no XML documentation. Set &lt;GenerateDocumentationFile&gt;true&lt;/GenerateDocumentationFile&gt; next to IsPackable in its .csproj (docs/plan/DECISIONS.md D-014)." />
+  </Target>
+
+</Project>
