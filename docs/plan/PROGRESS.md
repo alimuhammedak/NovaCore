@@ -7,7 +7,7 @@
 
 | Faz | Durum | Branch | Başlangıç | Bitiş | Merge |
 |---|---|---|---|---|---|
-| 0 | ✅ tamam | `faz/0-stabilizasyon` | 2026-09-25 | 2026-09-25 | merge onayı bekleniyor |
+| 0 | ✅ tamam | `faz/0-stabilizasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 1 | ⏳ başlamadı | | | | |
 | 2a | ⏳ başlamadı | | | | |
 | 2b | ⏳ başlamadı | | | | |
@@ -128,7 +128,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-25, Faz 0 bitti** (`faz/0-stabilizasyon`, main'e henüz merge edilmedi).
+**2026-09-25, Faz 0 bitti** ve kullanıcı onayıyla `faz/0-stabilizasyon` main'e merge edildi (`--no-ff`).
 
 - **Yapılanlar:**
   - Git kuruldu. Baseline `849a30d` main'de.
@@ -150,7 +150,5 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - Test factory'lerinde eager config için `CreateHost` + `ConfigureHostConfiguration` (R-026), ortam için `EnvironmentName` override edilir.
   - Test factory'leri artık açık `ValidateScopes`/`ValidateOnBuild` ile kuruluyor.
   - Kök CLAUDE.md'deki Mediator notu Y-01 ile çelişiyor ("Sonraya bırakılanlar").
-- **Bekleyen:**
-  - main'e merge onayı.
-  - Remote açılınca ilk CI koşusu (Q-03).
-- **Sıradaki:** merge'den sonra yeni oturumda `/novacore-phase 1`.
+- **Bekleyen:** Remote açılınca ilk CI koşusu (Q-03).
+- **Sıradaki:** yeni oturumda `/novacore-phase 1`.
