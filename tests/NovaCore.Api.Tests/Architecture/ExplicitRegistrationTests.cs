@@ -10,11 +10,12 @@ namespace NovaCore.Api.Tests.Architecture;
 /// </summary>
 public class ExplicitRegistrationTests
 {
-    // Assembly loading and type enumeration, plus any *FromAssembly* registration helper (AddValidatorsFromAssembly,
-    // FromAssemblyOf, RegisterServicesFromAssembly and the like). EF Core's ApplyConfigurationsFromAssembly configures
-    // the model, not the container, so it is allowed (DECISIONS D-023).
+    // Assembly loading and type enumeration (the GetTypes/GetExportedTypes methods and the DefinedTypes/ExportedTypes
+    // properties), plus any *FromAssembly* registration helper (AddValidatorsFromAssembly, FromAssemblyOf,
+    // RegisterServicesFromAssembly and the like). EF Core's ApplyConfigurationsFromAssembly configures the model, not the
+    // container, so it is allowed (DECISIONS D-023).
     private static readonly Regex AssemblyScanning = new(
-        @"\bAssembly\.Load(From|File)?\s*\(|\.GetAssemblies\s*\(|\bAssemblyName\.GetAssemblyName\s*\(|\bAssemblyLoadContext\b|\.GetTypes\s*\(|\.GetExportedTypes\s*\(|\b(?!ApplyConfigurationsFromAssembly\b)\w*FromAssembl\w*");
+        @"\bAssembly\.Load(From|File)?\s*\(|\.GetAssemblies\s*\(|\bAssemblyName\.GetAssemblyName\s*\(|\bAssemblyLoadContext\b|\.GetTypes\s*\(|\.GetExportedTypes\s*\(|\.(DefinedTypes|ExportedTypes)\b|\b(?!ApplyConfigurationsFromAssembly\b)\w*FromAssembl\w*");
 
     [Fact]
     public void Source_does_not_scan_assemblies_to_register_services()
