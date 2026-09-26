@@ -1,3 +1,5 @@
+using System.Net.Http.Headers;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -5,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using NovaCore.AspNetCore.Auth;
 using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Identity.Infrastructure;
@@ -39,6 +42,19 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
 
     /// <summary>The host environment the app boots in. Override to test environment-specific wiring.</summary>
     protected virtual string EnvironmentName => Environments.Development;
+
+    /// <summary>
+    /// A client whose bearer token carries exactly <paramref name="claims"/>, signed by the host's own
+    /// <see cref="ITokenService"/>: exercises authorization and validation without seeding users.
+    /// </summary>
+    public HttpClient CreateClientWithClaims(params Claim[] claims)
+    {
+        var token = Services.GetRequiredService<ITokenService>().CreateAccessToken(claims);
+
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
+        return client;
+    }
 
     // DECISIONS Y-26: captive dependencies and root-resolved scoped services fail the host build in every environment,
     // not only in Development where they are on by default (R-029).

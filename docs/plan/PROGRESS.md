@@ -259,6 +259,11 @@ Plan onayı (2026-09-25): kullanıcı kararı Q-24 (D-022, health uçları yaln�
 Plan onayı (2026-09-26): kullanıcı kararları Q-25 (boş Guid kuralı özel `ValidationAttribute` ile) ve Q-26 (`ExceptionHandlerOrderTests` silinir, Y-44 onayı). Model kararları D-023, araştırmalar R-052…R-054. Plan öncesinde repoya dokunmadan scratchpad'de doğrulananlar: modüller validation generator'ünü transitive framework referansıyla alıyor, yeni 400 yanıtının anahtarları ve alanları FluentValidation'ınkiyle aynı, EXTEXP0018 artık hiç üretilmiyor. main'in `/openapi/v1.json`'u faz sonu karşılaştırması için scratchpad'e kaydedildi (29.460 bayt, commit'lenmedi). F2c.1 alt adımlara bölündü: 1a test, 1b Catalog, 1c Payments, 1d Identity, 1e köprünün silinmesi.
 
 - [ ] F2c.1 Validation (alt adımlar: 1a karakterizasyon testi, 1b Catalog, 1c Payments, 1d Identity, 1e köprünün silinmesi)
+  - [ ] F2c.1a Karakterizasyon testi (devam ediyor)
+  - [ ] F2c.1b Catalog
+  - [ ] F2c.1c Payments
+  - [ ] F2c.1d Identity
+  - [ ] F2c.1e Köprünün silinmesi
 - [ ] F2c.2 Yetkilendirme
 - [ ] F2c.3 Cache
 - [ ] F2c.4 Paket temizliği
