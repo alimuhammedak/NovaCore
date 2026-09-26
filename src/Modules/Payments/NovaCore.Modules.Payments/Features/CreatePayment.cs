@@ -1,11 +1,10 @@
-using FluentValidation;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using NovaCore.Abstractions.Results;
 using NovaCore.AspNetCore.Http;
 using NovaCore.AspNetCore.Authorization;
-using NovaCore.FluentValidation;
 using NovaCore.Modules.Catalog.Contracts;
 using NovaCore.Modules.Payments.Authorization;
 using NovaCore.Modules.Payments.Domain;
@@ -19,24 +18,22 @@ namespace NovaCore.Modules.Payments.Features;
 /// </summary>
 public static class CreatePayment
 {
-    public sealed record Request(Guid ProductId, int Quantity);
+    public sealed record Request([NotEmpty] Guid ProductId, [Range(1, int.MaxValue)] int Quantity);
 
     public sealed record Response(Guid PaymentId, decimal Amount, string Status);
 
-    public sealed class Validator : AbstractValidator<Request>
+    // [Required] can't reject Guid.Empty: a Guid is never null. A rule on a single value is a custom attribute; an
+    // IValidatableObject would only run once every property is valid (docs/plan/RESEARCH.md R-052, Q-25).
+    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Property)]
+    private sealed class NotEmptyAttribute() : ValidationAttribute("The {0} field must not be empty.")
     {
-        public Validator()
-        {
-            RuleFor(x => x.ProductId).NotEmpty();
-            RuleFor(x => x.Quantity).GreaterThan(0);
-        }
+        public override bool IsValid(object? value) => value is not Guid guid || guid != Guid.Empty;
     }
 
     public static void Map(IEndpointRouteBuilder group) =>
         group.MapPost("/", Handle)
             .WithName("CreatePayment")
             .WithSummary("Create a payment for a product")
-            .AddEndpointFilter<ValidationFilter<Request>>()
             .RequirePermission(PaymentsPermissions.Create)
             .Produces<Response>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status404NotFound)

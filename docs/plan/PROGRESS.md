@@ -263,8 +263,10 @@ Plan onayı (2026-09-26): kullanıcı kararları Q-25 (boş Guid kuralı özel `
     - Her satır geçersiz bir gövde gönderip 400 validation ProblemDetails'ı sabitliyor: content-type, `type`, `status`, dolu `title`, `instance` = yol, `traceId` ve `errors` anahtar kümesi birebir.
     - FluentValidation'a karşı yeşil. CreateProduct filtresi geçici kaldırılınca yalnızca o satır kırmızıya döndü (commit'lenmedi).
     - Yeni yardımcı `NovaCoreApiFactory.CreateClientWithClaims(...)`: token host'un kendi `ITokenService`'iyle imzalanıyor, kullanıcı seed'i gerekmiyor (D-023 (7)). tests/CLAUDE.md'ye yazıldı. 102/102.
-  - [ ] F2c.1b Catalog (devam ediyor)
-  - [ ] F2c.1c Payments
+  - [x] F2c.1b (2798a2b): `CreateProduct`/`UpdateProduct` kurallarını request record'larındaki DataAnnotations'ta tanımlıyor: `[Required]`, `[MaxLength]`, `[Range]`. Fiyat için `[Range]` `MinimumIsExclusive` ve anlaşılır bir `ErrorMessage` taşıyor.
+    - `Validator` sınıfları ve `ValidationFilter` kalktı. `CatalogModule` kendisi `services.AddValidation()` çağırıyor (D-023 (1)). csproj'da FluentValidation ve köprü referansı yok.
+    - Catalog satırları yeşil. `AddValidation()` geçici silinince tam o iki satır kırmızıya döndü (commit'lenmedi). 102/102.
+  - [ ] F2c.1c Payments (devam ediyor)
   - [ ] F2c.1d Identity
   - [ ] F2c.1e Köprünün silinmesi
 - [ ] F2c.2 Yetkilendirme
