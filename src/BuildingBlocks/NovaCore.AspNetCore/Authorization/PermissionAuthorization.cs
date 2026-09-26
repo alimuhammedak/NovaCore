@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Options;
 using NovaCore.AspNetCore.Identity;
 
 namespace NovaCore.AspNetCore.Authorization;
@@ -34,47 +33,19 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
 }
 
 /// <summary>
-/// Builds an authorization policy on the fly for any policy name of the form <c>perm:&lt;permission&gt;</c>,
-/// so we never have to register a named policy per permission. Falls back to the default provider otherwise.
+/// Requires an authenticated caller that holds <see cref="Permission"/> (or the super-admin role):
+/// <c>[RequirePermission("catalog:products:create")]</c> on a handler, or <c>.RequirePermission(...)</c> on an endpoint.
+/// The attribute carries its own <see cref="PermissionRequirement"/> (<see cref="IAuthorizationRequirementData"/>), so
+/// no named policy is registered per permission. .NET 10 enforces it on Minimal API and other routed endpoints, not on
+/// MVC controllers, SignalR hubs or Blazor components.
 /// </summary>
-public sealed class PermissionPolicyProvider : IAuthorizationPolicyProvider
-{
-    /// <summary>The prefix that marks a policy name as a permission policy.</summary>
-    public const string PolicyPrefix = "perm:";
-
-    private readonly DefaultAuthorizationPolicyProvider _fallback;
-
-    /// <summary>Creates the provider; non-permission policies go to the default provider built from <paramref name="options"/>.</summary>
-    /// <param name="options">The authorization options.</param>
-    public PermissionPolicyProvider(IOptions<AuthorizationOptions> options) =>
-        _fallback = new DefaultAuthorizationPolicyProvider(options);
-
-    /// <inheritdoc />
-    public Task<AuthorizationPolicy> GetDefaultPolicyAsync() => _fallback.GetDefaultPolicyAsync();
-
-    /// <inheritdoc />
-    public Task<AuthorizationPolicy?> GetFallbackPolicyAsync() => _fallback.GetFallbackPolicyAsync();
-
-    /// <inheritdoc />
-    public Task<AuthorizationPolicy?> GetPolicyAsync(string policyName)
-    {
-        if (!policyName.StartsWith(PolicyPrefix, StringComparison.OrdinalIgnoreCase))
-            return _fallback.GetPolicyAsync(policyName);
-
-        var policy = new AuthorizationPolicyBuilder()
-            .RequireAuthenticatedUser()
-            .AddRequirements(new PermissionRequirement(policyName[PolicyPrefix.Length..]))
-            .Build();
-
-        return Task.FromResult<AuthorizationPolicy?>(policy);
-    }
-}
-
-/// <summary>Declarative form: <c>[HasPermission("catalog:products:create")]</c>.</summary>
+/// <param name="permission">The permission name, e.g. <c>catalog:products:create</c>.</param>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
-public sealed class HasPermissionAttribute : AuthorizeAttribute
+public sealed class RequirePermissionAttribute(string permission) : AuthorizeAttribute, IAuthorizationRequirementData
 {
-    /// <summary>Requires <paramref name="permission"/> on the decorated class or method.</summary>
-    /// <param name="permission">The permission name, e.g. <c>catalog:products:create</c>.</param>
-    public HasPermissionAttribute(string permission) => Policy = PermissionPolicyProvider.PolicyPrefix + permission;
+    /// <summary>The permission the caller must hold.</summary>
+    public string Permission { get; } = permission;
+
+    /// <inheritdoc />
+    public IEnumerable<IAuthorizationRequirement> GetRequirements() => [new PermissionRequirement(Permission)];
 }

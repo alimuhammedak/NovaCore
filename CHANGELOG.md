@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Architecture tests for the package map: the core packages depend on Microsoft packages only and point one way
   (Abstractions ← AspNetCore / EntityFrameworkCore, add-ons → AspNetCore), and nothing under `src/` scans assemblies
   to register services. Host wiring tests pin the module order and endpoints, the validation response of every
-  validated request and the Scalar UI.
+  validated request, permission-based 200/403 and the Scalar UI.
 - `Directory.Build.targets` fails the build of a packable project that does not reference PublicApiAnalyzers.
 
 ### Changed
@@ -106,6 +106,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     keyed by property name.
   - Its `title` is now the framework default "One or more validation errors occurred." instead of "Validation failed".
     The handlers' own validation responses already used that title. The messages are the DataAnnotations ones.
+- **Breaking:** permission authorization no longer uses a custom policy provider.
+  - `RequirePermissionAttribute` (an `AuthorizeAttribute` that implements `IAuthorizationRequirementData`) carries the
+    `PermissionRequirement` itself.
+  - `RequirePermission(...)` keeps its signature and now attaches that attribute.
+  - `PermissionPolicyProvider`, with its `perm:` policy names, is removed, and so is `HasPermissionAttribute`. Use
+    `[RequirePermission(...)]` instead.
+  - Behaviour is unchanged: anonymous callers get 401, callers without the permission (or the `Administrator` role)
+    get 403. .NET 10 enforces the attribute on Minimal API and routed endpoints.
 
 ### Removed
 

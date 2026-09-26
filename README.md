@@ -312,8 +312,10 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
 
 ### Yetkilendirme (authorization) — permission-based
 - Roller (Identity) **+ ince taneli izinler**. İzinler `module:resource:action` (ör. `catalog:products:create`).
-- `PermissionPolicyProvider` (dinamik policy) + `PermissionRequirement` + handler. Kullanım:
-  `endpoint.RequirePermission("catalog:products:create")` veya `[HasPermission(...)]`.
+- `RequirePermissionAttribute` (`AuthorizeAttribute` + `IAuthorizationRequirementData`) kendi `PermissionRequirement`'ını
+  taşır, `PermissionAuthorizationHandler` onu denetler. Özel policy provider ya da izin başına bir named policy yok.
+  Kullanım: `endpoint.RequirePermission("catalog:products:create")` veya handler'da `[RequirePermission(...)]`.
+  Anonim istek 401, izni olmayan istek 403 alır.
 - İzinler login'de **JWT claim** olarak gömülür; `Administrator` rolü super-admin (tüm kontrolleri geçer).
 - **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder hepsini toplayıp
   rollere bağlar (`User` rolü = iş modüllerinin yalnızca `:read` izinleri — least privilege).

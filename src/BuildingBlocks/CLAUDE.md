@@ -45,8 +45,10 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
   catch-all, so a more specific handler must be registered ahead of it.
 - Caching goes through `ICacheService` (wraps HybridCache). Don't take a hard dependency on `HybridCache`
   in feature code.
-- Permission authorization: the dynamic `PermissionPolicyProvider` maps any `perm:<name>` policy; expose
-  ergonomics via `RequirePermission(...)` / `[HasPermission]` rather than hand-rolled `[Authorize(Roles=)]`.
+- Permission authorization: `RequirePermissionAttribute` carries a `PermissionRequirement`
+  (`IAuthorizationRequirementData`, R-053), which `PermissionAuthorizationHandler` checks. There is no custom policy
+  provider and no named policy per permission. Use `RequirePermission(...)` / `[RequirePermission]` rather than
+  hand-rolled `[Authorize(Roles=)]`; `PermissionAuthorizationTests` pins 200/403.
 - The packages are `IsPackable=true`; avoid leaking app-specific assumptions (connection strings,
   concrete modules) into them. A new package needs `GenerateDocumentationFile`, the PublicApiAnalyzers reference and
   the two `PublicAPI.*.txt` files; `Directory.Build.targets` fails the build without the first two.

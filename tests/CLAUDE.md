@@ -11,7 +11,8 @@ Stack: **xUnit v3** (test projects are `OutputType=Exe`). Run a single test with
 - **Integration** (`Integration/`) — boot the real host via `NovaCoreApiFactory` (`WebApplicationFactory`).
   DB-free tests (health, OpenAPI, security headers, 401/validation gates) need no seeding. A caller with specific roles
   or permissions comes from `factory.CreateClientWithClaims(...)`: the host's own `ITokenService` signs the token, so no
-  user is seeded (`ValidationTests`). DB-backed tests (`AuthFlowTests`) implement `IAsyncLifetime` and seed via
+  user is seeded (`ValidationTests`, `PermissionAuthorizationTests`). DB-backed tests (`AuthFlowTests`) implement
+  `IAsyncLifetime` and seed via
   `IdentityDataSeeder` + `UserManager`.
 - **Architecture** (`Architecture/`) — `ModularityTests` enforce boundaries (Payments → only
   Catalog.Contracts; `NovaCore.Abstractions` has no ASP.NET/EF reference). The testable bans in

@@ -258,7 +258,7 @@ Plan onayı (2026-09-25): kullanıcı kararı Q-24 (D-022, health uçları yaln�
 ### Faz 2c
 Plan onayı (2026-09-26): kullanıcı kararları Q-25 (boş Guid kuralı özel `ValidationAttribute` ile) ve Q-26 (`ExceptionHandlerOrderTests` silinir, Y-44 onayı). Model kararları D-023, araştırmalar R-052…R-054. Plan öncesinde repoya dokunmadan scratchpad'de doğrulananlar: modüller validation generator'ünü transitive framework referansıyla alıyor, yeni 400 yanıtının anahtarları ve alanları FluentValidation'ınkiyle aynı, EXTEXP0018 artık hiç üretilmiyor. main'in `/openapi/v1.json`'u faz sonu karşılaştırması için scratchpad'e kaydedildi (29.460 bayt, commit'lenmedi). F2c.1 alt adımlara bölündü: 1a test, 1b Catalog, 1c Payments, 1d Identity, 1e köprünün silinmesi.
 
-- [ ] F2c.1 Validation (alt adımlar: 1a karakterizasyon testi, 1b Catalog, 1c Payments, 1d Identity, 1e köprünün silinmesi)
+- [x] F2c.1 Validation (alt adımlar: 1a karakterizasyon testi, 1b Catalog, 1c Payments, 1d Identity, 1e köprünün silinmesi). FluentValidation'ın yerini modül başına `AddValidation()` ve DataAnnotations aldı. 400 biçimi `ValidationTests` ile korunuyor.
   - [x] F2c.1a (e69a55c): Yeni `ValidationTests` (Theory, 13 satır). Kapsam: validate edilen her request şekli (Catalog 2, Payments 2, Identity 9).
     - Her satır geçersiz bir gövde gönderip 400 validation ProblemDetails'ı sabitliyor: content-type, `type`, `status`, dolu `title`, `instance` = yol, `traceId` ve `errors` anahtar kümesi birebir.
     - FluentValidation'a karşı yeşil. CreateProduct filtresi geçici kaldırılınca yalnızca o satır kırmızıya döndü (commit'lenmedi).
@@ -271,8 +271,10 @@ Plan onayı (2026-09-26): kullanıcı kararları Q-25 (boş Guid kuralı özel `
   - [x] F2c.1d (1743422): Identity'nin dokuz request record'u DataAnnotations taşıyor. `[Required]`, `[EmailAddress]`, `[MaxLength]` kullanılıyor; parola için `[Length(12, 128)]`, kodlar için `[Length(6, 8)]` (length-first politika yorumu record'un üstünde). Validator'lar ve filtreler kalktı, `IdentityModule` `services.AddValidation()` çağırıyor. Artık hiçbir modül FluentValidation'a referans vermiyor.
     - Dokuz Identity satırı ve `AuthGateTests` yeşil.
     - `AddValidation()` geçici silinince bunlar kırmızıya döndü. D-009 gereği login'in 400'üne dayandığı için `StrictRateLimitTests` de kırmızıya döndü (commit'lenmedi). 102/102.
-  - [ ] F2c.1e Köprünün silinmesi (devam ediyor)
-- [ ] F2c.2 Yetkilendirme
+  - [x] F2c.1e (03b9cae): `NovaCore.FluentValidation` silindi (D-019): `ValidationFilter<T>`, `ValidationExceptionHandler`, `AddValidationExceptionHandler`, slnx kaydı, Api referansı ve `Program.cs` çağrısı. `ExceptionHandlerOrderTests` kullanıcı onayıyla silindi (Q-26, Y-44). Yeniden adlandırma gotcha'sı gereği tüm `bin/obj` temizlendi.
+    - `ExplicitRegistrationTests` (Y-20) artık tüm `src`'yi tarıyor. `*FromAssembly*` kayıt yardımcılarını da yakalıyor; EF'in `ApplyConfigurationsFromAssembly`'si hariç (D-023 (5)). İki kasıtlı ihlalle kırmızı görüldü (commit'lenmedi).
+    - Dokümanlar: kök, BuildingBlocks, Modules, Identity ve tests CLAUDE.md, README, CHANGELOG (Unreleased net duruma göre düzeltildi), memory (`novacore-stack`, `novacore-project`). README lisans satırı F2c.4'e kaldı. 101/101.
+- [ ] F2c.2 Yetkilendirme (devam ediyor)
 - [ ] F2c.3 Cache
 - [ ] F2c.4 Paket temizliği
 
