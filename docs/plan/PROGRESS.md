@@ -11,7 +11,7 @@
 | 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2a | ✅ tamam | `faz/2a-paket-yapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2b | ✅ tamam | `faz/2b-konfigurasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
-| 2c | ✅ tamam | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | 2026-09-26 | |
+| 2c | ✅ tamam | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | 2026-09-26 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
 | 3a | ⏳ başlamadı | | | | |
 | 3b | ⏳ başlamadı | | | | |
 | 4a | ⏳ başlamadı | | | | |
@@ -423,7 +423,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-26, Faz 2c bitti.** Branch `faz/2c-yerlesik-karsiliklar`, main'e merge için kullanıcı onayı bekleniyor.
+**2026-09-26, Faz 2c bitti.** 2026-09-27'de kullanıcı onayıyla `faz/2c-yerlesik-karsiliklar` main'e merge edildi (`--no-ff`). `main` push'lanmadı.
 
 - **Yapılanlar:**
   - Validation (F2c.1a–1e): FluentValidation yerine .NET 10'un yerleşik Minimal API validation'ı. Kurallar request record'larının parametrelerinde DataAnnotations. Her modül `AddModule` içinde `services.AddValidation()` çağırıyor (generator yalnızca çağıran assembly'yi kapsar, R-052). Boş Guid kuralı `CreatePayment` içinde private nested bir `ValidationAttribute` (Q-25). `NovaCore.FluentValidation` köprüsü ve `ExceptionHandlerOrderTests` silindi (D-019, Q-26). `ValidationTests` validate edilen 13 request şeklinin 400 yanıtını sabitliyor.
@@ -444,5 +444,5 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - F3a.2 (sunucu tarafında izin çözümleme): `PermissionAuthorizationHandler` bugün JWT'deki `permission` claim'ine bakıyor. `PermissionAuthorizationTests` izinleri token claim'i olarak veriyor; claim transformation'a geçince bu testlerin kurulumu değişmeli. HybridCache `AddCoreCaching` ile kayıtlı, doğrudan enjekte edilir (Y-15: sarmalayıcı yok).
   - Token üretimi `TimeProvider`'dan, JwtBearer lifetime doğrulaması gerçek saatten okuyor (R-050). F3a.1'de hizalanabilir.
   - Açık "Sonraya bırakılanlar" maddeleri: R-055 aralıklı test hatası, iki validation başlığı, `BadHttpRequestException` → 500, health check timeout, test yardımcılarındaki tekrar, OTel'in erken okuması, eski Y-10 atıfları, mediator cümlesi.
-- **Bekleyen:** faz 2c merge onayı; önizleme yayını (tag + GitHub Packages) ayrı bir kullanıcı kararı.
-- **Sıradaki:** merge'den sonra yeni oturumda `/novacore-phase 3a`.
+- **Bekleyen:** `main`'in push'u ve önizleme yayını (tag + GitHub Packages) ayrı kullanıcı kararları.
+- **Sıradaki:** yeni oturumda `/novacore-phase 3a`.
