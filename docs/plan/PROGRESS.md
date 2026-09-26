@@ -11,7 +11,7 @@
 | 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2a | ✅ tamam | `faz/2a-paket-yapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2b | ✅ tamam | `faz/2b-konfigurasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
-| 2c | 🔄 devam ediyor | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | | |
+| 2c | ✅ tamam | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | 2026-09-26 | |
 | 3a | ⏳ başlamadı | | | | |
 | 3b | ⏳ başlamadı | | | | |
 | 4a | ⏳ başlamadı | | | | |
@@ -287,7 +287,26 @@ Plan onayı (2026-09-26): kullanıcı kararları Q-25 (boş Guid kuralı özel `
   - `EXTEXP0018` `NoWarn`'dan çıktı (R-054). Release ve Debug `--no-incremental` build: 0 uyarı, 0 hata.
   - `ConfigurationValidationTests`'e yeni vaka: `Cache:DefaultExpiration` `HybridCacheOptions.DefaultEntryOptions`'a ulaşıyor. Önce yeşil görüldü, bağlantı bozulunca kırmızıya döndü (commit'lenmedi).
   - PublicAPI (iki paket), README, BuildingBlocks ve kök CLAUDE.md (Gotchas), CHANGELOG ve memory güncellendi. 106/106.
-- [ ] F2c.4 Paket temizliği (devam ediyor): doğrulama sırasında aralıklı bir test hatası görüldü. Kök nedeni framework yarışı, F2c'den önce de vardı (R-055, "Sonraya bırakılanlar").
+- [x] F2c.4 (1dd53c4): `FluentValidation` ve `FluentValidation.DependencyInjectionExtensions` CPM'den ve `package-policy.json` allowlist'inden çıktı (hook onayıyla). README (giriş ve lisans tablosu) ve CHANGELOG güncellendi. `restore --force` temiz, `git grep -i fluentvalidation` kodda, props'ta ve policy'de boş. 106/106.
+  - Doğrulama sırasında ~45 tam koşuda 2 kez aralıklı bir test hatası görüldü. Kök nedeni `Mvc.Testing`'deki bir framework yarışı, F2c'den önce de vardı (R-055, "Sonraya bırakılanlar").
+- Faz doğrulaması (2026-09-26):
+  - `restore --force`: temiz, NU uyarısı yok.
+  - `build -c Release --no-incremental`: 0 uyarı, 0 hata.
+  - `test`: 106/106.
+  - `list package --vulnerable --include-transitive`: 12 projenin hepsi temiz (`NovaCore.FluentValidation` silindiği için 13 → 12).
+  - `has-pending-model-changes` (3 context): değişiklik yok.
+  - `git grep`: kodda, props'ta, slnx'te, workflow'larda ve policy'de `FluentValidation`, `ICacheService`, `HybridCacheService`, `PermissionPolicyProvider`, `HasPermissionAttribute`, `ValidationFilter`, `ValidationExceptionHandler`, `EXTEXP0018` yok. `services.AddValidation()` üç modülde de var.
+  - OpenAPI: faz başında main'den alınan `/openapi/v1.json` ile faz sonundaki belge **bayt bayt aynı** (29.460 bayt). DataAnnotations kısıtları belgeye yansımıyor (R-052, "Sonraya bırakılanlar").
+  - Smoke run (Development, yerel SQL Server açık):
+    - `/alive` 200, `/health` 200 Healthy, `/scalar/v1` 200, `/api/v1/products` 401.
+    - Boş login gövdesi 400 `application/problem+json`: RFC 9110 `type`, `instance: "/api/v1/auth/login"`, `traceId`, `errors` = `Email`, `Password`.
+    - Geçersiz register (`not-an-email`, kısa parola) 400: `Email` ve `Password` hataları.
+    - Ortam Development'a ayarlanmadan (yanlış `dotnet run` bayrağı) host `Jwt:SigningKey is required outside Development` mesajıyla açılmadı. Bu doğru davranış.
+- Faz sonu code review (xhigh), 5 bulgu:
+  - Düzeltildi (aff227e):
+    - (1) `ExplicitRegistrationTests` (Y-20) `GetTypes()`/`GetExportedTypes()` metotlarını yakalıyordu, `DefinedTypes`/`ExportedTypes` property'lerini yakalamıyordu. F2c.1e testi tüm `src`'ye genişletmişti. Artık ikisi de yakalanıyor. Catalog'a eklenen geçici bir probe testi kırmızıya çevirdi (commit'lenmedi).
+    - (2) `AddCoreWeb`'deki yorum hâlâ F2c.2'de silinen policy provider'dan söz ediyordu.
+  - Atlandı ("Sonraya bırakılanlar"a yazıldı): iki farklı validation 400 başlığı, Catalog/Payments için geçerli gövde testi yok (F5.3). Kök CLAUDE.md'deki mediator cümlesi zaten listedeydi (Faz 0, F0.6).
 
 ### Faz 3a
 - [ ] F3a.1 JWT doğrulama (Authority/JWKS)
@@ -394,31 +413,36 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - F2c'den önce de vardı. CI'da da aralıklı kırmızıya yol açabilir.
   - Olası yollar: upstream'e bildirmek; açılış doğrulamasını `IStartupValidator` sarmalayıcısı ile yakalamak (hosted service hatalarını kapsamaz); bu testleri `WebApplicationFactory` dışında kurmak. Karar test altyapısını değiştireceği için kullanıcıya bırakıldı.
 - (Faz 2c) README "Paket / Lisans Tablosu"ndaki `Microsoft.EntityFrameworkCore / Extensions.Hosting.Abstractions / Configuration.Binder` satırı eskimiş. EF paketi F2b'den beri Binder yerine `Options.ConfigurationExtensions` ve `Diagnostics.HealthChecks.EntityFrameworkCore` kullanıyor. F2c.4 aynı tabloda yalnızca FluentValidation satırını sildi.
+- (Faz 2c, code review) **İki farklı validation 400 başlığı:** Yerleşik validation "One or more validation errors occurred." diyor (D-023 (4)). `Result` üzerinden dönen `ErrorType.Validation` (`ResultHttpExtensions.TitleFor`) ve `AppException` validation'ı (`GlobalExceptionHandler`) hâlâ "Validation failed" diyor. F2c'den önce ikisi de "Validation failed" idi. İki yanıtın `type`'ı zaten farklıydı (RFC 9110 / `httpstatuses.io`). Hizalamak public davranış değişikliği, F2c'nin kapsamı dışında.
+- (Faz 2c, code review → F5.3) Catalog ve Payments için geçerli gövdeyle uçtan uca test yok. `ValidationTests` yalnızca reddedilen gövdeleri sabitliyor, `PermissionAuthorizationTests`'teki POST 403'te duruyor. Geçerli girdiyi yanlışlıkla reddeden bir attribute değişikliği yakalanmaz. F5.3'ün (Catalog/Payments entegrasyon testleri) kapsamına giriyor.
+- (Faz 2c, R-052) Record ctor parametrelerindeki DataAnnotations (`[MaxLength]`, `[Range]`, `[Length]`) OpenAPI şemasına yansımıyor. Faz sonunda belge main ile bayt bayt aynıydı. FluentValidation döneminde de şemada kısıt yoktu, yani bu bir gerileme değil. Kısıtları belgeye taşımanın yolu araştırılmadı.
+- (Faz 2c) Y-10'un yerini Y-44 aldı, ama iki yer hâlâ Y-10 diyor: `tests/CLAUDE.md` ("never weaken one to pass (Y-10)") ve `Directory.Build.props`'taki `TreatWarningsAsErrors` yorumu. Kök CLAUDE.md'deki aynı not yukarıda (Faz 2a, F2a.5).
 - (Faz 2b → Faz 3a) Token üretimi `TimeProvider`'dan okuyor, JwtBearer'ın lifetime doğrulaması (IdentityModel) ise gerçek saatten. Sahte saatli testler bu yüzden gerçek "şimdi"den başlıyor (R-050). F3a.1'de doğrulama yeniden yazılırken `TimeProvider` ile hizalanabilir.
 
 ## Son devir notu
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-25, Faz 2b bitti** ve kullanıcı onayıyla `faz/2b-konfigurasyon` main'e merge edildi (`--no-ff`), `main` push'landı.
+**2026-09-26, Faz 2c bitti.** Branch `faz/2c-yerlesik-karsiliklar`, main'e merge için kullanıcı onayı bekleniyor.
 
 - **Yapılanlar:**
-  - Config (F2b.1a/1b): `Jwt`, `RateLimiting`, `Cors`, `Cache` ve `Database` artık `BindConfiguration` + `ValidateOnStart` ile bağlanan doğrulanmış options. `[OptionsValidator]` source-gen kullanılıyor, nitelikle ifade edilemeyen kurallar `.Validate` ile. Framework options'ları (`JwtBearerOptions`, `RateLimiterOptions`, `CorsOptions`, `HybridCacheOptions`) `Configure<IOptions<T>>` ile ilk kullanımda yapılandırılıyor. `DatabaseMigrationService` her zaman kayıtlı ve internal.
-  - Test host (F2b.2): env-var hack'i kalktı. `ConfigureAppConfiguration` yeterli.
-  - Saat (F2b.3): tüm zaman okumaları enjekte edilen `TimeProvider`'dan. Tek istisna `DomainEvent.OccurredOnUtc` varsayılanı. `AccessToken` `IssuedAtUtc` taşıyor. `SourceHygieneTests` kuralı koruyor.
-  - Hata yanıtları (F2b.4): istemciye yalnızca `AppException` mesajları gidiyor. `instance` bir URI reference (path, query yok).
-  - Health (F2b.5): her modül DbContext'i için "ready" etiketli DB kontrolü. `/health` ve `/alive` yalnızca Development'ta (D-022). Test host üç context'i de SQLite'a çeviriyor.
-  - Testler 58 → 89. OpenAPI belgesi main ile bayt bayt aynı.
-  - Kararlar: D-021 (model), D-022 (kullanıcı, Q-24). Araştırmalar: R-048…R-051.
+  - Validation (F2c.1a–1e): FluentValidation yerine .NET 10'un yerleşik Minimal API validation'ı. Kurallar request record'larının parametrelerinde DataAnnotations. Her modül `AddModule` içinde `services.AddValidation()` çağırıyor (generator yalnızca çağıran assembly'yi kapsar, R-052). Boş Guid kuralı `CreatePayment` içinde private nested bir `ValidationAttribute` (Q-25). `NovaCore.FluentValidation` köprüsü ve `ExceptionHandlerOrderTests` silindi (D-019, Q-26). `ValidationTests` validate edilen 13 request şeklinin 400 yanıtını sabitliyor.
+  - Yetkilendirme (F2c.2): `RequirePermissionAttribute : AuthorizeAttribute, IAuthorizationRequirementData` mevcut `PermissionRequirement`'ı taşıyor. `PermissionPolicyProvider` ve `HasPermissionAttribute` silindi. `RequirePermission(...)` imzası aynı. `PermissionAuthorizationTests` 200/403'ü sabitliyor.
+  - Cache (F2c.3): `ICacheService`/`HybridCacheService` silindi, tüketiciler `HybridCache`'i doğrudan enjekte ediyor. `EXTEXP0018` bastırması kalktı (R-054).
+  - Paketler (F2c.4): FluentValidation CPM'den ve allowlist'ten çıktı.
+  - Test yardımcısı: `NovaCoreApiFactory.CreateClientWithClaims(...)` host'un `ITokenService`'iyle imzalı token üretiyor, kullanıcı seed'i gerekmiyor.
+  - `ExplicitRegistrationTests` (Y-20) artık tüm `src`'yi tarıyor. `*FromAssembly*` yardımcılarını ve `DefinedTypes`/`ExportedTypes` property'lerini de yakalıyor, EF'in `ApplyConfigurationsFromAssembly`'si hariç (D-023 (5)).
+  - Testler 89 → 106. OpenAPI belgesi main ile bayt bayt aynı.
+  - Kararlar: D-023 (model; (3)'teki Guid kuralı kullanıcı, Q-25), Q-26 (kullanıcı). Araştırmalar: R-052…R-055.
 - **Sürprizler:**
-  - Tembel okumaya geçince `ConfigureHostConfiguration` (`args`) artık factory'nin `ConfigureAppConfiguration` değerini ezemiyor. Sonradan eklenen kaynak kazanıyor, bu yüzden `StrictRateLimitApiFactory` F2b.1a'da `ConfigureAppConfiguration`'a geçti.
-  - `ValidateOnStart` birden fazla hatayı `AggregateException` içinde topluyor. Testler iç mesajları düzleştirerek kontrol ediyor.
-  - `FakeTimeProvider` DI'a konunca ASP.NET Identity de onu kullanıyor (R-050). JWT doğrulaması ise gerçek saatte kalıyor.
-  - Bash'te inline Python heredoc'ları regex kaçışlarını ve tırnakları bozabiliyor. Uzun betikler dosyaya yazılıp çalıştırılmalı; regex içeren C# dosyaları Write/Edit ile yazılmalı.
-- **Sonraki fazın (2c) bilmesi gerekenler:**
-  - F2c.1: `NovaCore.FluentValidation` silinecek. `ConfigurationValidationTests` ve `HealthEndpointsTests` host'u bu köprü olmadan da açabilmeli. `ValidationExceptionHandler`'a bağımlı test: `ExceptionHandlerOrderTests`.
-  - F2c.3: `ICacheService`/`HybridCacheService` kalkacak. `CacheOptions` (`Cache:DefaultExpiration`) ve `HybridCacheOptions` yapılandırması `AddCoreCaching`'te duruyor; `AddHybridCache` doğrudan kullanılınca da korunmalı.
-  - Yeni config eklenecekse kök CLAUDE.md Standards'taki kural geçerli: options + `ValidateOnStart`, kayıt anında okuma yok.
-  - Açık "Sonraya bırakılanlar" maddeleri: `BadHttpRequestException` → 500, health check timeout, test yardımcılarındaki tekrar, OTel'in erken okuması.
-- **Bekleyen:** önizleme yayını (tag + GitHub Packages) ayrı bir kullanıcı kararı.
-- **Sıradaki:** yeni oturumda `/novacore-phase 2c`.
+  - Validation 400'ünün `title`'ı framework varsayılanına geçti ("One or more validation errors occurred."). `Result` yolundaki validation hataları hâlâ "Validation failed" diyor ("Sonraya bırakılanlar").
+  - DataAnnotations kısıtları OpenAPI şemasına yansımıyor. Belge değişmedi.
+  - Açılışta hata bekleyen testler yük altında ara sıra `ObjectDisposedException` alıyor (R-055). Framework yarışı, F2c'den önce de vardı, CI'da aralıklı kırmızıya yol açabilir. Çözüm yolu kullanıcı kararı.
+  - `dotnet run --environment Development` ortamı ayarlamıyor. Smoke run için `ASPNETCORE_ENVIRONMENT=Development` gerekiyor.
+- **Sonraki fazın (3a) bilmesi gerekenler:**
+  - F3a.1 (Authority/JWKS doğrulaması) `CreateClientWithClaims`'i etkiler: yardımcı bugün host'un simetrik anahtarlı `ITokenService`'ini kullanıyor. F3a.3'teki bellek içi RSA test IdP'si onun yerini almalı. `ValidationTests` ve `PermissionAuthorizationTests` bu yardımcıya dayanıyor.
+  - F3a.2 (sunucu tarafında izin çözümleme): `PermissionAuthorizationHandler` bugün JWT'deki `permission` claim'ine bakıyor. `PermissionAuthorizationTests` izinleri token claim'i olarak veriyor; claim transformation'a geçince bu testlerin kurulumu değişmeli. HybridCache `AddCoreCaching` ile kayıtlı, doğrudan enjekte edilir (Y-15: sarmalayıcı yok).
+  - Token üretimi `TimeProvider`'dan, JwtBearer lifetime doğrulaması gerçek saatten okuyor (R-050). F3a.1'de hizalanabilir.
+  - Açık "Sonraya bırakılanlar" maddeleri: R-055 aralıklı test hatası, iki validation başlığı, `BadHttpRequestException` → 500, health check timeout, test yardımcılarındaki tekrar, OTel'in erken okuması, eski Y-10 atıfları, mediator cümlesi.
+- **Bekleyen:** faz 2c merge onayı; önizleme yayını (tag + GitHub Packages) ayrı bir kullanıcı kararı.
+- **Sıradaki:** merge'den sonra yeni oturumda `/novacore-phase 3a`.
