@@ -52,12 +52,6 @@ NovaCore.AspNetCore.Authorization.RequirePermissionAttribute
 NovaCore.AspNetCore.Authorization.RequirePermissionAttribute.GetRequirements() -> System.Collections.Generic.IEnumerable<Microsoft.AspNetCore.Authorization.IAuthorizationRequirement!>!
 NovaCore.AspNetCore.Authorization.RequirePermissionAttribute.Permission.get -> string!
 NovaCore.AspNetCore.Authorization.RequirePermissionAttribute.RequirePermissionAttribute(string! permission) -> void
-NovaCore.AspNetCore.Caching.HybridCacheService
-NovaCore.AspNetCore.Caching.HybridCacheService.GetOrCreateAsync<T>(string! key, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! factory, NovaCore.Abstractions.Caching.CacheEntryOptions? options = null, System.Collections.Generic.IReadOnlyCollection<string!>? tags = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
-NovaCore.AspNetCore.Caching.HybridCacheService.HybridCacheService(Microsoft.Extensions.Caching.Hybrid.HybridCache! cache) -> void
-NovaCore.AspNetCore.Caching.HybridCacheService.RemoveAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
-NovaCore.AspNetCore.Caching.HybridCacheService.RemoveByTagAsync(string! tag, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
-NovaCore.AspNetCore.Caching.HybridCacheService.SetAsync<T>(string! key, T value, NovaCore.Abstractions.Caching.CacheEntryOptions? options = null, System.Collections.Generic.IReadOnlyCollection<string!>? tags = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 NovaCore.AspNetCore.DependencyInjection.InfrastructureServiceCollectionExtensions
 NovaCore.AspNetCore.Exceptions.AppException
 NovaCore.AspNetCore.Exceptions.AppException.AppException(string! message, NovaCore.Abstractions.Results.ErrorType type) -> void

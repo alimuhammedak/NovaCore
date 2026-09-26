@@ -206,9 +206,8 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 - **Two EF providers can't coexist** in one container. The test host swaps Identity to SQLite and must
   give it its own internal service provider (see `tests/CLAUDE.md`).
 - **Suppressed-by-design warnings** (all user-approved, DECISIONS D-011):
-  - `Directory.Build.props`: `NoWarn` `EXTEXP0018` (HybridCache is GA but flagged experimental) and `RMG020`
-    (Mapperly intentional source-member drops). `WarningsNotAsErrors` `NU1901;NU1902` (low/moderate advisories stay
-    warnings; high/critical fail restore; CI fails on any).
+  - `Directory.Build.props`: `NoWarn` `RMG020` (Mapperly intentional source-member drops). `WarningsNotAsErrors`
+    `NU1901;NU1902` (low/moderate advisories stay warnings; high/critical fail restore; CI fails on any).
   - `.editorconfig`: CA1707 is off for `tests/**.cs` (test names are sentences).
   - `[SuppressMessage]` with justification on `Error` (CA1716) and `IDomainEventHandler<T>` (CA1711).
 - **`Directory.Build.targets` is too late for some properties.** The SDK computes `DocumentationFile` (from

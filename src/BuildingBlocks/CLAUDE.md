@@ -12,12 +12,12 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 - **`NovaCore.Abstractions`** — BCL only. **No `FrameworkReference`, no NuGet, no ASP.NET, no EF.**
   Home of `Result`/`Result<T>`/`Error`, `PagedList<T>`/`PaginationRequest`, `Entity`/`AuditableEntity`,
   `IDomainEvent` (events derive from the `DomainEvent` record, which fixes `EventId`/`OccurredOnUtc` at
-  creation), `ICacheService`, `ICurrentUser`. If a new type needs a framework, it does **not** belong here.
+  creation), `ICurrentUser`. If a new type needs a framework, it does **not** belong here.
 
 - **`NovaCore.AspNetCore`** — the web host: `IModule` + `AddModule<TModule>()`/`MapModules`, `AddCoreDefaults`
   (health + HttpClient resilience), `AddCoreWeb`/`UseCoreWeb`, `GlobalExceptionHandler` (RFC 9457) and the
   `AppException` types, `ResultHttpExtensions.ToHttpResult`, JWT auth (`AddCoreAuthentication`), permission authz
-  (`Authorization/`), the OpenAPI document, `SecurityHeadersMiddleware`, `HybridCacheService`. Depends on
+  (`Authorization/`), the OpenAPI document, `SecurityHeadersMiddleware`, HybridCache (`AddCoreCaching`). Depends on
   Abstractions + `FrameworkReference Microsoft.AspNetCore.App`, never on EntityFrameworkCore.
 
 - **`NovaCore.EntityFrameworkCore`** — persistence without ASP.NET Core: `AddModuleDbContext` (also a "ready"-tagged
@@ -43,8 +43,8 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
 - **Health endpoints are Development-only** (`MapDefaultEndpoints`, D-022); `/health` includes every module database.
 - **`IExceptionHandler` order matters** — they run in registration order (R-046). `GlobalExceptionHandler` is the
   catch-all, so a more specific handler must be registered ahead of it.
-- Caching goes through `ICacheService` (wraps HybridCache). Don't take a hard dependency on `HybridCache`
-  in feature code.
+- Caching: inject `HybridCache` directly. It is already an abstract class with a default implementation (R-008), so
+  don't wrap it (Y-15). `AddCoreCaching` registers it with the default entry lifetime from `Cache:DefaultExpiration`.
 - Permission authorization: `RequirePermissionAttribute` carries a `PermissionRequirement`
   (`IAuthorizationRequirementData`, R-053), which `PermissionAuthorizationHandler` checks. There is no custom policy
   provider and no named policy per permission. Use `RequirePermission(...)` / `[RequirePermission]` rather than

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -47,6 +48,19 @@ public class ConfigurationValidationTests
         var jwt = factory.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
 
         Assert.Equal(7, jwt.AccessTokenMinutes);
+    }
+
+    [Fact]
+    public async Task Cache_default_expiration_applies_to_hybrid_cache_entries()
+    {
+        await using var factory = new ConfiguredApiFactory(Environments.Development, new() { ["Cache:DefaultExpiration"] = "00:07:00" });
+
+        var defaults = factory.Services.GetRequiredService<IOptions<HybridCacheOptions>>().Value.DefaultEntryOptions;
+
+        // Consumers inject HybridCache itself; AddCoreCaching only sets its default entry lifetime.
+        Assert.NotNull(factory.Services.GetService<HybridCache>());
+        Assert.Equal(TimeSpan.FromMinutes(7), defaults?.Expiration);
+        Assert.Equal(TimeSpan.FromMinutes(7), defaults?.LocalCacheExpiration);
     }
 
     [Fact]

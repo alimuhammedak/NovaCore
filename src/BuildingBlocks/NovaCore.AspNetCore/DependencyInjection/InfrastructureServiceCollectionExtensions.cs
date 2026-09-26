@@ -2,7 +2,6 @@ using System.Diagnostics;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using NovaCore.Abstractions.Caching;
 using NovaCore.AspNetCore.Caching;
 using NovaCore.AspNetCore.Exceptions;
 
@@ -32,9 +31,9 @@ public static class InfrastructureServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Registers HybridCache (L1 in-memory) behind <see cref="ICacheService"/>, with the default entry lifetime from
-    /// <c>Cache:DefaultExpiration</c> (validated on start). To add an L2 distributed tier, register an
-    /// <c>IDistributedCache</c> (e.g. Redis) — HybridCache adopts it automatically.
+    /// Registers <see cref="HybridCache"/> (L1 in-memory), with the default entry lifetime from
+    /// <c>Cache:DefaultExpiration</c> (validated on start). Consumers inject <see cref="HybridCache"/> directly. To add
+    /// an L2 distributed tier, register an <c>IDistributedCache</c> (e.g. Redis) — HybridCache adopts it automatically.
     /// </summary>
     public static IServiceCollection AddCoreCaching(this IServiceCollection services)
     {
@@ -52,7 +51,6 @@ public static class InfrastructureServiceCollectionExtensions
                 LocalCacheExpiration = cache.Value.DefaultExpiration
             });
 
-        services.AddSingleton<ICacheService, HybridCacheService>();
         return services;
     }
 }

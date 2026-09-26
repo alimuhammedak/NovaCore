@@ -274,8 +274,16 @@ Plan onayı (2026-09-26): kullanıcı kararları Q-25 (boş Guid kuralı özel `
   - [x] F2c.1e (03b9cae): `NovaCore.FluentValidation` silindi (D-019): `ValidationFilter<T>`, `ValidationExceptionHandler`, `AddValidationExceptionHandler`, slnx kaydı, Api referansı ve `Program.cs` çağrısı. `ExceptionHandlerOrderTests` kullanıcı onayıyla silindi (Q-26, Y-44). Yeniden adlandırma gotcha'sı gereği tüm `bin/obj` temizlendi.
     - `ExplicitRegistrationTests` (Y-20) artık tüm `src`'yi tarıyor. `*FromAssembly*` kayıt yardımcılarını da yakalıyor; EF'in `ApplyConfigurationsFromAssembly`'si hariç (D-023 (5)). İki kasıtlı ihlalle kırmızı görüldü (commit'lenmedi).
     - Dokümanlar: kök, BuildingBlocks, Modules, Identity ve tests CLAUDE.md, README, CHANGELOG (Unreleased net duruma göre düzeltildi), memory (`novacore-stack`, `novacore-project`). README lisans satırı F2c.4'e kaldı. 101/101.
-- [ ] F2c.2 Yetkilendirme (devam ediyor)
-- [ ] F2c.3 Cache
+- [x] F2c.2 (e0a4791): Yeni `RequirePermissionAttribute : AuthorizeAttribute, IAuthorizationRequirementData`. Attribute mevcut `PermissionRequirement`'ı taşıyor, handler değişmedi (D-023 (6), R-053).
+  - `RequirePermission(...)` imzası aynı, artık bu attribute'u ekliyor. `AddCoreAuthorization` yalnızca handler'ı kaydediyor.
+  - `PermissionPolicyProvider` (`perm:` policy adları) ve kullanılmayan `HasPermissionAttribute` silindi. PublicAPI güncellendi (0.x).
+  - Yeni `PermissionAuthorizationTests` token'larla davranışı sabitliyor, önce policy provider'a karşı yeşil görüldü:
+    - permission claim'i kendi ucunu açıyor (200), başka ucu açmıyor (403);
+    - `Administrator` rolü her ucu açıyor;
+    - izni olmayan kimliği doğrulanmış çağıran 403 alıyor.
+  - Attribute requirement döndürmeyince korunan her uç düştü (commit'lenmedi).
+  - Dokümanlar: README güvenlik bölümü, BuildingBlocks ve tests CLAUDE.md, CHANGELOG, memory `novacore-security`. 105/105.
+- [ ] F2c.3 Cache (devam ediyor)
 - [ ] F2c.4 Paket temizliği
 
 ### Faz 3a

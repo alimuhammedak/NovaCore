@@ -120,7 +120,7 @@ NovaCore.AspNetCore        NovaCore.EntityFrameworkCore     (çekirdek: yalnızc
 | `Result<T>`, `Error`, `PagedList<T>` | Domain entity'leri (Product, Payment...) |
 | Global exception handling + ProblemDetails | İş modülleri ve endpoint'leri |
 | `IModule` + açık kayıt (`AddModule<TModule>()`) | DbContext'ler + migration'lar |
-| HybridCache sarmalayıcı (`ICacheService`) | İş kuralları, request validation kuralları |
+| HybridCache kaydı ve varsayılan süre (`AddCoreCaching`) | İş kuralları, request validation kuralları |
 | Health + resilient HttpClient (`AddCoreDefaults`); Serilog ve OpenTelemetry eklentileri | Modüle özel konfigürasyon |
 | OpenAPI (+ Scalar eklentisi), rate limiting, CORS | |
 | JWT bearer auth + permission-based authz altyapısı | Identity *modülü* (users/roles/tokens) |
@@ -140,7 +140,7 @@ NovaCore.slnx
 │
 ├── src/
 │   ├── BuildingBlocks/
-│   │   ├── NovaCore.Abstractions/        # Result, PagedList, Entity, IDomainEvent/DomainEvent, ICacheService, ICurrentUser (yalnızca BCL)
+│   │   ├── NovaCore.Abstractions/        # Result, PagedList, Entity, IDomainEvent/DomainEvent, ICurrentUser (yalnızca BCL)
 │   │   ├── NovaCore.AspNetCore/          # IModule + AddModule<T>, AddCoreDefaults/AddCoreWeb, ProblemDetails, Result→HTTP, JWT, authz, OpenAPI, HybridCache
 │   │   ├── NovaCore.EntityFrameworkCore/ # AddModuleDbContext, AddCorePersistence: auditing, startup migration, domain-event dispatcher
 │   │   ├── NovaCore.Serilog/             # eklenti: AddCoreLogging (Console + opsiyonel Seq)
@@ -272,7 +272,7 @@ HTTP/mesaj kuyruğuna döner.
 | **Exception handling** | `IExceptionHandler` + `AddProblemDetails` (RFC 9457) | `GlobalExceptionHandler` |
 | **Logging** | Serilog (structured) + OTel korelasyon | `AddCoreLogging` (`NovaCore.Serilog` eklentisi) — Console + opsiyonel Seq |
 | **Tracing/Metrics** | OpenTelemetry | `AddCoreObservability` (`NovaCore.OpenTelemetry` eklentisi) — OTLP yalnızca endpoint konfigüre ise |
-| **Caching** | HybridCache (L1 + opsiyonel L2) | `ICacheService` → `HybridCacheService` |
+| **Caching** | HybridCache (L1 + opsiyonel L2) | `HybridCache` doğrudan enjekte edilir (zaten soyut bir sınıf, sarmalayıcı yok). `AddCoreCaching` varsayılan süreyi `Cache:DefaultExpiration`'dan alır |
 | **Validation** | .NET 10 yerleşik validation (`AddValidation`, DataAnnotations) | Her modül `AddModule`'de `services.AddValidation()` çağırır; kurallar request record'unda |
 | **Mapping** | Mapperly (source-gen) | `[Mapper]` statik partial sınıflar, EF-translatable `ProjectToDto` |
 | **Auth** | ASP.NET Core Identity + JWT/refresh + permission-based | bkz. [Güvenlik & Yetkilendirme](#güvenlik--yetkilendirme) |
@@ -479,6 +479,6 @@ dotnet test
 
 ### Notlar
 - .NET 10 LTS'tir (Kasım 2025 → ~Kasım 2028).
-- HybridCache .NET 9'dan beri GA/production-ready; .NET 10'da API'leri hâlâ `[Experimental]` (EXTEXP0018)
-  işaretli olduğundan `NoWarn` ile bilinçli olarak açıldı.
+- HybridCache .NET 9'dan beri GA/production-ready. `Microsoft.Extensions.Caching.Hybrid` 10.0.0 artık deneysel
+  uyarısı (EXTEXP0018) üretmiyor, bu yüzden bastırma da yok.
 - Modüller açıkça kaydedilir (`AddModule<TModule>()`); assembly taranmaz.

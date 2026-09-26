@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `NovaCore.Core.Infrastructure`. Hosts register them with the new `builder.AddCorePersistence()`, called before the
     modules; `AddCoreWeb`/`AddCoreInfrastructure` no longer do.
   - `NovaCore.Core.Web` and the rest of `NovaCore.Core.Infrastructure` (ProblemDetails exception handling, the
-    `AppException` types, `ResultHttpExtensions`, `HybridCacheService`) → `NovaCore.AspNetCore`. The
+    `AppException` types, `ResultHttpExtensions`) → `NovaCore.AspNetCore`. The
     `NovaCore.Core.Infrastructure` package no longer exists.
   - New add-on `NovaCore.Serilog`: `AddCoreLogging` moved here from `AddCoreDefaults`, which no longer configures
     logging. `UseCoreWeb` no longer calls `UseSerilogRequestLogging`; the host calls it before `UseCoreWeb`.
@@ -120,6 +120,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unused dependencies and wiring: `Scrutor` (never called), `Asp.Versioning.Http` + `AddApiVersioning` (no endpoint used a
   version set), `AddOutputCache`/`UseOutputCache` (no policy or endpoint used it).
 - **Breaking:** `PagedList<T>.Empty(int)` (it had no callers).
+- **Breaking:** `ICacheService` and `CacheEntryOptions` (`NovaCore.Abstractions`) and `HybridCacheService`
+  (`NovaCore.AspNetCore`). .NET's `HybridCache` is already an abstraction, so inject it directly. `AddCoreCaching` still
+  registers it with `Cache:DefaultExpiration` as the default entry lifetime.
+- The `EXTEXP0018` warning suppression. `Microsoft.Extensions.Caching.Hybrid` 10.0.0 no longer marks its APIs
+  experimental.
 
 ### Security
 
