@@ -120,7 +120,7 @@ NovaCore.AspNetCore        NovaCore.EntityFrameworkCore     (çekirdek: yalnızc
 | `Result<T>`, `Error`, `PagedList<T>` | Domain entity'leri (Product, Payment...) |
 | Global exception handling + ProblemDetails | İş modülleri ve endpoint'leri |
 | `IModule` + açık kayıt (`AddModule<TModule>()`) | DbContext'ler + migration'lar |
-| HybridCache sarmalayıcı (`ICacheService`) | İş kuralları, validator'lar |
+| HybridCache sarmalayıcı (`ICacheService`) | İş kuralları, request validation kuralları |
 | Health + resilient HttpClient (`AddCoreDefaults`); Serilog ve OpenTelemetry eklentileri | Modüle özel konfigürasyon |
 | OpenAPI (+ Scalar eklentisi), rate limiting, CORS | |
 | JWT bearer auth + permission-based authz altyapısı | Identity *modülü* (users/roles/tokens) |
@@ -145,8 +145,7 @@ NovaCore.slnx
 │   │   ├── NovaCore.EntityFrameworkCore/ # AddModuleDbContext, AddCorePersistence: auditing, startup migration, domain-event dispatcher
 │   │   ├── NovaCore.Serilog/             # eklenti: AddCoreLogging (Console + opsiyonel Seq)
 │   │   ├── NovaCore.OpenTelemetry/       # eklenti: AddCoreObservability (metrics + tracing, OTLP)
-│   │   ├── NovaCore.Scalar/              # eklenti: MapCoreScalar (Scalar UI, yalnızca Development)
-│   │   └── NovaCore.FluentValidation/    # paket değil: ValidationFilter<T> + ValidationExceptionHandler
+│   │   └── NovaCore.Scalar/              # eklenti: MapCoreScalar (Scalar UI, yalnızca Development)
 │   │
 │   ├── Modules/
 │   │   ├── Catalog/
@@ -176,7 +175,6 @@ builder.AddCoreObservability();                    // OpenTelemetry metrics + tr
 builder.AddCoreDefaults();                         // health + resilient HttpClients
 builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth, rate limit, CORS
 builder.AddCorePersistence();                      // audit interceptor, domain event'ler, opt-in startup migration
-builder.Services.AddValidationExceptionHandler();  // FluentValidation exception'ı → 400, global handler'dan önce
 
 // Modüller: açık kayıt; endpoint'ler bu sırayla bağlanır
 builder.AddModule<CatalogModule>();
@@ -203,7 +201,8 @@ satır.** Modüller assembly taranarak bulunmaz; host her modülü `builder.AddM
 
 1. `dotnet new classlib -o src/Modules/Orders/NovaCore.Modules.Orders` (isim `NovaCore.Modules.` ile başlamalı;
    mimari testler modülleri bu önekle bulur)
-2. `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` ve `NovaCore.FluentValidation`'a referans ver.
+2. `NovaCore.AspNetCore` ve `NovaCore.EntityFrameworkCore`'a referans ver. Validation için paket gerekmez, ASP.NET Core
+   framework'ü getiriyor.
 3. `IModule` implement et:
 
 ```csharp
@@ -219,7 +218,7 @@ public sealed class OrdersModule : IModule
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", OrdersDbContext.Schema));
             o.AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>());
         });
-        services.AddValidatorsFromAssembly(typeof(OrdersModule).Assembly, includeInternalTypes: true);
+        services.AddValidation();   // .NET 10 validation; generator yalnızca bu çağrının assembly'sini kapsar
         return services;
     }
 
@@ -234,8 +233,15 @@ public sealed class OrdersModule : IModule
 4. `NovaCore.Api`'ye proje referansı ekle ve `Program.cs`'e `builder.AddModule<OrdersModule>();` yaz. Bitti.
 
 ### Bir özelliğin (feature) anatomisi — Vertical Slice
-Her özellik tek dosya: request + response + validator + route + handler bir arada. Mediator yok;
+Her özellik tek dosya: request (validation attribute'larıyla) + response + route + handler bir arada. Mediator yok;
 handler bağımlılıklarını doğrudan minimal-API DI'dan alır. Örnek: [`CreateProduct.cs`](src/Modules/Catalog/NovaCore.Modules.Catalog/Features/CreateProduct.cs).
+
+Validation, .NET 10'un yerleşik Minimal API validation'ıdır. Kurallar request record'unun parametrelerindeki
+DataAnnotations'tır (`[Required, MaxLength(200)] string Name`). Hazır bir attribute'un ifade edemediği kural, tek bir
+değer için özel bir `ValidationAttribute`'tur (ör. `CreatePayment`'taki `NotEmpty`), birden çok özellik için
+`IValidatableObject`'tir. Geçersiz istek handler'a ulaşmadan 400 validation ProblemDetails alır (`errors` alan adına
+göre). Modül `services.AddValidation()` çağırmazsa hiçbir şey doğrulanmaz ve bir hata da oluşmaz. Bu yüzden
+`ValidationTests` her validation'lı endpoint'i sabitler.
 
 ---
 
@@ -263,11 +269,11 @@ HTTP/mesaj kuyruğuna döner.
 
 | Concern | Yaklaşım (.NET 10) | NovaCore'da |
 |---|---|---|
-| **Exception handling** | `IExceptionHandler` + `AddProblemDetails` (RFC 9457) | `GlobalExceptionHandler` + `ValidationExceptionHandler` (`AddValidationExceptionHandler` onu en öne ekler) |
+| **Exception handling** | `IExceptionHandler` + `AddProblemDetails` (RFC 9457) | `GlobalExceptionHandler` |
 | **Logging** | Serilog (structured) + OTel korelasyon | `AddCoreLogging` (`NovaCore.Serilog` eklentisi) — Console + opsiyonel Seq |
 | **Tracing/Metrics** | OpenTelemetry | `AddCoreObservability` (`NovaCore.OpenTelemetry` eklentisi) — OTLP yalnızca endpoint konfigüre ise |
 | **Caching** | HybridCache (L1 + opsiyonel L2) | `ICacheService` → `HybridCacheService` |
-| **Validation** | FluentValidation | `ValidationFilter<T>` endpoint filtresi |
+| **Validation** | .NET 10 yerleşik validation (`AddValidation`, DataAnnotations) | Her modül `AddModule`'de `services.AddValidation()` çağırır; kurallar request record'unda |
 | **Mapping** | Mapperly (source-gen) | `[Mapper]` statik partial sınıflar, EF-translatable `ProjectToDto` |
 | **Auth** | ASP.NET Core Identity + JWT/refresh + permission-based | bkz. [Güvenlik & Yetkilendirme](#güvenlik--yetkilendirme) |
 | **Auditing** | EF Core `SaveChangesInterceptor` | `AuditableEntityInterceptor` — CreatedBy/ModifiedAt merkezî |
@@ -431,8 +437,7 @@ dotnet test
    # artifacts/ klasörünü lokal feed olarak ekleyin, sonra: dotnet add package NovaCore.AspNetCore (ve ihtiyaca göre diğerleri)
    ```
    - Altı paket üretilir: çekirdek `NovaCore.Abstractions`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore`;
-     eklentiler `NovaCore.Serilog`, `NovaCore.OpenTelemetry`, `NovaCore.Scalar`. Modüller ve `NovaCore.FluentValidation`
-     paketlenmez.
+     eklentiler `NovaCore.Serilog`, `NovaCore.OpenTelemetry`, `NovaCore.Scalar`. Modüller paketlenmez.
    - Sürüm `Directory.Build.props`'taki `VersionPrefix`'ten gelir. API kararlı olana kadar 0.x kalır.
    - Her paket XML dokümanını, `src/PACKAGE.md`'den gelen README'yi, MIT lisans ifadesini ve repo linkini taşır. Yanında bir `.snupkg` sembol paketi üretilir.
    - Public API `PublicAPI.*.txt` dosyalarında izlenir. İzlenmeyen bir değişiklik build'i kırar.

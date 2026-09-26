@@ -28,7 +28,7 @@ Design is grounded in the OWASP Authentication / Password Storage / OAuth2 cheat
 - Map it under the `/api/v1/auth` group (already rate-limited with the `"strict"` policy). Use
   `.AllowAnonymous()` only for pre-login endpoints (register/confirm/login/refresh); everything else is
   `.RequireAuthorization()` or `.RequirePermission(IdentityPermissions.X)`.
-- Validate DTOs with `.AddEndpointFilter<ValidationFilter<Request>>()`.
+- Validate DTOs with DataAnnotations on the request record; `IdentityModule` already calls `services.AddValidation()`.
 - Seeding (`IdentityDataSeeder`) collects permissions from **all** modules' `IPermissionDefinitionProvider`s:
   `Administrator` gets everything; `User` gets non-Identity `:read` permissions (least privilege).
 

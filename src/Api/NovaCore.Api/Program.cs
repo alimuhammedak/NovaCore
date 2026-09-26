@@ -2,7 +2,6 @@ using NovaCore.AspNetCore.Hosting;
 using NovaCore.AspNetCore.Modules;
 using NovaCore.AspNetCore.Web;
 using NovaCore.EntityFrameworkCore.Persistence;
-using NovaCore.FluentValidation;
 using NovaCore.Modules.Catalog;
 using NovaCore.Modules.Identity;
 using NovaCore.Modules.Payments;
@@ -21,7 +20,6 @@ builder.AddCoreObservability();                    // OpenTelemetry metrics + tr
 builder.AddCoreDefaults();                         // health checks + resilient HttpClients
 builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth, rate limiting, CORS
 builder.AddCorePersistence();                      // audit interceptor, domain events, opt-in startup migrations
-builder.Services.AddValidationExceptionHandler();  // FluentValidation exceptions -> 400, ahead of the global handler
 
 // Modules, after AddCorePersistence so migrations start before module hosted services. Endpoints map in this order.
 builder.AddModule<CatalogModule>();

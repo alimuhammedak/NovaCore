@@ -29,8 +29,8 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`), `NovaCore.Scalar`
 (`MapCoreScalar`). A new third-party integration becomes a new add-on, not a dependency of the core.
 
-**Not a package:** `NovaCore.FluentValidation` (`ValidationFilter<T>`, `ValidationExceptionHandler`,
-`AddValidationExceptionHandler`) keeps FluentValidation out of the core until .NET 10 validation replaces it (D-019).
+Request validation is not a building block: .NET 10's built-in validation needs `services.AddValidation()` in the
+assembly that declares the request types, so each module calls it (root `CLAUDE.md` Standards, R-052).
 
 ## Conventions here
 
@@ -41,9 +41,8 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 - **Time comes from `TimeProvider`**: register `TimeProvider.System` with `TryAddSingleton` where its consumer is
   registered, so the package works whichever `AddCore*` the host calls first.
 - **Health endpoints are Development-only** (`MapDefaultEndpoints`, D-022); `/health` includes every module database.
-- **`IExceptionHandler` order matters** — they run in registration order (R-046). `AddValidationExceptionHandler`
-  inserts `ValidationExceptionHandler` ahead of `GlobalExceptionHandler` (validation wins); `ExceptionHandlerOrderTests`
-  checks it.
+- **`IExceptionHandler` order matters** — they run in registration order (R-046). `GlobalExceptionHandler` is the
+  catch-all, so a more specific handler must be registered ahead of it.
 - Caching goes through `ICacheService` (wraps HybridCache). Don't take a hard dependency on `HybridCache`
   in feature code.
 - Permission authorization: the dynamic `PermissionPolicyProvider` maps any `perm:<name>` policy; expose

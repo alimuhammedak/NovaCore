@@ -89,21 +89,21 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
 - **Packages (`src/BuildingBlocks/`, ANALYSIS §4):** three **core** packages that depend on the BCL and Microsoft
   packages only (D-003) — `NovaCore.Abstractions` (BCL only), `NovaCore.AspNetCore` and `NovaCore.EntityFrameworkCore`
   — plus optional **add-on** packages for third-party libraries: `NovaCore.Serilog`, `NovaCore.OpenTelemetry`,
-  `NovaCore.Scalar`. `NovaCore.FluentValidation` is a non-packable bridge until .NET 10 validation replaces it (D-019).
+  `NovaCore.Scalar`.
 
 - **Dependency direction (one way):** `Api` → `Modules.*` → `NovaCore.AspNetCore` / `NovaCore.EntityFrameworkCore`
   → `NovaCore.Abstractions` → BCL. AspNetCore and EntityFrameworkCore never reference each other; add-ons reference
   at most AspNetCore/Abstractions. Enforced by `PackageDependencyTests`.
 
 - **The host composes everything explicitly** (`src/Api/NovaCore.Api/Program.cs`): the add-ons (`AddCoreLogging`,
-  `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`,
-  `AddValidationExceptionHandler`), then one `builder.AddModule<TModule>()` per module; after `Build`,
+  `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`), then one
+  `builder.AddModule<TModule>()` per module; after `Build`,
   `UseSerilogRequestLogging`, `UseCoreWeb`, `MapCoreScalar`, `MapModules`, `MapDefaultEndpoints` (health endpoints,
   Development only, D-022). Nothing is found by
   assembly scanning (Y-20, `ExplicitRegistrationTests`).
 
-- **Modules are self-contained.** Each `IModule` registers its own services + DbContext + permissions and maps its
-  own endpoints. **Adding a module = new project + implement `IModule` + reference it from `Api` + one
+- **Modules are self-contained.** Each `IModule` registers its own services + DbContext + permissions + request
+  validation (`services.AddValidation()`) and maps its own endpoints. **Adding a module = new project + implement `IModule` + reference it from `Api` + one
   `builder.AddModule<TModule>()` line in `Program.cs`.** Modules map their endpoints in that order. (See
   `src/Modules/CLAUDE.md`.)
 
@@ -128,8 +128,8 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
 These are hard rules. Breaking them defeats the point of the project or fails an architecture test.
 
 - **Packages: MIT/Apache (or Microsoft built-in) ONLY.** **Never add MediatR, AutoMapper, or
-  FluentAssertions** — they are now commercial. Use: Mapperly (mapping), FluentValidation (validation),
-  Scalar (OpenAPI UI). If a mediator is ever truly needed, use MIT `martinothamar/Mediator`.
+  FluentAssertions** — they are now commercial. Use: Mapperly (mapping), .NET 10's built-in validation
+  (validation), Scalar (OpenAPI UI). If a mediator is ever truly needed, use MIT `martinothamar/Mediator`.
 
 - **No mediator / no CQRS dispatcher.** Handlers receive dependencies directly from minimal-API DI
   (`sade CQRS`). Don't introduce a request-dispatch abstraction.
@@ -184,8 +184,15 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   - Only one public overload of a method may take optional parameters (RS0026); prefer plain overloads.
   - Keep types `internal` unless consumers need them (DECISIONS Y-23).
 
-- **Vertical slice:** one feature = one file (request + response + validator + route + handler together)
+- **Vertical slice:** one feature = one file (request + response + validation + route + handler together)
   under a module's `Features/`. Don't spread a feature across layered folders.
+
+- **Validation is .NET 10's built-in Minimal API validation.** Put DataAnnotations on the request record's
+  parameters (`[Required]`, `[MaxLength]`, `[Length]`, `[Range]`, `[EmailAddress]`). A rule no attribute expresses is
+  a custom `ValidationAttribute` when it checks one value, or `IValidatableObject` when it spans several properties
+  (that runs only once every property is valid). Every module calls `services.AddValidation()` in `AddModule`: the
+  source generator only covers the assembly that makes the call, and a missing call fails silently, letting invalid
+  input reach the handler (docs/plan/RESEARCH.md R-052). `ValidationTests` pins every validated endpoint.
 
 - **Mapping:** Mapperly static partial mappers (`[Mapper]`). For EF list queries use a source-generated
   `ProjectToDto` (IQueryable projection) so it translates to SQL.

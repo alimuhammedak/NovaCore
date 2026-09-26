@@ -24,8 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release workflow (`.github/workflows/release.yml`): on a `v*` tag matching `VersionPrefix`, packs and pushes to
   GitHub Packages.
 - Architecture tests for the package map: the core packages depend on Microsoft packages only and point one way
-  (Abstractions ← AspNetCore / EntityFrameworkCore, add-ons → AspNetCore), and the building blocks never scan
-  assemblies. Host wiring tests pin the module order and endpoints, the exception-handler order and the Scalar UI.
+  (Abstractions ← AspNetCore / EntityFrameworkCore, add-ons → AspNetCore), and nothing under `src/` scans assemblies
+  to register services. Host wiring tests pin the module order and endpoints, the validation response of every
+  validated request and the Scalar UI.
 - `Directory.Build.targets` fails the build of a packable project that does not reference PublicApiAnalyzers.
 
 ### Changed
@@ -56,10 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     health checks and the HttpClient resilience handler.
   - New add-on `NovaCore.Scalar`: `app.MapCoreScalar()` maps the Scalar UI in Development. `UseCoreWeb` still maps the
     OpenAPI document but no longer the Scalar UI.
-  - `ValidationFilter<T>` and `ValidationExceptionHandler` (FluentValidation) moved to the non-packable
-    `NovaCore.FluentValidation` project, so the core packages depend on Microsoft packages only. `AddCoreWeb` no longer
-    registers the handler; the host calls `AddValidationExceptionHandler()`, which puts it ahead of the global handler.
-    .NET 10's built-in validation replaces this project in a later phase.
+  - `ValidationFilter<T>` and `ValidationExceptionHandler` (FluentValidation) are removed (see the validation entry
+    below), so the core packages depend on Microsoft packages only.
 - **Breaking:** modules are registered explicitly with `builder.AddModule<TModule>()` and mapped in that order.
   `AddModules()` and the assembly-scanning `ModuleLoader` are removed, and so is `IModule.IsEnabled` (it was never
   configurable): leave a module out by not adding it.
@@ -98,6 +97,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Database:ApplyMigrations` when the host starts. `NovaCore.EntityFrameworkCore` references
   `Microsoft.Extensions.Options.ConfigurationExtensions` instead of `Microsoft.Extensions.Configuration.Binder` (which
   still comes transitively).
+- **Breaking:** request validation is .NET 10's built-in Minimal API validation instead of FluentValidation.
+  - The rules are DataAnnotations on the request records. Each module calls `services.AddValidation()` in
+    `AddModule`, because the source generator only covers the assembly that makes the call.
+  - The host no longer registers a validation exception handler, and there is no `AddValidationExceptionHandler()` to
+    call.
+  - The 400 response keeps its shape: `application/problem+json`, `type`, `status`, `instance`, `traceId`, and `errors`
+    keyed by property name.
+  - Its `title` is now the framework default "One or more validation errors occurred." instead of "Validation failed".
+    The handlers' own validation responses already used that title. The messages are the DataAnnotations ones.
 
 ### Removed
 
