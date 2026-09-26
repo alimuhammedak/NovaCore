@@ -1,4 +1,4 @@
-using FluentValidation;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 using NovaCore.Abstractions.Identity;
 using NovaCore.Abstractions.Pagination;
 using NovaCore.AspNetCore.Authorization;
-using NovaCore.FluentValidation;
 using NovaCore.Modules.Identity.Authorization;
 using NovaCore.Modules.Identity.Domain;
 using NovaCore.Modules.Identity.Services;
@@ -33,7 +32,6 @@ public static class AdminEndpoints
 
         group.MapPost("/users/{userId:guid}/roles", AssignRole)
             .WithName("AdminAssignRole").WithSummary("Grant a role to a user")
-            .AddEndpointFilter<ValidationFilter<AssignRoleRequest>>()
             .RequirePermission(IdentityPermissions.UsersManage);
 
         group.MapDelete("/users/{userId:guid}/roles/{role}", RemoveRole)
@@ -41,13 +39,8 @@ public static class AdminEndpoints
             .RequirePermission(IdentityPermissions.UsersManage);
     }
 
-    public sealed record AssignRoleRequest(string Role);
+    public sealed record AssignRoleRequest([Required, MaxLength(256)] string Role);
     public sealed record UserSummary(Guid Id, string? Email, string? UserName, bool EmailConfirmed, bool TwoFactorEnabled, bool LockedOut);
-
-    public sealed class AssignRoleValidator : AbstractValidator<AssignRoleRequest>
-    {
-        public AssignRoleValidator() => RuleFor(x => x.Role).NotEmpty().MaximumLength(256);
-    }
 
     private static async Task<IResult> ListUsers(
         UserManager<ApplicationUser> userManager,

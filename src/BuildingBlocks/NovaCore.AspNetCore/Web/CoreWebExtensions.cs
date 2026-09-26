@@ -44,7 +44,7 @@ public static class CoreWebExtensions
         services.AddCoreInfrastructure(); // adds ProblemDetails + GlobalExceptionHandler + caching
 
         services.AddCoreAuthentication();
-        services.AddCoreAuthorization(); // permission-based policy provider + handler
+        services.AddCoreAuthorization(); // the handler behind RequirePermission(...)
 
         services.AddOpenApi(options => options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 

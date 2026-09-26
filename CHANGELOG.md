@@ -24,8 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release workflow (`.github/workflows/release.yml`): on a `v*` tag matching `VersionPrefix`, packs and pushes to
   GitHub Packages.
 - Architecture tests for the package map: the core packages depend on Microsoft packages only and point one way
-  (Abstractions ← AspNetCore / EntityFrameworkCore, add-ons → AspNetCore), and the building blocks never scan
-  assemblies. Host wiring tests pin the module order and endpoints, the exception-handler order and the Scalar UI.
+  (Abstractions ← AspNetCore / EntityFrameworkCore, add-ons → AspNetCore), and nothing under `src/` scans assemblies
+  to register services. Host wiring tests pin the module order and endpoints, the validation response of every
+  validated request, permission-based 200/403 and the Scalar UI.
 - `Directory.Build.targets` fails the build of a packable project that does not reference PublicApiAnalyzers.
 
 ### Changed
@@ -48,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `NovaCore.Core.Infrastructure`. Hosts register them with the new `builder.AddCorePersistence()`, called before the
     modules; `AddCoreWeb`/`AddCoreInfrastructure` no longer do.
   - `NovaCore.Core.Web` and the rest of `NovaCore.Core.Infrastructure` (ProblemDetails exception handling, the
-    `AppException` types, `ResultHttpExtensions`, `HybridCacheService`) → `NovaCore.AspNetCore`. The
+    `AppException` types, `ResultHttpExtensions`) → `NovaCore.AspNetCore`. The
     `NovaCore.Core.Infrastructure` package no longer exists.
   - New add-on `NovaCore.Serilog`: `AddCoreLogging` moved here from `AddCoreDefaults`, which no longer configures
     logging. `UseCoreWeb` no longer calls `UseSerilogRequestLogging`; the host calls it before `UseCoreWeb`.
@@ -56,10 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     health checks and the HttpClient resilience handler.
   - New add-on `NovaCore.Scalar`: `app.MapCoreScalar()` maps the Scalar UI in Development. `UseCoreWeb` still maps the
     OpenAPI document but no longer the Scalar UI.
-  - `ValidationFilter<T>` and `ValidationExceptionHandler` (FluentValidation) moved to the non-packable
-    `NovaCore.FluentValidation` project, so the core packages depend on Microsoft packages only. `AddCoreWeb` no longer
-    registers the handler; the host calls `AddValidationExceptionHandler()`, which puts it ahead of the global handler.
-    .NET 10's built-in validation replaces this project in a later phase.
+  - `ValidationFilter<T>` and `ValidationExceptionHandler` (FluentValidation) are removed (see the validation entry
+    below), so the core packages depend on Microsoft packages only.
 - **Breaking:** modules are registered explicitly with `builder.AddModule<TModule>()` and mapped in that order.
   `AddModules()` and the assembly-scanning `ModuleLoader` are removed, and so is `IModule.IsEnabled` (it was never
   configurable): leave a module out by not adding it.
@@ -98,12 +97,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Database:ApplyMigrations` when the host starts. `NovaCore.EntityFrameworkCore` references
   `Microsoft.Extensions.Options.ConfigurationExtensions` instead of `Microsoft.Extensions.Configuration.Binder` (which
   still comes transitively).
+- **Breaking:** request validation is .NET 10's built-in Minimal API validation instead of FluentValidation.
+  - The rules are DataAnnotations on the request records. Each module calls `services.AddValidation()` in
+    `AddModule`, because the source generator only covers the assembly that makes the call.
+  - The host no longer registers a validation exception handler, and there is no `AddValidationExceptionHandler()` to
+    call.
+  - The 400 response keeps its shape: `application/problem+json`, `type`, `status`, `instance`, `traceId`, and `errors`
+    keyed by property name.
+  - Its `title` is now the framework default "One or more validation errors occurred." instead of "Validation failed".
+    The handlers' own validation responses already used that title. The messages are the DataAnnotations ones.
+- **Breaking:** permission authorization no longer uses a custom policy provider.
+  - `RequirePermissionAttribute` (an `AuthorizeAttribute` that implements `IAuthorizationRequirementData`) carries the
+    `PermissionRequirement` itself.
+  - `RequirePermission(...)` keeps its signature and now attaches that attribute.
+  - `PermissionPolicyProvider`, with its `perm:` policy names, is removed, and so is `HasPermissionAttribute`. Use
+    `[RequirePermission(...)]` instead.
+  - Behaviour is unchanged: anonymous callers get 401, callers without the permission (or the `Administrator` role)
+    get 403. .NET 10 enforces the attribute on Minimal API and routed endpoints.
 
 ### Removed
 
 - Unused dependencies and wiring: `Scrutor` (never called), `Asp.Versioning.Http` + `AddApiVersioning` (no endpoint used a
   version set), `AddOutputCache`/`UseOutputCache` (no policy or endpoint used it).
 - **Breaking:** `PagedList<T>.Empty(int)` (it had no callers).
+- **Breaking:** `ICacheService` and `CacheEntryOptions` (`NovaCore.Abstractions`) and `HybridCacheService`
+  (`NovaCore.AspNetCore`). .NET's `HybridCache` is already an abstraction, so inject it directly. `AddCoreCaching` still
+  registers it with `Cache:DefaultExpiration` as the default entry lifetime.
+- The `EXTEXP0018` warning suppression. `Microsoft.Extensions.Caching.Hybrid` 10.0.0 no longer marks its APIs
+  experimental.
+- The `FluentValidation` and `FluentValidation.DependencyInjectionExtensions` packages: they are gone from central
+  package management and from the package-policy allowlist, since nothing uses them after the move to built-in
+  validation.
 
 ### Security
 

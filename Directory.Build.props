@@ -20,14 +20,10 @@
     <!-- 0 warnings is enforced, not just aimed for. Suppressing a warning needs user approval (docs/plan/DECISIONS.md Y-10). -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!--
-      EXTEXP0018 : HybridCache APIs are still flagged [Experimental] in .NET 10 even though
-                   the feature is GA / production-ready since .NET 9. We opt in knowingly.
-    -->
-    <!--
       RMG020: Mapperly "source member not mapped" — intentional for DTOs that deliberately drop
               audit/domain-event fields. Suppressed so honest, narrow DTOs don't spam warnings.
     -->
-    <NoWarn>$(NoWarn);EXTEXP0018;RMG020</NoWarn>
+    <NoWarn>$(NoWarn);RMG020</NoWarn>
     <!--
       NuGet audit: a high (NU1903) or critical (NU1904) vulnerability in any package, transitive included, fails restore.
       Low (NU1901) and moderate (NU1902) stay warnings even under TreatWarningsAsErrors, so a newly published advisory

@@ -30,8 +30,6 @@ NovaCore.AspNetCore.Auth.JwtTokenService
 NovaCore.AspNetCore.Auth.JwtTokenService.CreateAccessToken(System.Collections.Generic.IReadOnlyCollection<System.Security.Claims.Claim!>! claims) -> NovaCore.AspNetCore.Auth.AccessToken
 NovaCore.AspNetCore.Auth.JwtTokenService.JwtTokenService(Microsoft.Extensions.Options.IOptions<NovaCore.AspNetCore.Auth.JwtOptions!>! options, System.TimeProvider! timeProvider) -> void
 NovaCore.AspNetCore.Authorization.AuthorizationExtensions
-NovaCore.AspNetCore.Authorization.HasPermissionAttribute
-NovaCore.AspNetCore.Authorization.HasPermissionAttribute.HasPermissionAttribute(string! permission) -> void
 NovaCore.AspNetCore.Authorization.IPermissionDefinitionProvider
 NovaCore.AspNetCore.Authorization.IPermissionDefinitionProvider.GetPermissions() -> System.Collections.Generic.IReadOnlyCollection<NovaCore.AspNetCore.Authorization.PermissionDefinition!>!
 NovaCore.AspNetCore.Authorization.PermissionAuthorizationHandler
@@ -47,20 +45,13 @@ NovaCore.AspNetCore.Authorization.PermissionDefinition.Group.init -> void
 NovaCore.AspNetCore.Authorization.PermissionDefinition.Name.get -> string!
 NovaCore.AspNetCore.Authorization.PermissionDefinition.Name.init -> void
 NovaCore.AspNetCore.Authorization.PermissionDefinition.PermissionDefinition(string! Name, string! DisplayName, string! Group) -> void
-NovaCore.AspNetCore.Authorization.PermissionPolicyProvider
-NovaCore.AspNetCore.Authorization.PermissionPolicyProvider.GetDefaultPolicyAsync() -> System.Threading.Tasks.Task<Microsoft.AspNetCore.Authorization.AuthorizationPolicy!>!
-NovaCore.AspNetCore.Authorization.PermissionPolicyProvider.GetFallbackPolicyAsync() -> System.Threading.Tasks.Task<Microsoft.AspNetCore.Authorization.AuthorizationPolicy?>!
-NovaCore.AspNetCore.Authorization.PermissionPolicyProvider.GetPolicyAsync(string! policyName) -> System.Threading.Tasks.Task<Microsoft.AspNetCore.Authorization.AuthorizationPolicy?>!
-NovaCore.AspNetCore.Authorization.PermissionPolicyProvider.PermissionPolicyProvider(Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Authorization.AuthorizationOptions!>! options) -> void
 NovaCore.AspNetCore.Authorization.PermissionRequirement
 NovaCore.AspNetCore.Authorization.PermissionRequirement.Permission.get -> string!
 NovaCore.AspNetCore.Authorization.PermissionRequirement.PermissionRequirement(string! permission) -> void
-NovaCore.AspNetCore.Caching.HybridCacheService
-NovaCore.AspNetCore.Caching.HybridCacheService.GetOrCreateAsync<T>(string! key, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! factory, NovaCore.Abstractions.Caching.CacheEntryOptions? options = null, System.Collections.Generic.IReadOnlyCollection<string!>? tags = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
-NovaCore.AspNetCore.Caching.HybridCacheService.HybridCacheService(Microsoft.Extensions.Caching.Hybrid.HybridCache! cache) -> void
-NovaCore.AspNetCore.Caching.HybridCacheService.RemoveAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
-NovaCore.AspNetCore.Caching.HybridCacheService.RemoveByTagAsync(string! tag, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
-NovaCore.AspNetCore.Caching.HybridCacheService.SetAsync<T>(string! key, T value, NovaCore.Abstractions.Caching.CacheEntryOptions? options = null, System.Collections.Generic.IReadOnlyCollection<string!>? tags = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+NovaCore.AspNetCore.Authorization.RequirePermissionAttribute
+NovaCore.AspNetCore.Authorization.RequirePermissionAttribute.GetRequirements() -> System.Collections.Generic.IEnumerable<Microsoft.AspNetCore.Authorization.IAuthorizationRequirement!>!
+NovaCore.AspNetCore.Authorization.RequirePermissionAttribute.Permission.get -> string!
+NovaCore.AspNetCore.Authorization.RequirePermissionAttribute.RequirePermissionAttribute(string! permission) -> void
 NovaCore.AspNetCore.DependencyInjection.InfrastructureServiceCollectionExtensions
 NovaCore.AspNetCore.Exceptions.AppException
 NovaCore.AspNetCore.Exceptions.AppException.AppException(string! message, NovaCore.Abstractions.Results.ErrorType type) -> void
@@ -101,7 +92,6 @@ NovaCore.AspNetCore.Security.SecurityHeadersMiddleware.InvokeAsync(Microsoft.Asp
 NovaCore.AspNetCore.Security.SecurityHeadersMiddleware.SecurityHeadersMiddleware(Microsoft.AspNetCore.Http.RequestDelegate! next) -> void
 NovaCore.AspNetCore.Web.CoreWebExtensions
 const NovaCore.AspNetCore.Auth.JwtOptions.SectionName = "Jwt" -> string!
-const NovaCore.AspNetCore.Authorization.PermissionPolicyProvider.PolicyPrefix = "perm:" -> string!
 const NovaCore.AspNetCore.Identity.HttpContextCurrentUser.SuperAdminRole = "Administrator" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Email = "email" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Name = "name" -> string!

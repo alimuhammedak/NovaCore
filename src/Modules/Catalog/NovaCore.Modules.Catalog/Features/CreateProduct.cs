@@ -1,10 +1,9 @@
-using FluentValidation;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using NovaCore.AspNetCore.Authorization;
-using NovaCore.FluentValidation;
 using NovaCore.Modules.Catalog.Authorization;
 using NovaCore.Modules.Catalog.Domain;
 using NovaCore.Modules.Catalog.Infrastructure;
@@ -17,26 +16,19 @@ namespace NovaCore.Modules.Catalog.Features;
 /// </summary>
 public static class CreateProduct
 {
-    public sealed record Request(string Name, string? Description, decimal Price, int Stock);
+    public sealed record Request(
+        [Required, MaxLength(200)] string Name,
+        [MaxLength(2000)] string? Description,
+        [Range(0d, double.MaxValue, MinimumIsExclusive = true, ErrorMessage = "The field {0} must be greater than 0.")]
+        decimal Price,
+        [Range(0, int.MaxValue)] int Stock);
 
     public sealed record Response(Guid Id);
-
-    public sealed class Validator : AbstractValidator<Request>
-    {
-        public Validator()
-        {
-            RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
-            RuleFor(x => x.Description).MaximumLength(2000);
-            RuleFor(x => x.Price).GreaterThan(0);
-            RuleFor(x => x.Stock).GreaterThanOrEqualTo(0);
-        }
-    }
 
     public static void Map(IEndpointRouteBuilder group) =>
         group.MapPost("/", Handle)
             .WithName("CreateProduct")
             .WithSummary("Create a new product")
-            .AddEndpointFilter<ValidationFilter<Request>>()
             .RequirePermission(CatalogPermissions.ProductsCreate)
             .Produces<Response>(StatusCodes.Status201Created)
             .ProducesValidationProblem();

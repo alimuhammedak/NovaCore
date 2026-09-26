@@ -1,4 +1,3 @@
-using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -86,7 +85,8 @@ public sealed class IdentityModule : IModule
         services.AddScoped<IdentityDataSeeder>();
         services.AddHostedService<IdentitySeederHostedService>();
 
-        services.AddValidatorsFromAssembly(typeof(IdentityModule).Assembly, includeInternalTypes: true);
+        // Built-in validation: generated per assembly, so each module calls it itself (docs/plan/RESEARCH.md R-052).
+        services.AddValidation();
 
         return services;
     }

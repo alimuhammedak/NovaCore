@@ -1,11 +1,10 @@
 using System.Buffers.Text;
+using System.ComponentModel.DataAnnotations;
 using System.Text;
-using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
-using NovaCore.FluentValidation;
 using NovaCore.Modules.Identity.Domain;
 using NovaCore.Modules.Identity.Services;
 
@@ -22,7 +21,6 @@ public static class RegistrationEndpoints
         group.MapPost("/register", Register)
             .WithName("Register")
             .WithSummary("Register a new account (sends an email confirmation link)")
-            .AddEndpointFilter<ValidationFilter<RegisterRequest>>()
             .AllowAnonymous();
 
         group.MapGet("/confirm-email", ConfirmEmail)
@@ -31,18 +29,11 @@ public static class RegistrationEndpoints
             .AllowAnonymous();
     }
 
-    public sealed record RegisterRequest(string Email, string Password, string? DisplayName);
-
-    public sealed class RegisterValidator : AbstractValidator<RegisterRequest>
-    {
-        public RegisterValidator()
-        {
-            RuleFor(x => x.Email).NotEmpty().EmailAddress().MaximumLength(256);
-            // Length-first policy (OWASP): require length, not character composition.
-            RuleFor(x => x.Password).NotEmpty().MinimumLength(12).MaximumLength(128);
-            RuleFor(x => x.DisplayName).MaximumLength(128);
-        }
-    }
+    // Length-first password policy (OWASP): require length, not character composition.
+    public sealed record RegisterRequest(
+        [Required, EmailAddress, MaxLength(256)] string Email,
+        [Required, Length(12, 128)] string Password,
+        [MaxLength(128)] string? DisplayName);
 
     private static async Task<IResult> Register(
         RegisterRequest request,

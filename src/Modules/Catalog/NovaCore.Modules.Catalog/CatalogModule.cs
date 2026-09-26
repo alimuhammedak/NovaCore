@@ -1,4 +1,3 @@
-using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -18,7 +17,7 @@ namespace NovaCore.Modules.Catalog;
 
 /// <summary>
 /// The Catalog module. Added by the host with <c>AddModule&lt;CatalogModule&gt;()</c> — registers its own DbContext, public
-/// contract and validators, and maps its endpoints under <c>/api/v1/products</c>.
+/// contract and request validation, and maps its endpoints under <c>/api/v1/products</c>.
 /// </summary>
 public sealed class CatalogModule : IModule
 {
@@ -46,8 +45,9 @@ public sealed class CatalogModule : IModule
         // Declare this module's permissions so the Identity seeder can wire them to roles.
         services.AddPermissionDefinitions<CatalogPermissionProvider>();
 
-        // FluentValidation validators (incl. the internal ones nested in feature classes).
-        services.AddValidatorsFromAssembly(typeof(CatalogModule).Assembly, includeInternalTypes: true);
+        // Built-in validation of the request records' DataAnnotations. The source generator only covers the assembly that
+        // calls AddValidation, so each module calls it itself (docs/plan/RESEARCH.md R-052).
+        services.AddValidation();
 
         return services;
     }

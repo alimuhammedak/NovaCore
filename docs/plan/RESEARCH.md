@@ -339,3 +339,53 @@ Biçim:
 - Bulgu: `ProblemDetails.Instance`: *"A URI reference that identifies the specific occurrence of the problem."* NovaCore bugün `"{Method} {Path}"` yazıyor (`InfrastructureServiceCollectionExtensions.cs:25`, ör. `"GET /api/v1/products/42"`). Bu değer bir URI reference değil: HTTP metodu ve boşluk içeriyor. İsteğin yolu (`PathBase + Path`, `PathString.ToUriComponent()` ile kodlanmış) göreli bir URI reference'tır. Query string dahil edilmez, çünkü istemcinin gönderdiği secret'ları yanıta geri yansıtabilir (Y-35).
 - Kaynak: https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.problemdetails.instance?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/fundamentals/error-handling?view=aspnetcore-10.0#customizeproblemdetails-operation
 - Sonuç: F2b.4.
+
+## Faz 2c araştırması (2026-09-26)
+
+### R-052: Modül assembly'lerinde .NET 10 yerleşik validation (2026-09-26, faz 2c)
+- Bulgu:
+  - *"The source generator creates metadata only for the assembly where AddValidation is called."* Metadata eksikse *"No automatic validation runs. Invalid input reaches the endpoint handler"*, üstelik hata ya da log da olmuyor. Bu yüzden her modül kendi assembly'sinde `AddValidation()` çağırmalı ve her modülün validation'ı testle korunmalı.
+  - MS dokümanı iki adım öneriyor: *"If the assembly is a plain class library (it isn't based on the Microsoft.NET.Sdk.Web or Microsoft.NET.Sdk.Razor SDKs), add a package reference ... Microsoft.Extensions.Validation"* ve her assembly'de `AddValidation`'ı çağıran bir extension metot. Paket adımı, ASP.NET framework referansı olmayan kütüphaneler için.
+  - NovaCore modülleri framework'ü `NovaCore.AspNetCore`'dan transitive alıyor. Bu durumda framework şunları zaten getiriyor:
+    - Transitive framework referansları `@(FrameworkReference)`'a ekleniyor (`Microsoft.NET.Sdk.FrameworkReferenceResolution.targets:255-260`).
+    - Hedef paket `Microsoft.Extensions.Validation.dll` referansını ve `Microsoft.Extensions.Validation.ValidationsGenerator` analyzer'ını getiriyor. Catalog modülünde `dotnet msbuild -t:ResolveTargetingPackAssets -getItem:Analyzer` ile görüldü.
+    - Generator'ün interceptor namespace'i SDK tarafından net10+ için koşulsuz ekleniyor (`…targets:486`, `InterceptorsPreviewNamespaces`).
+    - Paket, `Microsoft.AspNetCore.App.Ref/10.0.8/data/PackageOverrides.txt`'de yer alıyor. Açıkça referans verilirse budanır (NU1510, bkz. F2a.4 notu).
+  - Scratch deneyi: transitive framework'lü bir `Microsoft.NET.Sdk` kütüphanesi, TWAE + `latest-recommended`, `services.AddValidation()` kütüphane içinde çağrıldı.
+    - Build 0 uyarı verdi. Üretilen kod `#pragma warning disable ASP0029` içeriyor. Method-group handler'ların parametre tipleri de bulunuyor.
+    - 400 yanıtı `application/problem+json`, `type` RFC 9110 §15.5.1, `status` 400. `instance` ve `traceId` host'un `CustomizeProblemDetails`'ından geliyor. Hata anahtarları PascalCase özellik adları.
+    - Bunlar main'deki FluentValidation yanıtıyla aynı (gerçek API'den alındı). Farklar yalnızca üç:
+      - `title`: "Validation failed" yerine framework varsayılanı "One or more validation errors occurred.". Handler'ların kendi `Results.ValidationProblem(...)` yanıtları bu başlığı zaten kullanıyor.
+      - Mesaj metinleri değişiyor.
+      - `[Required]` başarısız olursa aynı alandaki diğer attribute'lar çalışmıyor.
+  - Model sırası: *"If property validation produces an error, the remaining steps are skipped"*. Yani `IValidatableObject` yalnızca property hataları yoksa çalışıyor, bu da denemede görüldü. MS önerisi: tek bir değeri denetleyen kural için özel `ValidationAttribute`, birden çok özelliği kapsayan kural için `IValidatableObject`. Private nested özel bir attribute record parametresinde çalıştı; generator attribute'ları reflection ile okuyor.
+  - `[ValidatableType]` ve `[SkipValidation]` .NET 10'da deneysel (ASP0029). Minimal API parametre tipleri handler imzasından bulunduğu için bunlara gerek yok. Record ctor parametresindeki kısıtlar OpenAPI şemasına yansımadı.
+- Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/validation?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/release-notes/aspnetcore-10.0?view=aspnetcore-10.0#validation-support-in-minimal-apis · https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis/responses?view=aspnetcore-10.0#customize-validation-error-responses-using-iproblemdetailsservice · yerel SDK 10.0.300 ve targeting pack 10.0.8 dosyaları · scratchpad deneyi ve main'deki API'nin yanıtı (2026-09-26)
+- Sonuç: F2c.1, D-023. Ek paket yok, her modül `AddModule` içinde `services.AddValidation()` çağırıyor. Boş Guid kuralı özel attribute ile yazılıyor (Q-25).
+
+### R-053: `IAuthorizationRequirementData` ile permission attribute'u (2026-09-26, faz 2c)
+- Bulgu:
+  - MS örneği: `class MinimumAgeAuthorizeAttribute(int age) : AuthorizeAttribute, IAuthorizationRequirement, IAuthorizationRequirementData`. `GetRequirements()` requirement'ı döndürüyor, handler `AuthorizationHandler<…>` olarak singleton kaydediliyor, endpoint'te `.RequireAuthorization(new MinimumAgeAuthorizeAttribute(21))` kullanılıyor. Requirement karşılanmazsa sonuç 403.
+  - `AuthorizeAttribute`'tan türeyen ve policy adı taşımayan attribute, varsayılan policy'yi (kimliği doğrulanmış kullanıcı) getiriyor. Yani anonim istek bugünkü gibi 401 alıyor.
+  - .NET 8–10'da bu yalnızca Minimal API ve routed endpoint'lerde uygulanıyor. MVC, SignalR ve Blazor desteği .NET 11'le geliyor. NovaCore yalnızca Minimal API kullanıyor.
+- Kaynak: https://learn.microsoft.com/aspnet/core/security/authorization/custom-authorization-policies-with-iauthorizationrequirementdata?view=aspnetcore-10.0
+- Sonuç: F2c.2, D-023 (6). Attribute mevcut `PermissionRequirement`'ı döndürüyor, handler değişmiyor, `PermissionPolicyProvider` siliniyor.
+
+### R-054: EXTEXP0018 bastırması hâlâ gerekli mi? (2026-09-26, faz 2c; gözlem)
+- Bulgu:
+  - `Microsoft.Extensions.Caching.Hybrid` 10.0.0 ile `Microsoft.Extensions.Caching.Abstractions` 10.0.12'nin `lib/net10.0` assembly'lerinde `EXTEXP` dizgesi yok. Abstract `HybridCache` sınıfı bu ikincisinde.
+  - Çözüm, `NoWarn`'da `EXTEXP0018` olmadan (global property ile `NoWarn=RMG020;xUnit1051`, ayrı `--artifacts-path`) `--no-incremental` derlendi: 0 uyarı, 0 hata.
+  - Override'ın gerçekten uygulandığını görmek için aynı yolla RMG020 de kaldırıldı: Catalog'da 28 RMG020 hatası çıktı.
+  - MS dokümanında EXTEXP0018'e dair bir ifade bulunamadı. R-008'e göre güncel HybridCache dokümanları deneysel bir uyarıdan söz etmiyor.
+- Kaynak: NuGet önbelleğindeki assembly'ler, yerel build (SDK 10.0.300) · https://learn.microsoft.com/aspnet/core/performance/caching/hybrid?view=aspnetcore-10.0
+- Sonuç: F2c.3. `EXTEXP0018` `NoWarn`'dan çıkarılıyor. PLAN'daki "uyarı gelirse sor" koşulu oluşmadı.
+
+### R-055: Açılışta hata bekleyen testler neden ara sıra `ObjectDisposedException` alıyor? (2026-09-26, faz 2c; kaynak + gözlem)
+- Bulgu:
+  - F2c.4 doğrulamasında `restore --force` → build → test sırasıyla ~45 tam koşuda 2 kez aynı hata görüldü: `ConfigurationValidationTests.Invalid_configuration_stops_the_host_at_startup` (Cors satırı), `factory.Server`'dan beklenen validation mesajı yerine *"Cannot access a disposed object. Object name: 'IServiceProvider'"* aldı. Yalnızca ilgili sınıflar koşarken (paralel yük yokken) yeniden üretilemedi.
+  - Kök neden `Microsoft.AspNetCore.Mvc.Testing`'deki `DeferredHostBuilder.DeferredHost.StartAsync`: sonucu `_hostStartedTcs`'ten beklemeden önce koşulsuz olarak `_host.Services.GetRequiredService<IHostApplicationLifetime>()` çağırıyor. Minimal hosting'de host'u uygulamanın kendi `app.Run()`'ı başlatıyor. Açılış hata verirse `RunAsync`'in `finally`'si host'u dispose ediyor, gerçek exception da `EntryPointCompleted(exception)` ile `_hostStartedTcs`'e yazılıyor. Test thread'i `StartAsync`'e bundan sonra girerse gerçek hata `ObjectDisposedException` ile örtülüyor.
+  - Etkilenebilecek testler: açılışın düşmesini ve mesajı bekleyenler. `ConfigurationValidationTests` (F2b.1a), `EmailSenderRegistrationTests`'in Production/sender yok vakası (F0.5; `ObjectDisposedException` `InvalidOperationException`'ın alt tipi, ama `Assert.Throws` tam tip istiyor) ve `DatabaseMigrationServiceTests`'in `yes` vakası.
+  - Hata F2c öncesinden beri var ve F2c koduyla ilgili değil. Uygulamanın açılış yolunda F2c yalnızca endpoint filtrelerini azalttı.
+  - Bizim kodumuzda temiz bir düzeltme yok: gerçek exception yalnızca private bir TCS'te. `IStartupValidator` sarmalayıcısı `ValidateOnStart` hatalarını yakalayabilir, ama hosted service hatalarını (`EmailSenderStartupCheck`) yakalayamaz.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Mvc/Mvc.Testing/src/DeferredHostBuilder.cs · https://learn.microsoft.com/dotnet/api/microsoft.extensions.hosting.hostingabstractionshostextensions.runasync · yerel koşular (SDK 10.0.300)
+- Sonuç: Kapsam dışı (F2c'nin işi değil, test altyapısındaki framework yarışı), PROGRESS → "Sonraya bırakılanlar". Faz raporunda kullanıcıya bildirilir.

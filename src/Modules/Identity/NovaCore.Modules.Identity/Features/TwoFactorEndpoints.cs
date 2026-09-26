@@ -1,10 +1,9 @@
-using FluentValidation;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
 using NovaCore.Abstractions.Identity;
-using NovaCore.FluentValidation;
 using NovaCore.Modules.Identity.Domain;
 using NovaCore.Modules.Identity.Services;
 
@@ -23,22 +22,15 @@ public static class TwoFactorEndpoints
 
         group.MapPost("/2fa/enable", Enable)
             .WithName("TwoFactorEnable").WithSummary("Enable 2FA by verifying a TOTP code (returns recovery codes)")
-            .AddEndpointFilter<ValidationFilter<CodeRequest>>()
             .RequireAuthorization();
 
         group.MapPost("/2fa/disable", Disable)
             .WithName("TwoFactorDisable").WithSummary("Disable 2FA after verifying a TOTP code")
-            .AddEndpointFilter<ValidationFilter<CodeRequest>>()
             .RequireAuthorization();
     }
 
-    public sealed record CodeRequest(string Code);
+    public sealed record CodeRequest([Required, Length(6, 8)] string Code);
     public sealed record SetupResponse(string SharedKey, string AuthenticatorUri);
-
-    public sealed class CodeValidator : AbstractValidator<CodeRequest>
-    {
-        public CodeValidator() => RuleFor(x => x.Code).NotEmpty().Length(6, 8);
-    }
 
     private static async Task<IResult> Setup(
         UserManager<ApplicationUser> userManager, ICurrentUser currentUser)

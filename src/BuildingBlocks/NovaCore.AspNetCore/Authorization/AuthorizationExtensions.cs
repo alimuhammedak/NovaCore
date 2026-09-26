@@ -8,12 +8,11 @@ namespace NovaCore.AspNetCore.Authorization;
 public static class AuthorizationExtensions
 {
     /// <summary>
-    /// Enables permission-based authorization: the dynamic policy provider + the permission handler.
-    /// Call after <c>AddCoreAuthentication</c>.
+    /// Enables permission-based authorization: the handler that checks the <see cref="PermissionRequirement"/> a
+    /// <see cref="RequirePermissionAttribute"/> carries. Call after <c>AddCoreAuthentication</c>.
     /// </summary>
     public static IServiceCollection AddCoreAuthorization(this IServiceCollection services)
     {
-        services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
         services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
         services.AddAuthorization();
         return services;
@@ -27,8 +26,11 @@ public static class AuthorizationExtensions
         return services;
     }
 
-    /// <summary>Guards an endpoint (or group) with a fine-grained permission: <c>.RequirePermission("catalog:products:create")</c>.</summary>
+    /// <summary>
+    /// Guards an endpoint (or group) with a fine-grained permission: <c>.RequirePermission("catalog:products:create")</c>.
+    /// Anonymous callers get 401; authenticated callers without the permission (or the super-admin role) get 403.
+    /// </summary>
     public static TBuilder RequirePermission<TBuilder>(this TBuilder builder, string permission)
         where TBuilder : IEndpointConventionBuilder =>
-        builder.RequireAuthorization(PermissionPolicyProvider.PolicyPrefix + permission);
+        builder.RequireAuthorization(new RequirePermissionAttribute(permission));
 }
