@@ -379,3 +379,13 @@ Biçim:
   - MS dokümanında EXTEXP0018'e dair bir ifade bulunamadı. R-008'e göre güncel HybridCache dokümanları deneysel bir uyarıdan söz etmiyor.
 - Kaynak: NuGet önbelleğindeki assembly'ler, yerel build (SDK 10.0.300) · https://learn.microsoft.com/aspnet/core/performance/caching/hybrid?view=aspnetcore-10.0
 - Sonuç: F2c.3. `EXTEXP0018` `NoWarn`'dan çıkarılıyor. PLAN'daki "uyarı gelirse sor" koşulu oluşmadı.
+
+### R-055: Açılışta hata bekleyen testler neden ara sıra `ObjectDisposedException` alıyor? (2026-09-26, faz 2c; kaynak + gözlem)
+- Bulgu:
+  - F2c.4 doğrulamasında `restore --force` → build → test sırasıyla ~45 tam koşuda 2 kez aynı hata görüldü: `ConfigurationValidationTests.Invalid_configuration_stops_the_host_at_startup` (Cors satırı), `factory.Server`'dan beklenen validation mesajı yerine *"Cannot access a disposed object. Object name: 'IServiceProvider'"* aldı. Yalnızca ilgili sınıflar koşarken (paralel yük yokken) yeniden üretilemedi.
+  - Kök neden `Microsoft.AspNetCore.Mvc.Testing`'deki `DeferredHostBuilder.DeferredHost.StartAsync`: sonucu `_hostStartedTcs`'ten beklemeden önce koşulsuz olarak `_host.Services.GetRequiredService<IHostApplicationLifetime>()` çağırıyor. Minimal hosting'de host'u uygulamanın kendi `app.Run()`'ı başlatıyor. Açılış hata verirse `RunAsync`'in `finally`'si host'u dispose ediyor, gerçek exception da `EntryPointCompleted(exception)` ile `_hostStartedTcs`'e yazılıyor. Test thread'i `StartAsync`'e bundan sonra girerse gerçek hata `ObjectDisposedException` ile örtülüyor.
+  - Etkilenebilecek testler: açılışın düşmesini ve mesajı bekleyenler. `ConfigurationValidationTests` (F2b.1a), `EmailSenderRegistrationTests`'in Production/sender yok vakası (F0.5; `ObjectDisposedException` `InvalidOperationException`'ın alt tipi, ama `Assert.Throws` tam tip istiyor) ve `DatabaseMigrationServiceTests`'in `yes` vakası.
+  - Hata F2c öncesinden beri var ve F2c koduyla ilgili değil. Uygulamanın açılış yolunda F2c yalnızca endpoint filtrelerini azalttı.
+  - Bizim kodumuzda temiz bir düzeltme yok: gerçek exception yalnızca private bir TCS'te. `IStartupValidator` sarmalayıcısı `ValidateOnStart` hatalarını yakalayabilir, ama hosted service hatalarını (`EmailSenderStartupCheck`) yakalayamaz.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Mvc/Mvc.Testing/src/DeferredHostBuilder.cs · https://learn.microsoft.com/dotnet/api/microsoft.extensions.hosting.hostingabstractionshostextensions.runasync · yerel koşular (SDK 10.0.300)
+- Sonuç: Kapsam dışı (F2c'nin işi değil, test altyapısındaki framework yarışı), PROGRESS → "Sonraya bırakılanlar". Faz raporunda kullanıcıya bildirilir.

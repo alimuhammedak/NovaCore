@@ -125,6 +125,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   registers it with `Cache:DefaultExpiration` as the default entry lifetime.
 - The `EXTEXP0018` warning suppression. `Microsoft.Extensions.Caching.Hybrid` 10.0.0 no longer marks its APIs
   experimental.
+- The `FluentValidation` and `FluentValidation.DependencyInjectionExtensions` packages: they are gone from central
+  package management and from the package-policy allowlist, since nothing uses them after the move to built-in
+  validation.
 
 ### Security
 

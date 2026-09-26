@@ -283,8 +283,11 @@ Plan onayı (2026-09-26): kullanıcı kararları Q-25 (boş Guid kuralı özel `
     - izni olmayan kimliği doğrulanmış çağıran 403 alıyor.
   - Attribute requirement döndürmeyince korunan her uç düştü (commit'lenmedi).
   - Dokümanlar: README güvenlik bölümü, BuildingBlocks ve tests CLAUDE.md, CHANGELOG, memory `novacore-security`. 105/105.
-- [ ] F2c.3 Cache (devam ediyor)
-- [ ] F2c.4 Paket temizliği
+- [x] F2c.3 (8712414): `ICacheService`, `CacheEntryOptions` (Abstractions) ve `HybridCacheService` (AspNetCore) silindi, tüketicisi yoktu. `AddCoreCaching` `HybridCache`'i kaydetmeye ve varsayılan süreyi `Cache:DefaultExpiration`'dan vermeye devam ediyor. Tüketiciler `HybridCache`'i doğrudan enjekte ediyor.
+  - `EXTEXP0018` `NoWarn`'dan çıktı (R-054). Release ve Debug `--no-incremental` build: 0 uyarı, 0 hata.
+  - `ConfigurationValidationTests`'e yeni vaka: `Cache:DefaultExpiration` `HybridCacheOptions.DefaultEntryOptions`'a ulaşıyor. Önce yeşil görüldü, bağlantı bozulunca kırmızıya döndü (commit'lenmedi).
+  - PublicAPI (iki paket), README, BuildingBlocks ve kök CLAUDE.md (Gotchas), CHANGELOG ve memory güncellendi. 106/106.
+- [ ] F2c.4 Paket temizliği (devam ediyor): doğrulama sırasında aralıklı bir test hatası görüldü. Kök nedeni framework yarışı, F2c'den önce de vardı (R-055, "Sonraya bırakılanlar").
 
 ### Faz 3a
 - [ ] F3a.1 JWT doğrulama (Authority/JWKS)
@@ -385,6 +388,12 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 2b, code review) DbContext health check'lerinde timeout yok. SQL Server'a erişilemezse `/health` bağlantı timeout'u kadar bekleyebilir. Uçlar yalnızca Development'ta olduğu için şimdi etkisi düşük. Production'da probe gerekince (D-022) `HealthCheckRegistration.Timeout` ile birlikte ele alınmalı.
 - (Faz 2b, code review) Test yardımcıları tekrar ediyor: `NoOpEmailSender` iki dosyada (`EmailSenderRegistrationTests`, `ConfigurationValidationTests`), kullanıcı seed'i iki dosyada (`AuthFlowTests`, `RefreshTokenExpiryTests`). Paylaşılan bir test yardımcısına taşınabilir; mevcut testleri değiştirmek gerektiği için yapılmadı.
 - (Faz 2b) `NovaCore.OpenTelemetry`, `OTEL_EXPORTER_OTLP_ENDPOINT`'i kayıt anında okuyor (`OpenTelemetryHostingExtensions.cs:35`). F2b.1'in kapsamı iki çekirdek paketti. Bu okuma `ConfigureAppConfiguration` ile ezilemiyor, ama MS ServiceDefaults da aynı kalıbı kullanıyor.
+- (Faz 2c, R-055) **Aralıklı test hatası (framework yarışı):** Açılışta hata bekleyen testler, test yükü altında ara sıra gerçek hata yerine `ObjectDisposedException ('IServiceProvider')` alıyor. ~45 tam koşuda 2 kez görüldü.
+  - Etkilenebilecek testler: `ConfigurationValidationTests` Theory'si, `EmailSenderRegistrationTests` (Production, sender yok), `DatabaseMigrationServiceTests` (`yes`).
+  - Kök neden: `Mvc.Testing` `DeferredHost.StartAsync`, dispose edilmiş host'tan servis çözüyor.
+  - F2c'den önce de vardı. CI'da da aralıklı kırmızıya yol açabilir.
+  - Olası yollar: upstream'e bildirmek; açılış doğrulamasını `IStartupValidator` sarmalayıcısı ile yakalamak (hosted service hatalarını kapsamaz); bu testleri `WebApplicationFactory` dışında kurmak. Karar test altyapısını değiştireceği için kullanıcıya bırakıldı.
+- (Faz 2c) README "Paket / Lisans Tablosu"ndaki `Microsoft.EntityFrameworkCore / Extensions.Hosting.Abstractions / Configuration.Binder` satırı eskimiş. EF paketi F2b'den beri Binder yerine `Options.ConfigurationExtensions` ve `Diagnostics.HealthChecks.EntityFrameworkCore` kullanıyor. F2c.4 aynı tabloda yalnızca FluentValidation satırını sildi.
 - (Faz 2b → Faz 3a) Token üretimi `TimeProvider`'dan okuyor, JwtBearer'ın lifetime doğrulaması (IdentityModel) ise gerçek saatten. Sahte saatli testler bu yüzden gerçek "şimdi"den başlıyor (R-050). F3a.1'de doğrulama yeniden yazılırken `TimeProvider` ile hizalanabilir.
 
 ## Son devir notu

@@ -15,8 +15,6 @@
   <ItemGroup>
     <!-- Cross-cutting building blocks (all MIT / Apache-2.0 — no commercial licences) -->
     <PackageVersion Include="Scalar.AspNetCore" Version="2.17.9" />
-    <PackageVersion Include="FluentValidation" Version="12.1.1" />
-    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageVersion Include="Riok.Mapperly" Version="4.3.1" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />

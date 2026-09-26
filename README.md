@@ -5,7 +5,7 @@ mimarisi. İnce bir paylaşılan **BuildingBlocks çekirdeği** + her modülde *
 ile organize edilmiş iş modülleri.
 
 > **Lisans felsefesi:** MediatR ve AutoMapper artık ticari (Lucky Penny). NovaCore bunları **kullanmaz**.
-> Yerine: sade CQRS (mediator yok), **Mapperly** (Apache-2.0), **FluentValidation** (Apache-2.0),
+> Yerine: sade CQRS (mediator yok), **Mapperly** (Apache-2.0), .NET 10'un yerleşik validation'ı,
 > **Scalar** (MIT) ve Microsoft-yerleşik bileşenler. Çekirdek paketler yalnızca Microsoft paketlerine bağlıdır;
 > üçüncü taraf kütüphaneler (Serilog, OpenTelemetry, Scalar) opsiyonel eklenti paketlerindedir. Hepsi MIT/Apache.
 
@@ -452,7 +452,6 @@ dotnet test
 | Paket | İşlev | Lisans |
 |---|---|---|
 | Mapperly (Riok) | Object mapping (source-gen) | **Apache-2.0** |
-| FluentValidation | Validation (modüller + paketlenmeyen `NovaCore.FluentValidation`) | **Apache-2.0** |
 | Scalar.AspNetCore | OpenAPI arayüzü (`NovaCore.Scalar` eklentisi) | **MIT** |
 | Serilog.AspNetCore | Structured logging (`NovaCore.Serilog` eklentisi) | **Apache-2.0** |
 | OpenTelemetry.* | Observability (`NovaCore.OpenTelemetry` eklentisi) | **Apache-2.0** |

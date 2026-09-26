@@ -14,8 +14,6 @@
   ],
   "allowed": [
     "Scalar.AspNetCore",
-    "FluentValidation",
-    "FluentValidation.DependencyInjectionExtensions",
     "Riok.Mapperly",
     "Serilog.AspNetCore",
     "Serilog.Sinks.Console",
