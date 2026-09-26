@@ -1,10 +1,9 @@
-using FluentValidation;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
 using NovaCore.AspNetCore.Http;
-using NovaCore.FluentValidation;
 using NovaCore.Modules.Identity.Domain;
 using NovaCore.Modules.Identity.Services;
 
@@ -20,47 +19,21 @@ public static class LoginEndpoints
     {
         group.MapPost("/login", Login)
             .WithName("Login").WithSummary("Sign in with email + password")
-            .AddEndpointFilter<ValidationFilter<LoginRequest>>()
             .AllowAnonymous();
 
         group.MapPost("/login/2fa", TwoFactorLogin)
             .WithName("TwoFactorLogin").WithSummary("Complete sign-in with a TOTP code")
-            .AddEndpointFilter<ValidationFilter<TwoFactorLoginRequest>>()
             .AllowAnonymous();
 
         group.MapPost("/refresh", Refresh)
             .WithName("RefreshToken").WithSummary("Exchange a refresh token for a new token pair (rotating)")
-            .AddEndpointFilter<ValidationFilter<RefreshRequest>>()
             .AllowAnonymous();
     }
 
-    public sealed record LoginRequest(string Email, string Password);
-    public sealed record TwoFactorLoginRequest(string Email, string Password, string Code);
-    public sealed record RefreshRequest(string RefreshToken);
-
-    public sealed class LoginValidator : AbstractValidator<LoginRequest>
-    {
-        public LoginValidator()
-        {
-            RuleFor(x => x.Email).NotEmpty().EmailAddress();
-            RuleFor(x => x.Password).NotEmpty();
-        }
-    }
-
-    public sealed class TwoFactorLoginValidator : AbstractValidator<TwoFactorLoginRequest>
-    {
-        public TwoFactorLoginValidator()
-        {
-            RuleFor(x => x.Email).NotEmpty().EmailAddress();
-            RuleFor(x => x.Password).NotEmpty();
-            RuleFor(x => x.Code).NotEmpty().Length(6, 8);
-        }
-    }
-
-    public sealed class RefreshValidator : AbstractValidator<RefreshRequest>
-    {
-        public RefreshValidator() => RuleFor(x => x.RefreshToken).NotEmpty();
-    }
+    public sealed record LoginRequest([Required, EmailAddress] string Email, [Required] string Password);
+    public sealed record TwoFactorLoginRequest(
+        [Required, EmailAddress] string Email, [Required] string Password, [Required, Length(6, 8)] string Code);
+    public sealed record RefreshRequest([Required] string RefreshToken);
 
     private static async Task<IResult> Login(
         LoginRequest request,

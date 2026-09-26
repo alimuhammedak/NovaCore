@@ -1,10 +1,9 @@
-using FluentValidation;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
 using NovaCore.Abstractions.Identity;
-using NovaCore.FluentValidation;
 using NovaCore.Modules.Identity.Domain;
 using NovaCore.Modules.Identity.Services;
 
@@ -21,7 +20,6 @@ public static class SessionEndpoints
 
         group.MapPost("/logout", Logout)
             .WithName("Logout").WithSummary("Revoke the presented refresh token's session")
-            .AddEndpointFilter<ValidationFilter<LogoutRequest>>()
             .RequireAuthorization();
 
         group.MapPost("/logout-all", LogoutAll)
@@ -30,27 +28,12 @@ public static class SessionEndpoints
 
         group.MapPost("/change-password", ChangePassword)
             .WithName("ChangePassword").WithSummary("Change password (revokes all sessions)")
-            .AddEndpointFilter<ValidationFilter<ChangePasswordRequest>>()
             .RequireAuthorization();
     }
 
-    public sealed record LogoutRequest(string RefreshToken);
-    public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+    public sealed record LogoutRequest([Required] string RefreshToken);
+    public sealed record ChangePasswordRequest([Required] string CurrentPassword, [Required, Length(12, 128)] string NewPassword);
     public sealed record MeResponse(string UserId, string? UserName, string? Email, IReadOnlyCollection<string> Roles, IReadOnlyCollection<string> Permissions);
-
-    public sealed class ChangePasswordValidator : AbstractValidator<ChangePasswordRequest>
-    {
-        public ChangePasswordValidator()
-        {
-            RuleFor(x => x.CurrentPassword).NotEmpty();
-            RuleFor(x => x.NewPassword).NotEmpty().MinimumLength(12).MaximumLength(128);
-        }
-    }
-
-    public sealed class LogoutValidator : AbstractValidator<LogoutRequest>
-    {
-        public LogoutValidator() => RuleFor(x => x.RefreshToken).NotEmpty();
-    }
 
     private static IResult Me(ICurrentUser currentUser) =>
         currentUser is { IsAuthenticated: true, UserId: { } userId }
