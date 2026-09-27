@@ -34,7 +34,9 @@ Design is grounded in the OWASP Authentication / Password Storage / OAuth2 cheat
 
 ## Production checklist (must be true before shipping)
 
-- `Jwt:SigningKey` set from user-secrets/env (≥ 32 bytes) — the dev fallback only exists in Development.
+- This module signs HS256 tokens with `Jwt:SigningKey`, which the core accepts **in Development only** (D-024):
+  outside Development the host requires `Jwt:Authority` (an OpenID Connect provider) and refuses a signing key, so
+  this module's login cannot issue tokens there. It is retired in F3b.3; don't extend its token issuance (Y-07).
 - A real `IEmailSender` is registered by the host. `LoggingEmailSender` (logs the confirmation link) is wired only in
   Development; anywhere else `EmailSenderStartupCheck` stops startup if no `IEmailSender` is registered.
 - TLS/HTTPS enforced at the edge (HSTS is wired for non-dev).

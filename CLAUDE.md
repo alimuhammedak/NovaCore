@@ -117,9 +117,12 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
   generic startup migration (`DatabaseMigrationService`, registered by `AddCorePersistence`; it migrates only when
   `Database:ApplyMigrations` is true).
 
-- **Security** is a first-class subsystem: the `Identity` module (ASP.NET Core Identity + JWT/refresh +
-  2FA + admin) plus permission-based-authorization infrastructure in `NovaCore.AspNetCore`. See
-  `src/Modules/NovaCore.Modules.Identity/CLAUDE.md` before touching auth.
+- **Security** is a first-class subsystem. The core only *validates* access tokens (D-002): JWT bearer against an
+  OpenID Connect provider, `Jwt:Authority` (issuer + JWKS discovered, asymmetric algorithms only); a symmetric
+  `Jwt:SigningKey` is accepted in Development only (D-024). Permission-based-authorization infrastructure lives in
+  `NovaCore.AspNetCore` too. The `Identity` module (ASP.NET Core Identity + its own HS256 JWT/refresh + 2FA + admin)
+  is the legacy issuer, Development-only until F3b.3 retires it. See `src/Modules/NovaCore.Modules.Identity/CLAUDE.md`
+  before touching auth.
 
 ---
 

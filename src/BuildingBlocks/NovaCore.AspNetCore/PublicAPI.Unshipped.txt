@@ -19,6 +19,8 @@ NovaCore.AspNetCore.Auth.JwtOptions.AccessTokenMinutes.get -> int
 NovaCore.AspNetCore.Auth.JwtOptions.AccessTokenMinutes.set -> void
 NovaCore.AspNetCore.Auth.JwtOptions.Audience.get -> string!
 NovaCore.AspNetCore.Auth.JwtOptions.Audience.set -> void
+NovaCore.AspNetCore.Auth.JwtOptions.Authority.get -> string!
+NovaCore.AspNetCore.Auth.JwtOptions.Authority.set -> void
 NovaCore.AspNetCore.Auth.JwtOptions.Issuer.get -> string!
 NovaCore.AspNetCore.Auth.JwtOptions.Issuer.set -> void
 NovaCore.AspNetCore.Auth.JwtOptions.JwtOptions() -> void

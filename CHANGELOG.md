@@ -114,6 +114,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `[RequirePermission(...)]` instead.
   - Behaviour is unchanged: anonymous callers get 401, callers without the permission (or the `Administrator` role)
     get 403. .NET 10 enforces the attribute on Minimal API and routed endpoints.
+- **Breaking (configuration):** JWT bearer tokens are validated against an OpenID Connect provider, `Jwt:Authority`.
+  Its issuer and signing keys are discovered from `{Authority}/.well-known/openid-configuration` and its JWKS, and only
+  asymmetric algorithms (RS/PS/ES 256–512) are accepted.
+  - Outside Development `Jwt:Authority` is required and must be an absolute `https` URI.
+  - The symmetric `Jwt:SigningKey` (HS256) is accepted in Development only; anywhere else the host refuses to start
+    with one. In Development, with neither setting, the built-in development key still applies.
+  - As a result the Identity module's own HS256 tokens are validated only in Development, and issuing one elsewhere
+    fails with a message naming `Jwt:SigningKey` (`JwtTokenService`).
 
 ### Removed
 

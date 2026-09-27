@@ -21,7 +21,10 @@ public class ConfigurationValidationTests
     [InlineData("Development", "RateLimiting:PermitLimit", "0", "PermitLimit")]
     [InlineData("Development", "RateLimiting:WindowSeconds", "0", "WindowSeconds")]
     [InlineData("Development", "Jwt:SigningKey", "shorter-than-32-bytes", "Jwt:SigningKey")]
-    [InlineData("Production", "Jwt:SigningKey", "", "SigningKey")]
+    [InlineData("Development", "Jwt:Authority", "not-a-uri", "Jwt:Authority")]
+    [InlineData("Production", "Jwt:Authority", "", "Jwt:Authority")]
+    [InlineData("Production", "Jwt:Authority", "http://idp.example.com", "Jwt:Authority")]
+    [InlineData("Production", "Jwt:SigningKey", "a-symmetric-key-that-is-long-enough-0123456789", "Jwt:SigningKey")]
     [InlineData("Development", "Jwt:Issuer", "", "Issuer")]
     [InlineData("Development", "Jwt:AccessTokenMinutes", "0", "AccessTokenMinutes")]
     [InlineData("Development", "Jwt:RefreshTokenDays", "0", "RefreshTokenDays")]
@@ -64,9 +67,10 @@ public class ConfigurationValidationTests
     }
 
     [Fact]
-    public async Task In_development_an_empty_signing_key_falls_back_to_a_development_key()
+    public async Task In_development_without_an_authority_or_signing_key_a_development_key_is_used()
     {
-        await using var factory = new ConfiguredApiFactory(Environments.Development, new() { ["Jwt:SigningKey"] = "" });
+        await using var factory = new ConfiguredApiFactory(
+            Environments.Development, new() { ["Jwt:Authority"] = "", ["Jwt:SigningKey"] = "" });
 
         var jwt = factory.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
 

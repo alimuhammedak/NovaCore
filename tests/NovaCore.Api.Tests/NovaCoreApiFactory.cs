@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -16,9 +17,10 @@ using NovaCore.Modules.Payments.Infrastructure;
 namespace NovaCore.Api.Tests;
 
 /// <summary>
-/// Boots the real Program host in-memory (Development), with a fixed signing key and migrations off.
-/// Every module's DbContext is swapped to its own in-memory SQLite database, so the full auth flow
-/// (register/login/refresh/permissions) and the database health checks run without a real SQL Server.
+/// Boots the real Program host in-memory (Development), with migrations off. JWT validation points at an in-memory
+/// OpenID Connect issuer (<see cref="IdentityProvider"/>); in Development the Identity module's own HS256 tokens are
+/// also accepted, through a fixed signing key. Every module's DbContext is swapped to its own in-memory SQLite database,
+/// so the full auth flow (register/login/refresh/permissions) and the database health checks run without a real SQL Server.
 /// </summary>
 public class NovaCoreApiFactory : WebApplicationFactory<Program>
 {
@@ -42,6 +44,9 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
 
     /// <summary>The host environment the app boots in. Override to test environment-specific wiring.</summary>
     protected virtual string EnvironmentName => Environments.Development;
+
+    /// <summary>The issuer the host trusts through <c>Jwt:Authority</c>, in every environment.</summary>
+    public TestIdentityProvider IdentityProvider { get; } = new();
 
     /// <summary>
     /// A client whose bearer token carries exactly <paramref name="claims"/>, signed by the host's own
@@ -77,7 +82,11 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Jwt:SigningKey"] = "novacore-integration-test-signing-key-0123456789-abcdef",
+                ["Jwt:Authority"] = TestIdentityProvider.Issuer,
+                // The symmetric key is Development-only (D-024): elsewhere it stops the host.
+                ["Jwt:SigningKey"] = EnvironmentName == Environments.Development
+                    ? "novacore-integration-test-signing-key-0123456789-abcdef"
+                    : null,
                 ["Jwt:AccessTokenMinutes"] = "15",
                 ["Database:ApplyMigrations"] = "false",
                 ["Identity:Seed:SeedOnStartup"] = "false",
@@ -88,6 +97,10 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            // Configure (not PostConfigure): JwtBearer builds its metadata backchannel in PostConfigure (R-056).
+            services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
+                options => options.BackchannelHttpHandler = IdentityProvider.Handler);
+
             ReplaceWithSqlite<IdentityDbContext>(services, options => options.UseSqlite(_identityConnection));
             ReplaceWithSqlite<CatalogDbContext>(services, options => options.UseSqlite(_catalogConnection));
             ReplaceWithSqlite<PaymentsDbContext>(services, options => options.UseSqlite(_paymentsConnection));
@@ -127,6 +140,7 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
             _catalogConnection.Dispose();
             _paymentsConnection.Dispose();
             _sqliteServices.Dispose();
+            IdentityProvider.Dispose();
         }
 
         base.Dispose(disposing);
