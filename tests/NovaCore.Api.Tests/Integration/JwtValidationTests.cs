@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using NovaCore.AspNetCore.Identity;
 using NovaCore.Modules.Catalog.Infrastructure;
-using NovaCore.Modules.Identity.Services;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -67,14 +66,11 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
     [Fact]
     public async Task Outside_development_the_authority_is_the_only_trusted_issuer()
     {
-        // The parent owns the SQLite connections; disposing it also disposes the derived factory.
-        await using var production = new ProductionApiFactory();
-        var factory = production.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services => services.AddSingleton<IEmailSender, LoggingEmailSender>()));
+        await using var factory = new ProductionApiFactory();
         await EnsureCatalogCreatedAsync(factory);
 
         // The authority's token works over the HTTPS-only metadata path Production requires...
-        var accepted = await GetWithTokenAsync(factory, production.IdentityProvider.CreateToken(SuperAdmin()));
+        var accepted = await GetWithTokenAsync(factory, factory.IdentityProvider.CreateToken(SuperAdmin()));
 
         // ...while an HS256 token signed with the Development fallback key (a public constant in
         // AuthenticationExtensions) is not: symmetric keys are Development-only (D-024).

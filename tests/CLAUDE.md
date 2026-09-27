@@ -12,8 +12,9 @@ Stack: **xUnit v3** (test projects are `OutputType=Exe`). Run a single test with
   DB-free tests (health, OpenAPI, security headers, 401/validation gates) need no seeding. A caller with specific roles
   comes from `factory.CreateClientWithClaims(...)`: the factory's in-memory issuer (`factory.IdentityProvider`, see
   below) signs the token, so no user is seeded (`ValidationTests`). Permissions are never read from the token, so a
-  caller with permissions comes from `factory.CreateClientWithPermissions(...)` (`PermissionAuthorizationTests`). DB-backed tests (`AuthFlowTests`) implement `IAsyncLifetime` and seed via
-  `IdentityDataSeeder` + `UserManager`; they use the Identity module's own HS256 tokens.
+  caller with permissions comes from `factory.CreateClientWithPermissions(...)` (`PermissionAuthorizationTests`). The
+  identity provider's own flows are tested on their own host (`IdentityServer/`, below); `IdentityServerWiringTests`
+  signs in through the Api host itself.
 - **Architecture** (`Architecture/`) — `ModularityTests` enforce boundaries (Payments → only
   Catalog.Contracts; `NovaCore.Abstractions` has no ASP.NET/EF reference). The testable bans in
   `docs/plan/DECISIONS.md` are tests too: banned packages anywhere in the dependency graph (Y-01/32/33),
@@ -32,7 +33,7 @@ Stack: **xUnit v3** (test projects are `OutputType=Exe`). Run a single test with
 
 ## How the test host works (and why)
 
-`NovaCoreApiFactory` swaps **every module DbContext** (Identity, Catalog, Payments) from SQL Server to its own
+`NovaCoreApiFactory` swaps **every DbContext** (Catalog, Payments and the identity provider's) from SQL Server to its own
 **in-memory SQLite** connection (`ReplaceWithSqlite<TContext>`), so the full auth flow and the `/health` database
 checks run without a database. Two non-obvious requirements, both load-bearing:
 
@@ -44,8 +45,9 @@ checks run without a database. Two non-obvious requirements, both load-bearing:
    registers SQL Server, and EF forbids two providers in one container.
 
 The SQLite connections are opened in the factory ctor and disposed in `Dispose` to keep the in-memory databases
-alive for the test class. Only Identity's schema is created (`EnsureCreated` in the auth tests); the others just need
-to be reachable. A subclass can call `ReplaceWithSqlite` again to point one context elsewhere, e.g. at a missing file
+alive for the test class. A test that needs a schema creates it (`EnsureCreated`); the others just need the
+databases to be reachable. Outside Development the factory also brings what a production host must: ephemeral
+signing/encryption keys for the identity provider (standing in for certificates) and an email sender. A subclass can call `ReplaceWithSqlite` again to point one context elsewhere, e.g. at a missing file
 to make its health check fail (`HealthEndpointsTests`).
 
 ## Tokens: an in-memory OpenID Connect issuer
@@ -59,18 +61,16 @@ So tokens go through the real Authority → metadata → JWKS path with no netwo
 - `factory.IdentityProvider.CreateToken(claims)` signs with the published key.
 - `TestIdentityProvider.CreateToken(claims, key, algorithm, issuer, audience, expires)` breaks one property at a time
   for rejection tests (`JwtValidationTests`).
-- The symmetric `Jwt:SigningKey` is set in Development only (outside Development it stops the host), so
-  `AuthFlowTests` and `RefreshTokenExpiryTests` can log in through the Identity module, which still signs HS256.
 - **Permissions** are resolved on the server (`IPermissionResolver`). The factory wraps the host's resolver: a subject
   of `IdentityProvider`'s tokens holds what `factory.GrantPermissions(subject, ...)` gave it (nothing by default), and
-  every other token (the Identity module's) goes to the host's resolver. `CreateClientWithPermissions(...)` does both
-  for a fresh subject.
+  every other token (the identity provider add-on's) goes to the host's resolver. `CreateClientWithPermissions(...)`
+  does both for a fresh subject.
 - Resolved permissions are cached (`Cache:PermissionExpiration`). `FakeClockApiFactory` drives the memory cache's
   clock too (`MemoryCacheOptions.Clock`: HybridCache's local entries expire by it, not by `TimeProvider`, R-057), so
-  `PermissionResolutionTests` moves the clock past the lifetime instead of waiting. **Gotcha:** the Identity module
-  stamps its tokens from that fake clock while JWT validation reads the real one (R-058), so never log in through
-  Identity after a shared fixture's clock was advanced (the token would be "not yet valid", 401). That is why
-  `RoleChangeTests` has its own host.
+  `PermissionResolutionTests` moves the clock past the lifetime instead of waiting. **Gotcha:** the identity provider
+  stamps its tokens from the fake clock while JWT validation reads the real one (R-058), so never sign in through it
+  after a shared fixture's clock was advanced (the token would be "not yet valid", 401). That is why the fake-clock
+  classes under `IdentityServer/` each have their own host.
 
 ## The identity provider add-on: its own host
 

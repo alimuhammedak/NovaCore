@@ -17,9 +17,6 @@
     <Project Path="src/Modules/Catalog/NovaCore.Modules.Catalog.Contracts/NovaCore.Modules.Catalog.Contracts.csproj" />
     <Project Path="src/Modules/Catalog/NovaCore.Modules.Catalog/NovaCore.Modules.Catalog.csproj" />
   </Folder>
-  <Folder Name="/src/Modules/Identity/">
-    <Project Path="src/Modules/Identity/NovaCore.Modules.Identity/NovaCore.Modules.Identity.csproj" />
-  </Folder>
   <Folder Name="/src/Modules/Payments/">
     <Project Path="src/Modules/Payments/NovaCore.Modules.Payments/NovaCore.Modules.Payments.csproj" />
   </Folder>

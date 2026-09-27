@@ -482,7 +482,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
       - kısa yeni parola validation hatası.
     - Kasıtlı bozmalar (commit'lenmedi): varsayılan stamp aralığıyla 2 test, iptalsiz logout-all ile 1 test kırmızıya döndü.
     - 184/184. Tam koşu artık ~1 dk: seri IdentityServer testlerinde her kullanıcı ve giriş PBKDF2 600k hesaplıyor.
-  - [x] F3b.2e (commit: bir sonraki satırda): Admin ve rol seed'i.
+  - [x] F3b.2e (4d5fd89): Admin ve rol seed'i.
     - `/api/v1/admin/*` modüldeki yollarında, `identity:*` izinleriyle (`IdentityPermissionProvider`). Doğrulanan gövde public `AssignRoleRequest`. Audit: role_assigned/removed.
     - `IdentityServerSeeder`, `SeedOnStartup`'ta şu sırayla çalışıyor:
       - roller: Administrator her beyan edilmiş izni, User kimlik dışı `:read` izinlerini alıyor; eksik izin ekleniyor, verilmiş izin silinmiyor;
@@ -504,6 +504,32 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - `IdentityPermissionResolverTests` → `IdentityServerPermissionResolverTests`
     - `EmailSenderRegistrationTests` → `RegistrationTests`
     - Host düzeyindeki `StrictRateLimitTests`, `ValidationTests` ve `AuthGateTests` satırları F3b.3a'da Api host'una taşınıyor.
+- [ ] F3b.3 Eski modülün emekliye ayrılması (alt adımlar: 3a Api geçişi + modülün silinmesi, 3b çekirdek temizliği, 3c dokümanlar)
+  - [x] F3b.3a (commit: bir sonraki satırda): Api host'unun geçişi ve modülün silinmesi (kullanıcı onayıyla).
+    - `Program.cs`:
+      - modül kaydı yerine `AddCoreIdentityServer` ve `AddModuleDbContext<IdentityServerDbContext>` (SQL Server, `MigrationsAssembly` = Api, geçmiş tablosu `identity` şemasında, `EnableRetryOnFailure`; OpenIddict store'ları transaction'ları execution strategy içinde açıyor, R-064);
+      - `MapCoreIdentityServer`, modüllerden önce.
+    - Migration ve factory: Api'de `Identity/Migrations/…_Initial` ve `IdentityServerDbContextFactory`. `has-pending-model-changes` üç context'te "No changes".
+    - `appsettings.Development.json`: `Jwt:Authority` = `https://localhost:5443`.
+    - CI'daki model kontrolü Api'deki context'i de kapsıyor.
+    - Migration'daki bileşik index dizileri CA1861 verdi. `.editorconfig`'te yalnızca `src/**/Migrations/*.cs` için kapatıldı (MS "When to suppress": tek seferlik çağrı, dizi saklanıyor; Y-44, R-064).
+    - Silinenler:
+      - `src/Modules/Identity/` (slnx'ten de);
+      - karşılığı eklentide olan `AuthFlowTests`, `RefreshTokenExpiryTests`, `RoleChangeTests`, `IdentityPermissionResolverTests`, `EmailSenderRegistrationTests`;
+      - Api/test `bin/obj` temizlendi.
+      - `FakeClockApiFactory` ve `ProductionApiFactory` `DerivedApiFactories.cs`'e taşındı.
+    - Güncellenen host testleri:
+      - `ModuleRegistrationTests` (modüller Catalog/Payments; uç listesi eklentinin API uçlarıyla);
+      - `ValidationTests` (login/2fa-login/refresh/logout satırları çıktı);
+      - `AuthGateTests` (login satırı yerine grant'sız token isteği 400);
+      - `StrictRateLimitTests` → `/connect/token` (D-009 anlamı: A 400, A 429, B 400);
+      - `HealthEndpointsTests` (context adı), `OpenApiTests` (`/connect` ve `/account` belgede yok).
+    - `NovaCoreApiFactory` Development dışında ephemeral anahtar ve e-posta gönderici veriyor (üretim host'unun getirmesi gerekenler). Böylece production testlerindeki modül sender sarmalayıcıları kalktı.
+    - Development'ta Authority'siz geliştirme anahtarını sınayan test, "Development'ta da Authority gerekir" testine çevrildi. Eklenti Authority'yi zorunlu kılıyor; D-028 çekirdekten de kaldırıyor.
+    - Yeni `IdentityServerWiringTests`: Api host'u kendi Authority'si. Authorization Code + PKCE ile giriş → `/api/v1/products` 200, `/api/v1/payments` 403 (izinler store'dan). `Program.cs`'teki map satırı kaldırılınca bu test ve kayıt testi kırmızıya döndü (commit'lenmedi).
+    - Değişmezler `src/BuildingBlocks/NovaCore.Identity.OpenIddict/CLAUDE.md`'ye taşındı. Kök ve tests CLAUDE.md'deki modül atıfları, README'deki üç yer düzeltildi (geniş README güncellemesi F3b.3c'de).
+    - Kabul: `git grep "NovaCore.Modules.Identity|IdentityModule"` (docs/plan ve CHANGELOG dışında) boş.
+    - 173/173 (iki koşu).
 - [ ] F3b.3 Eski modülün emekliye ayrılması
 - [ ] F3b.4 docker-compose
 - [ ] F3b.5 Uçtan uca doğrulama

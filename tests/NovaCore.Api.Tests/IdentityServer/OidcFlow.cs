@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing.Handlers;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.WebUtilities;
 using Xunit;
 
@@ -18,8 +19,14 @@ namespace NovaCore.Api.Tests.IdentityServer;
 internal sealed partial class OidcFlow : IDisposable
 {
     public OidcFlow(IdentityServerTestHost host)
+        : this(host.Server)
     {
-        Browser = new HttpClient(new CookieContainerHandler { InnerHandler = host.Server.CreateHandler() })
+    }
+
+    /// <summary>Drives the provider of any TestServer at <see cref="IdentityServerTestHost.Authority"/>, e.g. the Api host.</summary>
+    public OidcFlow(TestServer server)
+    {
+        Browser = new HttpClient(new CookieContainerHandler { InnerHandler = server.CreateHandler() })
         {
             BaseAddress = new Uri(IdentityServerTestHost.Authority)
         };

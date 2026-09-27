@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NovaCore.AspNetCore.Auth;
-using NovaCore.Modules.Identity.Services;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -68,14 +67,15 @@ public class ConfigurationValidationTests
     }
 
     [Fact]
-    public async Task In_development_without_an_authority_or_signing_key_a_development_key_is_used()
+    public async Task In_development_the_host_needs_an_authority_too()
     {
+        // The host issues its own tokens (NovaCore.Identity.OpenIddict), for the authority it is (DECISIONS D-028).
         await using var factory = new ConfiguredApiFactory(
             Environments.Development, new() { ["Jwt:Authority"] = "", ["Jwt:SigningKey"] = "" });
 
-        var jwt = factory.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
+        var exception = Assert.ThrowsAny<Exception>(() => factory.Server);
 
-        Assert.False(string.IsNullOrWhiteSpace(jwt.SigningKey));
+        Assert.Contains("Jwt:Authority", Messages(exception), StringComparison.Ordinal);
     }
 
     private static string Messages(Exception exception) => exception switch
@@ -85,15 +85,10 @@ public class ConfigurationValidationTests
         _ => exception.Message
     };
 
-    private sealed class NoOpEmailSender : IEmailSender
-    {
-        public Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-    }
-
     /// <summary>
     /// The shared test host plus a few configuration overrides, layered in after the factory's own values. Outside
-    /// Development it also brings an <see cref="IEmailSender"/>, so only the configuration under test can stop the host.
+    /// Development the factory brings the keys and email sender a production host needs, so only the configuration under
+    /// test can stop the host.
     /// </summary>
     private sealed class ConfiguredApiFactory(string environmentName, Dictionary<string, string?> overrides)
         : NovaCoreApiFactory
@@ -105,7 +100,6 @@ public class ConfigurationValidationTests
             base.ConfigureWebHost(builder);
 
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(overrides));
-            builder.ConfigureServices(services => services.AddSingleton<IEmailSender, NoOpEmailSender>());
         }
     }
 }

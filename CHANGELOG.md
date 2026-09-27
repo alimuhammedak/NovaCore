@@ -59,6 +59,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   permissions. When `Identity:Seed:SeedOnStartup` is true the store is seeded: the Administrator role with every
   declared permission, the User role with the business read permissions, the administrator from
   `Identity:Seed:AdminEmail`/`AdminPassword`, then the clients. A new registration gets the User role.
+- **Breaking:** the Api host runs `NovaCore.Identity.OpenIddict` as its own authority and the `NovaCore.Modules.Identity`
+  module is removed. `POST /api/v1/auth/login`, `/login/2fa`, `/refresh` and `/logout` are gone: clients sign in with
+  Authorization Code + PKCE at `/connect/authorize` and `/connect/token`, and sign out with `/connect/revoke` and
+  `/connect/endsession`. The other `/api/v1/auth/*` and `/api/v1/admin/*` endpoints keep their paths. The identity
+  store's migrations now live in the Api project (`Identity/Migrations`, context `IdentityServerDbContext`, schema
+  `identity`); an `identity` schema created by the old module has to be dropped before migrating. In Development
+  `Jwt:Authority` is the host's https address (`https://localhost:5443`, the https launch profile).
 
 ### Changed
 

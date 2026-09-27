@@ -55,17 +55,19 @@ completed phases update this file.
 dotnet build                                  # whole solution (NovaCore.slnx); TreatWarningsAsErrors: any warning fails the build
 dotnet restore NovaCore.slnx --force          # incremental builds skip restore, so NuGet audit (NU19xx) stays hidden without this
 dotnet build -c Release
-dotnet test                                   # all tests (no SQL Server needed — Identity runs on SQLite)
-dotnet test --filter "FullyQualifiedName~AuthFlowTests.Refresh_rotates_the_refresh_token"   # single test
+dotnet test                                   # all tests (no SQL Server needed — every DbContext runs on SQLite)
+dotnet test --filter "FullyQualifiedName~AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"   # single test
 
 # Run (Development opens Scalar UI at /scalar/v1)
 dotnet run --project src/Api/NovaCore.Api
 
-# EF Core migrations — THREE separate DbContexts, one per module. Restore tools first.
+# EF Core migrations — THREE separate DbContexts: one per module, plus the identity provider's in the host. Restore tools first.
 dotnet tool restore
 dotnet ef migrations add <Name> --project src/Modules/<M>/NovaCore.Modules.<M> --startup-project src/Modules/<M>/NovaCore.Modules.<M> --context <M>DbContext --output-dir Infrastructure/Migrations
 dotnet ef database update     --project src/Modules/<M>/NovaCore.Modules.<M> --startup-project src/Modules/<M>/NovaCore.Modules.<M> --context <M>DbContext
-#   <M> ∈ { Catalog, Payments, Identity }. The module is BOTH -p and -s (each has a design-time factory).
+#   <M> ∈ { Catalog, Payments }. The module is BOTH -p and -s (each has a design-time factory).
+# The identity provider's context comes from the NovaCore.Identity.OpenIddict package; its migrations live in the Api (R-060):
+dotnet ef migrations add <Name> --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context IdentityServerDbContext --output-dir Identity/Migrations
 
 # Scaffold a fresh project from this repo (it is a `dotnet new` template)
 dotnet new install .
@@ -121,9 +123,10 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
   OpenID Connect provider, `Jwt:Authority` (issuer + JWKS discovered, asymmetric algorithms only); a symmetric
   `Jwt:SigningKey` is accepted in Development only (D-024). Permission-based authorization lives in
   `NovaCore.AspNetCore` too: permissions are resolved on the server through `IPermissionResolver` (never read from the
-  token) and cached per `sub` + security stamp for `Cache:PermissionExpiration`. The `Identity` module (ASP.NET Core Identity + its own HS256 JWT/refresh + 2FA + admin)
-  is the legacy issuer, Development-only until F3b.3 retires it. See `src/Modules/NovaCore.Modules.Identity/CLAUDE.md`
-  before touching auth.
+  token) and cached per `sub` + security stamp for `Cache:PermissionExpiration`. The tokens come from the
+  `NovaCore.Identity.OpenIddict` add-on (ASP.NET Core Identity + OpenIddict: Authorization Code + PKCE, refresh
+  rotation, client credentials, 2FA, admin), which the Api host runs as its own authority. See
+  `src/BuildingBlocks/NovaCore.Identity.OpenIddict/CLAUDE.md` before touching auth.
 
 ---
 
@@ -207,11 +210,13 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 
 - **`WithTags` on a route group** needs `using Microsoft.AspNetCore.Http;` (not just `...Builder`).
 - **SQL Server, not Postgres:** use `EF.Functions.Like` (not `ILike`); `UseSqlServer`, not `UseNpgsql`.
-- **Two EF providers can't coexist** in one container. The test host swaps Identity to SQLite and must
-  give it its own internal service provider (see `tests/CLAUDE.md`).
+- **Two EF providers can't coexist** in one container. The test host swaps every DbContext to SQLite and must
+  give them their own internal service provider (see `tests/CLAUDE.md`).
 - **Suppressed-by-design warnings** (all user-approved, DECISIONS D-011):
   - `Directory.Build.props`: `NoWarn` `RMG020` (Mapperly intentional source-member drops). `WarningsNotAsErrors`
     `NU1901;NU1902` (low/moderate advisories stay warnings; high/critical fail restore; CI fails on any).
+  - Allowed by Microsoft's "When to suppress" section (DECISIONS Y-44): `.editorconfig` CA1861 off for
+    `src/**/Migrations/*.cs` (EF migrations, R-064); `[SuppressMessage]` CA5350 on the test TOTP generator (R-063).
   - `.editorconfig`: CA1707 is off for `tests/**.cs` (test names are sentences).
   - `[SuppressMessage]` with justification on `Error` (CA1716) and `IDomainEventHandler<T>` (CA1711).
 - **`Directory.Build.targets` is too late for some properties.** The SDK computes `DocumentationFile` (from

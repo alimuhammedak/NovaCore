@@ -19,6 +19,11 @@ dotnet_sort_system_directives_first = true
 # Test names are sentences (Refresh_rotates_the_refresh_token), as in Microsoft's unit-testing guidance (docs/plan/DECISIONS.md D-011).
 dotnet_diagnostic.CA1707.severity = none
 
+[src/**/Migrations/*.cs]
+# EF Core migrations pass constant column arrays (composite indexes). Up/Down run once per database and the builder keeps
+# the arrays, the two cases CA1861's documentation allows suppressing (docs/plan/RESEARCH.md R-064).
+dotnet_diagnostic.CA1861.severity = none
+
 [*.{csproj,props,targets}]
 indent_size = 2
 

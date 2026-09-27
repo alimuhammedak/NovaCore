@@ -18,8 +18,11 @@ public class OpenApiTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreAp
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("/api/v1/products", json);
         Assert.Contains("/api/v1/payments", json);
-        Assert.Contains("/api/v1/auth/login", json);
         Assert.Contains("/api/v1/auth/register", json);
+        Assert.Contains("/api/v1/admin/users", json);
+        // The protocol endpoints and the sign-in page are not API operations.
+        Assert.DoesNotContain("/connect/", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("/account/login", json, StringComparison.Ordinal);
         // The bearer security scheme transformer should have registered the scheme.
         Assert.Contains("Bearer", json);
     }

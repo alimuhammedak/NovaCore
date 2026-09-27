@@ -476,3 +476,12 @@ Biçim:
   - Başka bir API ile (`IncrementalHash` + `HashAlgorithmName.SHA1`) analyzer'ı atlatmak Y-11'e aykırı olurdu.
 - Kaynak: https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca5350 · https://datatracker.ietf.org/doc/html/rfc6238
 - Sonuç: Y-44'ün izin verdiği kalıcı ve dar bastırma: yalnızca `tests/.../IdentityServer/AuthenticatorCode.For` üzerinde gerekçeli `[SuppressMessage]`.
+
+### R-064: Api host'unda identity store'u: retry stratejisi ve migration analyzer'ı (2026-09-27, faz 3b; kaynak)
+- Bulgu:
+  - `OpenIddictEntityFrameworkCoreAuthorizationStore` açık transaction'larını (`DeleteAsync`, `PruneAsync`) `context.Database.CreateExecutionStrategy().ExecuteAsync(...)` içinde açıyor. Toplu iptaller (`RevokeBySubjectAsync`) `ExecuteUpdateAsync` kullanıyor. Yani `EnableRetryOnFailure` (SQL Server retrying strategy) ile uyumlu; modüllerle aynı ayar kullanılabilir.
+  - Üretilen ilk migration bileşik index'ler için `columns: new[] { ... }` geçiyor, bu da CA1861'i tetikliyor. CA1861'in "When to suppress" bölümü: *"The invocation only runs once."* ve *"The array could be mutated within the invoked method, or you aren't sure if it would mutated."* Migration'ın `Up`/`Down`'u veritabanı başına bir kez çalışıyor; `MigrationBuilder` diziyi operasyonda saklıyor.
+- Kaynak: https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.EntityFrameworkCore/Stores/OpenIddictEntityFrameworkCoreAuthorizationStore.cs · https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1861
+- Sonuç:
+  - Api host'u context'i `EnableRetryOnFailure` ile kaydediyor (F3b.3a).
+  - CA1861 `.editorconfig`'te yalnızca `src/**/Migrations/*.cs` için kapalı (Y-44'ün izin verdiği kalıcı bastırma). Kök CLAUDE.md'nin bastırma listesine eklendi.

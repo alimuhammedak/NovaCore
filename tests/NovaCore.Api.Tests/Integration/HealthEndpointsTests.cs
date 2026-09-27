@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using NovaCore.Modules.Catalog.Infrastructure;
-using NovaCore.Modules.Identity.Services;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -45,7 +44,7 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
     {
         var registrations = _factory.Services.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value.Registrations;
 
-        foreach (var context in new[] { "CatalogDbContext", "IdentityDbContext", "PaymentsDbContext" })
+        foreach (var context in new[] { "CatalogDbContext", "IdentityServerDbContext", "PaymentsDbContext" })
         {
             var check = Assert.Single(registrations, registration => registration.Name == context);
             Assert.Contains("ready", check.Tags);
@@ -69,12 +68,8 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
     [InlineData("/alive")]
     public async Task Health_endpoints_are_not_mapped_outside_development(string path)
     {
-        // The parent owns the SQLite connections; disposing it also disposes the derived factory.
         await using var production = new ProductionApiFactory();
-        var client = production
-            .WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => services.AddSingleton<IEmailSender, LoggingEmailSender>()))
-            .CreateClient();
+        var client = production.CreateClient();
 
         var response = await client.GetAsync(path);
 

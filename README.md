@@ -41,7 +41,7 @@ dotnet test
 dotnet tool restore
 dotnet ef database update --project src/Modules/Catalog/NovaCore.Modules.Catalog   --context CatalogDbContext   --startup-project src/Modules/Catalog/NovaCore.Modules.Catalog
 dotnet ef database update --project src/Modules/Payments/NovaCore.Modules.Payments  --context PaymentsDbContext  --startup-project src/Modules/Payments/NovaCore.Modules.Payments
-dotnet ef database update --project src/Modules/Identity/NovaCore.Modules.Identity  --context IdentityDbContext  --startup-project src/Modules/Identity/NovaCore.Modules.Identity
+dotnet ef database update --project src/Api/NovaCore.Api  --context IdentityServerDbContext  --startup-project src/Api/NovaCore.Api
 
 # 3) İlk admin + roller + izinler için seed (parolayı user-secrets ile ver — repoya YAZMA)
 dotnet user-secrets --project src/Api/NovaCore.Api set "Identity:Seed:AdminPassword" "Admin!Passw0rd-2026"
@@ -151,10 +151,8 @@ NovaCore.slnx
 │   │   ├── Catalog/
 │   │   │   ├── NovaCore.Modules.Catalog.Contracts/  # IProductCatalog + ProductInfo (dışa açılan tek yüzey)
 │   │   │   └── NovaCore.Modules.Catalog/            # CatalogModule, Domain, Features/, Infrastructure/ (schema: catalog)
-│   │   ├── Payments/
-│   │   │   └── NovaCore.Modules.Payments/           # PaymentsModule (schema: payments) — Catalog'a Contracts ile bağlı
-│   │   └── Identity/
-│   │       └── NovaCore.Modules.Identity/           # IdentityModule (schema: identity) — Identity+JWT/refresh+2FA+admin
+│   │   └── Payments/
+│   │       └── NovaCore.Modules.Payments/           # PaymentsModule (schema: payments) — Catalog'a Contracts ile bağlı
 │   │
 │   └── Api/
 │       └── NovaCore.Api/           # Program.cs: composition root, her şeyi açıkça ekler
@@ -176,9 +174,12 @@ builder.AddCoreDefaults();                         // health + resilient HttpCli
 builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth, rate limit, CORS
 builder.AddCorePersistence();                      // audit interceptor, domain event'ler, opt-in startup migration
 
+// Kimlik sağlayıcı (eklenti): Jwt:Authority'nin gösterdiği token'ları üretir; store'u ve migration'ları host'ta
+builder.AddCoreIdentityServer();
+builder.Services.AddModuleDbContext<IdentityServerDbContext>((services, db) => db.UseSqlServer(/* ... */));
+
 // Modüller: açık kayıt; endpoint'ler bu sırayla bağlanır
 builder.AddModule<CatalogModule>();
-builder.AddModule<IdentityModule>();
 builder.AddModule<PaymentsModule>();
 
 var app = builder.Build();
@@ -186,6 +187,7 @@ var app = builder.Build();
 app.UseSerilogRequestLogging();                    // istek başına bir log satırı
 app.UseCoreWeb();                                  // security headers, exception handling, auth, rate limiter, OpenAPI (Development)
 app.MapCoreScalar();                               // Scalar UI (Development)
+app.MapCoreIdentityServer();                       // /connect/*, giriş sayfası, /api/v1/auth/*, /api/v1/admin/*
 app.MapModules();                                  // modüllerin endpoint'leri
 app.MapDefaultEndpoints();                         // /health, /alive (Development)
 
