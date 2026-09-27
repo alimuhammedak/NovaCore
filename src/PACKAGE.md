@@ -11,6 +11,7 @@ only; third-party integrations are separate, optional add-ons.
 | `NovaCore.Serilog` | Add-on: Serilog logging (console, Seq) |
 | `NovaCore.OpenTelemetry` | Add-on: OpenTelemetry metrics and tracing, OTLP export |
 | `NovaCore.Scalar` | Add-on: Scalar API reference UI (Development) |
+| `NovaCore.Identity.OpenIddict` | Add-on: OpenID Connect provider (ASP.NET Core Identity + OpenIddict) |
 
 > **Pre-release (0.x).** The public API is not stable yet. Package names and namespaces are expected to change before
 > 1.0, and a 0.x minor version may contain breaking changes.

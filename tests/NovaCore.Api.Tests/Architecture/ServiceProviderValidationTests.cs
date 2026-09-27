@@ -1,7 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using NovaCore.Api.Tests.Integration;
 using NovaCore.Abstractions.Identity;
-using NovaCore.Modules.Identity.Services;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Architecture;
@@ -16,10 +14,7 @@ public class ServiceProviderValidationTests
     public async Task Scoped_services_cannot_be_resolved_from_the_root_provider_even_outside_development()
     {
         // Production: the environment where the framework would leave validation off by default (R-029).
-        // The parent owns the SQLite connection; disposing it also disposes the derived factory.
-        await using var production = new ProductionApiFactory();
-        var factory = production.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services => services.AddSingleton<IEmailSender, LoggingEmailSender>()));
+        await using var factory = new ProductionApiFactory();
 
         var error = Assert.Throws<InvalidOperationException>(() => factory.Services.GetRequiredService<ICurrentUser>());
 

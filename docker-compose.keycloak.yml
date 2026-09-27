@@ -1,0 +1,27 @@
+# Optional external identity provider: Keycloak with an example realm, for trying NovaCore against a provider it does
+# not host itself. Merge it with the main file:
+#   docker compose -f docker-compose.yml -f docker-compose.keycloak.yml up -d keycloak
+# It is a separate file because compose checks required variables in every service it loads, profiles or not: this way
+# KEYCLOAK_ADMIN_PASSWORD is only needed when Keycloak is (docs/plan/RESEARCH.md R-065).
+#
+# The realm "novacore" (deploy/keycloak/novacore-realm.json) has a public PKCE client for Scalar, puts "novacore.api" in
+# the access token's audience and the realm roles in a "role" claim. It has no users: create one in the admin console
+# (http://localhost:8180/admin, user "admin", password from .env). To validate its tokens, a host sets
+#   Jwt:Authority = http://localhost:8180/realms/novacore   (http is accepted in Development only)
+# and registers an IPermissionResolver for Keycloak's users. It then does not call AddCoreIdentityServer.
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4
+    container_name: novacore-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}"
+    ports:
+      # Local only: the admin console runs in development mode over plain HTTP. 8180, not 8080, which local web
+      # servers often hold.
+      - "127.0.0.1:8180:8080"
+    volumes:
+      # Imported on first start only; an existing realm is kept.
+      - ./deploy/keycloak:/opt/keycloak/data/import:ro

@@ -43,12 +43,13 @@ public class AuthGateTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreA
     }
 
     [Fact]
-    public async Task Login_with_missing_fields_returns_400_validation()
+    public async Task A_token_request_without_a_grant_is_rejected()
     {
-        var client = _factory.CreateClient();
+        var client = _factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
 
-        var response = await client.PostAsJsonAsync("/api/v1/auth/login", new { email = "", password = "" });
+        var response = await client.PostAsync("/connect/token", new FormUrlEncodedContent(new Dictionary<string, string>()));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("invalid_request", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 }

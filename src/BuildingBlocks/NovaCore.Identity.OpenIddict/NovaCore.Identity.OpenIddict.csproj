@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NovaCore.Identity.OpenIddict: optional add-on. An OpenID Connect provider in the host: ASP.NET Core Identity for the
+    accounts, OpenIddict for the protocol. The core validates its tokens like any other provider's, through Jwt:Authority
+    (docs/plan/DECISIONS.md D-002, D-026). The host picks the database provider and owns the migrations.
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>NovaCore add-on: an OpenID Connect provider built on ASP.NET Core Identity and OpenIddict.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <PackageReference Include="OpenIddict.Server.AspNetCore" />
+    <PackageReference Include="OpenIddict.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NovaCore.AspNetCore\NovaCore.AspNetCore.csproj" />
+  </ItemGroup>
+
+</Project>

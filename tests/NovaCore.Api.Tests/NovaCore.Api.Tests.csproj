@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Api\NovaCore.Api\NovaCore.Api.csproj" />
+    <!-- The identity provider add-on, tested on its own host (IdentityServer/) the way a package consumer composes it. -->
+    <ProjectReference Include="..\..\src\BuildingBlocks\NovaCore.Identity.OpenIddict\NovaCore.Identity.OpenIddict.csproj" />
   </ItemGroup>
 
 </Project>

@@ -389,6 +389,7 @@ Biçim:
   - Bizim kodumuzda temiz bir düzeltme yok: gerçek exception yalnızca private bir TCS'te. `IStartupValidator` sarmalayıcısı `ValidateOnStart` hatalarını yakalayabilir, ama hosted service hatalarını (`EmailSenderStartupCheck`) yakalayamaz.
 - Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Mvc/Mvc.Testing/src/DeferredHostBuilder.cs · https://learn.microsoft.com/dotnet/api/microsoft.extensions.hosting.hostingabstractionshostextensions.runasync · yerel koşular (SDK 10.0.300)
 - Sonuç: Kapsam dışı (F2c'nin işi değil, test altyapısındaki framework yarışı), PROGRESS → "Sonraya bırakılanlar". Faz raporunda kullanıcıya bildirilir.
+- Ek gözlem (2026-09-27, F3b.1b): Eklentinin testleri (çok sayıda host açılışı ve PBKDF2) diğer testlerle paralel koşunca yarış tam koşuların çoğunda (4'te 3) görüldü; yeni testler hariç tutulunca 4/4 yeşildi. Bu testler `DisableParallelization` koleksiyonuna alındı ve host'lar sınıf başına paylaşıldı. Ardından 13/13 tam koşu yeşil. Kök neden değişmedi.
 
 ## Faz 3a araştırması (2026-09-27)
 
@@ -413,3 +414,128 @@ Biçim:
 - Bulgu: `TokenValidationParameters`'ta (IdentityModel 8.19) bir `TimeProvider` yok. Sürenin dışarıdan kontrol edilebilmesinin tek yolu `LifetimeValidator` delegesi. Doküman: *"If set, this delegate will be called to validate the lifetime of the token, instead of default processing. This means that no default lifetime validation will occur."* `TimeProvider` yalnızca deneysel `ValidationParameters` API'sinde var.
 - Kaynak: https://learn.microsoft.com/dotnet/api/microsoft.identitymodel.tokens.tokenvalidationparameters.lifetimevalidator?view=msal-web-dotnet-latest · https://learn.microsoft.com/dotnet/api/microsoft.identitymodel.tokens.validators.validatelifetime?view=msal-web-dotnet-latest
 - Sonuç: R-050'deki hizalama yapılmıyor (D-024 (8)). Varsayılan doğrulamayı elle yazılmış bir delegeyle değiştirmenin riski, testte "şimdi"den başlayan sahte saatin maliyetinden büyük.
+
+## Faz 3b araştırması (2026-09-27)
+
+### R-059: OpenIddict 7.7.1: paketler, access token biçimi, anahtarlar, refresh token rotasyonu (2026-09-27, faz 3b)
+- Bulgu:
+  - Güncel kararlı sürüm 7.7.1 (2026-09-17). Lisans Apache-2.0, `net10.0` hedefi var. `OpenIddict.EntityFrameworkCore` 7.7.1'in bağımlılıkları: `OpenIddict.Core`, `OpenIddict.EntityFrameworkCore.Models`, `Microsoft.EntityFrameworkCore.Relational [10.0.11, )`. `OpenIddict.AspNetCore` meta paketi client ve validation paketlerini de getiriyor; sunucu için `OpenIddict.Server.AspNetCore` yetiyor.
+  - Access token şifrelemesi varsayılan olarak açık (JWE). *"the OpenIddict server enforces encryption for all the token types it supports"*. `DisableAccessTokenEncryption()` *"when integration with third-party APIs/resource servers is desired"* için var. Kaynakta: *"SHOULD only be done when issuing tokens to third-party resource servers/APIs you don't control and don't fully trust."*
+  - `OpenIddictServerConfiguration` bir `IPostConfigureOptions<OpenIddictServerOptions>`. Asimetrik imza anahtarı yoksa ID0086, şifreleme anahtarı yoksa ID0085 ile `InvalidOperationException` fırlatıyor. Şifreleme anahtarı, access token şifrelemesi kapalıyken de zorunlu (code ve refresh token için).
+  - `AddEphemeralSigningKey(algorithm)` RSA ve ECDSA (ES256/384/512) algoritmalarını destekliyor. `AddSigningCertificate(X509Certificate2)` anahtar türünü kısıtlamıyor, yalnızca `DigitalSignature` kullanımını kontrol ediyor. Ephemeral anahtarlar *"should only be used during development"*.
+  - `OpenIddictServerOptions` varsayılanları:
+    - `RefreshTokenReuseLeeway` 30 sn; rolling refresh token'lar açık (`DisableRollingRefreshTokens` false).
+    - `RequireProofKeyForCodeExchange` false; ömürler: access 1 saat, refresh 14 gün.
+    - `TimeProvider` DI'dan alınıyor, yoksa `TimeProvider.System`.
+  - `CodeChallengeMethods` varsayılan olarak `plain` ve `S256`'yı içeriyor (F3b.1a testi discovery'de `plain`'i yakaladı). RFC 9700 §2.1.1 istemcilerin `S256` kullanmasını istiyor; `plain`'de challenge, verifier'ın kendisi. Eklenti `plain`'i listeden siliyor.
+  - `ValidateTokenEntry`: zaten "redeemed" işaretli bir token gelirse *"revoke the entire chain of tokens associated with the authorization"* (`RevokeByAuthorizationIdAsync`). Refresh token'lar için leeway süresince tekrar kullanıma izin veriliyor. Authorization'ın kendisi iptal edilmiyor.
+  - EF entegrasyonu: `modelBuilder.UseOpenIddict()` (varsayılan `string` anahtar) OnModelCreating içinde çağrılabiliyor. Store kaydı: `AddCore(o => o.UseEntityFrameworkCore().UseDbContext<T>())`.
+  - Minimal API passthrough: örnek `Zirku.Server`, `connect/authorize`'ı `app.MapMethods(...)` ile map'liyor ve `Results.SignIn(principal, null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)` döndürüyor. `Velusia.Server`, Identity ile authorization code akışını gösteriyor:
+    - cookie yoksa Challenge;
+    - implicit consent'te kalıcı authorization oluşturuluyor;
+    - token endpoint'inde kullanıcı yeniden doğrulanıyor (`CanSignInAsync`);
+    - security stamp claim'i hiçbir token'a yazılmıyor.
+- Kaynak: https://api.nuget.org/v3/catalog0/data/2026.09.17.20.00.23/openiddict.aspnetcore.7.7.1.json · https://api.nuget.org/v3/catalog0/data/2026.09.17.20.01.01/openiddict.entityframeworkcore.7.7.1.json · https://documentation.openiddict.com/configuration/token-formats · https://documentation.openiddict.com/configuration/encryption-and-signing-credentials · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Server/OpenIddictServerOptions.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Server/OpenIddictServerConfiguration.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Server/OpenIddictServerBuilder.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Server/OpenIddictServerHandlers.Protection.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.EntityFrameworkCore/OpenIddictEntityFrameworkCoreHelpers.cs · https://github.com/openiddict/openiddict-samples/tree/dev/samples/Zirku · https://github.com/openiddict/openiddict-samples/tree/dev/samples/Velusia
+- Sonuç: D-026 (1), (3), (5), (7), (9). Çekirdek JwtBearer IdP'den bağımsız standart bir resource server olduğu için access token şifrelemesi kapatılıyor. Anahtar eksikliği `ValidateOnStart` ile açılışta yakalanıyor.
+
+### R-060: DbContext bir pakette, migration'lar uygulamada (2026-09-27, faz 3b)
+- Bulgu: EF Core, migration'ları DbContext'ten farklı bir assembly'de tutmayı destekliyor. *"You can store migrations in a different project from the one containing your DbContext."* Önerilen düzen:
+  - veri projesi DbContext'i ve entity'leri taşır;
+  - migration projesi migration'ları, snapshot'ı ve `IDesignTimeDbContextFactory<TContext>`'i taşır;
+  - çalışma anında `x.MigrationsAssembly("…")` ayarlanır.
+  
+  Uygulama migration'ları çalışma anında uyguluyorsa migration assembly'sini referans almalı.
+- Kaynak: https://learn.microsoft.com/ef/core/managing-schemas/migrations/projects
+- Sonuç: D-026 (2). `NovaCore.Identity.OpenIddict` `IdentityServerDbContext`'i taşır. Api host'u SQL Server migration'larını ve design-time factory'yi taşır (F3b.3a). Paket sağlayıcıya bağlanmaz.
+
+### R-061: Sağlayıcı cookie'si, antiforgery ve `IClaimsTransformation` (2026-09-27, faz 3b; kaynak + gözlem)
+- Bulgu:
+  - *"For the following AddAuthentication call without a default authentication scheme specified, two authentication handlers are added to the app using their default authentication scheme names"*: parametresiz `AddAuthentication()` varsayılan şemayı değiştirmiyor. `AddIdentityCookies` yalnızca şemaları ekliyor (Identity UI'ın `AddIdentity`'si ise varsayılanları cookie'ye çeviriyor). Testte API anonim çağrıya 302 değil 401 veriyor.
+  - Antiforgery: .NET 8 notu *"WebApplicationBuilder automatically adds the middleware when the antiforgery services have been registered"* diyor. Antiforgery sayfası ise *"Blazor and Minimal APIs require an explicit call to UseAntiforgery"* diyor. Gözlem bu pipeline'da ikincisini doğruluyor: `UseCoreWeb` `UseAuthentication`/`UseAuthorization`'ı açıkça çağırıyor, `[FromForm]` parametreli login ucu "contains anti-forgery metadata, but a middleware was not found" ile 500 verdi. Aynı sayfa açık doğrulamayı da anlatıyor: *"resolve IAntiforgery from DI and call ValidateRequestAsync or IsRequestValidAsync explicitly"*.
+  - `IClaimsTransformation` her `AuthenticateAsync` çağrısında, hangi şema olursa olsun çalışıyor (R-057). Token endpoint'indeki `AuthenticateAsync(OpenIddict şeması)` da çekirdeğin `PermissionClaimsTransformation`'ından geçiyor. OpenIddict örneğindeki "principal'ın bütün claim'lerini kopyala" kalıbı bu yüzden çözülmüş `permission` claim'lerini refresh sonrası access token'a taşıdı (F3b.1b testi yakaladı).
+- Kaynak: https://learn.microsoft.com/aspnet/core/security/authorization/authorize-with-a-specific-scheme?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/release-notes/aspnetcore-8.0?view=aspnetcore-10.0#minimal-apis · https://learn.microsoft.com/aspnet/core/security/anti-request-forgery?view=aspnetcore-10.0#antiforgery-with-minimal-apis · yerel koşu
+- Sonuç: D-026 (6):
+  - Login formu `ReadFormAsync` + `IAntiforgery.IsRequestValidAsync` ile açıkça doğrulanır. Çekirdeğe `UseAntiforgery` eklenmez; yalnızca bir eklentinin ihtiyacı için çekirdek pipeline'ı değişmezdi.
+  - Token endpoint'i principal'ı kopyalarken `permission` claim'lerini dışarıda bırakır.
+
+### R-062: .NET 10'un validation generator'ü internal request tiplerini kapsıyor mu? (2026-09-27, faz 3b; gözlem + doküman)
+- Bulgu:
+  - Eklentideki `internal sealed record RegisterRequest` (internal bir static sınıf içinde) için generator metadata üretmedi. Geçersiz gövde handler'a ulaştı, yanıtta Identity'nin `password` hatası vardı.
+  - `EmitCompilerGeneratedFiles` çıktısında `ValidatableInfoResolver.g.cs` handler'ın servis parametrelerini (`IOptions<JwtOptions>`, `UserManager<…>`) kapsıyordu, request tipini kapsamıyordu. Aynı handler'ın bağlandığı bir yerde:
+    - record `public` olunca tip resolver'a girdi;
+    - yalnızca kapsayan sınıf `public` olunca girmedi.
+  - MS'in "internal da olur" diyen diyagnostikleri (ASP0034 *"Make the parameter type and each of its containing types public or internal"*) aspnetcore-11.0 dokümanında. .NET 10 dokümanı yalnızca *"Validated types and properties are accessible to generated code"* diyor.
+  - Sonuç: bu SDK'da (10.0.300, targeting pack 10.0.8) generator yalnızca public request tiplerini kapsıyor. Eksik metadata hata ya da log üretmiyor (R-052).
+- Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/validation?view=aspnetcore-10.0#troubleshoot-generated-validation-metadata · https://learn.microsoft.com/aspnet/core/diagnostics/asp0034?view=aspnetcore-11.0 · yerel derleme (`-p:EmitCompilerGeneratedFiles=true`)
+- Sonuç: D-026'ya ek: eklentinin doğrulanan request gövdeleri (`RegisterRequest` ve sonrakiler) public, üst düzey record'lardır ve PublicAPI'de izlenir. Y-23 gereksiz public API'yi yasaklıyor; burada public olmaları doğrulamanın çalışmasının koşulu. Endpoint sınıfları internal kalıyor. Api host'unun `ValidationTests`'i bu uçları da kapsayacak (F3b.3a).
+
+### R-063: Testteki TOTP hesabı için CA5350 bastırması (2026-09-27, faz 3b)
+- Bulgu:
+  - 2FA testleri bir authenticator uygulamasının yerine kodu kendisi hesaplıyor. RFC 6238 ve ASP.NET Core Identity'nin doğrulayıcısı HMAC-SHA1 kullanıyor. Identity'nin `AuthenticatorTokenProvider.GenerateAsync`'i boş döndüğü için (kod uygulamada üretilir) sunucudan alınamıyor.
+  - `HMACSHA1` CA5350'yi tetikliyor. Kuralın dokümanı: *"Suppress a warning from this rule when the level of protection needed for the data does not require a security guarantee."* Testteki kod bir authenticator uygulamasını taklit ediyor ve güvenlik garantisi gerektirmiyor.
+  - Başka bir API ile (`IncrementalHash` + `HashAlgorithmName.SHA1`) analyzer'ı atlatmak Y-11'e aykırı olurdu.
+- Kaynak: https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca5350 · https://datatracker.ietf.org/doc/html/rfc6238
+- Sonuç: Y-44'ün izin verdiği kalıcı ve dar bastırma: yalnızca `tests/.../IdentityServer/AuthenticatorCode.For` üzerinde gerekçeli `[SuppressMessage]`.
+
+### R-064: Api host'unda identity store'u: retry stratejisi ve migration analyzer'ı (2026-09-27, faz 3b; kaynak)
+- Bulgu:
+  - `OpenIddictEntityFrameworkCoreAuthorizationStore` açık transaction'larını (`DeleteAsync`, `PruneAsync`) `context.Database.CreateExecutionStrategy().ExecuteAsync(...)` içinde açıyor. Toplu iptaller (`RevokeBySubjectAsync`) `ExecuteUpdateAsync` kullanıyor. Yani `EnableRetryOnFailure` (SQL Server retrying strategy) ile uyumlu; modüllerle aynı ayar kullanılabilir.
+  - Üretilen ilk migration bileşik index'ler için `columns: new[] { ... }` geçiyor, bu da CA1861'i tetikliyor. CA1861'in "When to suppress" bölümü: *"The invocation only runs once."* ve *"The array could be mutated within the invoked method, or you aren't sure if it would mutated."* Migration'ın `Up`/`Down`'u veritabanı başına bir kez çalışıyor; `MigrationBuilder` diziyi operasyonda saklıyor.
+- Kaynak: https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.EntityFrameworkCore/Stores/OpenIddictEntityFrameworkCoreAuthorizationStore.cs · https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1861
+- Sonuç:
+  - Api host'u context'i `EnableRetryOnFailure` ile kaydediyor (F3b.3a).
+  - CA1861 `.editorconfig`'te yalnızca `src/**/Migrations/*.cs` için kapalı (Y-44'ün izin verdiği kalıcı bastırma). Kök CLAUDE.md'nin bastırma listesine eklendi.
+
+### R-065: docker-compose imaj sürümleri, Keycloak realm import'u ve compose'un zorunlu değişkenleri (2026-09-27, faz 3b; kaynak + gözlem)
+- Bulgu:
+  - Güncel etiketler (2026-09-27, registry API'leri):
+    - Keycloak `26.7.4` (quay.io, 2026-09-16);
+    - SQL Server 2022 için en yüksek CU `2022-CU27-ubuntu-22.04` (mcr.microsoft.com);
+    - Seq `2026.1.17182` (2026-09-24);
+    - Jaeger v2 `jaegertracing/jaeger:2.21.0` (2026-09-15). Jaeger v1'in `all-in-one` imajı yerine v2 imajının varsayılan all-in-one yapılandırması OTLP 4317/4318 ve UI 16686'yı sunuyor.
+  - Keycloak dokümanı:
+    - *"For the Keycloak containers, the import directory is `/opt/keycloak/data/import`"*, `--import-realm` ile. *"If a realm already exists in the server, the import operation is skipped."*
+    - İlk admin: `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD`. Geliştirme örneği `start-dev` kullanıyor ve portu `127.0.0.1`'e bağlıyor.
+  - Gözlem: `docker compose config`, profili aktif olmayan servislerdeki `${VAR:?}` zorunlu değişkenlerini de yorumlayıp hata veriyor (scratch denemesi). Keycloak ana dosyada bir profile konsaydı, `.env`'inde `KEYCLOAK_ADMIN_PASSWORD` olmayan herkesin compose komutları bozulurdu.
+  - Bu makinede host'un 8080 portunu bir `httpd` kullanıyordu.
+  - Smoke denemesi (kullanıcı onayıyla, 2026-09-27):
+    - `Realm 'novacore' imported`; discovery issuer `http://localhost:8180/realms/novacore`;
+    - admin API'ye göre client public, standard flow, PKCE `S256`, audience mapper'ı `novacore.api`, rol mapper'ı `role`, roller Administrator/User;
+    - container, volume ve ağ silindi, imaj yerelde kaldı.
+- Kaynak: https://quay.io/repository/keycloak/keycloak?tab=tags · https://mcr.microsoft.com/v2/mssql/server/tags/list · https://hub.docker.com/r/datalust/seq/tags · https://hub.docker.com/r/jaegertracing/jaeger/tags · https://www.keycloak.org/server/importExport · https://www.keycloak.org/server/containers · yerel `docker compose` 29.2.1 denemeleri
+- Sonuç: F3b.4.
+  - Keycloak ayrı bir overlay dosyasında (`docker-compose.keycloak.yml`), host portu `127.0.0.1:8180`.
+  - İmajlar pinli; Jaeger v2'ye geçildi (v1 EOL).
+  - `.env.example` iki parolanın yer tutucusunu içeriyor.
+
+### R-066: Built-in browser'da Scalar'ın OAuth popup'ı (2026-09-27, faz 3b; gözlem)
+- Bulgu (F3b.5b, uygulama https profilinde, ayrı `NovaCore_F3b5` veritabanıyla):
+  - Scalar "Authorize" butonu authorize URL'sini `window.open` ile açıyor. Built-in browser bunu yeni bir pencere yerine aynı sekmede açtı: `/connect/authorize` 302 → `/account/login`.
+  - Giriş başarılı oldu: `login_succeeded`, ardından authorize code verdi ve `/scalar/v1?code=…&state=…&iss=…`'e döndü. Ancak code'u token'a çevirecek asıl Scalar penceresi (opener) artık yoktu, bu yüzden Scalar token isteği göndermedi.
+  - Aynı sekmede, aynı public `scalar` client'ı ve PKCE S256 ile akış elle sürdürüldü:
+    - IdP oturumu açık olduğu için authorize sormadan code verdi;
+    - `/connect/token` 200 döndü: RS256, `typ: at+jwt`, `iss` `https://localhost:5443/`, `aud` `novacore.api`, `client_id` `scalar`, rol Administrator, `permission` claim'i yok, `expires_in` 899, id_token var.
+  - Scalar'ın API client'ından `GET /api/v1/products`:
+    - OAuth2 şeması seçili ama token'sız kalınca, elle eklenen `Authorization` başlığına rağmen 401 döndü. Muhtemelen Scalar seçili şemanın boş başlığını gönderiyor.
+    - Şema kaldırılınca aynı token'la **200 OK** (sayfalı liste).
+    - Aynı token'la sayfadan doğrudan `fetch` de 200.
+- Kaynak: yerel çalıştırma logları (`SECURITY login_succeeded`, `HTTP GET /connect/authorize 302`, `HTTP POST /connect/token 200`, `HTTP GET /api/v1/products 200`) ve built-in browser ekran görüntüleri.
+- Sonuç:
+  - Sağlayıcı, çekirdek doğrulama ve Scalar'ın istek arayüzü tarayıcıda uçtan uca çalışıyor.
+  - Scalar'ın popup tabanlı code değişimi bu tarayıcı panelinde denenemedi; normal bir tarayıcıda popup açılır. Aynı adımlar otomatik testlerde de koşuyor (`AuthorizationCodeFlowTests`, `IdentityServerWiringTests`).
+  - Scalar'ın token'sız OAuth2 seçimiyle başlığı ezmesi "Sonraya bırakılanlar"a yazıldı.
+
+### R-067: Faz 3b code review — `SignInManager`'ın NotAllowed sırası ve cookie yenilemesinin `IssuedUtc`'si (2026-09-27, faz 3b; kaynak + kırmızı test)
+- Soru: Giriş sayfasındaki "e-postanı onayla" mesajı gerçekten yalnızca doğru paroladan sonra mı çıkıyor? `auth_time` ve `max_age` için cookie'nin `IssuedUtc`'si oturum açma zamanı mı?
+- Bulgu:
+  - `SignInManager.CheckPasswordSignInCoreAsync` önce `PreSignInCheck`'i çalıştırıyor: `CanSignInAsync` false ise (onaysız e-posta) parolaya bakmadan `SignInResult.NotAllowed` dönüyor, lockout sayacına da dokunmuyor. Yani mesaj yanlış parolayla da çıkıyordu ve kayıtlı ama onaysız adresleri ele veriyordu (hesap tespiti). Eski modülde de aynıydı. Kırmızı test: yanlış parolayla "Confirm your email address" döndü.
+  - `CookieAuthenticationHandler`:
+    - `HandleAuthenticateAsync`, `ValidatePrincipal` sonrası `context.ShouldRenew` true ise `RequestRefresh`'i çağırıyor. `RequestRefresh` yarı ömür kontrolü yapmadan yeniliyor, `_refreshIssuedUtc = TimeProvider.GetUtcNow()`. `SecurityStampValidator` doğrulamadan sonra `ShouldRenew = true` yapıyor; `ValidationInterval = 0` (D-029 (5)) ile bu her okumada oluyor. Kayan süre de yarı ömürden sonra aynı şeyi yapıyor.
+    - `FinishResponseAsync` yenilenen bilete `IssuedUtc = _refreshIssuedUtc` yazıyor. `CloneTicket` ise `Properties.Items`'ı olduğu gibi kopyalıyor.
+    - `HandleSignInAsync` `IssuedUtc`'yi `Events.SigningIn`'den önce atıyor; `SigningIn` yalnızca oturum açılırken çalışıyor, yenilemede değil.
+  - Sonuç olarak `IssuedUtc` son yenileme zamanı. Kırmızı test (sahte saat): 16. dakikada bir authorize isteği, 21. dakikadaki id_token'ın `auth_time`'ını 960 sn ileri kaydırdı; `max_age` hiç tetiklenmezdi. OpenIddict örnekleri de `IssuedUtc` kullanıyor, ama onlarda stamp doğrulaması 30 dakikada bir.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Core/src/SignInManager.cs · https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Security/Authentication/Cookies/src/CookieAuthenticationHandler.cs · OpenID Connect Core 1.0 §2 (`auth_time`), §3.1.2.1 (`max_age`)
+- Sonuç (D-030):
+  - Giriş sayfası `NotAllowed`'da parolayı kendisi kontrol ediyor (lockout'taysa kontrol etmiyor). Doğruysa mesaj "e-postanı onayla", yanlışsa genel mesaj ve `AccessFailedAsync`.
+  - Oturum açma zamanı cookie'nin `AuthenticationProperties.Items`'ına `OnSigningIn`'de yazılıyor, `auth_time` ve `max_age` oradan okunuyor. Kaydı olmayan oturum `max_age` isteğinde yeniden giriş istiyor.
+  - Ayrıca: `AddAuthentication()` `TimeProvider.System`'ı `TryAddSingleton` ile kaydediyor (probe testiyle görüldü), yani eklenti zaten kendi kaydıyla `TimeProvider` getiriyor; code review'daki "TimeProvider kaydı yok" bulgusu gerçek bir hata değil.

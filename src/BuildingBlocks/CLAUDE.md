@@ -17,7 +17,7 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 - **`NovaCore.AspNetCore`** — the web host: `IModule` + `AddModule<TModule>()`/`MapModules`, `AddCoreDefaults`
   (health + HttpClient resilience), `AddCoreWeb`/`UseCoreWeb`, `GlobalExceptionHandler` (RFC 9457) and the
   `AppException` types, `ResultHttpExtensions.ToHttpResult`, JWT auth (`AddCoreAuthentication`: `Jwt:Authority` +
-  JWKS, a Development-only symmetric key), permission authz (`IPermissionResolver` + a claims transformation that
+  JWKS, asymmetric keys only, D-028), permission authz (`IPermissionResolver` + a claims transformation that
   resolves permissions on the server and caches them in HybridCache)
   (`Authorization/`), the OpenAPI document, `SecurityHeadersMiddleware`, HybridCache (`AddCoreCaching`). Depends on
   Abstractions + `FrameworkReference Microsoft.AspNetCore.App`, never on EntityFrameworkCore.
@@ -29,7 +29,17 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 
 **Add-ons** (optional, one third-party library each; they may reference AspNetCore/Abstractions only):
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`), `NovaCore.Scalar`
-(`MapCoreScalar`). A new third-party integration becomes a new add-on, not a dependency of the core.
+(`MapCoreScalar`), `NovaCore.Identity.OpenIddict` (`AddCoreIdentityServer`: an OpenID Connect provider on ASP.NET Core
+Identity + OpenIddict, D-026). A new third-party integration becomes a new add-on, not a dependency of the core.
+
+`NovaCore.Identity.OpenIddict` owns `IdentityServerDbContext` but no migrations: it can't reference
+NovaCore.EntityFrameworkCore, so the host registers the context with `AddModuleDbContext` (provider + `MigrationsAssembly`)
+and keeps the migrations (R-060). Its issuer is `Jwt:Authority` and its access tokens are unencrypted signed JWTs, so
+the core's JwtBearer validates them through discovery like any provider's (R-059). Tests run it on
+`tests/.../IdentityServer/IdentityServerTestHost`, a host composed only of the core and the add-on. Two traps (R-061):
+the host pipeline has no antiforgery middleware, so form posts validate with `IAntiforgery.IsRequestValidAsync` in
+the handler; and the core's claims transformation runs on every `AuthenticateAsync`, OpenIddict's scheme included, so
+a principal copied into a token must drop the resolved `permission` claims.
 
 Request validation is not a building block: .NET 10's built-in validation needs `services.AddValidation()` in the
 assembly that declares the request types, so each module calls it (root `CLAUDE.md` Standards, R-052).

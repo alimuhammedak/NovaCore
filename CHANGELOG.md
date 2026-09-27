@@ -28,6 +28,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to register services. Host wiring tests pin the module order and endpoints, the validation response of every
   validated request, permission-based 200/403 and the Scalar UI.
 - `Directory.Build.targets` fails the build of a packable project that does not reference PublicApiAnalyzers.
+- New add-on package `NovaCore.Identity.OpenIddict`: an OpenID Connect provider for the host, built on ASP.NET Core
+  Identity and OpenIddict (Apache-2.0). `builder.AddCoreIdentityServer()` registers it. Its issuer is `Jwt:Authority`,
+  so the core validates its signed JWT access tokens through discovery and the published keys like any other
+  provider's. PKCE is required (S256 only). Access tokens live 15 minutes, refresh tokens 7 days. Keys are ephemeral in
+  Development; elsewhere the host adds certificates with OpenIddict's API, and the host does not start without them.
+  The host registers `IdentityServerDbContext` (`AddModuleDbContext`) and keeps its migrations.
+  `app.MapCoreIdentityServer()` maps `/connect/authorize`, `/connect/token`, `/connect/revoke`, `/connect/endsession`
+  and a plain sign-in page at `/account/login` (antiforgery-protected, local return URLs only). `max_age` and the
+  `auth_time` claim count from the sign-in, not from the session cookie's last renewal. Clients come from
+  `Identity:Clients` and are synced into the store when `Identity:Seed:SeedOnStartup` is true. Refresh tokens rotate;
+  reusing a redeemed one after OpenIddict's 30-second leeway revokes every token of that authorization, and a refresh
+  is refused once the user is gone, can't sign in or is locked out.
+  Service clients (configured without redirect URIs, with a secret) get tokens with client credentials; their `sub`
+  is the client id and they hold the `Permissions` configured for them.
+  The Identity module's hardening carries over: PBKDF2 with 600,000 iterations, a length-first password policy (12
+  characters, no composition rules), unique emails, lockout after five failures for 15 minutes, a confirmed email before
+  sign-in, and one sign-in error for unknown accounts, wrong passwords and locked accounts. Sign-ins, lockouts, refreshes
+  and sign-outs go to the log as `SECURITY` events with masked emails.
+  Self-service registration and email confirmation (`/api/v1/auth/register`, `/api/v1/auth/confirm-email`) carry over
+  too. The confirmation link now starts from `Jwt:Authority` instead of the request's Host header. Outside Development
+  the host must register an `IEmailSender`; in Development emails go to the log.
+  Authenticator-app two-factor authentication carries over: `/api/v1/auth/2fa/setup|enable|disable` for the signed-in
+  caller, and a code step on the sign-in page. A wrong code now counts toward lockout like a wrong password. The
+  authenticator app shows the host's application name.
+  The session endpoints carry over too: `/api/v1/auth/me`, `/api/v1/auth/change-password` and
+  `/api/v1/auth/logout-all`. The last two revoke every refresh token and authorization of the user and end the sign-in
+  session at the provider immediately (the cookie's security stamp is checked on every use); issued access tokens stay
+  valid until they expire. Signing out of a single session is the standard `/connect/revoke` and `/connect/endsession`.
+  The admin API (`/api/v1/admin/users`, `/roles`, `/permissions`, role assignment) carries over with its `identity:*`
+  permissions. When `Identity:Seed:SeedOnStartup` is true the store is seeded: the Administrator role with every
+  declared permission, the User role with the business read permissions, the administrator from
+  `Identity:Seed:AdminEmail`/`AdminPassword`, then the clients. A new registration gets the User role.
+- **Breaking:** the Api host runs `NovaCore.Identity.OpenIddict` as its own authority and the `NovaCore.Modules.Identity`
+  module is removed. `POST /api/v1/auth/login`, `/login/2fa`, `/refresh` and `/logout` are gone: clients sign in with
+  Authorization Code + PKCE at `/connect/authorize` and `/connect/token`, and sign out with `/connect/revoke` and
+  `/connect/endsession`. The other `/api/v1/auth/*` and `/api/v1/admin/*` endpoints keep their paths. The identity
+  store's migrations now live in the Api project (`Identity/Migrations`, context `IdentityServerDbContext`, schema
+  `identity`); an `identity` schema created by the old module has to be dropped before migrating. In Development
+  `Jwt:Authority` is the host's https address (`https://localhost:5443`, the https launch profile).
+- **Breaking (configuration and API):** `Jwt:Authority` is required in every environment, and only asymmetric
+  signatures are accepted: `Jwt:SigningKey`, `Jwt:Issuer` and the built-in Development key are removed, as are
+  `Jwt:AccessTokenMinutes` and `Jwt:RefreshTokenDays` (the identity provider's lifetimes are set on
+  `OpenIddictServerOptions`). `ITokenService`, `JwtTokenService` and `AccessToken` are removed from `NovaCore.AspNetCore`:
+  nothing in NovaCore issues tokens locally any more.
+- `docker-compose.yml` pins its images (SQL Server `2022-CU27-ubuntu-22.04`, Seq `2026.1.17182`, Jaeger v2 `2.21.0`
+  instead of the end-of-life v1 all-in-one). New `docker-compose.keycloak.yml` adds an optional Keycloak `26.7.4` with an
+  example `novacore` realm (`deploy/keycloak/novacore-realm.json`: a public PKCE client for Scalar, the `novacore.api`
+  audience, realm roles as a `role` claim) on `http://localhost:8180`. `.env.example` lists the compose passwords.
+- The OpenAPI document declares the identity provider's Authorization Code flow (`OAuth2` scheme, under
+  `Jwt:Authority`), and `NovaCore.Scalar` has a `MapCoreScalar(Action<ScalarOptions>)` overload. The Api host uses it
+  to sign Scalar in with PKCE as the `scalar` client (`Identity:Clients` in `appsettings.Development.json`).
 
 ### Changed
 
@@ -148,6 +199,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - `docker-compose.yml` reads the SQL Server SA password from a git-ignored `.env` file instead of a hard-coded value.
+- Carried-over account flaws closed in `NovaCore.Identity.OpenIddict`: the sign-in page says "confirm your email" only
+  after the right password, and a wrong one counts toward lockout (the old login answered "email not confirmed" for any
+  password, which revealed unconfirmed accounts); `/api/v1/auth/2fa/setup` answers 409 once two-factor authentication
+  is enabled instead of returning the authenticator key, with which the holder of an access token could compute codes
+  and turn 2FA off.
 - Fixed two high-severity transitive vulnerabilities by updating the top-level packages: `Microsoft.OpenApi` 2.0.0
   ([GHSA-v5pm-xwqc-g5wc](https://github.com/advisories/GHSA-v5pm-xwqc-g5wc)) and `SQLitePCLRaw.lib.e_sqlite3` 2.1.11
   ([GHSA-2m69-gcr7-jv3q](https://github.com/advisories/GHSA-2m69-gcr7-jv3q)). ASP.NET Core and EF Core packages → 10.0.12,

@@ -10,36 +10,38 @@ using Xunit;
 namespace NovaCore.Api.Tests.Integration;
 
 /// <summary>
-/// The <c>"strict"</c> rate-limit policy on <c>/api/v1/auth</c> must be partitioned per client IP, so one caller
-/// exhausting its budget can't lock everyone else out of login (R-004, D-009).
+/// The <c>"strict"</c> rate-limit policy on the sign-in endpoints must be partitioned per client IP, so one caller
+/// exhausting its budget can't lock everyone else out (R-004, D-009). Exercised on the token endpoint, which the identity
+/// provider guards with it, as are the sign-in page and the account API.
 /// </summary>
 public class StrictRateLimitTests(StrictRateLimitApiFactory factory) : IClassFixture<StrictRateLimitApiFactory>
 {
-    private const string LoginPath = "/api/v1/auth/login";
+    private const string TokenPath = "/connect/token";
 
     [Fact]
     public async Task Strict_policy_limits_each_client_ip_separately()
     {
         var server = factory.Server;
 
-        Assert.Equal(StatusCodes.Status400BadRequest, await PostEmptyLoginFromAsync(server, "203.0.113.10"));
-        Assert.Equal(StatusCodes.Status429TooManyRequests, await PostEmptyLoginFromAsync(server, "203.0.113.10"));
+        Assert.Equal(StatusCodes.Status400BadRequest, await PostEmptyTokenRequestFromAsync(server, "203.0.113.10"));
+        Assert.Equal(StatusCodes.Status429TooManyRequests, await PostEmptyTokenRequestFromAsync(server, "203.0.113.10"));
 
-        // A different caller still has its own budget: rejected by validation (400), not by the limiter (429).
-        Assert.Equal(StatusCodes.Status400BadRequest, await PostEmptyLoginFromAsync(server, "198.51.100.20"));
+        // A different caller still has its own budget: rejected by the provider (400), not by the limiter (429).
+        Assert.Equal(StatusCodes.Status400BadRequest, await PostEmptyTokenRequestFromAsync(server, "198.51.100.20"));
     }
 
-    // HttpClient can't choose the client IP, so the request is built directly against TestServer. That path
-    // doesn't flag the request as having a body, so minimal APIs would ignore it without RequestHasBody.
-    private static async Task<int> PostEmptyLoginFromAsync(TestServer server, string clientIp)
+    // HttpClient can't choose the client IP, so the request is built directly against TestServer. That path doesn't
+    // flag the request as having a body, so it is set explicitly (RequestHasBody). HTTPS: OpenIddict refuses plain HTTP.
+    private static async Task<int> PostEmptyTokenRequestFromAsync(TestServer server, string clientIp)
     {
-        var body = Encoding.UTF8.GetBytes("""{"email":"","password":""}""");
+        var body = Encoding.UTF8.GetBytes("grant_type=");
 
         var context = await server.SendAsync(http =>
         {
             http.Request.Method = HttpMethods.Post;
-            http.Request.Path = LoginPath;
-            http.Request.ContentType = "application/json";
+            http.Request.Scheme = "https";
+            http.Request.Path = TokenPath;
+            http.Request.ContentType = "application/x-www-form-urlencoded";
             http.Request.ContentLength = body.Length;
             http.Request.Body = new MemoryStream(body);
             http.Features.Set<IHttpRequestBodyDetectionFeature>(new RequestHasBody());

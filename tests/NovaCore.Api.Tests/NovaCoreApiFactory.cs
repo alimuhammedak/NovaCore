@@ -12,18 +12,20 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.JsonWebTokens;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
+using NovaCore.Api.Tests.IdentityServer;
 using NovaCore.EntityFrameworkCore.Persistence;
+using NovaCore.Identity.OpenIddict;
 using NovaCore.Modules.Catalog.Infrastructure;
-using NovaCore.Modules.Identity.Infrastructure;
 using NovaCore.Modules.Payments.Infrastructure;
 
 namespace NovaCore.Api.Tests;
 
 /// <summary>
-/// Boots the real Program host in-memory (Development), with migrations off. JWT validation points at an in-memory
-/// OpenID Connect issuer (<see cref="IdentityProvider"/>); in Development the Identity module's own HS256 tokens are
-/// also accepted, through a fixed signing key. Every module's DbContext is swapped to its own in-memory SQLite database,
-/// so the full auth flow (register/login/refresh/permissions) and the database health checks run without a real SQL Server.
+/// Boots the real Program host in-memory (Development), with migrations and seeding off. JWT validation points at an
+/// in-memory OpenID Connect issuer (<see cref="IdentityProvider"/>). Every DbContext (the modules' and the identity
+/// provider's) is swapped to its own in-memory SQLite database, so the database health checks and the provider's flows
+/// run without a real SQL Server. Outside Development the host gets what a production host must bring: signing and
+/// encryption keys for the identity provider and an email sender.
 /// </summary>
 public class NovaCoreApiFactory : WebApplicationFactory<Program>
 {
@@ -38,8 +40,8 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
         .AddEntityFrameworkSqlite()
         .BuildServiceProvider();
 
-    // Permissions granted on the server to subjects of IdentityProvider's tokens (none unless granted). Other tokens,
-    // the Identity module's own, are resolved by the host's resolver from the Identity store.
+    // Permissions granted on the server to subjects of IdentityProvider's tokens (none unless granted). Other tokens, the
+    // identity provider add-on's, are resolved by the host's resolver from its store.
     private readonly ConcurrentDictionary<string, string[]> _grants = new();
 
     public NovaCoreApiFactory()
@@ -105,11 +107,6 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Jwt:Authority"] = TestIdentityProvider.Issuer,
-                // The symmetric key is Development-only (D-024): elsewhere it stops the host.
-                ["Jwt:SigningKey"] = EnvironmentName == Environments.Development
-                    ? "novacore-integration-test-signing-key-0123456789-abcdef"
-                    : null,
-                ["Jwt:AccessTokenMinutes"] = "15",
                 ["Database:ApplyMigrations"] = "false",
                 ["Identity:Seed:SeedOnStartup"] = "false",
                 // Keep the rate limiter wired but out of the way of the many auth calls the tests make.
@@ -123,13 +120,20 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
             services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
                 options => options.BackchannelHttpHandler = IdentityProvider.Handler);
 
-            // IdentityProvider's subjects resolve to their grants; Identity's own tokens to the host's resolver.
+            // IdentityProvider's subjects resolve to their grants; the add-on's tokens to the host's resolver.
             var hostResolver = services.Single(d => d.ServiceType == typeof(IPermissionResolver));
             services.Remove(hostResolver);
             services.AddScoped<IPermissionResolver>(provider => new GrantingPermissionResolver(
                 _grants, (IPermissionResolver)ActivatorUtilities.CreateInstance(provider, hostResolver.ImplementationType!)));
 
-            ReplaceWithSqlite<IdentityDbContext>(services, options => options.UseSqlite(_identityConnection));
+            ReplaceWithSqlite<IdentityServerDbContext>(services, options => options.UseSqlite(_identityConnection));
+
+            // A production host brings keys (certificates, stood in for by ephemeral keys) and a real email sender.
+            if (EnvironmentName != Environments.Development)
+            {
+                services.AddOpenIddict().AddServer(server => server.AddEphemeralSigningKey().AddEphemeralEncryptionKey());
+                services.AddSingleton<IEmailSender>(new CapturingEmailSender());
+            }
             ReplaceWithSqlite<CatalogDbContext>(services, options => options.UseSqlite(_catalogConnection));
             ReplaceWithSqlite<PaymentsDbContext>(services, options => options.UseSqlite(_paymentsConnection));
         });

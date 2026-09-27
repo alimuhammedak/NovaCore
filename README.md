@@ -41,13 +41,13 @@ dotnet test
 dotnet tool restore
 dotnet ef database update --project src/Modules/Catalog/NovaCore.Modules.Catalog   --context CatalogDbContext   --startup-project src/Modules/Catalog/NovaCore.Modules.Catalog
 dotnet ef database update --project src/Modules/Payments/NovaCore.Modules.Payments  --context PaymentsDbContext  --startup-project src/Modules/Payments/NovaCore.Modules.Payments
-dotnet ef database update --project src/Modules/Identity/NovaCore.Modules.Identity  --context IdentityDbContext  --startup-project src/Modules/Identity/NovaCore.Modules.Identity
+dotnet ef database update --project src/Api/NovaCore.Api  --context IdentityServerDbContext  --startup-project src/Api/NovaCore.Api
 
 # 3) İlk admin + roller + izinler için seed (parolayı user-secrets ile ver — repoya YAZMA)
 dotnet user-secrets --project src/Api/NovaCore.Api set "Identity:Seed:AdminPassword" "Admin!Passw0rd-2026"
 
-# 4) Çalıştır (Development: Jwt:Authority boşken geliştirme anahtarı devreye girer; prod'da Jwt:Authority zorunlu)
-Identity__Seed__SeedOnStartup=true dotnet run --project src/Api/NovaCore.Api
+# 4) Çalıştır: https profili. Host kendi kimlik sağlayıcısıdır; Development'ta Jwt:Authority = https://localhost:5443
+Identity__Seed__SeedOnStartup=true dotnet run --project src/Api/NovaCore.Api --launch-profile https
 ```
 
 Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlantı dizesi (varsayılan):
@@ -59,7 +59,9 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 | `GET /alive` | Liveness: yalnızca "live" etiketli (yalnızca Development) |
 | `GET /openapi/v1.json` | OpenAPI 3.1 dokümanı |
 | `/scalar/v1` | Scalar API arayüzü (yalnızca Development) |
-| `POST /api/v1/auth/register` · `login` · `refresh` · `logout` · `me` | Kimlik doğrulama akışı (bkz. [Güvenlik](#güvenlik--yetkilendirme)) |
+| `/connect/authorize` · `token` · `revoke` · `endsession` | OpenID Connect sağlayıcı: Authorization Code + PKCE, refresh, client credentials (bkz. [Güvenlik](#güvenlik--yetkilendirme)) |
+| `/account/login` | Sağlayıcının giriş sayfası (gerekirse 2FA adımı) |
+| `/api/v1/auth/register` · `confirm-email` · `me` · `change-password` · `logout-all` | Hesap API'si |
 | `/api/v1/auth/2fa/*` | TOTP iki-faktör (setup/enable/disable) |
 | `/api/v1/admin/*` | Kullanıcı/rol/izin yönetimi (permission korumalı) |
 | `/api/v1/products` | Catalog modülü (CRUD, permission korumalı) |
@@ -123,7 +125,8 @@ NovaCore.AspNetCore        NovaCore.EntityFrameworkCore     (çekirdek: yalnızc
 | HybridCache kaydı ve varsayılan süre (`AddCoreCaching`) | İş kuralları, request validation kuralları |
 | Health + resilient HttpClient (`AddCoreDefaults`); Serilog ve OpenTelemetry eklentileri | Modüle özel konfigürasyon |
 | OpenAPI (+ Scalar eklentisi), rate limiting, CORS | |
-| JWT bearer auth + permission-based authz altyapısı | Identity *modülü* (users/roles/tokens) |
+| JWT bearer auth (`Jwt:Authority`) + permission-based authz altyapısı | Kimlik sağlayıcının store'u ve migration'ları (host'ta) |
+| Kimlik sağlayıcı eklentisi (`NovaCore.Identity.OpenIddict`) | Client'lar, seed yöneticisi, üretim sertifikaları |
 | Auditing interceptor, domain-event dispatcher | |
 
 ---
@@ -135,7 +138,9 @@ NovaCore.slnx
 ├── Directory.Build.props          # tüm projeler: net10.0, nullable, analyzer'lar, TreatWarningsAsErrors, VersionPrefix
 ├── Directory.Build.targets        # IsPackable projeler: paket metadata'sı, README, PublicAPI dosyaları, doc/analyzer korumaları
 ├── Directory.Packages.props       # merkezî paket sürümleri (CPM)
-├── docker-compose.yml             # opsiyonel SQL Server + Seq + Jaeger
+├── docker-compose.yml             # opsiyonel SQL Server + Seq + Jaeger (imaj sürümleri pinli)
+├── docker-compose.keycloak.yml    # opsiyonel harici IdP: Keycloak + örnek realm (deploy/keycloak/)
+├── .env.example                   # compose parolaları için şablon (.env git-ignored)
 ├── .template.config/template.json # `dotnet new novacore`
 │
 ├── src/
@@ -145,19 +150,19 @@ NovaCore.slnx
 │   │   ├── NovaCore.EntityFrameworkCore/ # AddModuleDbContext, AddCorePersistence: auditing, startup migration, domain-event dispatcher
 │   │   ├── NovaCore.Serilog/             # eklenti: AddCoreLogging (Console + opsiyonel Seq)
 │   │   ├── NovaCore.OpenTelemetry/       # eklenti: AddCoreObservability (metrics + tracing, OTLP)
-│   │   └── NovaCore.Scalar/              # eklenti: MapCoreScalar (Scalar UI, yalnızca Development)
+│   │   ├── NovaCore.Scalar/              # eklenti: MapCoreScalar (Scalar UI, yalnızca Development)
+│   │   └── NovaCore.Identity.OpenIddict/ # eklenti: AddCoreIdentityServer/MapCoreIdentityServer (OIDC sağlayıcı: Identity + OpenIddict)
 │   │
 │   ├── Modules/
 │   │   ├── Catalog/
 │   │   │   ├── NovaCore.Modules.Catalog.Contracts/  # IProductCatalog + ProductInfo (dışa açılan tek yüzey)
 │   │   │   └── NovaCore.Modules.Catalog/            # CatalogModule, Domain, Features/, Infrastructure/ (schema: catalog)
-│   │   ├── Payments/
-│   │   │   └── NovaCore.Modules.Payments/           # PaymentsModule (schema: payments) — Catalog'a Contracts ile bağlı
-│   │   └── Identity/
-│   │       └── NovaCore.Modules.Identity/           # IdentityModule (schema: identity) — Identity+JWT/refresh+2FA+admin
+│   │   └── Payments/
+│   │       └── NovaCore.Modules.Payments/           # PaymentsModule (schema: payments) — Catalog'a Contracts ile bağlı
 │   │
 │   └── Api/
 │       └── NovaCore.Api/           # Program.cs: composition root, her şeyi açıkça ekler
+│           └── Identity/           # kimlik sağlayıcının migration'ları + design-time factory (schema: identity)
 │
 └── tests/
     └── NovaCore.Api.Tests/         # unit + integration (WebApplicationFactory) + architecture testleri
@@ -176,9 +181,12 @@ builder.AddCoreDefaults();                         // health + resilient HttpCli
 builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth, rate limit, CORS
 builder.AddCorePersistence();                      // audit interceptor, domain event'ler, opt-in startup migration
 
+// Kimlik sağlayıcı (eklenti): Jwt:Authority'nin gösterdiği token'ları üretir; store'u ve migration'ları host'ta
+builder.AddCoreIdentityServer();
+builder.Services.AddModuleDbContext<IdentityServerDbContext>((services, db) => db.UseSqlServer(/* ... */));
+
 // Modüller: açık kayıt; endpoint'ler bu sırayla bağlanır
 builder.AddModule<CatalogModule>();
-builder.AddModule<IdentityModule>();
 builder.AddModule<PaymentsModule>();
 
 var app = builder.Build();
@@ -186,6 +194,7 @@ var app = builder.Build();
 app.UseSerilogRequestLogging();                    // istek başına bir log satırı
 app.UseCoreWeb();                                  // security headers, exception handling, auth, rate limiter, OpenAPI (Development)
 app.MapCoreScalar();                               // Scalar UI (Development)
+app.MapCoreIdentityServer();                       // /connect/*, giriş sayfası, /api/v1/auth/*, /api/v1/admin/*
 app.MapModules();                                  // modüllerin endpoint'leri
 app.MapDefaultEndpoints();                         // /health, /alive (Development)
 
@@ -275,7 +284,7 @@ HTTP/mesaj kuyruğuna döner.
 | **Caching** | HybridCache (L1 + opsiyonel L2) | `HybridCache` doğrudan enjekte edilir (zaten soyut bir sınıf, sarmalayıcı yok). `AddCoreCaching` varsayılan süreyi `Cache:DefaultExpiration`'dan alır |
 | **Validation** | .NET 10 yerleşik validation (`AddValidation`, DataAnnotations) | Her modül `AddModule`'de `services.AddValidation()` çağırır; kurallar request record'unda |
 | **Mapping** | Mapperly (source-gen) | `[Mapper]` statik partial sınıflar, EF-translatable `ProjectToDto` |
-| **Auth** | ASP.NET Core Identity + JWT/refresh + permission-based | bkz. [Güvenlik & Yetkilendirme](#güvenlik--yetkilendirme) |
+| **Auth** | JWT doğrulama (`Jwt:Authority`) + OpenIddict/Identity sağlayıcı eklentisi + permission-based | bkz. [Güvenlik & Yetkilendirme](#güvenlik--yetkilendirme) |
 | **Auditing** | EF Core `SaveChangesInterceptor` | `AuditableEntityInterceptor` — CreatedBy/ModifiedAt merkezî |
 | **Rate limiting** | Yerleşik `AddRateLimiter` | IP bazlı fixed-window + `"strict"` adlı policy |
 | **Health** | Yerleşik Health Checks + `AddDbContextCheck` | `/health` (her modül DB'si, "ready" etiketi) + `/alive`, yalnızca Development |
@@ -290,31 +299,52 @@ exception. Exception'ı akış kontrolü için kullanmaktan kaçınılır.
 
 ## Güvenlik & Yetkilendirme
 
-ASP.NET Core Identity (SQL Server, `identity` şeması) + JWT access/refresh + permission-based authz.
-Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmiştir (kaynaklar aşağıda).
+İki ayrı parça: **çekirdek token'ı yalnızca doğrular** (`NovaCore.AspNetCore`, D-002), **token'ı bir OpenID Connect
+sağlayıcısı üretir**. Api host'u bu sağlayıcıyı kendisi çalıştırır: `NovaCore.Identity.OpenIddict` eklentisi (ASP.NET
+Core Identity + OpenIddict, `identity` şeması). Harici bir sağlayıcı (Keycloak, Entra) da aynı çekirdekle kullanılabilir.
+Tasarım OWASP cheat sheet'lerine, RFC 9700 (OAuth 2.0 Security BCP) ve Microsoft Learn'e göre sertleştirilmiştir.
 
-### Kimlik doğrulama (authentication)
+### Doğrulama (çekirdek)
+- API access token'ı `Jwt:Authority`'ye karşı doğrular; issuer ve imza anahtarları sağlayıcının discovery belgesinden ve
+  JWKS'inden gelir. `Jwt:Authority` her ortamda zorunlu, Development dışında `https`.
+- Yalnızca asimetrik algoritmalar (RS/PS/ES) kabul edilir, simetrik anahtar yoktur (MS JWT rehberi: *"Asymmetric keys
+  should always be used"*). Audience zorunlu, `ClockSkew = 30s`, `MapInboundClaims = false`, prod'da
+  `RequireHttpsMetadata = true`.
+
+### Kimlik sağlayıcı (`NovaCore.Identity.OpenIddict`)
+- **Akışlar:** Authorization Code + **PKCE (yalnızca S256)**, refresh token, client credentials. Uçlar `/connect/*`;
+  tarayıcı girişi `/account/login` (sade HTML, antiforgery, yalnızca yerel ReturnUrl), gerekirse 2FA adımı.
+- **Token'lar:** imzalı JWT access token (RFC 9068; şifresiz, çünkü çekirdek her sağlayıcıyı standart bir resource
+  server gibi doğrular), **15 dk**; `sub`, `name`, `email`, `role` claim'leri, **izinler token'a girmez**. Issuer =
+  `Jwt:Authority`, `aud` = `Jwt:Audience`.
+- **Refresh:** 7 gün, her kullanımda döner (rolling). Kullanılmış bir refresh token OpenIddict'in 30 sn'lik payından
+  sonra yeniden gelirse **o authorization'ın bütün token'ları iptal edilir** (hırsızlık tespiti). Her refresh'te hesap
+  yeniden denetlenir: silinmiş, girişi engellenmiş ya da kilitli kullanıcı yeni token alamaz.
+- **Anahtarlar:** Development'ta geçici (ephemeral) RSA. Diğer ortamlarda host sertifikaları OpenIddict'in kendi
+  API'siyle ekler (`services.AddOpenIddict().AddServer(o => o.AddSigningCertificate(...).AddEncryptionCertificate(...))`);
+  eksikse uygulama açılmaz. EC anahtarla ES256 da çalışır.
+- **Client'lar** `Identity:Clients`'tan gelir: redirect URI'si olan client kullanıcı girişi yapar (public ya da
+  secret'lı), olmayan client bir servistir (client credentials, secret zorunlu) ve `Permissions`'ında yazan izinleri
+  taşır. Onay ekranı yoktur (birinci taraf client'lar).
+
+### Harici sağlayıcıyla deneme (Keycloak, opsiyonel)
+`docker compose -f docker-compose.yml -f docker-compose.keycloak.yml up -d keycloak` örnek `novacore` realm'ini içe
+aktarır (`.env`'de `KEYCLOAK_ADMIN_PASSWORD` gerekir, bkz. `.env.example`; admin konsolu `http://localhost:8180/admin`).
+Realm'de Scalar için public PKCE client'ı (`novacore-scalar`), `novacore.api` audience'ı ve realm rollerini `role`
+claim'ine yazan mapper var; kullanıcı yok. Keycloak'ı Authority yapan bir host `Jwt:Authority =
+http://localhost:8180/realms/novacore` (http yalnızca Development'ta) ayarlar, `AddCoreIdentityServer`'ı çağırmaz ve
+Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
+
+### Hesaplar (authentication)
 - **Parola saklama:** Identity PBKDF2-HMAC-SHA256, **600.000 iterasyon** (OWASP Password Storage).
 - **Parola politikası:** uzunluk öncelikli — **min 12**, max 128, zorunlu kompozisyon kuralı yok
   (OWASP Authentication: "no composition rules").
-- **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**), `/auth` grubunda rate limiting (`strict`),
-  **generic 401** (user enumeration önleme — "Invalid credentials").
-- **Email confirmation** zorunlu (dev'de link loglanır), **TOTP 2FA** (authenticator app, iki adımlı login).
-
-### Token mimarisi
-- **Doğrulama (çekirdek):** API access token'ı bir OpenID Connect sağlayıcısına karşı doğrular: `Jwt:Authority`.
-  Issuer ve imza anahtarları sağlayıcının metadata'sından ve JWKS'inden keşfedilir, yalnızca asimetrik algoritmalar
-  (RS/PS/ES) kabul edilir. Simetrik `Jwt:SigningKey` (HS256) **yalnızca Development'ta** geçerlidir; başka ortamda host
-  açılmaz (MS JWT rehberi: *"Asymmetric keys should always be used"*).
-- **Identity modülünün kendi token'ları** (eski yol, F3b.3'te emekliye ayrılacak): kısa ömürlü **access JWT** (HS256,
-  15 dk) — `sub`, `name`, `email`, `role*` claim'leri (izinler token'a girmez, aşağıya bakın). HS256 olduğu için
-  yalnızca Development'ta ve testlerde doğrulanır.
-- Uzun ömürlü **refresh token** (256-bit, **DB'de SHA-256 hash'li**, 7 gün).
-- **Rotation:** her `/auth/refresh`'te yeni refresh, eskisi iptal.
-- **Reuse detection + family revocation:** tüketilmiş bir refresh tekrar gelirse **tüm token ailesi iptal**
-  + `ERR refresh_token_reuse_detected` audit log'u (hırsızlık tespiti — OWASP OAuth2).
-- **JWT validation sertleştirme:** algoritma listesi sabit (asimetrik; HS256 yalnızca Development anahtarıyla),
-  issuer/audience zorunlu, `ClockSkew = 30s`, `MapInboundClaims = false`, prod'da `RequireHttpsMetadata = true`.
+- **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**, hatalı 2FA kodu da sayılır), giriş sayfası, token ucu ve
+  hesap API'sinde rate limiting (`strict`), bilinmeyen hesap / yanlış parola / kilitli hesap için **tek hata mesajı**.
+- **E-posta onayı** zorunlu (dev'de link loglanır; link `Jwt:Authority`'den üretilir, Host başlığından değil),
+  **TOTP 2FA** (authenticator app).
+- **Oturumlar:** parola değişikliği ve "her yerden çıkış" bütün refresh token'ları ve authorization'ları iptal eder ve
+  sağlayıcıdaki giriş oturumunu hemen bitirir. Verilmiş access token'lar süreleri dolana kadar (15 dk) geçerlidir.
 
 ### Yetkilendirme (authorization) — permission-based
 - Roller (Identity) **+ ince taneli izinler**. İzinler `module:resource:action` (ör. `catalog:products:create`).
@@ -323,8 +353,8 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
   Kullanım: `endpoint.RequirePermission("catalog:products:create")` veya handler'da `[RequirePermission(...)]`.
   Anonim istek 401, izni olmayan istek 403 alır.
 - İzinler **sunucu tarafında çözülür**, token'dan okunmaz. Bir `IClaimsTransformation` token'daki `permission`
-  claim'lerini atar ve `IPermissionResolver`'ın döndürdüklerini ekler. Identity modülü bunları kullanıcının rollerinden
-  ve doğrudan izinlerinden okur (`IdentityPermissionResolver`). Sonuç HybridCache'te `sub` + security stamp anahtarıyla
+  claim'lerini atar ve `IPermissionResolver`'ın döndürdüklerini ekler. Kimlik sağlayıcı eklentisi bunları kullanıcının
+  rollerinden ve doğrudan izinlerinden, servis client'ları için `Identity:Clients`'tan okur. Sonuç HybridCache'te `sub` + security stamp anahtarıyla
   `Cache:PermissionExpiration` (varsayılan 5 dk) boyunca tutulur: bir rol değişikliği oturum açmış kullanıcıya en geç bu
   sürede yansır, yeni bir security stamp'li token cache'i atlar. Host'ta bir `IPermissionResolver` kayıtlı değilse
   uygulama açılmaz. `Administrator` rolü (token'daki rol claim'i) super-admin'dir, tüm kontrolleri geçer.
@@ -334,32 +364,37 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
 ### Endpoint'ler
 | Endpoint | Açıklama |
 |---|---|
+| `GET·POST /connect/authorize` | Authorization Code + PKCE (oturum yoksa `/account/login`'e yönlendirir) |
+| `POST /connect/token` | Code, refresh token (rotation + reuse detection) ve client credentials grant'ları |
+| `POST /connect/revoke` · `GET·POST /connect/endsession` | Token iptali / sağlayıcıdan çıkış |
 | `POST /api/v1/auth/register` | Kayıt (anti-enumeration generic yanıt) + onay e-postası |
 | `GET /api/v1/auth/confirm-email` | E-posta onayı |
-| `POST /api/v1/auth/login` · `login/2fa` | Giriş (gerekirse 2FA ile) |
-| `POST /api/v1/auth/refresh` | Token yenileme (rotation + reuse detection) |
-| `POST /api/v1/auth/logout` · `logout-all` | Oturum / tüm oturumları kapat |
+| `POST /api/v1/auth/logout-all` | Tüm oturumları kapat |
 | `GET /api/v1/auth/me` | Mevcut principal (id, email, roller, izinler) |
 | `POST /api/v1/auth/change-password` | Parola değiştir (tüm oturumları iptal eder) |
-| `POST /api/v1/auth/2fa/setup` · `enable` · `disable` | TOTP iki-faktör |
+| `POST /api/v1/auth/2fa/setup` · `enable` · `disable` | TOTP iki-faktör (2FA açıkken `setup` 409 döner, anahtar gizli kalır) |
 | `GET /api/v1/admin/users` · `roles` · `permissions` | Listeleme (permission korumalı) |
 | `POST·DELETE /api/v1/admin/users/{id}/roles` | Rol ata/kaldır (`identity:users:manage`) |
 
 ### Ek sertleştirme
 - **Security headers** (her yanıtta): `X-Content-Type-Options`, `X-Frame-Options: DENY`,
   `Referrer-Policy`, `Content-Security-Policy: default-src 'none'`, `Server` başlığı kaldırılır; prod'da **HSTS**.
-- **Audit logging:** login (başarılı/başarısız), lockout, refresh, **reuse**, logout, parola değişimi, rol atama
-  (`ISecurityAuditLogger`, e-posta maskeli, parola/token loglanmaz).
-- **Seed:** roller (`Administrator`, `User`) + tüm modül izinleri + opsiyonel admin (parola user-secrets ile).
+- **Audit logging:** giriş (başarılı/başarısız), lockout, 2FA, refresh, çıkış, parola değişimi, oturum iptali, rol
+  atama; `SECURITY` önekli, e-posta maskeli, parola/kod/token loglanmaz. Refresh token tekrar kullanımını OpenIddict
+  kendisi loglar.
+- **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü iş modüllerinin
+  `:read` izinlerini alır; opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.
 
-> **Üretimde mutlaka:** `Jwt:Authority`'yi token'ları imzalayan OpenID Connect sağlayıcısına (https) ayarla
-> (`Jwt:SigningKey` Development dışında reddedilir), TLS/HTTPS'i edge'de zorla,
-> gerçek bir `IEmailSender` (SMTP/SendGrid) tak, admin parolasını güçlü ver. `LoggingEmailSender` yalnızca
-> Development'ta kayıtlıdır. Diğer ortamlarda `IEmailSender` kayıtlı değilse uygulama açılışta anlamlı bir hatayla durur.
+> **Üretimde mutlaka:** `Jwt:Authority`'yi host'un public https adresine (ya da harici sağlayıcıya) ayarla, imza ve
+> şifreleme sertifikalarını host'ta ekle, TLS/HTTPS'i edge'de zorla, gerçek bir `IEmailSender` (SMTP/SendGrid) tak,
+> admin parolasını ve client secret'larını user-secrets/ortam değişkeniyle ver. `LoggingEmailSender` yalnızca
+> Development'ta kayıtlıdır; diğer ortamlarda `IEmailSender` ya da anahtarlar eksikse uygulama açılışta durur.
 
 **Kaynaklar:** [OWASP Authentication CS](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) ·
 [OWASP Password Storage CS](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) ·
 [OWASP OAuth2 CS](https://cheatsheetseries.owasp.org/cheatsheets/OAuth2_Cheat_Sheet.html) ·
+[RFC 9700 — OAuth 2.0 Security BCP](https://www.rfc-editor.org/rfc/rfc9700) ·
+[OpenIddict documentation](https://documentation.openiddict.com/) ·
 [MS Learn — Policy-based authorization](https://learn.microsoft.com/en-us/aspnet/core/security/authorization/policies?view=aspnetcore-10.0) ·
 [MS Learn — Identity model customization](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/customize-identity-model?view=aspnetcore-10.0)
 
@@ -373,26 +408,26 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
 {
   "ConnectionStrings": { "Database": "Server=localhost;Database=NovaCore;Trusted_Connection=True;TrustServerCertificate=True;Encrypt=True;" },
   "Database":      { "ApplyMigrations": false },   // true: açılışta migration uygula
-  "Jwt":           { "Authority": "", "Issuer": "novacore", "Audience": "novacore.api", "SigningKey": "", "AccessTokenMinutes": 15, "RefreshTokenDays": 7 },
-  "Identity":      { "Seed": { "SeedOnStartup": false, "AdminEmail": "admin@novacore.local", "AdminPassword": "" } },
+  "Jwt":           { "Authority": "", "Audience": "novacore.api" },   // Development: https://localhost:5443 (bu host)
+  "Identity":      { "Seed": { "SeedOnStartup": false, "AdminEmail": "admin@novacore.local", "AdminPassword": "" },
+                     "Clients": [] },                // { ClientId, DisplayName, ClientSecret, RedirectUris, PostLogoutRedirectUris, Permissions }
   "Cache":         { "DefaultExpiration": "00:05:00", "PermissionExpiration": "00:05:00" },
-  "RateLimiting":  { "PermitLimit": 100, "WindowSeconds": 60 },   // /auth grubu 1/10'unu kullanır ("strict")
+  "RateLimiting":  { "PermitLimit": 100, "WindowSeconds": 60 },   // giriş ve hesap uçları 1/10'unu kullanır ("strict")
   "Cors":          { "AllowedOrigins": [] },        // boş = her ortamda her origin'e izin (credentials olmadan)
   "Seq":           { "ServerUrl": "" }              // dolu = Seq'e log gönder
 }
 ```
 Çevre değişkeni `OTEL_EXPORTER_OTLP_ENDPOINT` doluysa traces/metrics OTLP ile dışa aktarılır (ör. Jaeger).
 
-> **Üretim:** `Jwt:Authority` zorunludur (mutlak `https` URI), `Jwt:SigningKey` verilemez. Development'ta ikisi de
-> boşsa sabit bir geliştirme anahtarı kullanılır.
-> Gizli değerler için `dotnet user-secrets` kullanın.
+> `Jwt:Authority` her ortamda zorunludur; Development dışında mutlak bir `https` URI olmalıdır.
+> Gizli değerler (admin parolası, client secret'ları) için `dotnet user-secrets` ya da ortam değişkenleri kullanın.
 
 Bu bölümler options pattern ile bağlanır ve **uygulama açılırken doğrulanır** (`ValidateOnStart`). Geçersiz bir değer
 host'u, ayarın adını veren bir hatayla durdurur:
 
-- `Jwt`: `Issuer`/`Audience` boş olamaz. `Authority` Development dışında zorunlu ve `https`, Development'ta verilirse
-  mutlak bir URI. `SigningKey` yalnızca Development'ta ve en az 32 bayt,
-  `AccessTokenMinutes` ≥ 1, `RefreshTokenDays` 1–36.500.
+- `Jwt`: `Authority` her ortamda zorunlu mutlak bir URI (Development dışında `https`), `Audience` boş olamaz.
+- `Identity:Clients`: `ClientId` tekil ve Guid değil; redirect URI'leri mutlak; redirect URI'si olmayan (servis)
+  client'ın secret'ı olmalı; `Permissions` yalnızca servis client'larında.
 - `RateLimiting`: `PermitLimit` ve `WindowSeconds` ≥ 1. `Cache:DefaultExpiration` ve `Cache:PermissionExpiration`
   pozitif birer süre.
 - `Cors:AllowedOrigins`: her giriş çıplak bir origin olmalı (`https://app.example.com`): yol, sondaki `/` ve `*` yok.
@@ -405,9 +440,11 @@ Değerler kayıt anında değil, ilk kullanımda okunur. Bu yüzden `CreateBuild
 
 ## Veritabanı & Migration
 
-Her modül **kendi DbContext'ine + kendi SQL Server şemasına** sahiptir (`catalog` / `payments` /
-`identity`, `HasDefaultSchema`), migration geçmişi de şema bazında ayrılır (`__EFMigrationsHistory`).
-Sınırlar veritabanı düzeyinde uygulanır.
+Her modül **kendi DbContext'ine + kendi SQL Server şemasına** sahiptir (`catalog` / `payments`,
+`HasDefaultSchema`), migration geçmişi de şema bazında ayrılır (`__EFMigrationsHistory`). Kimlik sağlayıcının
+`IdentityServerDbContext`'i (`identity` şeması) eklenti paketinden gelir; sağlayıcıyı ve migration'ları host seçer, bu
+yüzden migration'ları Api projesindedir (`src/Api/NovaCore.Api/Identity/Migrations`). Sınırlar veritabanı düzeyinde
+uygulanır.
 
 ```bash
 # Yeni migration (modül = hem -p hem -s; design-time factory sayesinde DB gerekmez)
@@ -415,6 +452,9 @@ dotnet ef migrations add <Ad> --project src/Modules/Catalog/NovaCore.Modules.Cat
 
 # Uygula
 dotnet ef database update --project src/Modules/Catalog/NovaCore.Modules.Catalog --context CatalogDbContext --startup-project src/Modules/Catalog/NovaCore.Modules.Catalog
+
+# Kimlik sağlayıcının migration'ları Api'de
+dotnet ef migrations add <Ad> --project src/Api/NovaCore.Api --context IdentityServerDbContext --startup-project src/Api/NovaCore.Api --output-dir Identity/Migrations
 ```
 Alternatif: `Database:ApplyMigrations=true` ile uygulama açılışta tüm modül migration'larını otomatik uygular
 (`DatabaseMigrationService`).
@@ -427,9 +467,11 @@ Alternatif: `Database:ApplyMigrations=true` ile uygulama açılışta tüm modü
 dotnet test
 ```
 - **Unit:** `Result<T>`, `PaginationRequest`/`PagedList<T>` davranışları.
-- **Integration:** gerçek host'u `WebApplicationFactory` ile ayağa kaldırır. Identity store testte
-  **in-memory SQLite**'a takılır; böylece tam güvenlik akışı **SQL Server gerektirmeden** test edilir:
-  login, refresh **rotation**, **reuse detection** (+ family revoke), permission 200/403, security headers.
+- **Integration:** gerçek host'u `WebApplicationFactory` ile ayağa kaldırır; her DbContext testte **in-memory
+  SQLite**'a takılır. Token'ları bellek içi bir OpenID Connect issuer'ı (`TestIdentityProvider`) üretir.
+- **Kimlik sağlayıcı:** eklenti, yalnızca çekirdek + eklentiden kurulan bir host'ta (`IdentityServer/`) uçtan uca test
+  edilir: Authorization Code + PKCE, refresh **rotation** ve **reuse** (zincir iptali), client credentials, sertleştirmeler,
+  2FA, oturum uçları, admin API'si. `IdentityServerWiringTests` aynı akışı Api host'unun kendisinde dener.
 - **Architecture:** modül sınırlarını zorlar (Payments yalnızca Catalog.Contracts'a bağlı), çekirdek paketlerin
   yalnızca Microsoft paketlerine bağlı olduğunu ve paketler arası bağımlılık yönünü doğrular (`NovaCore.Abstractions`
   ASP.NET/EF içermez), building block'larda assembly taraması olmadığını kontrol eder. Modül sırası ve endpoint listesi
@@ -453,8 +495,9 @@ dotnet test
    dotnet pack NovaCore.slnx -c Release -o ./artifacts --version-suffix preview.1    # 0.1.0-preview.1
    # artifacts/ klasörünü lokal feed olarak ekleyin, sonra: dotnet add package NovaCore.AspNetCore (ve ihtiyaca göre diğerleri)
    ```
-   - Altı paket üretilir: çekirdek `NovaCore.Abstractions`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore`;
-     eklentiler `NovaCore.Serilog`, `NovaCore.OpenTelemetry`, `NovaCore.Scalar`. Modüller paketlenmez.
+   - Yedi paket üretilir: çekirdek `NovaCore.Abstractions`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore`;
+     eklentiler `NovaCore.Serilog`, `NovaCore.OpenTelemetry`, `NovaCore.Scalar`, `NovaCore.Identity.OpenIddict`.
+     Modüller paketlenmez.
    - Sürüm `Directory.Build.props`'taki `VersionPrefix`'ten gelir. API kararlı olana kadar 0.x kalır.
    - Her paket XML dokümanını, `src/PACKAGE.md`'den gelen README'yi, MIT lisans ifadesini ve repo linkini taşır. Yanında bir `.snupkg` sembol paketi üretilir.
    - Public API `PublicAPI.*.txt` dosyalarında izlenir. İzlenmeyen bir değişiklik build'i kırar.
@@ -472,7 +515,8 @@ dotnet test
 | OpenTelemetry.* | Observability (`NovaCore.OpenTelemetry` eklentisi) | **Apache-2.0** |
 | Microsoft.AspNetCore.OpenApi / Caching.Hybrid / JwtBearer / Http.Resilience | Microsoft-yerleşik (`NovaCore.AspNetCore`) | **MIT** |
 | Microsoft.EntityFrameworkCore / Extensions.Hosting.Abstractions / Configuration.Binder | Microsoft-yerleşik (`NovaCore.EntityFrameworkCore`) | **MIT** |
-| Microsoft.AspNetCore.Identity.EntityFrameworkCore | Kullanıcı/rol deposu | **MIT** |
+| Microsoft.AspNetCore.Identity.EntityFrameworkCore | Kullanıcı/rol deposu (`NovaCore.Identity.OpenIddict`) | **MIT** |
+| OpenIddict.Server.AspNetCore / OpenIddict.EntityFrameworkCore | OpenID Connect sağlayıcı (`NovaCore.Identity.OpenIddict` eklentisi) | **Apache-2.0** |
 | Microsoft.EntityFrameworkCore.SqlServer | EF Core sağlayıcı | **MIT** |
 | Microsoft.CodeAnalysis.PublicApiAnalyzers | Public API takibi (yalnızca build, pakete girmez) | **MIT** |
 
@@ -486,7 +530,8 @@ dotnet test
 - **Mediator kütüphanesi ekle** → yalnızca pipeline behavior ihtiyacı somutlaşırsa (`martinothamar/Mediator`, MIT).
 - **Tam Clean Architecture'a geç** → yalnızca bir modül gerçekten karmaşık DDD/invariant içeriyorsa, sadece o modül için.
 - **Redis L2 cache ekle** → bir `IDistributedCache` (Redis) kaydet; HybridCache otomatik benimser.
-- **OpenIddict/Keycloak'a geç** → SSO/OIDC/multi-client/federation gerekirse.
+- **Harici bir IdP'ye geç (Keycloak, Entra)** → `Jwt:Authority`'yi ona çevir ve o IdP'nin kullanıcıları için bir
+  `IPermissionResolver` kaydet; çekirdek değişmez.
 - **Runtime .dll eklenti mimarisi** → üçüncü partiler senin derlemen olmadan modül yüklemeliyse (tek-geliştirici için neredeyse hiç gerekmez).
 
 ---

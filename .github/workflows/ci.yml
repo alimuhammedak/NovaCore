@@ -32,16 +32,20 @@ jobs:
       - name: Test
         run: dotnet test NovaCore.slnx -c Release --no-build
 
-      # Each module owns a DbContext; a model change without a migration fails here.
+      # Each module owns a DbContext, and the host owns the identity provider's; a model change without a migration
+      # fails here.
       - name: EF Core model matches migrations
         run: |
           dotnet tool restore
-          for module in Catalog Payments Identity; do
+          for module in Catalog Payments; do
             project="src/Modules/$module/NovaCore.Modules.$module"
             dotnet ef migrations has-pending-model-changes \
               --project "$project" --startup-project "$project" --context "${module}DbContext" \
               --configuration Release --no-build
           done
+          dotnet ef migrations has-pending-model-changes \
+            --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context IdentityServerDbContext \
+            --configuration Release --no-build
 
       # `dotnet list package --vulnerable` exits 0 even when it finds advisories (docs/plan/RESEARCH.md R-027),
       # so its JSON output is checked instead. Any severity fails the build.

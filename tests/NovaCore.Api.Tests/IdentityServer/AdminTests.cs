@@ -1,0 +1,228 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Internal;
+using Microsoft.Extensions.Time.Testing;
+using NovaCore.AspNetCore.Authorization;
+using NovaCore.AspNetCore.Identity;
+using NovaCore.Identity.OpenIddict;
+using Xunit;
+
+namespace NovaCore.Api.Tests.IdentityServer;
+
+/// <summary>
+/// User and role administration and the seeded roles (PLAN F3b.2): the Administrator role holds every declared
+/// permission, the User role the business read permissions; the admin API is guarded by the <c>identity:*</c>
+/// permissions; a new registration is a User.
+/// </summary>
+[Collection(IdentityServerTestGroup.Name)]
+public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<AdminTests.Fixture>
+{
+    public const string AdminEmail = "admin@novacore.test";
+    public const string AdminPassword = "the administrator's passphrase";
+    private const string Password = "a long passphrase for tests";
+
+    private readonly IdentityServerTestHost _host = fixture.Host;
+
+    /// <summary>An initial administrator, and a business permission the roles are seeded from.</summary>
+    public class Fixture : IdentityServerFixture
+    {
+        protected override void Configure(WebApplicationBuilder builder)
+        {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Identity:Seed:AdminEmail"] = AdminEmail,
+                ["Identity:Seed:AdminPassword"] = AdminPassword
+            });
+            builder.Services.AddPermissionDefinitions<ProbePermissions>();
+        }
+    }
+
+    [Fact]
+    public async Task The_seeded_roles_hold_the_declared_permissions()
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var roles = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+
+        var administrator = await PermissionsOfAsync(roles, "Administrator");
+        var user = await PermissionsOfAsync(roles, "User");
+
+        Assert.Equal(
+            ["identity:roles:manage", "identity:roles:read", "identity:users:manage", "identity:users:read", IdentityServerTestHost.ProbePermission],
+            administrator);
+        Assert.Equal([IdentityServerTestHost.ProbePermission], user);
+    }
+
+    [Fact]
+    public async Task The_administrator_lists_users()
+    {
+        using var flow = new OidcFlow(_host);
+        var tokens = await flow.SignInAsync(AdminEmail, AdminPassword);
+
+        var response = await flow.CallApiAsync("/api/v1/admin/users", tokens.AccessToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("totalCount").GetInt64() >= 1);
+    }
+
+    [Fact]
+    public async Task A_user_cannot_manage_roles()
+    {
+        var user = await CreateUserInRoleAsync("plain@novacore.test", "User");
+        using var flow = new OidcFlow(_host);
+        var tokens = await flow.SignInAsync("plain@novacore.test", Password);
+
+        var response = await flow.CallApiAsync(HttpMethod.Post, $"/api/v1/admin/users/{user.Id}/roles", tokens.AccessToken,
+            new { role = "Administrator" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_administrator_assigns_and_removes_roles()
+    {
+        var user = await _host.CreateUserAsync("promoted@novacore.test", Password);
+        using var flow = new OidcFlow(_host);
+        var tokens = await flow.SignInAsync(AdminEmail, AdminPassword);
+        var path = $"/api/v1/admin/users/{user.Id}/roles";
+
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await flow.CallApiAsync(HttpMethod.Post, path, tokens.AccessToken, new { role = "User" })).StatusCode);
+        Assert.True(await IsInRoleAsync(user.Id, "User"));
+
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await flow.CallApiAsync(HttpMethod.Post, path, tokens.AccessToken, new { role = "NoSuchRole" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await flow.CallApiAsync(HttpMethod.Post, path, tokens.AccessToken, new { role = "" })).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await flow.CallApiAsync(HttpMethod.Delete, path + "/User", tokens.AccessToken, body: null)).StatusCode);
+        Assert.False(await IsInRoleAsync(user.Id, "User"));
+    }
+
+    [Fact]
+    public async Task A_new_registration_is_a_User()
+    {
+        var register = await _host.CreateClient().PostAsJsonAsync("/api/v1/auth/register",
+            new { email = "joined@novacore.test", password = Password });
+        Assert.Equal(HttpStatusCode.OK, register.StatusCode);
+
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        Assert.Equal(["User"], await users.GetRolesAsync((await users.FindByEmailAsync("joined@novacore.test"))!));
+    }
+
+    private async Task<ApplicationUser> CreateUserInRoleAsync(string email, string role)
+    {
+        var user = await _host.CreateUserAsync(email, Password);
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        Assert.True((await users.AddToRoleAsync((await users.FindByIdAsync(user.Id.ToString()))!, role)).Succeeded);
+        return user;
+    }
+
+    private async Task<bool> IsInRoleAsync(Guid userId, string role)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        return await users.IsInRoleAsync((await users.FindByIdAsync(userId.ToString()))!, role);
+    }
+
+    private static async Task<string[]> PermissionsOfAsync(RoleManager<ApplicationRole> roles, string role) =>
+        (await roles.GetClaimsAsync((await roles.FindByNameAsync(role))!))
+        .Where(claim => claim.Type == NovaClaims.Permission)
+        .Select(claim => claim.Value)
+        .Order(StringComparer.Ordinal)
+        .ToArray();
+
+    /// <summary>A business permission, as a module would declare it.</summary>
+    public sealed class ProbePermissions : IPermissionDefinitionProvider
+    {
+        public IReadOnlyCollection<PermissionDefinition> GetPermissions() =>
+            [new(IdentityServerTestHost.ProbePermission, "Read the probe", "Probe")];
+    }
+}
+
+/// <summary>
+/// A host whose clock the test moves (<see cref="Clock"/>), with the admin fixture's administrator and permission.
+/// Tokens issued after the clock moved would not be valid yet for JwtBearer, which reads the real clock (R-058), so a
+/// class sign-ins before it moves the clock and doesn't share the host with another class.
+/// </summary>
+public sealed class FakeClockIdentityServerFixture : AdminTests.Fixture
+{
+    public FakeTimeProvider Clock { get; } = new(TimeProvider.System.GetUtcNow());
+
+    protected override void Configure(WebApplicationBuilder builder)
+    {
+        base.Configure(builder);
+        builder.Services.AddSingleton<TimeProvider>(Clock);
+        // HybridCache's local entries expire by the memory cache's clock, not TimeProvider (R-057).
+        builder.Services.Configure<MemoryCacheOptions>(options => options.Clock = new FakeSystemClock(Clock));
+    }
+
+    private sealed class FakeSystemClock(TimeProvider clock) : ISystemClock
+    {
+        public DateTimeOffset UtcNow => clock.GetUtcNow();
+    }
+}
+
+/// <summary>
+/// PLAN F3a.2's acceptance on a token of this provider: a role change reaches a signed-in user within
+/// <c>Cache:PermissionExpiration</c>, without waiting (fake clock).
+/// </summary>
+[Collection(IdentityServerTestGroup.Name)]
+public sealed class IdentityServerRoleChangeTests(FakeClockIdentityServerFixture fixture)
+    : IClassFixture<FakeClockIdentityServerFixture>
+{
+    private const string Password = "a long passphrase for tests";
+
+    // Cache:PermissionExpiration's default; the test host leaves it unset.
+    private static readonly TimeSpan PermissionExpiration = TimeSpan.FromMinutes(5);
+
+    private readonly IdentityServerTestHost _host = fixture.Host;
+
+    [Fact]
+    public async Task A_role_change_reaches_a_signed_in_user_within_the_cache_lifetime()
+    {
+        var user = await _host.CreateUserAsync("role-change@novacore.test", Password);
+        using var flow = new OidcFlow(_host);
+        var userToken = (await flow.SignInAsync("role-change@novacore.test", Password)).AccessToken;
+        using var adminFlow = new OidcFlow(_host);
+        var adminToken = (await adminFlow.SignInAsync(AdminTests.AdminEmail, AdminTests.AdminPassword)).AccessToken;
+        Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/probe", userToken)).StatusCode);
+
+        // The User role holds the probe permission (seeded from the declared permissions).
+        var assign = await adminFlow.CallApiAsync(HttpMethod.Post, $"/api/v1/admin/users/{user.Id}/roles", adminToken, new { role = "User" });
+        Assert.Equal(HttpStatusCode.NoContent, assign.StatusCode);
+
+        // Same token, still inside the cache lifetime: the old permissions stand...
+        Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/probe", userToken)).StatusCode);
+
+        // ...and once it has passed, the new role's permission is resolved.
+        fixture.Clock.Advance(PermissionExpiration + TimeSpan.FromSeconds(1));
+        Assert.Equal(HttpStatusCode.OK, (await flow.CallApiAsync("/probe", userToken)).StatusCode);
+    }
+}
+
+/// <summary>A refresh token dies after its lifetime (7 days), the provider's clock deciding.</summary>
+[Collection(IdentityServerTestGroup.Name)]
+public sealed class RefreshTokenLifetimeTests(FakeClockIdentityServerFixture fixture) : IClassFixture<FakeClockIdentityServerFixture>
+{
+    [Fact]
+    public async Task An_expired_refresh_token_is_refused()
+    {
+        await fixture.Host.CreateUserAsync("expiry@novacore.test", "a long passphrase for tests");
+        using var flow = new OidcFlow(fixture.Host);
+        var tokens = await flow.SignInAsync("expiry@novacore.test", "a long passphrase for tests");
+
+        fixture.Clock.Advance(TimeSpan.FromDays(7) + TimeSpan.FromSeconds(1));
+
+        Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(await flow.RefreshAsync(tokens.RefreshToken)));
+    }
+}

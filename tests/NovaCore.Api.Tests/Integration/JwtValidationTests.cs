@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using NovaCore.AspNetCore.Identity;
 using NovaCore.Modules.Catalog.Infrastructure;
-using NovaCore.Modules.Identity.Services;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -65,27 +64,32 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
     }
 
     [Fact]
-    public async Task Outside_development_the_authority_is_the_only_trusted_issuer()
+    public async Task Outside_development_the_authority_is_trusted_over_https_metadata()
     {
-        // The parent owns the SQLite connections; disposing it also disposes the derived factory.
-        await using var production = new ProductionApiFactory();
-        var factory = production.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services => services.AddSingleton<IEmailSender, LoggingEmailSender>()));
+        await using var factory = new ProductionApiFactory();
         await EnsureCatalogCreatedAsync(factory);
 
-        // The authority's token works over the HTTPS-only metadata path Production requires...
-        var accepted = await GetWithTokenAsync(factory, production.IdentityProvider.CreateToken(SuperAdmin()));
-
-        // ...while an HS256 token signed with the Development fallback key (a public constant in
-        // AuthenticationExtensions) is not: symmetric keys are Development-only (D-024).
-        var developmentKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes("novacore-development-only-signing-key-do-not-use-in-production-0123456789"));
-        var symmetric = TestIdentityProvider.CreateToken(
-            SuperAdmin(), developmentKey, SecurityAlgorithms.HmacSha256, issuer: "novacore");
-        var rejected = await GetWithTokenAsync(factory, symmetric);
+        var accepted = await GetWithTokenAsync(factory, factory.IdentityProvider.CreateToken(SuperAdmin()));
 
         Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Production")]
+    public async Task A_symmetrically_signed_token_is_rejected_in_every_environment(string environment)
+    {
+        // Only the authority's published asymmetric keys sign tokens (DECISIONS D-028): an HS256 token with the trusted
+        // issuer and audience is still refused, in Development too.
+        await using var production = environment == "Production" ? new ProductionApiFactory() : null;
+        var factory = production ?? _factory;
+        await EnsureCatalogCreatedAsync(factory);
+        var symmetricKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("a-symmetric-key-that-is-long-enough-0123456789"));
+
+        var response = await GetWithTokenAsync(factory,
+            TestIdentityProvider.CreateToken(SuperAdmin(), symmetricKey, SecurityAlgorithms.HmacSha256));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     private static Claim[] SuperAdmin() =>

@@ -18,26 +18,18 @@ public class ModuleRegistrationTests(NovaCoreApiFactory factory) : IClassFixture
     {
         var modules = _factory.Services.GetServices<IModule>().Select(module => module.Name);
 
-        Assert.Equal(["Catalog", "Identity", "Payments"], modules);
+        Assert.Equal(["Catalog", "Payments"], modules);
     }
 
     [Fact]
     public void Modules_map_the_same_endpoints()
     {
+        // The identity provider add-on maps its account and admin API before the modules (Program.cs).
         string[] expected =
         [
-            "POST /api/v1/products/",
-            "GET /api/v1/products/",
-            "GET /api/v1/products/{id:guid}",
-            "PUT /api/v1/products/{id:guid}",
-            "DELETE /api/v1/products/{id:guid}",
             "POST /api/v1/auth/register",
             "GET /api/v1/auth/confirm-email",
-            "POST /api/v1/auth/login",
-            "POST /api/v1/auth/login/2fa",
-            "POST /api/v1/auth/refresh",
             "GET /api/v1/auth/me",
-            "POST /api/v1/auth/logout",
             "POST /api/v1/auth/logout-all",
             "POST /api/v1/auth/change-password",
             "POST /api/v1/auth/2fa/setup",
@@ -48,6 +40,11 @@ public class ModuleRegistrationTests(NovaCoreApiFactory factory) : IClassFixture
             "GET /api/v1/admin/permissions",
             "POST /api/v1/admin/users/{userId:guid}/roles",
             "DELETE /api/v1/admin/users/{userId:guid}/roles/{role}",
+            "POST /api/v1/products/",
+            "GET /api/v1/products/",
+            "GET /api/v1/products/{id:guid}",
+            "PUT /api/v1/products/{id:guid}",
+            "DELETE /api/v1/products/{id:guid}",
             "POST /api/v1/payments/",
             "GET /api/v1/payments/",
         ];
