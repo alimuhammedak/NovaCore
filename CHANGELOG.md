@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   characters, no composition rules), unique emails, lockout after five failures for 15 minutes, a confirmed email before
   sign-in, and one sign-in error for unknown accounts, wrong passwords and locked accounts. Sign-ins, lockouts, refreshes
   and sign-outs go to the log as `SECURITY` events with masked emails.
+  Self-service registration and email confirmation (`/api/v1/auth/register`, `/api/v1/auth/confirm-email`) carry over
+  too. The confirmation link now starts from `Jwt:Authority` instead of the request's Host header. Outside Development
+  the host must register an `IEmailSender`; in Development emails go to the log.
 
 ### Changed
 

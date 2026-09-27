@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using NovaCore.Identity.OpenIddict;
 using Xunit;
 
 namespace NovaCore.Api.Tests.IdentityServer;
@@ -75,6 +76,7 @@ public sealed class IdentityServerConfigurationTests
             builder.Services.AddOpenIddict().AddServer(server => server
                 .AddEphemeralSigningKey(SecurityAlgorithms.EcdsaSha256)
                 .AddEphemeralEncryptionKey());
+            builder.Services.AddSingleton<IEmailSender>(new CapturingEmailSender());
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Identity:Clients:1:ClientId"] = "worker",

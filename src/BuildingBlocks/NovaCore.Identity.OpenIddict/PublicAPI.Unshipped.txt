@@ -16,3 +16,21 @@ NovaCore.Identity.OpenIddict.IdentityServerHostingExtensions
 const NovaCore.Identity.OpenIddict.IdentityServerDbContext.Schema = "identity" -> string!
 static NovaCore.Identity.OpenIddict.IdentityServerHostingExtensions.AddCoreIdentityServer(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static NovaCore.Identity.OpenIddict.IdentityServerHostingExtensions.MapCoreIdentityServer(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+NovaCore.Identity.OpenIddict.IEmailSender
+NovaCore.Identity.OpenIddict.IEmailSender.SendAsync(string! toEmail, string! subject, string! htmlBody, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+NovaCore.Identity.OpenIddict.RegisterRequest
+NovaCore.Identity.OpenIddict.RegisterRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.RegisterRequest!
+NovaCore.Identity.OpenIddict.RegisterRequest.Deconstruct(out string! Email, out string! Password, out string? DisplayName) -> void
+NovaCore.Identity.OpenIddict.RegisterRequest.DisplayName.get -> string?
+NovaCore.Identity.OpenIddict.RegisterRequest.DisplayName.init -> void
+NovaCore.Identity.OpenIddict.RegisterRequest.Email.get -> string!
+NovaCore.Identity.OpenIddict.RegisterRequest.Email.init -> void
+NovaCore.Identity.OpenIddict.RegisterRequest.Equals(NovaCore.Identity.OpenIddict.RegisterRequest? other) -> bool
+NovaCore.Identity.OpenIddict.RegisterRequest.Password.get -> string!
+NovaCore.Identity.OpenIddict.RegisterRequest.Password.init -> void
+NovaCore.Identity.OpenIddict.RegisterRequest.RegisterRequest(string! Email, string! Password, string? DisplayName) -> void
+override NovaCore.Identity.OpenIddict.RegisterRequest.Equals(object? obj) -> bool
+override NovaCore.Identity.OpenIddict.RegisterRequest.GetHashCode() -> int
+override NovaCore.Identity.OpenIddict.RegisterRequest.ToString() -> string!
+static NovaCore.Identity.OpenIddict.RegisterRequest.operator !=(NovaCore.Identity.OpenIddict.RegisterRequest? left, NovaCore.Identity.OpenIddict.RegisterRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.RegisterRequest.operator ==(NovaCore.Identity.OpenIddict.RegisterRequest? left, NovaCore.Identity.OpenIddict.RegisterRequest? right) -> bool

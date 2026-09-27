@@ -457,3 +457,14 @@ Biçim:
 - Sonuç: D-026 (6):
   - Login formu `ReadFormAsync` + `IAntiforgery.IsRequestValidAsync` ile açıkça doğrulanır. Çekirdeğe `UseAntiforgery` eklenmez; yalnızca bir eklentinin ihtiyacı için çekirdek pipeline'ı değişmezdi.
   - Token endpoint'i principal'ı kopyalarken `permission` claim'lerini dışarıda bırakır.
+
+### R-062: .NET 10'un validation generator'ü internal request tiplerini kapsıyor mu? (2026-09-27, faz 3b; gözlem + doküman)
+- Bulgu:
+  - Eklentideki `internal sealed record RegisterRequest` (internal bir static sınıf içinde) için generator metadata üretmedi. Geçersiz gövde handler'a ulaştı, yanıtta Identity'nin `password` hatası vardı.
+  - `EmitCompilerGeneratedFiles` çıktısında `ValidatableInfoResolver.g.cs` handler'ın servis parametrelerini (`IOptions<JwtOptions>`, `UserManager<…>`) kapsıyordu, request tipini kapsamıyordu. Aynı handler'ın bağlandığı bir yerde:
+    - record `public` olunca tip resolver'a girdi;
+    - yalnızca kapsayan sınıf `public` olunca girmedi.
+  - MS'in "internal da olur" diyen diyagnostikleri (ASP0034 *"Make the parameter type and each of its containing types public or internal"*) aspnetcore-11.0 dokümanında. .NET 10 dokümanı yalnızca *"Validated types and properties are accessible to generated code"* diyor.
+  - Sonuç: bu SDK'da (10.0.300, targeting pack 10.0.8) generator yalnızca public request tiplerini kapsıyor. Eksik metadata hata ya da log üretmiyor (R-052).
+- Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/validation?view=aspnetcore-10.0#troubleshoot-generated-validation-metadata · https://learn.microsoft.com/aspnet/core/diagnostics/asp0034?view=aspnetcore-11.0 · yerel derleme (`-p:EmitCompilerGeneratedFiles=true`)
+- Sonuç: D-026'ya ek: eklentinin doğrulanan request gövdeleri (`RegisterRequest` ve sonrakiler) public, üst düzey record'lardır ve PublicAPI'de izlenir. Y-23 gereksiz public API'yi yasaklıyor; burada public olmaları doğrulamanın çalışmasının koşulu. Endpoint sınıfları internal kalıyor. Api host'unun `ValidationTests`'i bu uçları da kapsayacak (F3b.3a).

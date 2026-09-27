@@ -68,6 +68,15 @@ public static class IdentityServerHostingExtensions
 
         services.AddSingleton<SecurityAuditLogger>();
 
+        // LoggingEmailSender writes confirmation links to the log: Development only, and only when the host brings none.
+        // Anywhere else the host registers a real sender, or EmailSenderStartupCheck stops the host.
+        if (builder.Environment.IsDevelopment())
+            services.TryAddSingleton<IEmailSender, LoggingEmailSender>();
+        services.AddHostedService<EmailSenderStartupCheck>();
+
+        // Built-in validation is generated per assembly, so the add-on registers it for its own requests (R-052).
+        services.AddValidation();
+
         services.AddOpenIddict()
             .AddCore(core => core.UseEntityFrameworkCore().UseDbContext<IdentityServerDbContext>())
             .AddServer(server =>
@@ -164,8 +173,9 @@ public static class IdentityServerHostingExtensions
 
     /// <summary>
     /// Maps the provider's endpoints: the authorization, token and end-session endpoints under <c>/connect</c> (OpenIddict
-    /// validates the requests first) and the sign-in page at <c>/account/login</c>. They are left out of the OpenAPI
-    /// document, and the token endpoint and the sign-in page use the <c>strict</c> rate limit.
+    /// validates the requests first) and the sign-in page at <c>/account/login</c>, which stay out of the OpenAPI
+    /// document; and the account API under <c>/api/v1/auth</c> (registration, email confirmation). The token endpoint,
+    /// the sign-in page and the account API use the <c>strict</c> rate limit.
     /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
     /// <returns><paramref name="endpoints"/>, for chaining.</returns>
@@ -173,6 +183,7 @@ public static class IdentityServerHostingExtensions
     {
         ConnectEndpoints.Map(endpoints);
         LoginPage.Map(endpoints);
+        AccountEndpoints.Map(endpoints);
         return endpoints;
     }
 }

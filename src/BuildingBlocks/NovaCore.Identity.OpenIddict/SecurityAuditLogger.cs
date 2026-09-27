@@ -8,6 +8,14 @@ namespace NovaCore.Identity.OpenIddict;
 /// </summary>
 internal sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
 {
+    public void UserRegistered(Guid userId, string email)
+    {
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogUserRegistered(userId, Mask(email));
+    }
+
+    public void EmailConfirmed(Guid userId) => logger.LogEmailConfirmed(userId);
+
     public void LoginSucceeded(Guid userId, string? ip) => logger.LogLoginSucceeded(userId, ip);
 
     public void LoginFailed(string? emailAttempted, string? ip, string reason)
@@ -35,6 +43,12 @@ internal sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
 // and the log call share the same logger receiver (docs/plan/RESEARCH.md R-047).
 internal static partial class SecurityAuditLog
 {
+    [LoggerMessage(EventId = 16, Level = LogLevel.Information, Message = "SECURITY user_registered User={UserId} Email={Email}")]
+    public static partial void LogUserRegistered(this ILogger logger, Guid userId, string email);
+
+    [LoggerMessage(EventId = 17, Level = LogLevel.Information, Message = "SECURITY email_confirmed User={UserId}")]
+    public static partial void LogEmailConfirmed(this ILogger logger, Guid userId);
+
     [LoggerMessage(EventId = 11, Level = LogLevel.Information, Message = "SECURITY login_succeeded User={UserId} Ip={Ip}")]
     public static partial void LogLoginSucceeded(this ILogger logger, Guid userId, string? ip);
 
