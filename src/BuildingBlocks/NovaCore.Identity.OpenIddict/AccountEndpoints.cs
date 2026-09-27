@@ -52,7 +52,7 @@ internal static class AccountEndpoints
             .RequireAuthorization();
 
         auth.MapPost("/2fa/setup", SetUpTwoFactor)
-            .WithName("TwoFactorSetup").WithSummary("Get the authenticator shared key + otpauth URI")
+            .WithName("TwoFactorSetup").WithSummary("Get the authenticator shared key + otpauth URI (409 once 2FA is enabled)")
             .RequireAuthorization();
 
         auth.MapPost("/2fa/enable", EnableTwoFactor)
@@ -190,6 +190,11 @@ internal static class AccountEndpoints
         var user = await FindAsync(users, currentUser);
         if (user is null)
             return Results.Unauthorized();
+
+        // An enabled authenticator's key stays secret: with it, any holder of an access token could compute codes and
+        // turn two-factor authentication off. A new authenticator starts after disabling (which takes a code).
+        if (await users.GetTwoFactorEnabledAsync(user))
+            return Results.Conflict(new { message = "Two-factor authentication is already enabled. Disable it to set up a new authenticator." });
 
         var key = await users.GetAuthenticatorKeyAsync(user);
         if (string.IsNullOrEmpty(key))

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
@@ -209,5 +210,48 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         var again = await flow.Browser.GetAsync(OidcFlow.AuthorizeUri(OidcFlow.NewPkce().Challenge));
         Assert.Equal(HttpStatusCode.Redirect, again.StatusCode);
         Assert.StartsWith(IdentityServerTestHost.Authority + "/account/login", again.Headers.Location!.ToString(), StringComparison.Ordinal);
+    }
+}
+
+/// <summary>
+/// The age of a sign-in (OpenID Connect Core §2 <c>auth_time</c>, §3.1.2.1 <c>max_age</c>) counts from the sign-in, not
+/// from the provider cookie's last renewal, which moves with sliding expiration and every security stamp check.
+/// </summary>
+[Collection(IdentityServerTestGroup.Name)]
+public sealed class SignInAgeTests(FakeClockIdentityServerFixture fixture) : IClassFixture<FakeClockIdentityServerFixture>
+{
+    private const string Password = "a long passphrase for tests";
+
+    [Fact]
+    public async Task Auth_time_and_max_age_count_from_the_sign_in_not_the_cookie_renewal()
+    {
+        var host = fixture.Host;
+        await host.CreateUserAsync("age@novacore.test", Password);
+        using var flow = new OidcFlow(host);
+        var signedInAt = fixture.Clock.GetUtcNow();
+        await flow.SignInAsync("age@novacore.test", Password);
+
+        // Past half of the cookie's 30 minutes, so this request renews the cookie.
+        fixture.Clock.Advance(TimeSpan.FromMinutes(16));
+        Assert.StartsWith(IdentityServerTestHost.RedirectUri, (await AuthorizeAsync(flow, OidcFlow.NewPkce().Challenge)).ToString(), StringComparison.Ordinal);
+
+        // 21 minutes after the sign-in and 5 after the renewal.
+        fixture.Clock.Advance(TimeSpan.FromMinutes(5));
+        var (verifier, challenge) = OidcFlow.NewPkce();
+        var callback = await flow.Browser.GetAsync(OidcFlow.AuthorizeUri(challenge));
+        var tokens = await flow.RedeemAsync(OidcFlow.CodeFrom(callback), verifier);
+        Assert.Equal(
+            signedInAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture),
+            new JsonWebToken(tokens.IdToken!).GetClaim("auth_time").Value);
+
+        var tooOld = await AuthorizeAsync(flow, OidcFlow.NewPkce().Challenge, ("max_age", "1200"));
+        Assert.StartsWith(IdentityServerTestHost.Authority + "/account/login", tooOld.ToString(), StringComparison.Ordinal);
+    }
+
+    private static async Task<Uri> AuthorizeAsync(OidcFlow flow, string challenge, params (string Name, string? Value)[] extra)
+    {
+        var response = await flow.Browser.GetAsync(OidcFlow.AuthorizeUri(challenge, extra));
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        return response.Headers.Location!;
     }
 }

@@ -30,8 +30,14 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   refresh tokens 7 days. The token endpoint re-checks the account on every refresh (exists, can sign in, not locked out)
   and rewrites the roles.
 - **Anti-enumeration:** the sign-in page shows one message for an unknown account, a wrong password and a locked
-  account; the "confirm your email" message comes only after the right password. Registration answers an existing
-  address like a new one.
+  account; the "confirm your email" message comes only after the right password. `SignInManager` answers `NotAllowed`
+  before it looks at the password, so `LoginPage` checks the password itself and counts a wrong one (D-030 (1)).
+  Registration answers an existing address like a new one.
+- **Sign-in age:** `auth_time` and `max_age` read the sign-in time the cookie's `OnSigningIn` records in its
+  properties, never the cookie's `IssuedUtc`, which moves on every renewal (sliding expiration, the zero-interval stamp
+  check; D-030 (2), R-067).
+- **Two-factor keys stay secret once enabled:** `/2fa/setup` answers 409 while 2FA is on; a new authenticator starts
+  after `/2fa/disable`, which takes a code (D-030 (3)).
 - **Claims contract:** access tokens carry `sub`, `name`, `email`, `role` (the names in `NovaClaims`). **Never
   permissions, never the security stamp:** the core resolves permissions per request (`IdentityPermissionResolver`: role
   + direct `permission` claims for a Guid `sub`, `Identity:Clients:n:Permissions` for a service client's id). The core's

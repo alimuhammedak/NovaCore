@@ -101,6 +101,32 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
     }
 
     [Fact]
+    public async Task A_wrong_password_on_an_unconfirmed_account_gets_the_generic_message_and_counts()
+    {
+        ApplicationUser user;
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            user = NewUser("unconfirmed-wrong@novacore.test");
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            Assert.True((await users.CreateAsync(user, Password)).Succeeded);
+        }
+
+        using var flow = new OidcFlow(_host);
+        var response = await SignInPageAsync(flow, "unconfirmed-wrong@novacore.test", "not the password");
+
+        // The "confirm your email" hint would tell anyone that the address is registered.
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains(InvalidCredentials, html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Confirm your email address", html, StringComparison.Ordinal);
+
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            Assert.Equal(1, await users.GetAccessFailedCountAsync((await users.FindByIdAsync(user.Id.ToString()))!));
+        }
+    }
+
+    [Fact]
     public async Task An_unknown_account_and_a_wrong_password_look_the_same()
     {
         await _host.CreateUserAsync("known@novacore.test", Password);

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
@@ -23,6 +24,8 @@ namespace NovaCore.Identity.OpenIddict;
 /// </summary>
 internal static class ConnectEndpoints
 {
+    private const string AuthenticationTimeItem = ".auth_time";
+
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         endpoints.MapMethods("/connect/authorize", [HttpMethods.Get, HttpMethods.Post], Authorize).ExcludeFromDescription();
@@ -63,7 +66,7 @@ internal static class ConnectEndpoints
         var subject = user.Id.ToString();
 
         var identity = await CreateIdentityAsync(users, user, request.GetScopes(), jwt.Value.Audience);
-        if (session.Properties?.IssuedUtc is { } signedInAt)
+        if (AuthenticationTime(session) is { } signedInAt)
             identity.SetClaim(Claims.AuthenticationTime, signedInAt.ToUnixTimeSeconds());
 
         // Implicit consent (first-party clients): reuse the user's permanent authorization for this client, or create
@@ -201,10 +204,23 @@ internal static class ConnectEndpoints
             yield return Destinations.IdentityToken;
     }
 
+    // The cookie's IssuedUtc is no sign-in time: sliding expiration and each security stamp check renew the cookie and
+    // move it (docs/plan/RESEARCH.md R-067). The sign-in time is recorded in the cookie's properties instead, which a
+    // renewal keeps.
+    internal static void RecordAuthenticationTime(AuthenticationProperties properties) =>
+        properties.Items[AuthenticationTimeItem] =
+            properties.IssuedUtc!.Value.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+
+    private static DateTimeOffset? AuthenticationTime(AuthenticateResult session) =>
+        session.Properties?.Items.TryGetValue(AuthenticationTimeItem, out var value) == true
+        && long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
+            ? DateTimeOffset.FromUnixTimeSeconds(seconds)
+            : null;
+
+    // A session without a recorded sign-in time can't prove it is recent enough.
     private static bool IsTooOld(AuthenticateResult session, OpenIddictRequest request, TimeProvider timeProvider) =>
         request.MaxAge is { } maxAge
-        && session.Properties?.IssuedUtc is { } signedInAt
-        && timeProvider.GetUtcNow() - signedInAt > TimeSpan.FromSeconds(maxAge);
+        && (AuthenticationTime(session) is not { } signedInAt || timeProvider.GetUtcNow() - signedInAt > TimeSpan.FromSeconds(maxAge));
 
     private static string RequestUriWithout(HttpRequest request, params string[] parameters)
     {

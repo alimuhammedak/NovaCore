@@ -524,3 +524,18 @@ Biçim:
   - Sağlayıcı, çekirdek doğrulama ve Scalar'ın istek arayüzü tarayıcıda uçtan uca çalışıyor.
   - Scalar'ın popup tabanlı code değişimi bu tarayıcı panelinde denenemedi; normal bir tarayıcıda popup açılır. Aynı adımlar otomatik testlerde de koşuyor (`AuthorizationCodeFlowTests`, `IdentityServerWiringTests`).
   - Scalar'ın token'sız OAuth2 seçimiyle başlığı ezmesi "Sonraya bırakılanlar"a yazıldı.
+
+### R-067: Faz 3b code review — `SignInManager`'ın NotAllowed sırası ve cookie yenilemesinin `IssuedUtc`'si (2026-09-27, faz 3b; kaynak + kırmızı test)
+- Soru: Giriş sayfasındaki "e-postanı onayla" mesajı gerçekten yalnızca doğru paroladan sonra mı çıkıyor? `auth_time` ve `max_age` için cookie'nin `IssuedUtc`'si oturum açma zamanı mı?
+- Bulgu:
+  - `SignInManager.CheckPasswordSignInCoreAsync` önce `PreSignInCheck`'i çalıştırıyor: `CanSignInAsync` false ise (onaysız e-posta) parolaya bakmadan `SignInResult.NotAllowed` dönüyor, lockout sayacına da dokunmuyor. Yani mesaj yanlış parolayla da çıkıyordu ve kayıtlı ama onaysız adresleri ele veriyordu (hesap tespiti). Eski modülde de aynıydı. Kırmızı test: yanlış parolayla "Confirm your email address" döndü.
+  - `CookieAuthenticationHandler`:
+    - `HandleAuthenticateAsync`, `ValidatePrincipal` sonrası `context.ShouldRenew` true ise `RequestRefresh`'i çağırıyor. `RequestRefresh` yarı ömür kontrolü yapmadan yeniliyor, `_refreshIssuedUtc = TimeProvider.GetUtcNow()`. `SecurityStampValidator` doğrulamadan sonra `ShouldRenew = true` yapıyor; `ValidationInterval = 0` (D-029 (5)) ile bu her okumada oluyor. Kayan süre de yarı ömürden sonra aynı şeyi yapıyor.
+    - `FinishResponseAsync` yenilenen bilete `IssuedUtc = _refreshIssuedUtc` yazıyor. `CloneTicket` ise `Properties.Items`'ı olduğu gibi kopyalıyor.
+    - `HandleSignInAsync` `IssuedUtc`'yi `Events.SigningIn`'den önce atıyor; `SigningIn` yalnızca oturum açılırken çalışıyor, yenilemede değil.
+  - Sonuç olarak `IssuedUtc` son yenileme zamanı. Kırmızı test (sahte saat): 16. dakikada bir authorize isteği, 21. dakikadaki id_token'ın `auth_time`'ını 960 sn ileri kaydırdı; `max_age` hiç tetiklenmezdi. OpenIddict örnekleri de `IssuedUtc` kullanıyor, ama onlarda stamp doğrulaması 30 dakikada bir.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Core/src/SignInManager.cs · https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Security/Authentication/Cookies/src/CookieAuthenticationHandler.cs · OpenID Connect Core 1.0 §2 (`auth_time`), §3.1.2.1 (`max_age`)
+- Sonuç (D-030):
+  - Giriş sayfası `NotAllowed`'da parolayı kendisi kontrol ediyor (lockout'taysa kontrol etmiyor). Doğruysa mesaj "e-postanı onayla", yanlışsa genel mesaj ve `AccessFailedAsync`.
+  - Oturum açma zamanı cookie'nin `AuthenticationProperties.Items`'ına `OnSigningIn`'de yazılıyor, `auth_time` ve `max_age` oradan okunuyor. Kaydı olmayan oturum `max_age` isteğinde yeniden giriş istiyor.
+  - Ayrıca: `AddAuthentication()` `TimeProvider.System`'ı `TryAddSingleton` ile kaydediyor (probe testiyle görüldü), yani eklenti zaten kendi kaydıyla `TimeProvider` getiriyor; code review'daki "TimeProvider kaydı yok" bulgusu gerçek bir hata değil.

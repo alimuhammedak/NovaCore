@@ -35,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Development; elsewhere the host adds certificates with OpenIddict's API, and the host does not start without them.
   The host registers `IdentityServerDbContext` (`AddModuleDbContext`) and keeps its migrations.
   `app.MapCoreIdentityServer()` maps `/connect/authorize`, `/connect/token`, `/connect/revoke`, `/connect/endsession`
-  and a plain sign-in page at `/account/login` (antiforgery-protected, local return URLs only). Clients come from
+  and a plain sign-in page at `/account/login` (antiforgery-protected, local return URLs only). `max_age` and the
+  `auth_time` claim count from the sign-in, not from the session cookie's last renewal. Clients come from
   `Identity:Clients` and are synced into the store when `Identity:Seed:SeedOnStartup` is true. Refresh tokens rotate;
   reusing a redeemed one after OpenIddict's 30-second leeway revokes every token of that authorization, and a refresh
   is refused once the user is gone, can't sign in or is locked out.
@@ -198,6 +199,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - `docker-compose.yml` reads the SQL Server SA password from a git-ignored `.env` file instead of a hard-coded value.
+- Carried-over account flaws closed in `NovaCore.Identity.OpenIddict`: the sign-in page says "confirm your email" only
+  after the right password, and a wrong one counts toward lockout (the old login answered "email not confirmed" for any
+  password, which revealed unconfirmed accounts); `/api/v1/auth/2fa/setup` answers 409 once two-factor authentication
+  is enabled instead of returning the authenticator key, with which the holder of an access token could compute codes
+  and turn 2FA off.
 - Fixed two high-severity transitive vulnerabilities by updating the top-level packages: `Microsoft.OpenApi` 2.0.0
   ([GHSA-v5pm-xwqc-g5wc](https://github.com/advisories/GHSA-v5pm-xwqc-g5wc)) and `SQLitePCLRaw.lib.e_sqlite3` 2.1.11
   ([GHSA-2m69-gcr7-jv3q](https://github.com/advisories/GHSA-2m69-gcr7-jv3q)). ASP.NET Core and EF Core packages → 10.0.12,

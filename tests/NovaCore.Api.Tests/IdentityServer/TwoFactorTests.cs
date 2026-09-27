@@ -103,6 +103,23 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
     }
 
     [Fact]
+    public async Task Setup_keeps_the_key_of_an_enabled_authenticator_secret()
+    {
+        await _host.CreateUserAsync("mfa-setup@novacore.test", Password);
+        var (flow, accessToken) = await SignedInAsync("mfa-setup@novacore.test");
+        using var ownedFlow = flow;
+        var key = await SetUpAsync(flow, accessToken);
+        Assert.Equal(HttpStatusCode.OK,
+            (await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { code = AuthenticatorCode.For(key) })).StatusCode);
+
+        // With the key, a stolen access token could compute codes and turn two-factor authentication off.
+        var again = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/setup", accessToken, body: null);
+
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        Assert.DoesNotContain(key, await again.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task The_code_step_needs_the_password_step_first()
     {
         using var flow = new OidcFlow(_host);

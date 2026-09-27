@@ -139,6 +139,13 @@ public static class IdentityServerHostingExtensions
             cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always;
             cookie.ExpireTimeSpan = TimeSpan.FromMinutes(30);
             cookie.SlidingExpiration = true;
+
+            // Only a sign-in raises this event, not a renewal, so the time stays the sign-in's for auth_time and max_age.
+            cookie.Events.OnSigningIn = context =>
+            {
+                ConnectEndpoints.RecordAuthenticationTime(context.Properties);
+                return Task.CompletedTask;
+            };
         }));
         services.AddAntiforgery();
 

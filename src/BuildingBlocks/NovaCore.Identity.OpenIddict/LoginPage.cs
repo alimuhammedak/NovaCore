@@ -22,7 +22,7 @@ internal static class LoginPage
     // One message for an unknown account, a wrong password and a locked account, so the page doesn't reveal which.
     private const string InvalidCredentials = "Invalid email or password.";
 
-    // Only after the right password, so it reveals nothing to someone who doesn't know it.
+    // Only after the right password (CheckUnconfirmedAsync), so it reveals nothing to someone who doesn't know it.
     private const string EmailNotConfirmed = "Confirm your email address before signing in.";
 
     private const string InvalidCode = "Invalid authenticator code.";
@@ -63,6 +63,8 @@ internal static class LoginPage
         }
 
         var result = await signIn.PasswordSignInAsync(user, password, isPersistent: false, lockoutOnFailure: true);
+        if (result.IsNotAllowed)
+            result = await CheckUnconfirmedAsync(users, user, password);
 
         if (result.Succeeded)
         {
@@ -84,6 +86,21 @@ internal static class LoginPage
             audit.LoginFailed(email, ip, result.IsNotAllowed ? "email-not-confirmed" : "bad-password");
 
         return PasswordForm(context, antiforgery, returnUrl, email, result.IsNotAllowed ? EmailNotConfirmed : InvalidCredentials);
+    }
+
+    // SignInManager answers NotAllowed (email not confirmed) before it looks at the password, so the password is checked
+    // here: the "confirm your email" hint goes only to someone who knows it, and a wrong one counts toward lockout as
+    // anywhere else (docs/plan/RESEARCH.md R-067).
+    private static async Task<SignInResult> CheckUnconfirmedAsync(UserManager<ApplicationUser> users, ApplicationUser user, string password)
+    {
+        if (await users.IsLockedOutAsync(user))
+            return SignInResult.LockedOut;
+
+        if (await users.CheckPasswordAsync(user, password))
+            return SignInResult.NotAllowed;
+
+        await users.AccessFailedAsync(user);
+        return await users.IsLockedOutAsync(user) ? SignInResult.LockedOut : SignInResult.Failed;
     }
 
     private static async Task<IResult> ShowTwoFactor(
