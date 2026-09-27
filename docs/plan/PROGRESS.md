@@ -505,7 +505,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - `EmailSenderRegistrationTests` → `RegistrationTests`
     - Host düzeyindeki `StrictRateLimitTests`, `ValidationTests` ve `AuthGateTests` satırları F3b.3a'da Api host'una taşınıyor.
 - [ ] F3b.3 Eski modülün emekliye ayrılması (alt adımlar: 3a Api geçişi + modülün silinmesi, 3b çekirdek temizliği, 3c dokümanlar)
-  - [x] F3b.3a (commit: bir sonraki satırda): Api host'unun geçişi ve modülün silinmesi (kullanıcı onayıyla).
+  - [x] F3b.3a (9d35624): Api host'unun geçişi ve modülün silinmesi (kullanıcı onayıyla).
     - `Program.cs`:
       - modül kaydı yerine `AddCoreIdentityServer` ve `AddModuleDbContext<IdentityServerDbContext>` (SQL Server, `MigrationsAssembly` = Api, geçmiş tablosu `identity` şemasında, `EnableRetryOnFailure`; OpenIddict store'ları transaction'ları execution strategy içinde açıyor, R-064);
       - `MapCoreIdentityServer`, modüllerden önce.
@@ -530,6 +530,21 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - Değişmezler `src/BuildingBlocks/NovaCore.Identity.OpenIddict/CLAUDE.md`'ye taşındı. Kök ve tests CLAUDE.md'deki modül atıfları, README'deki üç yer düzeltildi (geniş README güncellemesi F3b.3c'de).
     - Kabul: `git grep "NovaCore.Modules.Identity|IdentityModule"` (docs/plan ve CHANGELOG dışında) boş.
     - 173/173 (iki koşu).
+  - [x] F3b.3b (commit: bir sonraki satırda): Çekirdek temizliği (D-028).
+    - `ITokenService`, `JwtTokenService` ve `AccessToken` silindi. `JwtOptions`'ta yalnızca `Authority` ([Required]) ve `Audience` kaldı.
+    - `AddCoreAuthentication`:
+      - geliştirme anahtarı, `PostConfigure` ve HS256 dalı yok;
+      - issuer yalnızca metadata'dan geliyor, algoritmalar yalnızca asimetrik;
+      - Authority her ortamda zorunlu, Development dışında https;
+      - artık kullanmadığı için `TimeProvider` kaydı da kalktı; tüketicileri kendilerininkini `TryAdd` ediyor.
+    - PublicAPI'den 30 satır silindi. `appsettings.json`'daki Jwt bölümü sadeleşti. D-024 (1) satırına "yerine D-028" notu eklendi (hook onayıyla).
+    - Eklentinin kendi Authority kontrolü de kalktı: çekirdek artık aynı şeyi her ortamda doğruluyor ve önce o çalışıyor. Test çekirdeğin mesajını bekliyor.
+    - Testler:
+      - `JwtTokenServiceTests` silindi (silinen kodun testi, D-028).
+      - `ConfigurationValidationTests`: SigningKey/Issuer/AccessTokenMinutes/RefreshTokenDays satırları çıktı. Development + boş Authority satırı çekirdeğin mesajını bekliyor ve eski çekirdeğe karşı kırmızıydı (stash ile denendi). `Jwt:Audience` boş satırı eklendi. Config katmanı testi `Audience` üzerinden.
+      - `JwtValidationTests`: simetrik imzalı token Development ve Production'da 401 (theory); Production'da Authority kabulü ayrı test.
+      - Factory artık anahtar ya da token ömrü vermiyor.
+    - Kabul: `git grep "SigningKey|ITokenService|JwtTokenService|AccessTokenMinutes|RefreshTokenDays"` src/tests/.github'da yalnızca OpenIddict'in `AddEphemeralSigningKey`'i ve test IdP'sinin `SigningKey`'ini buluyor.
 - [ ] F3b.3 Eski modülün emekliye ayrılması
 - [ ] F3b.4 docker-compose
 - [ ] F3b.5 Uçtan uca doğrulama

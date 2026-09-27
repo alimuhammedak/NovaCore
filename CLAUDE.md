@@ -120,8 +120,8 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
   `Database:ApplyMigrations` is true).
 
 - **Security** is a first-class subsystem. The core only *validates* access tokens (D-002): JWT bearer against an
-  OpenID Connect provider, `Jwt:Authority` (issuer + JWKS discovered, asymmetric algorithms only); a symmetric
-  `Jwt:SigningKey` is accepted in Development only (D-024). Permission-based authorization lives in
+  OpenID Connect provider, `Jwt:Authority` (issuer + JWKS discovered, asymmetric algorithms only), required in every
+  environment (D-028). Permission-based authorization lives in
   `NovaCore.AspNetCore` too: permissions are resolved on the server through `IPermissionResolver` (never read from the
   token) and cached per `sub` + security stamp for `Cache:PermissionExpiration`. The tokens come from the
   `NovaCore.Identity.OpenIddict` add-on (ASP.NET Core Identity + OpenIddict: Authorization Code + PKCE, refresh

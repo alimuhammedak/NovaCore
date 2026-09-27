@@ -107,11 +107,6 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Jwt:Authority"] = TestIdentityProvider.Issuer,
-                // The symmetric key is Development-only (D-024): elsewhere it stops the host.
-                ["Jwt:SigningKey"] = EnvironmentName == Environments.Development
-                    ? "novacore-integration-test-signing-key-0123456789-abcdef"
-                    : null,
-                ["Jwt:AccessTokenMinutes"] = "15",
                 ["Database:ApplyMigrations"] = "false",
                 ["Identity:Seed:SeedOnStartup"] = "false",
                 // Keep the rate limiter wired but out of the way of the many auth calls the tests make.

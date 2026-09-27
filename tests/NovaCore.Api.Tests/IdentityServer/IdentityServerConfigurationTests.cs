@@ -135,7 +135,8 @@ public sealed class IdentityServerConfigurationTests
             configure: builder => builder.Configuration.AddInMemoryCollection(
                 new Dictionary<string, string?> { ["Jwt:Authority"] = "" })));
 
-        Assert.Contains("Jwt:Authority must be the absolute public URL of this host", exception.Message, StringComparison.Ordinal);
+        // The core's own rule: the provider can't pick an issuer without it.
+        Assert.Contains("Jwt:Authority must be the absolute URI of an OpenID Connect provider", exception.Message, StringComparison.Ordinal);
     }
 
     private static async Task<List<JsonElement>> SigningKeysAsync(IdentityServerTestHost host)

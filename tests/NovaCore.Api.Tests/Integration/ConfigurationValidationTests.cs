@@ -19,15 +19,11 @@ public class ConfigurationValidationTests
     [Theory]
     [InlineData("Development", "RateLimiting:PermitLimit", "0", "PermitLimit")]
     [InlineData("Development", "RateLimiting:WindowSeconds", "0", "WindowSeconds")]
-    [InlineData("Development", "Jwt:SigningKey", "shorter-than-32-bytes", "Jwt:SigningKey")]
+    [InlineData("Development", "Jwt:Authority", "", "Jwt:Authority must be the absolute URI of an OpenID Connect provider")]
     [InlineData("Development", "Jwt:Authority", "not-a-uri", "Jwt:Authority")]
     [InlineData("Production", "Jwt:Authority", "", "Jwt:Authority")]
     [InlineData("Production", "Jwt:Authority", "http://idp.example.com", "Jwt:Authority")]
-    [InlineData("Production", "Jwt:SigningKey", "a-symmetric-key-that-is-long-enough-0123456789", "Jwt:SigningKey")]
-    [InlineData("Development", "Jwt:Issuer", "", "Issuer")]
-    [InlineData("Development", "Jwt:AccessTokenMinutes", "0", "AccessTokenMinutes")]
-    [InlineData("Development", "Jwt:RefreshTokenDays", "0", "RefreshTokenDays")]
-    [InlineData("Development", "Jwt:RefreshTokenDays", "3000000", "RefreshTokenDays")]
+    [InlineData("Development", "Jwt:Audience", "", "Audience")]
     [InlineData("Development", "Cors:AllowedOrigins:0", "*", "Cors:AllowedOrigins")]
     [InlineData("Development", "Cors:AllowedOrigins:0", "app.example.com", "Cors:AllowedOrigins")]
     [InlineData("Development", "Cache:DefaultExpiration", "00:00:00", "Cache:DefaultExpiration")]
@@ -46,11 +42,11 @@ public class ConfigurationValidationTests
     [Fact]
     public async Task App_configuration_reaches_the_options()
     {
-        await using var factory = new ConfiguredApiFactory(Environments.Development, new() { ["Jwt:AccessTokenMinutes"] = "7" });
+        await using var factory = new ConfiguredApiFactory(Environments.Development, new() { ["Jwt:Audience"] = "another.api" });
 
         var jwt = factory.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
 
-        Assert.Equal(7, jwt.AccessTokenMinutes);
+        Assert.Equal("another.api", jwt.Audience);
     }
 
     [Fact]
@@ -64,18 +60,6 @@ public class ConfigurationValidationTests
         Assert.NotNull(factory.Services.GetService<HybridCache>());
         Assert.Equal(TimeSpan.FromMinutes(7), defaults?.Expiration);
         Assert.Equal(TimeSpan.FromMinutes(7), defaults?.LocalCacheExpiration);
-    }
-
-    [Fact]
-    public async Task In_development_the_host_needs_an_authority_too()
-    {
-        // The host issues its own tokens (NovaCore.Identity.OpenIddict), for the authority it is (DECISIONS D-028).
-        await using var factory = new ConfiguredApiFactory(
-            Environments.Development, new() { ["Jwt:Authority"] = "", ["Jwt:SigningKey"] = "" });
-
-        var exception = Assert.ThrowsAny<Exception>(() => factory.Server);
-
-        Assert.Contains("Jwt:Authority", Messages(exception), StringComparison.Ordinal);
     }
 
     private static string Messages(Exception exception) => exception switch

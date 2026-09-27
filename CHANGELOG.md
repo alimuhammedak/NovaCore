@@ -66,6 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   store's migrations now live in the Api project (`Identity/Migrations`, context `IdentityServerDbContext`, schema
   `identity`); an `identity` schema created by the old module has to be dropped before migrating. In Development
   `Jwt:Authority` is the host's https address (`https://localhost:5443`, the https launch profile).
+- **Breaking (configuration and API):** `Jwt:Authority` is required in every environment, and only asymmetric
+  signatures are accepted: `Jwt:SigningKey`, `Jwt:Issuer` and the built-in Development key are removed, as are
+  `Jwt:AccessTokenMinutes` and `Jwt:RefreshTokenDays` (the identity provider's lifetimes are set on
+  `OpenIddictServerOptions`). `ITokenService`, `JwtTokenService` and `AccessToken` are removed from `NovaCore.AspNetCore`:
+  nothing in NovaCore issues tokens locally any more.
 
 ### Changed
 

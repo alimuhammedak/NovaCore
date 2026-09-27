@@ -116,19 +116,11 @@ public static class IdentityServerHostingExtensions
                     .EnableEndSessionEndpointPassthrough();
             });
 
-        // The issuer is the authority the core validates against, so the "iss" of every token and the discovery
-        // document match it, also behind a proxy. ValidateOnStart builds the options when the host starts, so missing
-        // keys (OpenIddict's own check) or a missing authority stop the host instead of the first sign-in.
+        // The issuer is the authority the core validates against (validated there: absolute, https outside Development),
+        // so the "iss" of every token and the discovery document match it, also behind a proxy. ValidateOnStart builds the
+        // options when the host starts, so missing keys (OpenIddict's own check) stop the host instead of the first sign-in.
         services.AddOptions<OpenIddictServerOptions>()
-            .Configure<IOptions<JwtOptions>>((server, jwt) =>
-            {
-                if (Uri.TryCreate(jwt.Value.Authority, UriKind.Absolute, out var issuer))
-                    server.Issuer = issuer;
-            })
-            .Validate(
-                server => server.Issuer is not null,
-                "NovaCore.Identity.OpenIddict issues the tokens that Jwt:Authority points at, so Jwt:Authority must be "
-                + "the absolute public URL of this host, e.g. https://localhost:5443.")
+            .Configure<IOptions<JwtOptions>>((server, jwt) => server.Issuer = new Uri(jwt.Value.Authority, UriKind.Absolute))
             .ValidateOnStart();
 
         // The sign-in session at the provider: Identity's cookies, alongside the API's bearer default (the parameterless
