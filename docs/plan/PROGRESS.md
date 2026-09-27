@@ -329,8 +329,9 @@ Plan onayı (2026-09-27). Kullanıcı kararı: 2c önce main'e merge edildi (`--
   - `tests` altında `ITokenService` kullanan test kalmadı. Identity akış testleri (`AuthFlowTests`, `RefreshTokenExpiryTests`) modülün kendi HS256 token'larıyla Development'ta çalışıyor.
   - `tests/CLAUDE.md`'ye "Tokens: an in-memory OpenID Connect issuer" bölümü eklendi. 116/116.
 - [ ] F3a.2 İzin çözümleme (alt adımlar: 2a resolver, 2b claims transformation)
-  - [ ] F3a.2a `IPermissionResolver` + Identity implementasyonu — devam ediyor
-  - [ ] F3a.2b Claims transformation + HybridCache
+  - [x] F3a.2a (5063f54): Yeni public `IPermissionResolver` (`GetPermissionsAsync(ClaimsPrincipal, CancellationToken)`). Identity modülü `IdentityPermissionResolver`'ı scoped kaydediyor: `sub` → kullanıcı → rollerin `permission` claim'leri ∪ kullanıcının doğrudan izinleri. Guid olmayan, bilinmeyen ya da eksik `sub` boş döner (store Guid olmayan id'de exception fırlatıyor).
+    - Yeni `IdentityPermissionResolverTests` (4 vaka), önce derlenmedi. Bu alt adımda resolver'ı henüz tüketen yok; token'a izin gömen eski kod 2b'de kalkıyor. 120/120.
+  - [ ] F3a.2b Claims transformation + HybridCache — devam ediyor
 
 ### Faz 3b
 - [ ] F3b.1 OpenIddict eklentisi

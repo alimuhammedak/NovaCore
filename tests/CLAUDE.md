@@ -10,9 +10,9 @@ Stack: **xUnit v3** (test projects are `OutputType=Exe`). Run a single test with
 - **Unit** (`Unit/`) — pure logic (`Result<T>`, pagination). No host.
 - **Integration** (`Integration/`) — boot the real host via `NovaCoreApiFactory` (`WebApplicationFactory`).
   DB-free tests (health, OpenAPI, security headers, 401/validation gates) need no seeding. A caller with specific roles
-  or permissions comes from `factory.CreateClientWithClaims(...)`: the factory's in-memory issuer
-  (`factory.IdentityProvider`, see below) signs the token, so no user is seeded (`ValidationTests`,
-  `PermissionAuthorizationTests`). DB-backed tests (`AuthFlowTests`) implement `IAsyncLifetime` and seed via
+  comes from `factory.CreateClientWithClaims(...)`: the factory's in-memory issuer (`factory.IdentityProvider`, see
+  below) signs the token, so no user is seeded (`ValidationTests`). Permissions are never read from the token, so a
+  caller with permissions comes from `factory.CreateClientWithPermissions(...)` (`PermissionAuthorizationTests`). DB-backed tests (`AuthFlowTests`) implement `IAsyncLifetime` and seed via
   `IdentityDataSeeder` + `UserManager`; they use the Identity module's own HS256 tokens.
 - **Architecture** (`Architecture/`) — `ModularityTests` enforce boundaries (Payments → only
   Catalog.Contracts; `NovaCore.Abstractions` has no ASP.NET/EF reference). The testable bans in
@@ -61,6 +61,13 @@ So tokens go through the real Authority → metadata → JWKS path with no netwo
   for rejection tests (`JwtValidationTests`).
 - The symmetric `Jwt:SigningKey` is set in Development only (outside Development it stops the host), so
   `AuthFlowTests` and `RefreshTokenExpiryTests` can log in through the Identity module, which still signs HS256.
+- **Permissions** are resolved on the server (`IPermissionResolver`). The factory wraps the host's resolver: a subject
+  of `IdentityProvider`'s tokens holds what `factory.GrantPermissions(subject, ...)` gave it (nothing by default), and
+  every other token (the Identity module's) goes to the host's resolver. `CreateClientWithPermissions(...)` does both
+  for a fresh subject.
+- Resolved permissions are cached (`Cache:PermissionExpiration`). `FakeClockApiFactory` drives the memory cache's
+  clock too (`MemoryCacheOptions.Clock`: HybridCache's local entries expire by it, not by `TimeProvider`, R-057), so
+  `PermissionResolutionTests` moves the clock past the lifetime instead of waiting.
 
 ## Test configuration — in-memory config is enough
 

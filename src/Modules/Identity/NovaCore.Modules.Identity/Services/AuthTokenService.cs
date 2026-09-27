@@ -14,9 +14,10 @@ using NovaCore.Modules.Identity.Infrastructure;
 namespace NovaCore.Modules.Identity.Services;
 
 /// <summary>
-/// Issues and rotates the access/refresh token pair. Access tokens are short-lived JWTs carrying the
-/// user's roles + permissions as claims. Refresh tokens are opaque, stored hashed, rotated on every
-/// use, and a replayed (already-rotated) token revokes its entire family — OWASP reuse detection.
+/// Issues and rotates the access/refresh token pair. Access tokens are short-lived JWTs carrying the user's id, name,
+/// email and roles; permissions are resolved on the server (<see cref="IdentityPermissionResolver"/>). Refresh tokens
+/// are opaque, stored hashed, rotated on every use, and a replayed (already-rotated) token revokes its entire family —
+/// OWASP reuse detection.
 /// </summary>
 public interface IAuthTokenService
 {
@@ -29,7 +30,6 @@ public interface IAuthTokenService
 public sealed class AuthTokenService(
     IdentityDbContext dbContext,
     UserManager<ApplicationUser> userManager,
-    RoleManager<ApplicationRole> roleManager,
     ITokenService accessTokens,
     ISecurityAuditLogger audit,
     IOptions<JwtOptions> jwtOptions,
@@ -146,27 +146,8 @@ public sealed class AuthTokenService(
         if (!string.IsNullOrEmpty(user.Email))
             claims.Add(new Claim(NovaClaims.Email, user.Email));
 
-        var permissions = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var roleName in await userManager.GetRolesAsync(user))
-        {
-            claims.Add(new Claim(NovaClaims.Role, roleName));
-
-            var role = await roleManager.FindByNameAsync(roleName);
-            if (role is null)
-                continue;
-
-            foreach (var claim in await roleManager.GetClaimsAsync(role))
-                if (claim.Type == NovaClaims.Permission)
-                    permissions.Add(claim.Value);
-        }
-
-        // Direct, user-specific permission grants augment role permissions.
-        foreach (var claim in await userManager.GetClaimsAsync(user))
-            if (claim.Type == NovaClaims.Permission)
-                permissions.Add(claim.Value);
-
-        claims.AddRange(permissions.Select(p => new Claim(NovaClaims.Permission, p)));
+        // Roles only: permissions are resolved on the server per request, so a role change needs no new token.
+        claims.AddRange((await userManager.GetRolesAsync(user)).Select(role => new Claim(NovaClaims.Role, role)));
         return claims;
     }
 

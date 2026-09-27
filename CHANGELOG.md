@@ -122,6 +122,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     with one. In Development, with neither setting, the built-in development key still applies.
   - As a result the Identity module's own HS256 tokens are validated only in Development, and issuing one elsewhere
     fails with a message naming `Jwt:SigningKey` (`JwtTokenService`).
+- **Breaking (behaviour):** permissions are resolved on the server, never read from the access token.
+  `AddCoreAuthorization` registers a claims transformation that discards any `permission` claim in the token and adds
+  the permissions a registered `IPermissionResolver` returns. They are cached in HybridCache per `sub` and security
+  stamp (`NovaClaims.SecurityStamp`) for `Cache:PermissionExpiration` (default 5 minutes, validated on start), so a role
+  change reaches a signed-in user within that time. A host must register an `IPermissionResolver`; the Identity module
+  registers `IdentityPermissionResolver` (role and direct permission claims from its store), and its access tokens no
+  longer carry `permission` claims.
 
 ### Removed
 

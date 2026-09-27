@@ -17,8 +17,10 @@ Design is grounded in the OWASP Authentication / Password Storage / OAuth2 cheat
 - **Anti-enumeration:** login failures return a uniform **401 "Invalid credentials"** regardless of cause
   (unknown user / bad password / lockout). Registration returns the same generic message whether or not
   the email already exists. Don't add responses that leak account existence.
-- **Claims contract:** issue/validate the raw names in `NovaClaims` (`sub`/`name`/`email`/`role`/`permission`)
-  with `MapInboundClaims = false`. The `Administrator` role is the super-admin and bypasses permission checks
+- **Claims contract:** issue the raw names in `NovaClaims` (`sub`/`name`/`email`/`role`) with
+  `MapInboundClaims = false`. Permissions are **not** in the token: the core resolves them per request through
+  `IdentityPermissionResolver` (role + direct `permission` claims in the store) and discards any `permission` claim a
+  token carries. The `Administrator` role is the super-admin and bypasses permission checks
   (`HttpContextCurrentUser.SuperAdminRole`).
 - **Audit, don't print secrets.** Route security events through `ISecurityAuditLogger` (it masks emails).
   Never log passwords, raw refresh tokens, or full JWTs.

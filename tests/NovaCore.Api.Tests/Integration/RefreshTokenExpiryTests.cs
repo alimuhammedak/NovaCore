@@ -3,7 +3,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NovaCore.AspNetCore.Auth;
@@ -69,8 +71,10 @@ public sealed class RefreshTokenExpiryTests(FakeClockApiFactory factory)
 }
 
 /// <summary>
-/// The shared test host with a <see cref="FakeTimeProvider"/> as the app's clock. It starts at the real current time so
-/// the tokens it signs are still accepted by JWT validation, which uses the real clock (R-050).
+/// The shared test host with a <see cref="FakeTimeProvider"/> as the app's clock, including the memory cache behind
+/// HybridCache, whose entries expire by <see cref="MemoryCacheOptions.Clock"/> rather than <see cref="TimeProvider"/>
+/// (R-057). It starts at the real current time so the tokens it signs are still accepted by JWT validation, which uses
+/// the real clock (R-050, R-058).
 /// </summary>
 public sealed class FakeClockApiFactory : NovaCoreApiFactory
 {
@@ -80,6 +84,15 @@ public sealed class FakeClockApiFactory : NovaCoreApiFactory
     {
         base.ConfigureWebHost(builder);
 
-        builder.ConfigureServices(services => services.AddSingleton<TimeProvider>(Clock));
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<TimeProvider>(Clock);
+            services.Configure<MemoryCacheOptions>(options => options.Clock = new FakeSystemClock(Clock));
+        });
+    }
+
+    private sealed class FakeSystemClock(TimeProvider clock) : ISystemClock
+    {
+        public DateTimeOffset UtcNow => clock.GetUtcNow();
     }
 }

@@ -101,6 +101,7 @@ const NovaCore.AspNetCore.Identity.NovaClaims.Email = "email" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Name = "name" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Permission = "permission" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Role = "role" -> string!
+const NovaCore.AspNetCore.Identity.NovaClaims.SecurityStamp = "AspNet.Identity.SecurityStamp" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Subject = "sub" -> string!
 const NovaCore.AspNetCore.OpenApi.BearerSecuritySchemeTransformer.SchemeId = "Bearer" -> string!
 const NovaCore.AspNetCore.Web.CoreWebExtensions.CorsPolicyName = "novacore" -> string!

@@ -307,8 +307,8 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
   (RS/PS/ES) kabul edilir. Simetrik `Jwt:SigningKey` (HS256) **yalnızca Development'ta** geçerlidir; başka ortamda host
   açılmaz (MS JWT rehberi: *"Asymmetric keys should always be used"*).
 - **Identity modülünün kendi token'ları** (eski yol, F3b.3'te emekliye ayrılacak): kısa ömürlü **access JWT** (HS256,
-  15 dk) — `sub`, `name`, `email`, `role*`, `permission*` claim'leri. HS256 olduğu için yalnızca Development'ta ve
-  testlerde doğrulanır.
+  15 dk) — `sub`, `name`, `email`, `role*` claim'leri (izinler token'a girmez, aşağıya bakın). HS256 olduğu için
+  yalnızca Development'ta ve testlerde doğrulanır.
 - Uzun ömürlü **refresh token** (256-bit, **DB'de SHA-256 hash'li**, 7 gün).
 - **Rotation:** her `/auth/refresh`'te yeni refresh, eskisi iptal.
 - **Reuse detection + family revocation:** tüketilmiş bir refresh tekrar gelirse **tüm token ailesi iptal**
@@ -322,7 +322,12 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
   taşır, `PermissionAuthorizationHandler` onu denetler. Özel policy provider ya da izin başına bir named policy yok.
   Kullanım: `endpoint.RequirePermission("catalog:products:create")` veya handler'da `[RequirePermission(...)]`.
   Anonim istek 401, izni olmayan istek 403 alır.
-- İzinler login'de **JWT claim** olarak gömülür; `Administrator` rolü super-admin (tüm kontrolleri geçer).
+- İzinler **sunucu tarafında çözülür**, token'dan okunmaz. Bir `IClaimsTransformation` token'daki `permission`
+  claim'lerini atar ve `IPermissionResolver`'ın döndürdüklerini ekler. Identity modülü bunları kullanıcının rollerinden
+  ve doğrudan izinlerinden okur (`IdentityPermissionResolver`). Sonuç HybridCache'te `sub` + security stamp anahtarıyla
+  `Cache:PermissionExpiration` (varsayılan 5 dk) boyunca tutulur: bir rol değişikliği oturum açmış kullanıcıya en geç bu
+  sürede yansır, yeni bir security stamp'li token cache'i atlar. `Administrator` rolü (token'daki rol claim'i)
+  super-admin'dir, tüm kontrolleri geçer.
 - **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder hepsini toplayıp
   rollere bağlar (`User` rolü = iş modüllerinin yalnızca `:read` izinleri — least privilege).
 
@@ -370,7 +375,7 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
   "Database":      { "ApplyMigrations": false },   // true: açılışta migration uygula
   "Jwt":           { "Authority": "", "Issuer": "novacore", "Audience": "novacore.api", "SigningKey": "", "AccessTokenMinutes": 15, "RefreshTokenDays": 7 },
   "Identity":      { "Seed": { "SeedOnStartup": false, "AdminEmail": "admin@novacore.local", "AdminPassword": "" } },
-  "Cache":         { "DefaultExpiration": "00:05:00" },
+  "Cache":         { "DefaultExpiration": "00:05:00", "PermissionExpiration": "00:05:00" },
   "RateLimiting":  { "PermitLimit": 100, "WindowSeconds": 60 },   // /auth grubu 1/10'unu kullanır ("strict")
   "Cors":          { "AllowedOrigins": [] },        // boş = her ortamda her origin'e izin (credentials olmadan)
   "Seq":           { "ServerUrl": "" }              // dolu = Seq'e log gönder
@@ -388,7 +393,8 @@ host'u, ayarın adını veren bir hatayla durdurur:
 - `Jwt`: `Issuer`/`Audience` boş olamaz. `Authority` Development dışında zorunlu ve `https`, Development'ta verilirse
   mutlak bir URI. `SigningKey` yalnızca Development'ta ve en az 32 bayt,
   `AccessTokenMinutes` ≥ 1, `RefreshTokenDays` 1–36.500.
-- `RateLimiting`: `PermitLimit` ve `WindowSeconds` ≥ 1. `Cache:DefaultExpiration` pozitif bir süre.
+- `RateLimiting`: `PermitLimit` ve `WindowSeconds` ≥ 1. `Cache:DefaultExpiration` ve `Cache:PermissionExpiration`
+  pozitif birer süre.
 - `Cors:AllowedOrigins`: her giriş çıplak bir origin olmalı (`https://app.example.com`): yol, sondaki `/` ve `*` yok.
 - `Database:ApplyMigrations`: `true`/`false`.
 

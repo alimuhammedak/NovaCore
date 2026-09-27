@@ -12,8 +12,8 @@ public sealed class PermissionRequirement(string permission) : IAuthorizationReq
 }
 
 /// <summary>
-/// Grants access when the principal carries a matching <c>permission</c> claim, or belongs to the
-/// super-admin role. Permissions are embedded in the access token as claims at login time.
+/// Grants access when the principal carries a matching <c>permission</c> claim, or belongs to the super-admin role.
+/// The permission claims are the ones resolved on the server (<see cref="IPermissionResolver"/>), never the token's own.
 /// </summary>
 public sealed class PermissionAuthorizationHandler : AuthorizationHandler<PermissionRequirement>
 {

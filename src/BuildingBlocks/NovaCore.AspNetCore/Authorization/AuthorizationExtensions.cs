@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,11 +10,17 @@ public static class AuthorizationExtensions
 {
     /// <summary>
     /// Enables permission-based authorization: the handler that checks the <see cref="PermissionRequirement"/> a
-    /// <see cref="RequirePermissionAttribute"/> carries. Call after <c>AddCoreAuthentication</c>.
+    /// <see cref="RequirePermissionAttribute"/> carries, and the claims transformation that gives every authenticated
+    /// caller the permissions <see cref="IPermissionResolver"/> resolves on the server, cached in HybridCache per
+    /// subject and security stamp for <c>Cache:PermissionExpiration</c>. Permission claims in the access token are
+    /// discarded. Needs <c>AddCoreAuthentication</c>, <c>AddCoreCaching</c> and a registered
+    /// <see cref="IPermissionResolver"/> (the identity integration brings it); it replaces any other
+    /// <see cref="IClaimsTransformation"/>.
     /// </summary>
     public static IServiceCollection AddCoreAuthorization(this IServiceCollection services)
     {
         services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddScoped<IClaimsTransformation, PermissionClaimsTransformation>();
         services.AddAuthorization();
         return services;
     }
