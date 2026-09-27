@@ -13,6 +13,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
 using NovaCore.Api.Tests.IdentityServer;
+using NovaCore.EntityFrameworkCore.Messaging;
 using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Identity.OpenIddict;
 using NovaCore.Modules.Catalog.Infrastructure;
@@ -140,8 +141,9 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
     }
 
     /// <summary>
-    /// Replaces a module's SQL Server registration of <typeparamref name="TContext"/> with SQLite, keeping the audit
-    /// interceptor the module adds. EF Core 10 registers the provider via additive
+    /// Replaces a module's SQL Server registration of <typeparamref name="TContext"/> with SQLite, keeping the interceptors
+    /// of the original registration: the audit interceptor the module adds and the outbox interceptor
+    /// <c>AddModuleDbContext</c> adds. EF Core 10 registers the provider via additive
     /// <c>IDbContextOptionsConfiguration&lt;TContext&gt;</c>, so EVERY registration generic over the context (options,
     /// configuration, the context) is removed first.
     /// </summary>
@@ -160,7 +162,9 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
             useSqlite(options);
             options
                 .UseInternalServiceProvider(_sqliteServices)
-                .AddInterceptors(provider.GetRequiredService<AuditableEntityInterceptor>());
+                .AddInterceptors(
+                    provider.GetRequiredService<AuditableEntityInterceptor>(),
+                    provider.GetRequiredService<OutboxInterceptor>());
         });
     }
 

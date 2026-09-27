@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NovaCore.EntityFrameworkCore.Messaging;
 using NovaCore.Modules.Catalog.Domain;
 
 namespace NovaCore.Modules.Catalog.Infrastructure;
@@ -17,5 +18,6 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CatalogDbContext).Assembly);
+        modelBuilder.AddOutbox();
     }
 }

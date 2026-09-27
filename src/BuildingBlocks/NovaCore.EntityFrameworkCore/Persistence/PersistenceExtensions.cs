@@ -50,6 +50,8 @@ public static class PersistenceExtensions
     /// Registers a module's DbContext, advertises it for generic startup migration and adds a health check (named after
     /// the context and tagged <c>ready</c>) that reports whether its database can be reached.
     /// Each module keeps its own context (and its own schema) — the modular-monolith boundary at the DB level.
+    /// The context always gets <see cref="OutboxInterceptor"/>, which writes the domain events its entities raise to its
+    /// outbox; the module maps that with <see cref="OutboxModelBuilderExtensions.AddOutbox"/>.
     /// Also registers <see cref="AuditableEntityInterceptor"/> (and the <see cref="TimeProvider"/> it stamps with), which
     /// module contexts add to their options, so the context resolves whether or not the host has called
     /// <see cref="AddCorePersistence"/> yet.
@@ -63,8 +65,15 @@ public static class PersistenceExtensions
         Action<IServiceProvider, DbContextOptionsBuilder> configure)
         where TContext : DbContext
     {
-        services.AddDbContext<TContext>(configure);
+        // The outbox interceptor is added here rather than by each module: a module that forgot it would lose its events
+        // without an error.
+        services.AddDbContext<TContext>((provider, options) =>
+        {
+            configure(provider, options);
+            options.AddInterceptors(provider.GetRequiredService<OutboxInterceptor>());
+        });
         services.AddSingleton(new ModuleDbContextDescriptor(typeof(TContext)));
+        services.TryAddSingleton<OutboxInterceptor>();
         services.TryAddScoped<AuditableEntityInterceptor>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddHealthChecks().AddDbContextCheck<TContext>(tags: [ReadyTag]);

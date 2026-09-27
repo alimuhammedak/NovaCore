@@ -10,7 +10,8 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 **Core** (BCL and Microsoft packages only, D-003; enforced by `PackageDependencyTests`):
 
 - **`NovaCore.Abstractions`** — BCL only. **No `FrameworkReference`, no NuGet, no ASP.NET, no EF.**
-  Home of `Result`/`Result<T>`/`Error`, `PagedList<T>`/`PaginationRequest`, `Entity`/`AuditableEntity`,
+  Home of `Result`/`Result<T>`/`Error`, `PagedList<T>`/`PaginationRequest`, `Entity<TId>`/`AuditableEntity<TId>`
+  (their domain-event buffer lives on the non-generic `Entity` base, so persistence reads it without the key type),
   `IDomainEvent` (events derive from the `DomainEvent` record, which fixes `EventId`/`OccurredOnUtc` at
   creation), `ICurrentUser`. If a new type needs a framework, it does **not** belong here.
 
@@ -23,9 +24,12 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   Abstractions + `FrameworkReference Microsoft.AspNetCore.App`, never on EntityFrameworkCore.
 
 - **`NovaCore.EntityFrameworkCore`** — persistence without ASP.NET Core: `AddModuleDbContext` (also a "ready"-tagged
-  `AddDbContextCheck` per context), `AddCorePersistence` (`AuditableEntityInterceptor`, `DomainEventDispatcher`,
+  `AddDbContextCheck` per context, and the `OutboxInterceptor` on every module context), `AddOutbox()` (maps a module's
+  `outbox_messages`), `AddCorePersistence` (`AuditableEntityInterceptor`, `DomainEventDispatcher`,
   `DatabaseMigrationService`, which migrates only when `Database:ApplyMigrations` is true). Depends on Abstractions,
   EF Core and `Microsoft.Extensions` hosting/options/health-check packages only, never on AspNetCore (D-020).
+  `OutboxInterceptor` adds the outbox rows in `SavingChanges`, which EF Core runs before it detects changes and saves,
+  so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068).
 
 **Add-ons** (optional, one third-party library each; they may reference AspNetCore/Abstractions only):
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`), `NovaCore.Scalar`

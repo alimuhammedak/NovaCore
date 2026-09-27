@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NovaCore.EntityFrameworkCore.Messaging;
 using NovaCore.Modules.Payments.Domain;
 
 namespace NovaCore.Modules.Payments.Infrastructure;
@@ -14,5 +15,6 @@ public sealed class PaymentsDbContext(DbContextOptions<PaymentsDbContext> option
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PaymentsDbContext).Assembly);
+        modelBuilder.AddOutbox();
     }
 }

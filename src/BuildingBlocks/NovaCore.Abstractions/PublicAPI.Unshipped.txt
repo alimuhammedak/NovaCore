@@ -13,14 +13,16 @@ NovaCore.Abstractions.Entities.AuditableEntity<TId>.ModifiedAtUtc.get -> System.
 NovaCore.Abstractions.Entities.AuditableEntity<TId>.ModifiedAtUtc.set -> void
 NovaCore.Abstractions.Entities.AuditableEntity<TId>.ModifiedBy.get -> string?
 NovaCore.Abstractions.Entities.AuditableEntity<TId>.ModifiedBy.set -> void
+NovaCore.Abstractions.Entities.Entity
+NovaCore.Abstractions.Entities.Entity.ClearDomainEvents() -> void
+NovaCore.Abstractions.Entities.Entity.DomainEvents.get -> System.Collections.Generic.IReadOnlyCollection<NovaCore.Abstractions.Messaging.IDomainEvent!>!
+NovaCore.Abstractions.Entities.Entity.Entity() -> void
+NovaCore.Abstractions.Entities.Entity.Raise(NovaCore.Abstractions.Messaging.IDomainEvent! domainEvent) -> void
 NovaCore.Abstractions.Entities.Entity<TId>
-NovaCore.Abstractions.Entities.Entity<TId>.ClearDomainEvents() -> void
-NovaCore.Abstractions.Entities.Entity<TId>.DomainEvents.get -> System.Collections.Generic.IReadOnlyCollection<NovaCore.Abstractions.Messaging.IDomainEvent!>!
 NovaCore.Abstractions.Entities.Entity<TId>.Entity() -> void
 NovaCore.Abstractions.Entities.Entity<TId>.Entity(TId id) -> void
 NovaCore.Abstractions.Entities.Entity<TId>.Id.get -> TId
 NovaCore.Abstractions.Entities.Entity<TId>.Id.set -> void
-NovaCore.Abstractions.Entities.Entity<TId>.Raise(NovaCore.Abstractions.Messaging.IDomainEvent! domainEvent) -> void
 NovaCore.Abstractions.Entities.IAuditableEntity
 NovaCore.Abstractions.Entities.IAuditableEntity.CreatedAtUtc.get -> System.DateTimeOffset
 NovaCore.Abstractions.Entities.IAuditableEntity.CreatedAtUtc.set -> void

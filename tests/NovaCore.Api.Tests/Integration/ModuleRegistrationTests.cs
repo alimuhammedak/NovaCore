@@ -1,13 +1,16 @@
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NovaCore.AspNetCore.Modules;
+using NovaCore.EntityFrameworkCore.Persistence;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
 
 /// <summary>
-/// The host's module wiring, pinned: which modules are registered, in what order, and the endpoints they map. Written
-/// against assembly-scanning discovery before F2a.3 switched to explicit registration, which must keep both unchanged.
+/// The host's module wiring, pinned: which modules are registered, in what order, the endpoints they map and the outbox
+/// each module's DbContext maps. The first two were written against assembly-scanning discovery before F2a.3 switched to
+/// explicit registration, which must keep both unchanged.
 /// </summary>
 public class ModuleRegistrationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>
 {
@@ -56,5 +59,22 @@ public class ModuleRegistrationTests(NovaCoreApiFactory factory) : IClassFixture
                 $"{string.Join(',', endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? [])} {endpoint.RoutePattern.RawText}");
 
         Assert.Equal(expected, endpoints);
+    }
+
+    [Fact]
+    public void Every_module_DbContext_maps_the_outbox()
+    {
+        // A module's entities write their events to its outbox (PLAN F4a.1). Without modelBuilder.AddOutbox() the first
+        // event would fail its save; this catches the omission before any module raises one.
+        using var scope = _factory.Services.CreateScope();
+        var moduleContexts = scope.ServiceProvider.GetServices<ModuleDbContextDescriptor>()
+            .Where(descriptor => descriptor.ContextType.Assembly.GetName().Name!
+                .StartsWith("NovaCore.Modules.", StringComparison.Ordinal))
+            .Select(descriptor => (DbContext)scope.ServiceProvider.GetRequiredService(descriptor.ContextType))
+            .ToList();
+
+        Assert.Equal(["CatalogDbContext", "PaymentsDbContext"], moduleContexts.Select(context => context.GetType().Name));
+        Assert.All(moduleContexts, context =>
+            Assert.Contains(context.Model.GetEntityTypes(), entityType => entityType.GetTableName() == "outbox_messages"));
     }
 }

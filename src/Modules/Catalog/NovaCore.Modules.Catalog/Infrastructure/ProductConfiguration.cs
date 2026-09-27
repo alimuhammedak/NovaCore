@@ -20,7 +20,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(p => p.Name);
         builder.HasIndex(p => p.IsActive);
 
-        // Domain events are dispatched from the unit of work, never persisted.
+        // The event buffer isn't a column: saving writes the events to the module's outbox table (OutboxInterceptor).
         builder.Ignore(p => p.DomainEvents);
     }
 }

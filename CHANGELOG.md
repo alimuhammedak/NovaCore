@@ -79,6 +79,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The OpenAPI document declares the identity provider's Authorization Code flow (`OAuth2` scheme, under
   `Jwt:Authority`), and `NovaCore.Scalar` has a `MapCoreScalar(Action<ScalarOptions>)` overload. The Api host uses it
   to sign Scalar in with PKCE as the `scalar` client (`Identity:Clients` in `appsettings.Development.json`).
+- Transactional outbox, write side: the domain events an entity raises are written to its module's `outbox_messages`
+  table by the SaveChanges that saves the entity, in the same transaction, and the entity's buffer is cleared.
+  `modelBuilder.AddOutbox()` (`NovaCore.EntityFrameworkCore.Messaging`) maps the table in the context's schema, and
+  `AddModuleDbContext` adds the writing `OutboxInterceptor` to every module context. A context whose entities raise
+  events without an outbox in its model fails the save instead of dropping them. Catalog and Payments map the outbox
+  (migration `Outbox`: `catalog.outbox_messages`, `payments.outbox_messages`); neither raises events yet.
 
 ### Changed
 
@@ -181,6 +187,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start in any environment; the Identity module
   registers `IdentityPermissionResolver` (role and direct permission claims from its store), and its access tokens no
   longer carry `permission` claims.
+- **Breaking (API):** the domain-event buffer (`DomainEvents`, `Raise`, `ClearDomainEvents`) moved from `Entity<TId>` to
+  a new non-generic base class, `Entity`, so the persistence layer can read any entity's events without its key type.
+  Code that derives from `Entity<TId>` or `AuditableEntity<TId>` compiles unchanged.
 
 ### Removed
 

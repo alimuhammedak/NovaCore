@@ -14,7 +14,7 @@
 | 2c | ✅ tamam | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | 2026-09-26 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
 | 3a | ✅ tamam | `faz/3a-kimlik-dogrulama` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
 | 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
-| 4a | ⏳ başlamadı | | | | |
+| 4a | 🔄 devam ediyor | `faz/4a-outbox` | 2026-09-28 | | |
 | 4b | ⏳ başlamadı | | | | |
 | 5 | ⏳ başlamadı | | | | |
 
@@ -617,9 +617,28 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
   - Tarayıcı raporu: F3b.5b.
 
 ### Faz 4a
-- [ ] F4a.1 Event'lerin outbox'a yazılması
+Plan onayı 2026-09-28. Uygulama sırası F4a.1 → F4a.3 → F4a.2 (ID'ler sabit): F4a.2'nin dispatcher'ı handler'ları F4a.3'ün cache'li wrapper'ıyla çağırıyor.
+
+- [x] F4a.1 (commit: bir sonraki satırda): Event'lerin outbox'a yazılması.
+  - Event tamponu jenerik olmayan `Entity` tabanına taşındı (`Entity<TId> : Entity`). Mevcut kod aynen derleniyor.
+    - **Sapma:** planda kurucu `private protected`'tı. PublicApiAnalyzers RS0022 verdi (türeyen `Entity<TId>` korumalı `Raise`'i dışarı açıyor), kurucu `protected` oldu (D-031 (2)).
+  - `OutboxInterceptor` (public) `SavingChanges`'te her `Entity`'nin event'lerini `outbox_messages`'a ekliyor ve tamponu temizliyor.
+    - EF interceptor'ı `DetectChanges`'ten ve execution strategy'nin sardığı `StateManager.SaveChanges`'ten önce çağırdığı için satırlar aynı transaction'da (R-068).
+    - Modelde outbox yokken event gelirse kayıt açıklayıcı bir `InvalidOperationException` ile duruyor.
+  - `AddModuleDbContext` interceptor'ı her modül context'ine kendisi ekliyor. Catalog ve Payments `modelBuilder.AddOutbox()` çağırıyor. `Outbox` migration'ları: `bigint IDENTITY` anahtar, unique `EventId`.
+  - `NovaCoreApiFactory.ReplaceWithSqlite` interceptor'ı da ekliyor.
+  - Testler 172 → 178:
+    - `OutboxInterceptorTests` (5):
+      - yazım ve içeriğin geri dönüşü;
+      - iki yönlü rollback: reddedilen outbox satırı entity'yi, reddedilen entity outbox satırını geri alıyor. Hangi insert önce çalışırsa çalışsın aynı transaction kanıtlanıyor;
+      - outbox'sız context;
+      - event'siz kayıt.
+    - `ModuleRegistrationTests`: her modül context'i outbox'ı map'liyor.
+    - Önce kırmızı: `AddOutbox` yokken derleme hatası.
+  - `has-pending-model-changes` üç context'te temiz.
+  - CHANGELOG, `src/Modules/CLAUDE.md` ve `src/BuildingBlocks/CLAUDE.md` güncellendi. R-068, R-069 ve D-031 yazıldı.
+- [ ] F4a.3 Eski dispatcher düzeltmesi (sıradaki)
 - [ ] F4a.2 Dispatcher
-- [ ] F4a.3 Eski dispatcher düzeltmesi
 
 ### Faz 4b
 - [ ] F4b.1 Stok kararı
