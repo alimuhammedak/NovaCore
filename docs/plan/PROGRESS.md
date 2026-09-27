@@ -13,7 +13,7 @@
 | 2b | ✅ tamam | `faz/2b-konfigurasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2c | ✅ tamam | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | 2026-09-26 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
 | 3a | ✅ tamam | `faz/3a-kimlik-dogrulama` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
-| 3b | ⏳ başlamadı | | | | |
+| 3b | 🔄 devam ediyor | `faz/3b-idp` | 2026-09-27 | | |
 | 4a | ⏳ başlamadı | | | | |
 | 4b | ⏳ başlamadı | | | | |
 | 5 | ⏳ başlamadı | | | | |
@@ -369,6 +369,8 @@ Plan onayı (2026-09-27). Kullanıcı kararı: 2c önce main'e merge edildi (`--
   - Atlandı ("Sonraya bırakılanlar"a yazıldı): super-admin bypass'ının token rolüne dayanması, Development'ta issuer ve anahtarın bağsız birleşmesi, cache değerinin her okumada deserialize edilmesi, factory'deki dispose sırası, test yardımcılarındaki tekrar.
 
 ### Faz 3b
+Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29 (D-028, Development simetrik anahtarı kalkar). Model kararları D-026, araştırmalar R-059…. Başlangıçta main'in `/openapi/v1.json`'u scratchpad'e kaydedildi (29.460 bayt, commit'lenmedi). Alt adımlar: F3b.1a iskelet + sunucu, 1b Authorization Code + PKCE + refresh, 1c client credentials; F3b.2a sertleştirme + audit, 2b kayıt/onay, 2c 2FA, 2d oturum uçları, 2e admin + rol seed'i; F3b.3a Api geçişi + modülün silinmesi, 3b çekirdek temizliği, 3c dokümanlar; F3b.5a OpenAPI/Scalar, 5b tarayıcı. Eklenti, eski modül Api host'unda dururken her commit'in yeşil kalması için bir tüketici test host'unda test ediliyor (D-026 (12)).
+
 - [ ] F3b.1 OpenIddict eklentisi
 - [ ] F3b.2 Sertleştirmelerin taşınması
 - [ ] F3b.3 Eski modülün emekliye ayrılması
@@ -425,6 +427,8 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-25 | F2c.1: `CreatePayment.ProductId`'nin boş Guid kuralı (`NotEmpty`) hazır bir DataAnnotations attribute'uyla ifade edilemiyor (`[Required]` Guid.Empty'yi reddetmez). Nasıl ifade edilsin? | F2c.1 | **Özel `ValidationAttribute`** (2026-09-26, kullanıcı; R-052): `CreatePayment` içinde private nested. MS'in tek değerli kural yolu, hata diğer alan hatalarıyla aynı yanıtta gelir → D-023 |
 | Q-26 | F2c.1: `ExceptionHandlerOrderTests` silinecek `ValidationExceptionHandler`'ın sırasını test ediyor. Silinsin mi? (Y-44) | F2c.1e | **Sil** (2026-09-26, kullanıcı). Köprü D-019 gereği gidiyor, validation 400 yolunu `ValidationTests` koruyor. |
 | Q-27 | Faz 3b'nin IdP'si: OpenIddict eklentisi (PLAN F3b.1–3, Keycloak yalnızca F3b.4'te opsiyonel), yalnızca Keycloak ya da ikisi birden? (PLAN: 3a sonunda sorulur) | F3b.1'den önce | **OpenIddict eklentisi, Keycloak opsiyonel** (2026-09-27, kullanıcı; önce farkların açıklanmasını istedi, açıklama faz raporunda). PLAN F3b.1–F3b.5 olduğu gibi geçerli → D-025 |
+| Q-28 | Eski Identity modülünün PLAN F3b.2 listesinde olmayan özellikleri (2FA, parola değiştirme, logout-all, `/me`) yeni eklentiye taşınsın mı? | F3b.2 | **Tam parite** (2026-09-27, kullanıcı) → D-027 |
+| Q-29 | F3b.3'te Development'taki simetrik JWT doğrulaması (D-024 (1)) ne olsun? | F3b.3 | **Kaldır**: `Jwt:SigningKey`/`Issuer`/geliştirme anahtarı silinir, `Jwt:Authority` her ortamda zorunlu (2026-09-27, kullanıcı) → D-028 |
 
 ## Sonraya bırakılanlar
 

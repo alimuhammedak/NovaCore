@@ -413,3 +413,35 @@ Biçim:
 - Bulgu: `TokenValidationParameters`'ta (IdentityModel 8.19) bir `TimeProvider` yok. Sürenin dışarıdan kontrol edilebilmesinin tek yolu `LifetimeValidator` delegesi. Doküman: *"If set, this delegate will be called to validate the lifetime of the token, instead of default processing. This means that no default lifetime validation will occur."* `TimeProvider` yalnızca deneysel `ValidationParameters` API'sinde var.
 - Kaynak: https://learn.microsoft.com/dotnet/api/microsoft.identitymodel.tokens.tokenvalidationparameters.lifetimevalidator?view=msal-web-dotnet-latest · https://learn.microsoft.com/dotnet/api/microsoft.identitymodel.tokens.validators.validatelifetime?view=msal-web-dotnet-latest
 - Sonuç: R-050'deki hizalama yapılmıyor (D-024 (8)). Varsayılan doğrulamayı elle yazılmış bir delegeyle değiştirmenin riski, testte "şimdi"den başlayan sahte saatin maliyetinden büyük.
+
+## Faz 3b araştırması (2026-09-27)
+
+### R-059: OpenIddict 7.7.1: paketler, access token biçimi, anahtarlar, refresh token rotasyonu (2026-09-27, faz 3b)
+- Bulgu:
+  - Güncel kararlı sürüm 7.7.1 (2026-09-17). Lisans Apache-2.0, `net10.0` hedefi var. `OpenIddict.EntityFrameworkCore` 7.7.1'in bağımlılıkları: `OpenIddict.Core`, `OpenIddict.EntityFrameworkCore.Models`, `Microsoft.EntityFrameworkCore.Relational [10.0.11, )`. `OpenIddict.AspNetCore` meta paketi client ve validation paketlerini de getiriyor; sunucu için `OpenIddict.Server.AspNetCore` yetiyor.
+  - Access token şifrelemesi varsayılan olarak açık (JWE). *"the OpenIddict server enforces encryption for all the token types it supports"*. `DisableAccessTokenEncryption()` *"when integration with third-party APIs/resource servers is desired"* için var. Kaynakta: *"SHOULD only be done when issuing tokens to third-party resource servers/APIs you don't control and don't fully trust."*
+  - `OpenIddictServerConfiguration` bir `IPostConfigureOptions<OpenIddictServerOptions>`. Asimetrik imza anahtarı yoksa ID0086, şifreleme anahtarı yoksa ID0085 ile `InvalidOperationException` fırlatıyor. Şifreleme anahtarı, access token şifrelemesi kapalıyken de zorunlu (code ve refresh token için).
+  - `AddEphemeralSigningKey(algorithm)` RSA ve ECDSA (ES256/384/512) algoritmalarını destekliyor. `AddSigningCertificate(X509Certificate2)` anahtar türünü kısıtlamıyor, yalnızca `DigitalSignature` kullanımını kontrol ediyor. Ephemeral anahtarlar *"should only be used during development"*.
+  - `OpenIddictServerOptions` varsayılanları:
+    - `RefreshTokenReuseLeeway` 30 sn; rolling refresh token'lar açık (`DisableRollingRefreshTokens` false).
+    - `RequireProofKeyForCodeExchange` false; ömürler: access 1 saat, refresh 14 gün.
+    - `TimeProvider` DI'dan alınıyor, yoksa `TimeProvider.System`.
+  - `ValidateTokenEntry`: zaten "redeemed" işaretli bir token gelirse *"revoke the entire chain of tokens associated with the authorization"* (`RevokeByAuthorizationIdAsync`). Refresh token'lar için leeway süresince tekrar kullanıma izin veriliyor. Authorization'ın kendisi iptal edilmiyor.
+  - EF entegrasyonu: `modelBuilder.UseOpenIddict()` (varsayılan `string` anahtar) OnModelCreating içinde çağrılabiliyor. Store kaydı: `AddCore(o => o.UseEntityFrameworkCore().UseDbContext<T>())`.
+  - Minimal API passthrough: örnek `Zirku.Server`, `connect/authorize`'ı `app.MapMethods(...)` ile map'liyor ve `Results.SignIn(principal, null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)` döndürüyor. `Velusia.Server`, Identity ile authorization code akışını gösteriyor:
+    - cookie yoksa Challenge;
+    - implicit consent'te kalıcı authorization oluşturuluyor;
+    - token endpoint'inde kullanıcı yeniden doğrulanıyor (`CanSignInAsync`);
+    - security stamp claim'i hiçbir token'a yazılmıyor.
+- Kaynak: https://api.nuget.org/v3/catalog0/data/2026.09.17.20.00.23/openiddict.aspnetcore.7.7.1.json · https://api.nuget.org/v3/catalog0/data/2026.09.17.20.01.01/openiddict.entityframeworkcore.7.7.1.json · https://documentation.openiddict.com/configuration/token-formats · https://documentation.openiddict.com/configuration/encryption-and-signing-credentials · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Server/OpenIddictServerOptions.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Server/OpenIddictServerConfiguration.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Server/OpenIddictServerBuilder.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Server/OpenIddictServerHandlers.Protection.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.EntityFrameworkCore/OpenIddictEntityFrameworkCoreHelpers.cs · https://github.com/openiddict/openiddict-samples/tree/dev/samples/Zirku · https://github.com/openiddict/openiddict-samples/tree/dev/samples/Velusia
+- Sonuç: D-026 (1), (3), (5), (7), (9). Çekirdek JwtBearer IdP'den bağımsız standart bir resource server olduğu için access token şifrelemesi kapatılıyor. Anahtar eksikliği `ValidateOnStart` ile açılışta yakalanıyor.
+
+### R-060: DbContext bir pakette, migration'lar uygulamada (2026-09-27, faz 3b)
+- Bulgu: EF Core, migration'ları DbContext'ten farklı bir assembly'de tutmayı destekliyor. *"You can store migrations in a different project from the one containing your DbContext."* Önerilen düzen:
+  - veri projesi DbContext'i ve entity'leri taşır;
+  - migration projesi migration'ları, snapshot'ı ve `IDesignTimeDbContextFactory<TContext>`'i taşır;
+  - çalışma anında `x.MigrationsAssembly("…")` ayarlanır.
+  
+  Uygulama migration'ları çalışma anında uyguluyorsa migration assembly'sini referans almalı.
+- Kaynak: https://learn.microsoft.com/ef/core/managing-schemas/migrations/projects
+- Sonuç: D-026 (2). `NovaCore.Identity.OpenIddict` `IdentityServerDbContext`'i taşır. Api host'u SQL Server migration'larını ve design-time factory'yi taşır (F3b.3a). Paket sağlayıcıya bağlanmaz.
