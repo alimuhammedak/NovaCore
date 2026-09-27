@@ -485,3 +485,25 @@ Biçim:
 - Sonuç:
   - Api host'u context'i `EnableRetryOnFailure` ile kaydediyor (F3b.3a).
   - CA1861 `.editorconfig`'te yalnızca `src/**/Migrations/*.cs` için kapalı (Y-44'ün izin verdiği kalıcı bastırma). Kök CLAUDE.md'nin bastırma listesine eklendi.
+
+### R-065: docker-compose imaj sürümleri, Keycloak realm import'u ve compose'un zorunlu değişkenleri (2026-09-27, faz 3b; kaynak + gözlem)
+- Bulgu:
+  - Güncel etiketler (2026-09-27, registry API'leri):
+    - Keycloak `26.7.4` (quay.io, 2026-09-16);
+    - SQL Server 2022 için en yüksek CU `2022-CU27-ubuntu-22.04` (mcr.microsoft.com);
+    - Seq `2026.1.17182` (2026-09-24);
+    - Jaeger v2 `jaegertracing/jaeger:2.21.0` (2026-09-15). Jaeger v1'in `all-in-one` imajı yerine v2 imajının varsayılan all-in-one yapılandırması OTLP 4317/4318 ve UI 16686'yı sunuyor.
+  - Keycloak dokümanı:
+    - *"For the Keycloak containers, the import directory is `/opt/keycloak/data/import`"*, `--import-realm` ile. *"If a realm already exists in the server, the import operation is skipped."*
+    - İlk admin: `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD`. Geliştirme örneği `start-dev` kullanıyor ve portu `127.0.0.1`'e bağlıyor.
+  - Gözlem: `docker compose config`, profili aktif olmayan servislerdeki `${VAR:?}` zorunlu değişkenlerini de yorumlayıp hata veriyor (scratch denemesi). Keycloak ana dosyada bir profile konsaydı, `.env`'inde `KEYCLOAK_ADMIN_PASSWORD` olmayan herkesin compose komutları bozulurdu.
+  - Bu makinede host'un 8080 portunu bir `httpd` kullanıyordu.
+  - Smoke denemesi (kullanıcı onayıyla, 2026-09-27):
+    - `Realm 'novacore' imported`; discovery issuer `http://localhost:8180/realms/novacore`;
+    - admin API'ye göre client public, standard flow, PKCE `S256`, audience mapper'ı `novacore.api`, rol mapper'ı `role`, roller Administrator/User;
+    - container, volume ve ağ silindi, imaj yerelde kaldı.
+- Kaynak: https://quay.io/repository/keycloak/keycloak?tab=tags · https://mcr.microsoft.com/v2/mssql/server/tags/list · https://hub.docker.com/r/datalust/seq/tags · https://hub.docker.com/r/jaegertracing/jaeger/tags · https://www.keycloak.org/server/importExport · https://www.keycloak.org/server/containers · yerel `docker compose` 29.2.1 denemeleri
+- Sonuç: F3b.4.
+  - Keycloak ayrı bir overlay dosyasında (`docker-compose.keycloak.yml`), host portu `127.0.0.1:8180`.
+  - İmajlar pinli; Jaeger v2'ye geçildi (v1 EOL).
+  - `.env.example` iki parolanın yer tutucusunu içeriyor.

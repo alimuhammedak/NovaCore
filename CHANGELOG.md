@@ -71,6 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Jwt:AccessTokenMinutes` and `Jwt:RefreshTokenDays` (the identity provider's lifetimes are set on
   `OpenIddictServerOptions`). `ITokenService`, `JwtTokenService` and `AccessToken` are removed from `NovaCore.AspNetCore`:
   nothing in NovaCore issues tokens locally any more.
+- `docker-compose.yml` pins its images (SQL Server `2022-CU27-ubuntu-22.04`, Seq `2026.1.17182`, Jaeger v2 `2.21.0`
+  instead of the end-of-life v1 all-in-one). New `docker-compose.keycloak.yml` adds an optional Keycloak `26.7.4` with an
+  example `novacore` realm (`deploy/keycloak/novacore-realm.json`: a public PKCE client for Scalar, the `novacore.api`
+  audience, realm roles as a `role` claim) on `http://localhost:8180`. `.env.example` lists the compose passwords.
 
 ### Changed
 

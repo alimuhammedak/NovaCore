@@ -138,7 +138,9 @@ NovaCore.slnx
 ├── Directory.Build.props          # tüm projeler: net10.0, nullable, analyzer'lar, TreatWarningsAsErrors, VersionPrefix
 ├── Directory.Build.targets        # IsPackable projeler: paket metadata'sı, README, PublicAPI dosyaları, doc/analyzer korumaları
 ├── Directory.Packages.props       # merkezî paket sürümleri (CPM)
-├── docker-compose.yml             # opsiyonel SQL Server + Seq + Jaeger
+├── docker-compose.yml             # opsiyonel SQL Server + Seq + Jaeger (imaj sürümleri pinli)
+├── docker-compose.keycloak.yml    # opsiyonel harici IdP: Keycloak + örnek realm (deploy/keycloak/)
+├── .env.example                   # compose parolaları için şablon (.env git-ignored)
 ├── .template.config/template.json # `dotnet new novacore`
 │
 ├── src/
@@ -324,6 +326,14 @@ Tasarım OWASP cheat sheet'lerine, RFC 9700 (OAuth 2.0 Security BCP) ve Microsof
 - **Client'lar** `Identity:Clients`'tan gelir: redirect URI'si olan client kullanıcı girişi yapar (public ya da
   secret'lı), olmayan client bir servistir (client credentials, secret zorunlu) ve `Permissions`'ında yazan izinleri
   taşır. Onay ekranı yoktur (birinci taraf client'lar).
+
+### Harici sağlayıcıyla deneme (Keycloak, opsiyonel)
+`docker compose -f docker-compose.yml -f docker-compose.keycloak.yml up -d keycloak` örnek `novacore` realm'ini içe
+aktarır (`.env`'de `KEYCLOAK_ADMIN_PASSWORD` gerekir, bkz. `.env.example`; admin konsolu `http://localhost:8180/admin`).
+Realm'de Scalar için public PKCE client'ı (`novacore-scalar`), `novacore.api` audience'ı ve realm rollerini `role`
+claim'ine yazan mapper var; kullanıcı yok. Keycloak'ı Authority yapan bir host `Jwt:Authority =
+http://localhost:8180/realms/novacore` (http yalnızca Development'ta) ayarlar, `AddCoreIdentityServer`'ı çağırmaz ve
+Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
 
 ### Hesaplar (authentication)
 - **Parola saklama:** Identity PBKDF2-HMAC-SHA256, **600.000 iterasyon** (OWASP Password Storage).

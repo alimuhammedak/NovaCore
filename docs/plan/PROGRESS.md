@@ -545,7 +545,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
       - `JwtValidationTests`: simetrik imzalı token Development ve Production'da 401 (theory); Production'da Authority kabulü ayrı test.
       - Factory artık anahtar ya da token ömrü vermiyor.
     - Kabul: `git grep "SigningKey|ITokenService|JwtTokenService|AccessTokenMinutes|RefreshTokenDays"` src/tests/.github'da yalnızca OpenIddict'in `AddEphemeralSigningKey`'i ve test IdP'sinin `SigningKey`'ini buluyor.
-  - [x] F3b.3c (commit: bir sonraki satırda): Dokümanlar.
+  - [x] F3b.3c (bfc4161): Dokümanlar.
     - README:
       - hızlı başlangıç (https profili, migration komutu), uç nokta tablosu, çekirdek/proje tablosu, proje ağacı (eklenti ve Api/Identity);
       - Güvenlik bölümü yeniden yazıldı (doğrulama / sağlayıcı / hesaplar), konfigürasyon (Jwt, Identity:Clients, doğrulama kuralları);
@@ -556,7 +556,21 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - Dokunulmayanlar ("Sonraya bırakılanlar"da kalıyor): README'deki mediator cümlesi, eskimiş Binder satırı, Y-10 atıfları.
   - F3b.3 kabul kriteri: `NovaCore.Modules.Identity`'ye referans yok (docs/plan ve CHANGELOG geçmişi dışında).
 - [ ] F3b.3 Eski modülün emekliye ayrılması
-- [ ] F3b.4 docker-compose
+- [x] F3b.4 (commit: bir sonraki satırda): docker-compose.
+  - İmajlar pinlendi: SQL Server `2022-CU27-ubuntu-22.04`, Seq `2026.1.17182`, Jaeger v2 `jaegertracing/jaeger:2.21.0` (v1 all-in-one EOL; varsayılan yapılandırma OTLP'yi alıyor). `:latest` kalmadı.
+  - Keycloak ayrı bir overlay'de: `docker-compose.keycloak.yml`. `quay.io/keycloak/keycloak:26.7.4`, `start-dev --import-realm`, `127.0.0.1:8180`, bootstrap admin parolası `.env`'den.
+  - Neden ayrı dosya: compose, aktif olmayan profillerdeki `:?` değişkenlerini de yorumluyor (denendi, R-065). Profil kullanılsaydı Keycloak kullanmayanların compose'u bozulurdu.
+  - Neden 8180: bu makinede 8080'i bir httpd tutuyordu.
+  - Örnek realm `deploy/keycloak/novacore-realm.json`:
+    - public PKCE (S256) client `novacore-scalar` (redirect'ler Scalar'ın iki adresi);
+    - `novacore.api` audience mapper'ı, realm rolleri → `role` claim'i (Sonraya bırakılanlar'daki "Keycloak rolleri `realm_access.roles`'ta" notu bu mapper'la karşılandı);
+    - Administrator/User rolleri; kullanıcı ya da secret yok.
+  - `.env.example`: iki parolanın yer tutucusu. SA parolası D-008'den beri `.env`'de.
+  - Kabul:
+    - `docker compose config` (yerel `.env`), `docker compose --env-file .env.example config` ve iki dosyalı `config` geçerli;
+    - `config --images` yalnızca pinli etiketler.
+  - Ek smoke (kullanıcı onayıyla): realm import edildi, discovery ve admin API doğruladı. Container, volume ve ağ silindi (R-065).
+  - README (proje ağacı, "Harici sağlayıcıyla deneme") ve CHANGELOG güncellendi.
 - [ ] F3b.5 Uçtan uca doğrulama
 
 ### Faz 4a

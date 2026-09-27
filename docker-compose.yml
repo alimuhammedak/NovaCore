@@ -3,15 +3,16 @@
 # By default NovaCore targets a LOCAL SQL Server via Windows auth (see appsettings.json), so you
 # typically don't need the sqlserver service below — it's here only if you prefer a container.
 # Seq (logs) and Jaeger (traces) are opt-in: set Seq:ServerUrl / OTEL_EXPORTER_OTLP_ENDPOINT.
+# Image versions are pinned; bump them deliberately. An optional Keycloak lives in docker-compose.keycloak.yml.
 
 services:
   # Optional containerized SQL Server. The SA password is read from a git-ignored .env file next to
-  # this one (docker compose loads it automatically), e.g.  MSSQL_SA_PASSWORD='<strong-password>'
+  # this one (docker compose loads it automatically; see .env.example), e.g.  MSSQL_SA_PASSWORD='<strong-password>'
   # If you use this instead of a local instance, set (via user-secrets, never in appsettings):
   #   ConnectionStrings:Database =
   #   "Server=localhost,1433;Database=NovaCore;User Id=sa;Password=<MSSQL_SA_PASSWORD>;TrustServerCertificate=True;Encrypt=True;"
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
     container_name: novacore-sqlserver
     environment:
       ACCEPT_EULA: "Y"
@@ -24,7 +25,7 @@ services:
 
   # Structured log UI. Enable by setting Seq:ServerUrl=http://localhost:5341
   seq:
-    image: datalust/seq:latest
+    image: datalust/seq:2026.1.17182
     container_name: novacore-seq
     environment:
       ACCEPT_EULA: "Y"
@@ -33,11 +34,10 @@ services:
       - "8081:80"     # web UI -> http://localhost:8081
 
   # Distributed tracing UI. Enable by setting OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+  # Jaeger v2 (the v1 all-in-one image is end of life); its default all-in-one config receives OTLP.
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/jaeger:2.21.0
     container_name: novacore-jaeger
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
     ports:
       - "16686:16686" # web UI -> http://localhost:16686
       - "4317:4317"   # OTLP gRPC
