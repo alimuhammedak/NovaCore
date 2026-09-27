@@ -409,7 +409,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
       - (3) Yeni testlerin paralel yükü R-055 yarışını tam koşuların 4'te 3'üne çıkardı. Testler `DisableParallelization` koleksiyonuna alındı, host'lar sınıf başına paylaşıldı; ardından 13/13 tam koşu yeşil (R-055 ek gözlem).
     - Kasıtlı bozmalar (commit'lenmedi): antiforgery kontrolü, open redirect koruması, lockout kontrolü, endsession sign-out ve 0 leeway kaldırılınca ilgili testler kırmızıya döndü.
     - 149/149.
-  - [x] F3b.1c (commit: bir sonraki satırda): Client credentials.
+  - [x] F3b.1c (cf4f49c): Client credentials.
     - Redirect URI'si olmayan client bir servis sayılıyor: secret zorunlu, izinleri `Identity:Clients:n:Permissions`'tan geliyor.
     - Token endpoint'i client credentials grant'ını karşılıyor: `sub` = client id, `name` = görünen ad, `aud` = `Jwt:Audience`.
     - Resolver Guid olmayan `sub`'ı yapılandırılmış servis client'ı olarak çözüyor.
@@ -424,7 +424,16 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - Kasıtlı bozma (commit'lenmedi): resolver client izinlerini döndürmeyince iki test kırmızıya döndü.
     - 157/157 (üç ardışık tam koşu).
   - F3b.1 kabul kriteri: uçtan uca token akışı çalışıyor (Authorization Code + PKCE, refresh, client credentials; RS256 ve ES256).
-- [ ] F3b.2 Sertleştirmelerin taşınması
+- [ ] F3b.2 Sertleştirmelerin taşınması (alt adımlar: 2a sertleştirme + audit, 2b kayıt/onay, 2c 2FA, 2d oturum uçları, 2e admin + rol seed'i)
+  - [x] F3b.2a (commit: bir sonraki satırda): Sertleştirmeler ve audit.
+    - Identity seçenekleri modüldeki değerlerle aynı: PBKDF2 600.000, parola 12 karakter ve kompozisyon kuralı yok, tekil e-posta, onaylı e-posta, lockout 5 deneme / 15 dk (yeni hesaplar dahil), onay token'ı 6 saat.
+    - Login sayfası bilinmeyen hesap, yanlış parola ve kilitli hesap için tek mesaj gösteriyor. Onaysız e-posta mesajı yalnızca doğru paroladan sonra geliyor (modüldeki gibi).
+    - `SecurityAuditLogger` arayüzsüz, internal ve somut bir sınıf (Y-13). Bu adımda: login_succeeded/failed, account_locked_out, token_refreshed, signed_out.
+      - Maskeleme artık iki çağrıda da `IsEnabled` guard'ının arkasında; modüldeki guard'sız `LoginFailed` notu burada kapanıyor.
+      - Refresh token reuse'u OpenIddict kendi logluyor (Warning: "...were revoked to prevent a potential token replay attack", F3b.1b'de gözlendi).
+    - Testler (8, `SignInHardeningTests`): hash'te 600.000 iterasyon (v3 biçimi çözülerek), length-first politika (2), tekil e-posta, 5 hatada kilit (+ audit), onaysız hesap, bilinmeyen hesap ile yanlış parolanın aynı görünmesi, maskeli audit ve logda parola yok.
+    - Kırmızıdan yeşile: sertleştirme öncesi eklentiye karşı 7/8 kırmızı (stash ile denendi), sonra yeşil.
+    - 165/165.
 - [ ] F3b.3 Eski modülün emekliye ayrılması
 - [ ] F3b.4 docker-compose
 - [ ] F3b.5 Uçtan uca doğrulama

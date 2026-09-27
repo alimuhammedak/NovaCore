@@ -16,7 +16,11 @@ internal static class LoginPage
 {
     public const string Path = "/account/login";
 
+    // One message for an unknown account, a wrong password and a locked account, so the page doesn't reveal which.
     private const string InvalidCredentials = "Invalid email or password.";
+
+    // Only after the right password, so it reveals nothing to someone who doesn't know it.
+    private const string EmailNotConfirmed = "Confirm your email address before signing in.";
 
     public static void Map(IEndpointRouteBuilder endpoints)
     {
@@ -34,23 +38,37 @@ internal static class LoginPage
         HttpContext context,
         IAntiforgery antiforgery,
         UserManager<ApplicationUser> users,
-        SignInManager<ApplicationUser> signIn)
+        SignInManager<ApplicationUser> signIn,
+        SecurityAuditLogger audit)
     {
         if (!context.Request.HasFormContentType || !await antiforgery.IsRequestValidAsync(context))
             return Results.BadRequest();
 
         var form = await context.Request.ReadFormAsync(context.RequestAborted);
         string? email = form["Email"], password = form["Password"], returnUrl = form["ReturnUrl"];
+        var ip = context.Connection.RemoteIpAddress?.ToString();
 
         var user = string.IsNullOrWhiteSpace(email) ? null : await users.FindByEmailAsync(email);
         if (user is null || string.IsNullOrEmpty(password))
+        {
+            audit.LoginFailed(email, ip, "unknown-user");
             return Render(context, antiforgery, returnUrl, email, InvalidCredentials);
+        }
 
         var result = await signIn.PasswordSignInAsync(user, password, isPersistent: false, lockoutOnFailure: true);
-        if (!result.Succeeded)
-            return Render(context, antiforgery, returnUrl, email, InvalidCredentials);
 
-        return Continue(returnUrl);
+        if (result.Succeeded)
+        {
+            audit.LoginSucceeded(user.Id, ip);
+            return Continue(returnUrl);
+        }
+
+        if (result.IsLockedOut)
+            audit.AccountLockedOut(user.Id, ip);
+        else
+            audit.LoginFailed(email, ip, result.IsNotAllowed ? "email-not-confirmed" : "bad-password");
+
+        return Render(context, antiforgery, returnUrl, email, result.IsNotAllowed ? EmailNotConfirmed : InvalidCredentials);
     }
 
     // Only back into this application (the authorization endpoint): never an open redirect.

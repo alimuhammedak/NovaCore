@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is refused once the user is gone, can't sign in or is locked out.
   Service clients (configured without redirect URIs, with a secret) get tokens with client credentials; their `sub`
   is the client id and they hold the `Permissions` configured for them.
+  The Identity module's hardening carries over: PBKDF2 with 600,000 iterations, a length-first password policy (12
+  characters, no composition rules), unique emails, lockout after five failures for 15 minutes, a confirmed email before
+  sign-in, and one sign-in error for unknown accounts, wrong passwords and locked accounts. Sign-ins, lockouts, refreshes
+  and sign-outs go to the log as `SECURITY` events with masked emails.
 
 ### Changed
 

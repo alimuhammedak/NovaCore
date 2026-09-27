@@ -27,7 +27,7 @@ internal static class ConnectEndpoints
     {
         endpoints.MapMethods("/connect/authorize", [HttpMethods.Get, HttpMethods.Post], Authorize).ExcludeFromDescription();
         endpoints.MapPost("/connect/token", Exchange).ExcludeFromDescription().RequireRateLimiting("strict");
-        endpoints.MapMethods("/connect/endsession", [HttpMethods.Get, HttpMethods.Post], (Delegate)EndSession).ExcludeFromDescription();
+        endpoints.MapMethods("/connect/endsession", [HttpMethods.Get, HttpMethods.Post], EndSession).ExcludeFromDescription();
     }
 
     private static async Task<IResult> Authorize(
@@ -85,7 +85,8 @@ internal static class ConnectEndpoints
         UserManager<ApplicationUser> users,
         SignInManager<ApplicationUser> signIn,
         IOpenIddictApplicationManager applications,
-        IOptions<JwtOptions> jwt)
+        IOptions<JwtOptions> jwt,
+        SecurityAuditLogger audit)
     {
         var request = context.GetOpenIddictServerRequest()
                       ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
@@ -116,6 +117,9 @@ internal static class ConnectEndpoints
         SetUserClaims(identity, user, await users.GetRolesAsync(user));
         identity.SetDestinations(GetDestinations);
 
+        if (request.IsRefreshTokenGrantType())
+            audit.TokenRefreshed(user.Id, context.Connection.RemoteIpAddress?.ToString());
+
         return Results.SignIn(new ClaimsPrincipal(identity), properties: null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
@@ -138,8 +142,13 @@ internal static class ConnectEndpoints
         return Results.SignIn(new ClaimsPrincipal(identity), properties: null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    private static async Task<IResult> EndSession(HttpContext context)
+    private static async Task<IResult> EndSession(
+        HttpContext context, UserManager<ApplicationUser> users, SecurityAuditLogger audit)
     {
+        var session = await context.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+        if (session.Succeeded && await users.GetUserAsync(session.Principal) is { } user)
+            audit.SignedOut(user.Id);
+
         await context.SignOutAsync(IdentityConstants.ApplicationScheme);
 
         // OpenIddict redirects to the post_logout_redirect_uri when the client registered it.

@@ -37,11 +37,36 @@ public static class IdentityServerHostingExtensions
         var services = builder.Services;
 
         services
-            .AddIdentityCore<ApplicationUser>()
+            .AddIdentityCore<ApplicationUser>(options =>
+            {
+                options.User.RequireUniqueEmail = true;
+                options.SignIn.RequireConfirmedEmail = true;
+
+                // OWASP Authentication Cheat Sheet: length first, no character-composition rules.
+                options.Password.RequiredLength = 12;
+                options.Password.RequiredUniqueChars = 1;
+                options.Password.RequireDigit = false;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireUppercase = false;
+                options.Password.RequireNonAlphanumeric = false;
+
+                // Brute-force throttling per account, new accounts included.
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                options.Lockout.AllowedForNewUsers = true;
+            })
             .AddRoles<ApplicationRole>()
             .AddEntityFrameworkStores<IdentityServerDbContext>()
             .AddSignInManager()
             .AddDefaultTokenProviders();
+
+        // OWASP Password Storage Cheat Sheet: at least 600,000 iterations for PBKDF2-HMAC-SHA256.
+        services.Configure<PasswordHasherOptions>(options => options.IterationCount = 600_000);
+
+        // Email confirmation tokens expire after six hours.
+        services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = TimeSpan.FromHours(6));
+
+        services.AddSingleton<SecurityAuditLogger>();
 
         services.AddOpenIddict()
             .AddCore(core => core.UseEntityFrameworkCore().UseDbContext<IdentityServerDbContext>())
