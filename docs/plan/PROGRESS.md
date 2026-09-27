@@ -571,8 +571,8 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - `config --images` yalnızca pinli etiketler.
   - Ek smoke (kullanıcı onayıyla): realm import edildi, discovery ve admin API doğruladı. Container, volume ve ağ silindi (R-065).
   - README (proje ağacı, "Harici sağlayıcıyla deneme") ve CHANGELOG güncellendi.
-- [ ] F3b.5 Uçtan uca doğrulama (alt adımlar: 5a OpenAPI ve Scalar, 5b tarayıcıda akış)
-  - [x] F3b.5a (commit: bir sonraki satırda): OpenAPI ve Scalar.
+- [x] F3b.5 Uçtan uca doğrulama (alt adımlar: 5a OpenAPI ve Scalar, 5b tarayıcıda akış)
+  - [x] F3b.5a (23be3a9): OpenAPI ve Scalar.
     - Eklentinin internal `OAuthSecuritySchemeTransformer`'ı her OpenAPI belgesine (`ConfigureAll<OpenApiOptions>`) `OAuth2` şemasını ekliyor: authorizationCode akışı, URL'ler `Jwt:Authority` altında, scope'lar openid/profile/email/roles/offline_access. Şema anahtarı public `IdentityServerHostingExtensions.OpenApiSecuritySchemeId` sabiti.
     - `NovaCore.Scalar`'a `MapCoreScalar(WebApplication, Action<ScalarOptions>)` overload'u geldi; RS0026 gereği ikisi de düz overload.
     - `Program.cs` Scalar'da `OAuth2`'yi öne seçiyor: client `scalar`, PKCE SHA-256, scope'lar openid/profile/email/roles.
@@ -583,6 +583,18 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
       - `/connect` ve `/account` belgede işlem (path) olarak yok. Eski metin kontrolü yolu da yakaladığı için path kontrolüne çevrildi.
     - Kasıtlı bozma (commit'lenmedi): transformer kaydı kaldırılınca iki test kırmızıya döndü.
     - 169/169 (iki koşu).
+  - [x] F3b.5b (commit: bir sonraki satırda): Tarayıcıda akış (kullanıcı onayıyla ayrı `NovaCore_F3b5` veritabanı; deneme sonunda silindi).
+    - Uygulama https profilinde çalıştı:
+      - açılışta migration'lar ve seed (admin + `scalar` client) çalıştı;
+      - admin parolası yalnızca süreç ortamında tutuldu ve sonradan silindi.
+    - Built-in browser'da Scalar:
+      - OAuth2 şeması öne seçili; Auth/Token URL'leri, redirect `https://localhost:5443/scalar/v1`, client `scalar`, PKCE SHA-256 (ekran görüntüsü).
+      - "Authorize" → `/connect/authorize` 302 → `/account/login` (ekran görüntüsü) → giriş (`login_succeeded`) → code ile `/scalar/v1`'e dönüş.
+    - **Kısıt (R-066):** built-in browser Scalar'ın `window.open` popup'ını aynı sekmede açtı, bu yüzden Scalar'ın kendi code değişimi çalışmadı. Akış aynı sekmede aynı client ve PKCE ile sürdürüldü.
+      - Token 200: RS256, `at+jwt`, doğru `iss`/`aud`, izin claim'i yok.
+      - Scalar'ın API client'ından `GET /api/v1/products` → **200 OK** (ekran görüntüsü).
+      - OAuth2 şeması token'sız seçiliyken Scalar 401 aldı; şema kaldırılınca 200.
+    - Kod değişikliği yok. Popup tabanlı Scalar akışı otomatik testlerin karşılığıyla ve normal tarayıcıda denenmek üzere raporlandı.
 
 ### Faz 4a
 - [ ] F4a.1 Event'lerin outbox'a yazılması
@@ -695,6 +707,8 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 3a, code review) Test yardımcıları tekrarı büyüdü: Identity kullanıcısı oluşturma artık üç yerde (`AuthFlowTests`, `RefreshTokenExpiryTests`, `RoleChangeTests`), "Catalog şemasını oluştur" iki yerde (`PermissionAuthorizationTests`, `JwtValidationTests`). Yukarıdaki Faz 2b maddesiyle birlikte ele alınmalı.
 - (Faz 3a → 3b) Keycloak rolleri düz `role` claim'i olarak değil `realm_access.roles` içinde geliyor. Super-admin kontrolü ve bir Keycloak resolver'ı bunları eşlemeli. OpenAPI belgesi hâlâ düz Bearer şeması yayımlıyor; Scalar için OAuth2/OIDC akışı F3b.5'in işi.
 - (Faz 3a) DECISIONS D-024 (7) "eksikse DI doğrulaması açılışı durdurur" diyor. Code review'dan sonra açılışı her ortamda `PermissionResolverStartupCheck` durduruyor (DI doğrulaması yalnızca Development'ta). Sonuç aynı, mekanizmanın adı farklı. Satırı düzeltmek korunan dosyada kullanıcı onayı ister.
+
+- (Faz 3b, F3b.5b, R-066) Scalar'da OAuth2 şeması seçili ama token'sız kalınca elle eklenen `Authorization` başlığı işe yaramıyor (401). Normal kullanımda Scalar popup'la token alıyor; built-in browser popup'ı aynı sekmede açtığı için bu tarayıcıda denenemedi. Gerçek bir tarayıcıda Scalar'ın popup akışı bir kez elle denenmeli.
 
 ## Son devir notu
 

@@ -507,3 +507,20 @@ Biçim:
   - Keycloak ayrı bir overlay dosyasında (`docker-compose.keycloak.yml`), host portu `127.0.0.1:8180`.
   - İmajlar pinli; Jaeger v2'ye geçildi (v1 EOL).
   - `.env.example` iki parolanın yer tutucusunu içeriyor.
+
+### R-066: Built-in browser'da Scalar'ın OAuth popup'ı (2026-09-27, faz 3b; gözlem)
+- Bulgu (F3b.5b, uygulama https profilinde, ayrı `NovaCore_F3b5` veritabanıyla):
+  - Scalar "Authorize" butonu authorize URL'sini `window.open` ile açıyor. Built-in browser bunu yeni bir pencere yerine aynı sekmede açtı: `/connect/authorize` 302 → `/account/login`.
+  - Giriş başarılı oldu: `login_succeeded`, ardından authorize code verdi ve `/scalar/v1?code=…&state=…&iss=…`'e döndü. Ancak code'u token'a çevirecek asıl Scalar penceresi (opener) artık yoktu, bu yüzden Scalar token isteği göndermedi.
+  - Aynı sekmede, aynı public `scalar` client'ı ve PKCE S256 ile akış elle sürdürüldü:
+    - IdP oturumu açık olduğu için authorize sormadan code verdi;
+    - `/connect/token` 200 döndü: RS256, `typ: at+jwt`, `iss` `https://localhost:5443/`, `aud` `novacore.api`, `client_id` `scalar`, rol Administrator, `permission` claim'i yok, `expires_in` 899, id_token var.
+  - Scalar'ın API client'ından `GET /api/v1/products`:
+    - OAuth2 şeması seçili ama token'sız kalınca, elle eklenen `Authorization` başlığına rağmen 401 döndü. Muhtemelen Scalar seçili şemanın boş başlığını gönderiyor.
+    - Şema kaldırılınca aynı token'la **200 OK** (sayfalı liste).
+    - Aynı token'la sayfadan doğrudan `fetch` de 200.
+- Kaynak: yerel çalıştırma logları (`SECURITY login_succeeded`, `HTTP GET /connect/authorize 302`, `HTTP POST /connect/token 200`, `HTTP GET /api/v1/products 200`) ve built-in browser ekran görüntüleri.
+- Sonuç:
+  - Sağlayıcı, çekirdek doğrulama ve Scalar'ın istek arayüzü tarayıcıda uçtan uca çalışıyor.
+  - Scalar'ın popup tabanlı code değişimi bu tarayıcı panelinde denenemedi; normal bir tarayıcıda popup açılır. Aynı adımlar otomatik testlerde de koşuyor (`AuthorizationCodeFlowTests`, `IdentityServerWiringTests`).
+  - Scalar'ın token'sız OAuth2 seçimiyle başlığı ezmesi "Sonraya bırakılanlar"a yazıldı.
