@@ -36,7 +36,10 @@ Identity + OpenIddict, D-026). A new third-party integration becomes a new add-o
 NovaCore.EntityFrameworkCore, so the host registers the context with `AddModuleDbContext` (provider + `MigrationsAssembly`)
 and keeps the migrations (R-060). Its issuer is `Jwt:Authority` and its access tokens are unencrypted signed JWTs, so
 the core's JwtBearer validates them through discovery like any provider's (R-059). Tests run it on
-`tests/.../IdentityServer/IdentityServerTestHost`, a host composed only of the core and the add-on.
+`tests/.../IdentityServer/IdentityServerTestHost`, a host composed only of the core and the add-on. Two traps (R-061):
+the host pipeline has no antiforgery middleware, so form posts validate with `IAntiforgery.IsRequestValidAsync` in
+the handler; and the core's claims transformation runs on every `AuthenticateAsync`, OpenIddict's scheme included, so
+a principal copied into a token must drop the resolved `permission` claims.
 
 Request validation is not a building block: .NET 10's built-in validation needs `services.AddValidation()` in the
 assembly that declares the request types, so each module calls it (root `CLAUDE.md` Standards, R-052).

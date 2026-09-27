@@ -12,13 +12,10 @@ namespace NovaCore.Api.Tests.IdentityServer;
 /// The add-on's <see cref="IPermissionResolver"/>: a user's permissions are the <c>permission</c> claims of every role
 /// they hold plus their own direct grants, read from the store by the token's <c>sub</c>.
 /// </summary>
-public sealed class IdentityServerPermissionResolverTests : IAsyncLifetime
+[Collection(IdentityServerTestGroup.Name)]
+public sealed class IdentityServerPermissionResolverTests(IdentityServerFixture fixture) : IClassFixture<IdentityServerFixture>
 {
-    private IdentityServerTestHost _host = null!;
-
-    public async ValueTask InitializeAsync() => _host = await IdentityServerTestHost.StartAsync();
-
-    public ValueTask DisposeAsync() => _host.DisposeAsync();
+    private readonly IdentityServerTestHost _host = fixture.Host;
 
     [Fact]
     public async Task Role_permissions_and_direct_grants_are_combined()

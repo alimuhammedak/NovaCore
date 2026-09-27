@@ -15,3 +15,4 @@ NovaCore.Identity.OpenIddict.IdentityServerDbContext.IdentityServerDbContext(Mic
 NovaCore.Identity.OpenIddict.IdentityServerHostingExtensions
 const NovaCore.Identity.OpenIddict.IdentityServerDbContext.Schema = "identity" -> string!
 static NovaCore.Identity.OpenIddict.IdentityServerHostingExtensions.AddCoreIdentityServer(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
+static NovaCore.Identity.OpenIddict.IdentityServerHostingExtensions.MapCoreIdentityServer(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!

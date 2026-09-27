@@ -389,6 +389,7 @@ Biçim:
   - Bizim kodumuzda temiz bir düzeltme yok: gerçek exception yalnızca private bir TCS'te. `IStartupValidator` sarmalayıcısı `ValidateOnStart` hatalarını yakalayabilir, ama hosted service hatalarını (`EmailSenderStartupCheck`) yakalayamaz.
 - Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Mvc/Mvc.Testing/src/DeferredHostBuilder.cs · https://learn.microsoft.com/dotnet/api/microsoft.extensions.hosting.hostingabstractionshostextensions.runasync · yerel koşular (SDK 10.0.300)
 - Sonuç: Kapsam dışı (F2c'nin işi değil, test altyapısındaki framework yarışı), PROGRESS → "Sonraya bırakılanlar". Faz raporunda kullanıcıya bildirilir.
+- Ek gözlem (2026-09-27, F3b.1b): Eklentinin testleri (çok sayıda host açılışı ve PBKDF2) diğer testlerle paralel koşunca yarış tam koşuların çoğunda (4'te 3) görüldü; yeni testler hariç tutulunca 4/4 yeşildi. Bu testler `DisableParallelization` koleksiyonuna alındı ve host'lar sınıf başına paylaşıldı. Ardından 13/13 tam koşu yeşil. Kök neden değişmedi.
 
 ## Faz 3a araştırması (2026-09-27)
 
@@ -446,3 +447,13 @@ Biçim:
   Uygulama migration'ları çalışma anında uyguluyorsa migration assembly'sini referans almalı.
 - Kaynak: https://learn.microsoft.com/ef/core/managing-schemas/migrations/projects
 - Sonuç: D-026 (2). `NovaCore.Identity.OpenIddict` `IdentityServerDbContext`'i taşır. Api host'u SQL Server migration'larını ve design-time factory'yi taşır (F3b.3a). Paket sağlayıcıya bağlanmaz.
+
+### R-061: Sağlayıcı cookie'si, antiforgery ve `IClaimsTransformation` (2026-09-27, faz 3b; kaynak + gözlem)
+- Bulgu:
+  - *"For the following AddAuthentication call without a default authentication scheme specified, two authentication handlers are added to the app using their default authentication scheme names"*: parametresiz `AddAuthentication()` varsayılan şemayı değiştirmiyor. `AddIdentityCookies` yalnızca şemaları ekliyor (Identity UI'ın `AddIdentity`'si ise varsayılanları cookie'ye çeviriyor). Testte API anonim çağrıya 302 değil 401 veriyor.
+  - Antiforgery: .NET 8 notu *"WebApplicationBuilder automatically adds the middleware when the antiforgery services have been registered"* diyor. Antiforgery sayfası ise *"Blazor and Minimal APIs require an explicit call to UseAntiforgery"* diyor. Gözlem bu pipeline'da ikincisini doğruluyor: `UseCoreWeb` `UseAuthentication`/`UseAuthorization`'ı açıkça çağırıyor, `[FromForm]` parametreli login ucu "contains anti-forgery metadata, but a middleware was not found" ile 500 verdi. Aynı sayfa açık doğrulamayı da anlatıyor: *"resolve IAntiforgery from DI and call ValidateRequestAsync or IsRequestValidAsync explicitly"*.
+  - `IClaimsTransformation` her `AuthenticateAsync` çağrısında, hangi şema olursa olsun çalışıyor (R-057). Token endpoint'indeki `AuthenticateAsync(OpenIddict şeması)` da çekirdeğin `PermissionClaimsTransformation`'ından geçiyor. OpenIddict örneğindeki "principal'ın bütün claim'lerini kopyala" kalıbı bu yüzden çözülmüş `permission` claim'lerini refresh sonrası access token'a taşıdı (F3b.1b testi yakaladı).
+- Kaynak: https://learn.microsoft.com/aspnet/core/security/authorization/authorize-with-a-specific-scheme?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/release-notes/aspnetcore-8.0?view=aspnetcore-10.0#minimal-apis · https://learn.microsoft.com/aspnet/core/security/anti-request-forgery?view=aspnetcore-10.0#antiforgery-with-minimal-apis · yerel koşu
+- Sonuç: D-026 (6):
+  - Login formu `ReadFormAsync` + `IAntiforgery.IsRequestValidAsync` ile açıkça doğrulanır. Çekirdeğe `UseAntiforgery` eklenmez; yalnızca bir eklentinin ihtiyacı için çekirdek pipeline'ı değişmezdi.
+  - Token endpoint'i principal'ı kopyalarken `permission` claim'lerini dışarıda bırakır.

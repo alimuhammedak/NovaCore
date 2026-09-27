@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   provider's. PKCE is required (S256 only). Access tokens live 15 minutes, refresh tokens 7 days. Keys are ephemeral in
   Development; elsewhere the host adds certificates with OpenIddict's API, and the host does not start without them.
   The host registers `IdentityServerDbContext` (`AddModuleDbContext`) and keeps its migrations.
+  `app.MapCoreIdentityServer()` maps `/connect/authorize`, `/connect/token`, `/connect/revoke`, `/connect/endsession`
+  and a plain sign-in page at `/account/login` (antiforgery-protected, local return URLs only). Clients come from
+  `Identity:Clients` and are synced into the store when `Identity:Seed:SeedOnStartup` is true. Refresh tokens rotate;
+  reusing a redeemed one after OpenIddict's 30-second leeway revokes every token of that authorization, and a refresh
+  is refused once the user is gone, can't sign in or is locked out.
 
 ### Changed
 

@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
@@ -8,9 +10,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using NovaCore.AspNetCore.Authorization;
+using NovaCore.AspNetCore.Identity;
 using NovaCore.AspNetCore.Web;
 using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Identity.OpenIddict;
+using Xunit;
 
 namespace NovaCore.Api.Tests.IdentityServer;
 
@@ -20,10 +25,20 @@ namespace NovaCore.Api.Tests.IdentityServer;
 /// <see cref="Authority"/>, which is also <c>Jwt:Authority</c>, so the core validates the add-on's tokens through this
 /// server's own discovery document and keys, over the in-memory transport.
 /// </summary>
-internal sealed class IdentityServerTestHost : IAsyncDisposable
+public sealed class IdentityServerTestHost : IAsyncDisposable
 {
     /// <summary>The TestServer's base address, the issuer and <c>Jwt:Authority</c>.</summary>
     public const string Authority = "https://localhost";
+
+    /// <summary>The configured public client that signs users in.</summary>
+    public const string ClientId = "spa";
+
+    public const string RedirectUri = "https://client.novacore.test/callback";
+
+    public const string PostLogoutRedirectUri = "https://client.novacore.test/signed-out";
+
+    /// <summary>What <c>GET /probe</c> requires: the core's permission check on a token from this provider.</summary>
+    public const string ProbePermission = "probe:read";
 
     private readonly WebApplication _app;
     private readonly SqliteConnection _connection;
@@ -64,7 +79,11 @@ internal sealed class IdentityServerTestHost : IAsyncDisposable
             {
                 ["Jwt:Authority"] = Authority,
                 ["Database:ApplyMigrations"] = "false",
-                ["RateLimiting:PermitLimit"] = "100000"
+                ["RateLimiting:PermitLimit"] = "100000",
+                ["Identity:Seed:SeedOnStartup"] = "true",
+                ["Identity:Clients:0:ClientId"] = ClientId,
+                ["Identity:Clients:0:RedirectUris:0"] = RedirectUri,
+                ["Identity:Clients:0:PostLogoutRedirectUris:0"] = PostLogoutRedirectUri
             });
 
             builder.AddCoreWeb();
@@ -82,6 +101,8 @@ internal sealed class IdentityServerTestHost : IAsyncDisposable
 
             app = builder.Build();
             app.UseCoreWeb();
+            app.MapCoreIdentityServer();
+            app.MapGet("/probe", () => "ok").RequirePermission(ProbePermission);
 
             await using (var scope = app.Services.CreateAsyncScope())
                 await scope.ServiceProvider.GetRequiredService<IdentityServerDbContext>().Database.EnsureCreatedAsync();
@@ -99,6 +120,28 @@ internal sealed class IdentityServerTestHost : IAsyncDisposable
     }
 
     public HttpClient CreateClient() => Server.CreateClient();
+
+    /// <summary>A confirmed user with <paramref name="password"/>, holding <paramref name="permissions"/> as direct grants.</summary>
+    public async Task<ApplicationUser> CreateUserAsync(string email, string password, params string[] permissions)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+        var user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true,
+            CreatedAtUtc = TimeProvider.System.GetUtcNow()
+        };
+        var created = await users.CreateAsync(user, password);
+        Assert.True(created.Succeeded, string.Join(", ", created.Errors.Select(error => error.Description)));
+
+        foreach (var permission in permissions)
+            await users.AddClaimAsync(user, new Claim(NovaClaims.Permission, permission));
+
+        return user;
+    }
 
     public async ValueTask DisposeAsync()
     {
@@ -120,5 +163,26 @@ internal sealed class IdentityServerTestHost : IAsyncDisposable
                 _invoker?.Dispose();
             base.Dispose(disposing);
         }
+    }
+}
+
+/// <summary>
+/// One <see cref="IdentityServerTestHost"/> shared by a test class (<c>IClassFixture</c>): tests that don't need a host of
+/// their own use unique accounts instead. Override <see cref="Configure"/> to change the host.
+/// </summary>
+public class IdentityServerFixture : IAsyncLifetime
+{
+    public IdentityServerTestHost Host { get; private set; } = null!;
+
+    public async ValueTask InitializeAsync() => Host = await IdentityServerTestHost.StartAsync(configure: Configure);
+
+    public async ValueTask DisposeAsync()
+    {
+        await Host.DisposeAsync();
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Configure(WebApplicationBuilder builder)
+    {
     }
 }

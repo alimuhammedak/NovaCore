@@ -13,6 +13,7 @@ namespace NovaCore.Api.Tests.IdentityServer;
 /// <c>Jwt:Authority</c>, PKCE is required, keys are ephemeral in Development only and a host elsewhere must bring its
 /// own, RSA or EC.
 /// </summary>
+[Collection(IdentityServerTestGroup.Name)]
 public sealed class IdentityServerConfigurationTests
 {
     [Fact]

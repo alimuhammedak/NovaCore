@@ -72,6 +72,18 @@ So tokens go through the real Authority → metadata → JWKS path with no netwo
   Identity after a shared fixture's clock was advanced (the token would be "not yet valid", 401). That is why
   `RoleChangeTests` has its own host.
 
+## The identity provider add-on: its own host
+
+`IdentityServer/` tests `NovaCore.Identity.OpenIddict` on `IdentityServerTestHost`: a `WebApplication` composed only of
+the core packages and the add-on (no modules, no Api project), on TestServer at `https://localhost` with an in-memory
+SQLite store. That address is also `Jwt:Authority`, and JwtBearer's backchannel goes to the same server, so the add-on's
+tokens are validated through its own discovery document and keys. `OidcFlow` plays the browser (cookies, no automatic
+redirects) and the public client: authorize → sign-in form (antiforgery token) → code → token endpoint.
+`IdentityServerFixture` shares one host per class; tests that need a different host start their own
+(`IdentityServerTestHost.StartAsync(environment, configure)`). These classes run in the `IdentityServerTestGroup`
+collection, apart from the parallel tests: their CPU load made the `WebApplicationFactory` startup race (R-055) hit
+most full runs.
+
 ## Test configuration — in-memory config is enough
 
 The building blocks bind configuration through the options pattern and read it when the options are first built,

@@ -1,5 +1,9 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NovaCore.AspNetCore.Auth;
@@ -70,7 +74,10 @@ public static class IdentityServerHostingExtensions
                 if (builder.Environment.IsDevelopment())
                     server.AddEphemeralEncryptionKey().AddEphemeralSigningKey();
 
-                server.UseAspNetCore();
+                server.UseAspNetCore()
+                    .EnableAuthorizationEndpointPassthrough()
+                    .EnableTokenEndpointPassthrough()
+                    .EnableEndSessionEndpointPassthrough();
             });
 
         // The issuer is the authority the core validates against, so the "iss" of every token and the discovery
@@ -88,8 +95,50 @@ public static class IdentityServerHostingExtensions
                 + "the absolute public URL of this host, e.g. https://localhost:5443.")
             .ValidateOnStart();
 
+        // The sign-in session at the provider: Identity's cookies, alongside the API's bearer default (the parameterless
+        // AddAuthentication doesn't change the default scheme, docs/plan/RESEARCH.md R-061). Only /connect/* and
+        // /account/* read it.
+        services.AddAuthentication().AddIdentityCookies(cookies => cookies.ApplicationCookie!.Configure(cookie =>
+        {
+            cookie.LoginPath = LoginPage.Path;
+            cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            cookie.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+            cookie.SlidingExpiration = true;
+        }));
+        services.AddAntiforgery();
+
+        services.AddOptions<IdentityServerOptions>()
+            .BindConfiguration(IdentityServerOptions.SectionName)
+            .Validate(
+                identity => identity.Clients.TrueForAll(client => !Guid.TryParse(client.ClientId, out _)),
+                "Identity:Clients:n:ClientId must not be a Guid: a Guid subject is a user.")
+            .Validate(
+                identity => identity.Clients.DistinctBy(client => client.ClientId, StringComparer.Ordinal).Count() == identity.Clients.Count,
+                "Identity:Clients:n:ClientId must be unique.")
+            .Validate(
+                identity => identity.Clients.TrueForAll(client =>
+                    client.RedirectUris.Count > 0 && client.RedirectUris.Concat(client.PostLogoutRedirectUris).All(uri => uri.IsAbsoluteUri)),
+                "Identity:Clients:n:RedirectUris needs at least one entry, and every redirect URI must be absolute.")
+            .ValidateOnStart();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<IdentityServerOptions>, IdentityServerOptionsValidator>());
+        services.AddHostedService<IdentityServerSeeder>();
+
         services.AddScoped<IPermissionResolver, IdentityPermissionResolver>();
 
         return builder;
+    }
+
+    /// <summary>
+    /// Maps the provider's endpoints: the authorization, token and end-session endpoints under <c>/connect</c> (OpenIddict
+    /// validates the requests first) and the sign-in page at <c>/account/login</c>. They are left out of the OpenAPI
+    /// document, and the token endpoint and the sign-in page use the <c>strict</c> rate limit.
+    /// </summary>
+    /// <param name="endpoints">The endpoint route builder.</param>
+    /// <returns><paramref name="endpoints"/>, for chaining.</returns>
+    public static IEndpointRouteBuilder MapCoreIdentityServer(this IEndpointRouteBuilder endpoints)
+    {
+        ConnectEndpoints.Map(endpoints);
+        LoginPage.Map(endpoints);
+        return endpoints;
     }
 }
