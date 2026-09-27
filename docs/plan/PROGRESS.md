@@ -311,8 +311,20 @@ Plan onayı (2026-09-26): kullanıcı kararları Q-25 (boş Guid kuralı özel `
 ### Faz 3a
 Plan onayı (2026-09-27). Kullanıcı kararı: 2c önce main'e merge edildi (`--no-ff`, push yok). Model kararları D-024, araştırmalar R-056…R-058. Uygulama sırası F3a.1 → F3a.3 → F3a.2 (D-017 örneği, ID'ler sabit): F3a.1'in kabul testi RSA token istediği için `TestIdentityProvider` F3a.1'de doğuyor, F3a.3 mevcut testleri ona bağlıyor, F3a.2 testleri bir kez daha (sunucu tarafı izinlere) taşıyor. F3a.2 iki alt adım: 2a resolver + Identity implementasyonu, 2b claims transformation. Başlangıçta main'in `/openapi/v1.json`'u scratchpad'e kaydedildi (29.460 bayt, commit'lenmedi).
 
-- [ ] F3a.1 JWT doğrulama (Authority/JWKS) — devam ediyor
-- [ ] F3a.3 Test IdP yardımcısı
+- [x] F3a.1 (9327877): `Jwt:Authority` eklendi. JwtBearer issuer'ı ve imza anahtarlarını OIDC discovery + JWKS'ten alıyor. Kabul edilen algoritmalar RS/PS/ES 256–512.
+  - Simetrik `Jwt:SigningKey` yalnızca Development'ta geçerli (D-024 (1)): Development dışında `https` Authority zorunlu ve anahtar açılışı durduruyor. Development'ta ikisi de boşsa geliştirme anahtarı devreye giriyor. Anahtar varken HS256 ve `Jwt:Issuer` Authority'ninkilere ekleniyor; JwtBearer ikisini birleştiriyor (R-056).
+  - `JwtTokenService` anahtar yokken `Jwt:SigningKey`'i adlandıran bir `InvalidOperationException` fırlatıyor. Eskiden IdentityModel'in `ArgumentException`'ı 400'e dönüşürdü.
+  - Metot adı `AddCoreAuthentication` olarak kaldı (D-024 (2)). PublicAPI: `JwtOptions.Authority`.
+  - Yeni `TestIdentityProvider` (bellek içi RSA, discovery + JWKS bir `HttpMessageHandler` üzerinden). Factory bunu `BackchannelHttpHandler` olarak bağlıyor ve `Jwt:Authority`'yi her ortamda ona ayarlıyor. `SigningKey` yalnızca Development'ta ayarlanıyor.
+  - Yeni `JwtValidationTests` (7 vaka):
+    - Authority'nin RS256 token'ı 200.
+    - Yanlış issuer, yanlış audience, yabancı anahtar ve süresi dolmuş token 401.
+    - Production'da https metadata ile RS256 kabul, geliştirme anahtarıyla imzalı HS256 red.
+  - Kırmızıdan yeşile: pozitif ve Production testleri önce kırmızıydı. Ret testleri Authority yokken zaten yeşildi, bu yüzden issuer/audience/lifetime doğrulaması geçici olarak kapatıldı: üçü kırmızıya döndü (commit'lenmedi).
+  - `ConfigurationValidationTests`: Production satırı artık `Jwt:Authority` bekliyor. Yeni satırlar: Production'da `http://` ve boş authority, Production'da anahtar, geçersiz URI. `JwtTokenServiceTests`'e anahtarsız issuance vakası eklendi.
+  - README, appsettings, kök/BuildingBlocks/Identity CLAUDE.md ve CHANGELOG (Breaking configuration) güncellendi. 116/116.
+  - Doğrulama sırasında bir kez `ConfigurationValidationTests`'in Cors satırı düştü. Bu R-055'teki açılış yarışı (aynı satır); ardından 10 tam koşu yeşil.
+- [ ] F3a.3 Test IdP yardımcısı — devam ediyor
 - [ ] F3a.2 İzin çözümleme (alt adımlar: 2a resolver, 2b claims transformation)
 
 ### Faz 3b

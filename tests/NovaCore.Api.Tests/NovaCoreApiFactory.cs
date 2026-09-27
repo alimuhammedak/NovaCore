@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using NovaCore.AspNetCore.Auth;
 using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Identity.Infrastructure;
@@ -49,15 +48,15 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
     public TestIdentityProvider IdentityProvider { get; } = new();
 
     /// <summary>
-    /// A client whose bearer token carries exactly <paramref name="claims"/>, signed by the host's own
-    /// <see cref="ITokenService"/>: exercises authorization and validation without seeding users.
+    /// A client whose bearer token carries exactly <paramref name="claims"/>, issued by <see cref="IdentityProvider"/>
+    /// (RS256, validated through the host's <c>Jwt:Authority</c>): exercises authorization and validation without
+    /// seeding users.
     /// </summary>
     public HttpClient CreateClientWithClaims(params Claim[] claims)
     {
-        var token = Services.GetRequiredService<ITokenService>().CreateAccessToken(claims);
-
         var client = CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", IdentityProvider.CreateToken(claims));
         return client;
     }
 
