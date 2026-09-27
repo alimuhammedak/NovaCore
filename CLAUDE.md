@@ -73,7 +73,7 @@ dotnet ef migrations add <Name> --project src/Api/NovaCore.Api --startup-project
 dotnet new install .
 dotnet new novacore -n MyProject
 
-# NuGet packages (the six IsPackable building blocks) → artifacts/ (git-ignored). Version: VersionPrefix in Directory.Build.props.
+# NuGet packages (the seven IsPackable building blocks) → artifacts/ (git-ignored). Version: VersionPrefix in Directory.Build.props.
 dotnet pack NovaCore.slnx -c Release -o artifacts [--version-suffix preview.1]
 ```
 
@@ -91,17 +91,18 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
 - **Packages (`src/BuildingBlocks/`, ANALYSIS §4):** three **core** packages that depend on the BCL and Microsoft
   packages only (D-003) — `NovaCore.Abstractions` (BCL only), `NovaCore.AspNetCore` and `NovaCore.EntityFrameworkCore`
   — plus optional **add-on** packages for third-party libraries: `NovaCore.Serilog`, `NovaCore.OpenTelemetry`,
-  `NovaCore.Scalar`.
+  `NovaCore.Scalar`, `NovaCore.Identity.OpenIddict` (the OpenID Connect provider).
 
 - **Dependency direction (one way):** `Api` → `Modules.*` → `NovaCore.AspNetCore` / `NovaCore.EntityFrameworkCore`
   → `NovaCore.Abstractions` → BCL. AspNetCore and EntityFrameworkCore never reference each other; add-ons reference
   at most AspNetCore/Abstractions. Enforced by `PackageDependencyTests`.
 
 - **The host composes everything explicitly** (`src/Api/NovaCore.Api/Program.cs`): the add-ons (`AddCoreLogging`,
-  `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`), then one
+  `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`), the identity provider
+  (`AddCoreIdentityServer` + `AddModuleDbContext<IdentityServerDbContext>` with its SQL Server store), then one
   `builder.AddModule<TModule>()` per module; after `Build`,
-  `UseSerilogRequestLogging`, `UseCoreWeb`, `MapCoreScalar`, `MapModules`, `MapDefaultEndpoints` (health endpoints,
-  Development only, D-022). Nothing is found by
+  `UseSerilogRequestLogging`, `UseCoreWeb`, `MapCoreScalar`, `MapCoreIdentityServer`, `MapModules`,
+  `MapDefaultEndpoints` (health endpoints, Development only, D-022). Nothing is found by
   assembly scanning (Y-20, `ExplicitRegistrationTests`).
 
 - **Modules are self-contained.** Each `IModule` registers its own services + DbContext + permissions + request
@@ -180,7 +181,7 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   argument must be computed (CA1873), wrap the call in an `IsEnabled` guard and declare the methods as `this ILogger`
   extensions: CA1873 only accepts a guard on the same receiver (`SecurityAuditLogger`, RESEARCH R-047).
 
-- **Packable projects are NuGet packages** (the three core packages and the three add-ons in `src/BuildingBlocks`):
+- **Packable projects are NuGet packages** (the three core packages and the four add-ons in `src/BuildingBlocks`):
   - Every public member needs an XML doc comment (CS1591).
   - The `.csproj` sets `<GenerateDocumentationFile>true</GenerateDocumentationFile>` next to `IsPackable` and references
     `Microsoft.CodeAnalysis.PublicApiAnalyzers` (`PrivateAssets="all"`); `Directory.Build.targets` fails the build

@@ -504,7 +504,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - `IdentityPermissionResolverTests` → `IdentityServerPermissionResolverTests`
     - `EmailSenderRegistrationTests` → `RegistrationTests`
     - Host düzeyindeki `StrictRateLimitTests`, `ValidationTests` ve `AuthGateTests` satırları F3b.3a'da Api host'una taşınıyor.
-- [ ] F3b.3 Eski modülün emekliye ayrılması (alt adımlar: 3a Api geçişi + modülün silinmesi, 3b çekirdek temizliği, 3c dokümanlar)
+- [x] F3b.3 Eski modülün emekliye ayrılması (alt adımlar: 3a Api geçişi + modülün silinmesi, 3b çekirdek temizliği, 3c dokümanlar)
   - [x] F3b.3a (9d35624): Api host'unun geçişi ve modülün silinmesi (kullanıcı onayıyla).
     - `Program.cs`:
       - modül kaydı yerine `AddCoreIdentityServer` ve `AddModuleDbContext<IdentityServerDbContext>` (SQL Server, `MigrationsAssembly` = Api, geçmiş tablosu `identity` şemasında, `EnableRetryOnFailure`; OpenIddict store'ları transaction'ları execution strategy içinde açıyor, R-064);
@@ -530,7 +530,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - Değişmezler `src/BuildingBlocks/NovaCore.Identity.OpenIddict/CLAUDE.md`'ye taşındı. Kök ve tests CLAUDE.md'deki modül atıfları, README'deki üç yer düzeltildi (geniş README güncellemesi F3b.3c'de).
     - Kabul: `git grep "NovaCore.Modules.Identity|IdentityModule"` (docs/plan ve CHANGELOG dışında) boş.
     - 173/173 (iki koşu).
-  - [x] F3b.3b (commit: bir sonraki satırda): Çekirdek temizliği (D-028).
+  - [x] F3b.3b (16f6aae): Çekirdek temizliği (D-028).
     - `ITokenService`, `JwtTokenService` ve `AccessToken` silindi. `JwtOptions`'ta yalnızca `Authority` ([Required]) ve `Audience` kaldı.
     - `AddCoreAuthentication`:
       - geliştirme anahtarı, `PostConfigure` ve HS256 dalı yok;
@@ -545,6 +545,16 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
       - `JwtValidationTests`: simetrik imzalı token Development ve Production'da 401 (theory); Production'da Authority kabulü ayrı test.
       - Factory artık anahtar ya da token ömrü vermiyor.
     - Kabul: `git grep "SigningKey|ITokenService|JwtTokenService|AccessTokenMinutes|RefreshTokenDays"` src/tests/.github'da yalnızca OpenIddict'in `AddEphemeralSigningKey`'i ve test IdP'sinin `SigningKey`'ini buluyor.
+  - [x] F3b.3c (commit: bir sonraki satırda): Dokümanlar.
+    - README:
+      - hızlı başlangıç (https profili, migration komutu), uç nokta tablosu, çekirdek/proje tablosu, proje ağacı (eklenti ve Api/Identity);
+      - Güvenlik bölümü yeniden yazıldı (doğrulama / sağlayıcı / hesaplar), konfigürasyon (Jwt, Identity:Clients, doğrulama kuralları);
+      - veritabanı (migration'lar Api'de), test, dağıtım (yedi paket), lisans tablosu (OpenIddict, Apache-2.0), eşikler.
+    - Kök CLAUDE.md: paket listesi, host kompozisyonu, yedi paket / dört eklenti.
+    - Memory: `novacore-security` yeniden yazıldı, `novacore-stack`, `novacore-project` ve `MEMORY.md` güncellendi.
+    - F3b.3a ve 3b'de gelen belgelerle birlikte eski modülden söz eden doküman kalmadı.
+    - Dokunulmayanlar ("Sonraya bırakılanlar"da kalıyor): README'deki mediator cümlesi, eskimiş Binder satırı, Y-10 atıfları.
+  - F3b.3 kabul kriteri: `NovaCore.Modules.Identity`'ye referans yok (docs/plan ve CHANGELOG geçmişi dışında).
 - [ ] F3b.3 Eski modülün emekliye ayrılması
 - [ ] F3b.4 docker-compose
 - [ ] F3b.5 Uçtan uca doğrulama
