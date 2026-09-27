@@ -18,6 +18,8 @@
     "Serilog.AspNetCore",
     "Serilog.Sinks.Console",
     "Serilog.Sinks.Seq",
+    "OpenIddict.Server.AspNetCore",
+    "OpenIddict.EntityFrameworkCore",
     "xunit.v3",
     "xunit.runner.visualstudio"
   ],

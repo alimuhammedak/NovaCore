@@ -1,0 +1,17 @@
+#nullable enable
+NovaCore.Identity.OpenIddict.ApplicationRole
+NovaCore.Identity.OpenIddict.ApplicationRole.ApplicationRole() -> void
+NovaCore.Identity.OpenIddict.ApplicationRole.ApplicationRole(string! roleName) -> void
+NovaCore.Identity.OpenIddict.ApplicationRole.Description.get -> string?
+NovaCore.Identity.OpenIddict.ApplicationRole.Description.set -> void
+NovaCore.Identity.OpenIddict.ApplicationUser
+NovaCore.Identity.OpenIddict.ApplicationUser.ApplicationUser() -> void
+NovaCore.Identity.OpenIddict.ApplicationUser.CreatedAtUtc.get -> System.DateTimeOffset
+NovaCore.Identity.OpenIddict.ApplicationUser.CreatedAtUtc.set -> void
+NovaCore.Identity.OpenIddict.ApplicationUser.DisplayName.get -> string?
+NovaCore.Identity.OpenIddict.ApplicationUser.DisplayName.set -> void
+NovaCore.Identity.OpenIddict.IdentityServerDbContext
+NovaCore.Identity.OpenIddict.IdentityServerDbContext.IdentityServerDbContext(Microsoft.EntityFrameworkCore.DbContextOptions<NovaCore.Identity.OpenIddict.IdentityServerDbContext!>! options) -> void
+NovaCore.Identity.OpenIddict.IdentityServerHostingExtensions
+const NovaCore.Identity.OpenIddict.IdentityServerDbContext.Schema = "identity" -> string!
+static NovaCore.Identity.OpenIddict.IdentityServerHostingExtensions.AddCoreIdentityServer(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!

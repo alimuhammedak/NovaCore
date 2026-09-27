@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to register services. Host wiring tests pin the module order and endpoints, the validation response of every
   validated request, permission-based 200/403 and the Scalar UI.
 - `Directory.Build.targets` fails the build of a packable project that does not reference PublicApiAnalyzers.
+- New add-on package `NovaCore.Identity.OpenIddict`: an OpenID Connect provider for the host, built on ASP.NET Core
+  Identity and OpenIddict (Apache-2.0). `builder.AddCoreIdentityServer()` registers it. Its issuer is `Jwt:Authority`,
+  so the core validates its signed JWT access tokens through discovery and the published keys like any other
+  provider's. PKCE is required (S256 only). Access tokens live 15 minutes, refresh tokens 7 days. Keys are ephemeral in
+  Development; elsewhere the host adds certificates with OpenIddict's API, and the host does not start without them.
+  The host registers `IdentityServerDbContext` (`AddModuleDbContext`) and keeps its migrations.
 
 ### Changed
 

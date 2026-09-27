@@ -426,6 +426,7 @@ Biçim:
     - `RefreshTokenReuseLeeway` 30 sn; rolling refresh token'lar açık (`DisableRollingRefreshTokens` false).
     - `RequireProofKeyForCodeExchange` false; ömürler: access 1 saat, refresh 14 gün.
     - `TimeProvider` DI'dan alınıyor, yoksa `TimeProvider.System`.
+  - `CodeChallengeMethods` varsayılan olarak `plain` ve `S256`'yı içeriyor (F3b.1a testi discovery'de `plain`'i yakaladı). RFC 9700 §2.1.1 istemcilerin `S256` kullanmasını istiyor; `plain`'de challenge, verifier'ın kendisi. Eklenti `plain`'i listeden siliyor.
   - `ValidateTokenEntry`: zaten "redeemed" işaretli bir token gelirse *"revoke the entire chain of tokens associated with the authorization"* (`RevokeByAuthorizationIdAsync`). Refresh token'lar için leeway süresince tekrar kullanıma izin veriliyor. Authorization'ın kendisi iptal edilmiyor.
   - EF entegrasyonu: `modelBuilder.UseOpenIddict()` (varsayılan `string` anahtar) OnModelCreating içinde çağrılabiliyor. Store kaydı: `AddCore(o => o.UseEntityFrameworkCore().UseDbContext<T>())`.
   - Minimal API passthrough: örnek `Zirku.Server`, `connect/authorize`'ı `app.MapMethods(...)` ile map'liyor ve `Results.SignIn(principal, null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)` döndürüyor. `Velusia.Server`, Identity ile authorization code akışını gösteriyor:
