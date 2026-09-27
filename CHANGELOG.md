@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/api/v1/auth/logout-all`. The last two revoke every refresh token and authorization of the user and end the sign-in
   session at the provider immediately (the cookie's security stamp is checked on every use); issued access tokens stay
   valid until they expire. Signing out of a single session is the standard `/connect/revoke` and `/connect/endsession`.
+  The admin API (`/api/v1/admin/users`, `/roles`, `/permissions`, role assignment) carries over with its `identity:*`
+  permissions. When `Identity:Seed:SeedOnStartup` is true the store is seeded: the Administrator role with every
+  declared permission, the User role with the business read permissions, the administrator from
+  `Identity:Seed:AdminEmail`/`AdminPassword`, then the clients. A new registration gets the User role.
 
 ### Changed
 

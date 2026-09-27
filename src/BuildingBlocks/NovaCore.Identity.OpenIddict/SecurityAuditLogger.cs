@@ -41,6 +41,10 @@ internal sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
 
     public void PasswordChanged(Guid userId) => logger.LogPasswordChanged(userId);
 
+    public void RoleAssigned(Guid userId, string role, string? byUserId) => logger.LogRoleAssigned(userId, role, byUserId);
+
+    public void RoleRemoved(Guid userId, string role, string? byUserId) => logger.LogRoleRemoved(userId, role, byUserId);
+
     // Light masking: the first character and the domain, so logs don't store full addresses.
     private static string Mask(string? email)
     {
@@ -88,4 +92,10 @@ internal static partial class SecurityAuditLog
 
     [LoggerMessage(EventId = 22, Level = LogLevel.Information, Message = "SECURITY sessions_revoked User={UserId} Reason={Reason}")]
     public static partial void LogSessionsRevoked(this ILogger logger, Guid userId, string reason);
+
+    [LoggerMessage(EventId = 23, Level = LogLevel.Information, Message = "SECURITY role_assigned User={UserId} Role={Role} By={By}")]
+    public static partial void LogRoleAssigned(this ILogger logger, Guid userId, string role, string? by);
+
+    [LoggerMessage(EventId = 24, Level = LogLevel.Information, Message = "SECURITY role_removed User={UserId} Role={Role} By={By}")]
+    public static partial void LogRoleRemoved(this ILogger logger, Guid userId, string role, string? by);
 }

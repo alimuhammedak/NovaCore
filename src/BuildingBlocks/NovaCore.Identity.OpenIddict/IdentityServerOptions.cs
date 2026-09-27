@@ -50,8 +50,17 @@ internal sealed class IdentityClientOptions
 /// <summary>Startup seeding (<c>Identity:Seed</c>).</summary>
 internal sealed class IdentitySeedOptions
 {
-    /// <summary>Sync the clients into the store on startup. Needs a migrated database.</summary>
+    /// <summary>
+    /// Seed on startup: the Administrator and User roles with their permissions, the initial administrator and the
+    /// clients. Needs a migrated database.
+    /// </summary>
     public bool SeedOnStartup { get; set; }
+
+    /// <summary>The initial administrator's email. Skipped while either this or the password is unset.</summary>
+    public string? AdminEmail { get; set; }
+
+    /// <summary>The initial administrator's password, from user secrets or the environment, never from appsettings.</summary>
+    public string? AdminPassword { get; set; }
 }
 
 /// <summary>Source-generated validator for the data-annotation rules (docs/plan/RESEARCH.md R-048).</summary>

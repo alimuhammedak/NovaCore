@@ -424,7 +424,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - Kasıtlı bozma (commit'lenmedi): resolver client izinlerini döndürmeyince iki test kırmızıya döndü.
     - 157/157 (üç ardışık tam koşu).
   - F3b.1 kabul kriteri: uçtan uca token akışı çalışıyor (Authorization Code + PKCE, refresh, client credentials; RS256 ve ES256).
-- [ ] F3b.2 Sertleştirmelerin taşınması (alt adımlar: 2a sertleştirme + audit, 2b kayıt/onay, 2c 2FA, 2d oturum uçları, 2e admin + rol seed'i)
+- [x] F3b.2 Sertleştirmelerin taşınması (alt adımlar: 2a sertleştirme + audit, 2b kayıt/onay, 2c 2FA, 2d oturum uçları, 2e admin + rol seed'i)
   - [x] F3b.2a (9d4b08a): Sertleştirmeler ve audit.
     - Identity seçenekleri modüldeki değerlerle aynı: PBKDF2 600.000, parola 12 karakter ve kompozisyon kuralı yok, tekil e-posta, onaylı e-posta, lockout 5 deneme / 15 dk (yeni hesaplar dahil), onay token'ı 6 saat.
     - Login sayfası bilinmeyen hesap, yanlış parola ve kilitli hesap için tek mesaj gösteriyor. Onaysız e-posta mesajı yalnızca doğru paroladan sonra geliyor (modüldeki gibi).
@@ -466,7 +466,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - TOTP testte hesaplanıyor (`AuthenticatorCode`). HMAC-SHA1 için CA5350, MS'in "When to suppress" iznine dayanan dar ve gerekçeli bir `[SuppressMessage]` ile bastırıldı (R-063, Y-44).
     - Kasıtlı bozmalar (commit'lenmedi): kod adımı atlanınca 2 test, hatalı kod sayılmayınca lockout testi kırmızıya döndü.
     - 178/178.
-  - [x] F3b.2d (commit: bir sonraki satırda): Oturum uçları.
+  - [x] F3b.2d (824b67f): Oturum uçları.
     - Yeni uçlar modüldeki yollarında (bearer):
       - `/api/v1/auth/me`: çekirdeğin çözdüğü izinleri de gösteriyor.
       - `/change-password`: public `ChangePasswordRequest`. Identity stamp'i yeniliyor ve bütün token'lar iptal ediliyor.
@@ -482,6 +482,28 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
       - kısa yeni parola validation hatası.
     - Kasıtlı bozmalar (commit'lenmedi): varsayılan stamp aralığıyla 2 test, iptalsiz logout-all ile 1 test kırmızıya döndü.
     - 184/184. Tam koşu artık ~1 dk: seri IdentityServer testlerinde her kullanıcı ve giriş PBKDF2 600k hesaplıyor.
+  - [x] F3b.2e (commit: bir sonraki satırda): Admin ve rol seed'i.
+    - `/api/v1/admin/*` modüldeki yollarında, `identity:*` izinleriyle (`IdentityPermissionProvider`). Doğrulanan gövde public `AssignRoleRequest`. Audit: role_assigned/removed.
+    - `IdentityServerSeeder`, `SeedOnStartup`'ta şu sırayla çalışıyor:
+      - roller: Administrator her beyan edilmiş izni, User kimlik dışı `:read` izinlerini alıyor; eksik izin ekleniyor, verilmiş izin silinmiyor;
+      - admin: `Identity:Seed:AdminEmail/AdminPassword`;
+      - client'lar.
+    - Kayıt yeni kullanıcıyı User rolüne ekliyor (modüldeki gibi).
+    - Testler (8):
+      - `AdminTests` (5): seed edilen rol izinleri, admin kullanıcı listeler, User rol atayamaz (403), rol atama/kaldırma + 404 + 400, yeni kayıt User rolünde;
+      - `IdentityServerRoleChangeTests`: rol değişikliği TTL içinde yansıyor, sahte saatle;
+      - `RefreshTokenLifetimeTests`: 7 gün + 1 sn sonra refresh `invalid_grant`. Bu, modüldeki `RefreshTokenExpiryTests`'in karşılığı.
+      - Sahte saatli sınıflar `FakeClockIdentityServerFixture`'ı paylaşıyor ama her biri kendi host'unu açıyor.
+    - Kasıtlı bozmalar (commit'lenmedi): User rolüne admin okuma izinleri verilince, atama ucu izinsiz bırakılınca ve refresh ömrü 14 gün olunca ilgili test kırmızıya döndü.
+    - Faz içindeki ek model kararları tek bir kayıtta toplandı: D-029.
+    - 191/191 (iki ardışık tam koşu).
+  - F3b.2 kabul kriteri: modülün her güvenlik testinin eklentide bir karşılığı var ve yeşil.
+    - `AuthFlowTests` → `AuthorizationCodeFlowTests` + `SignInHardeningTests` + `AdminTests`
+    - `RefreshTokenExpiryTests` → `RefreshTokenLifetimeTests`
+    - `RoleChangeTests` → `IdentityServerRoleChangeTests`
+    - `IdentityPermissionResolverTests` → `IdentityServerPermissionResolverTests`
+    - `EmailSenderRegistrationTests` → `RegistrationTests`
+    - Host düzeyindeki `StrictRateLimitTests`, `ValidationTests` ve `AuthGateTests` satırları F3b.3a'da Api host'una taşınıyor.
 - [ ] F3b.3 Eski modülün emekliye ayrılması
 - [ ] F3b.4 docker-compose
 - [ ] F3b.5 Uçtan uca doğrulama

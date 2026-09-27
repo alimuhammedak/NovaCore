@@ -96,6 +96,8 @@ internal static class AccountEndpoints
             });
         }
 
+        await users.AddToRoleAsync(user, IdentityRoles.User);
+
         var token = Base64Url.EncodeToString(Encoding.UTF8.GetBytes(await users.GenerateEmailConfirmationTokenAsync(user)));
 
         // The link starts from the configured public URL, never from the request's Host header (host header poisoning).

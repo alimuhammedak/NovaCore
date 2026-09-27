@@ -171,6 +171,7 @@ public static class IdentityServerHostingExtensions
         services.AddHostedService<IdentityServerSeeder>();
 
         services.AddScoped<IPermissionResolver, IdentityPermissionResolver>();
+        services.AddPermissionDefinitions<IdentityPermissionProvider>();
 
         return builder;
     }
@@ -179,7 +180,8 @@ public static class IdentityServerHostingExtensions
     /// Maps the provider's endpoints: the authorization, token and end-session endpoints under <c>/connect</c> (OpenIddict
     /// validates the requests first) and the sign-in page at <c>/account/login</c>, which stay out of the OpenAPI
     /// document; and the account API under <c>/api/v1/auth</c> (registration, email confirmation, the current user,
-    /// password change, sign-out everywhere, two-factor authentication). The token endpoint, the sign-in page and the
+    /// password change, sign-out everywhere, two-factor authentication) and the user and role administration under
+    /// <c>/api/v1/admin</c>, guarded by the <c>identity:*</c> permissions. The token endpoint, the sign-in page and the
     /// account API use the <c>strict</c> rate limit.
     /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
@@ -189,6 +191,7 @@ public static class IdentityServerHostingExtensions
         ConnectEndpoints.Map(endpoints);
         LoginPage.Map(endpoints);
         AccountEndpoints.Map(endpoints);
+        AdminEndpoints.Map(endpoints);
         return endpoints;
     }
 }

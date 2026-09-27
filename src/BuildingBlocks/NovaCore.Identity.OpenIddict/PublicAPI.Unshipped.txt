@@ -60,3 +60,15 @@ override NovaCore.Identity.OpenIddict.ChangePasswordRequest.GetHashCode() -> int
 override NovaCore.Identity.OpenIddict.ChangePasswordRequest.ToString() -> string!
 static NovaCore.Identity.OpenIddict.ChangePasswordRequest.operator !=(NovaCore.Identity.OpenIddict.ChangePasswordRequest? left, NovaCore.Identity.OpenIddict.ChangePasswordRequest? right) -> bool
 static NovaCore.Identity.OpenIddict.ChangePasswordRequest.operator ==(NovaCore.Identity.OpenIddict.ChangePasswordRequest? left, NovaCore.Identity.OpenIddict.ChangePasswordRequest? right) -> bool
+NovaCore.Identity.OpenIddict.AssignRoleRequest
+NovaCore.Identity.OpenIddict.AssignRoleRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.AssignRoleRequest!
+NovaCore.Identity.OpenIddict.AssignRoleRequest.AssignRoleRequest(string! Role) -> void
+NovaCore.Identity.OpenIddict.AssignRoleRequest.Deconstruct(out string! Role) -> void
+NovaCore.Identity.OpenIddict.AssignRoleRequest.Equals(NovaCore.Identity.OpenIddict.AssignRoleRequest? other) -> bool
+NovaCore.Identity.OpenIddict.AssignRoleRequest.Role.get -> string!
+NovaCore.Identity.OpenIddict.AssignRoleRequest.Role.init -> void
+override NovaCore.Identity.OpenIddict.AssignRoleRequest.Equals(object? obj) -> bool
+override NovaCore.Identity.OpenIddict.AssignRoleRequest.GetHashCode() -> int
+override NovaCore.Identity.OpenIddict.AssignRoleRequest.ToString() -> string!
+static NovaCore.Identity.OpenIddict.AssignRoleRequest.operator !=(NovaCore.Identity.OpenIddict.AssignRoleRequest? left, NovaCore.Identity.OpenIddict.AssignRoleRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.AssignRoleRequest.operator ==(NovaCore.Identity.OpenIddict.AssignRoleRequest? left, NovaCore.Identity.OpenIddict.AssignRoleRequest? right) -> bool

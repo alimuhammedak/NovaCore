@@ -22,3 +22,7 @@ public sealed record TwoFactorCodeRequest([Required, Length(6, 8)] string Code);
 /// <param name="CurrentPassword">The password the caller signs in with now.</param>
 /// <param name="NewPassword">12 to 128 characters; length is the only rule (OWASP).</param>
 public sealed record ChangePasswordRequest([Required] string CurrentPassword, [Required, Length(12, 128)] string NewPassword);
+
+/// <summary>The body of <c>POST /api/v1/admin/users/{userId}/roles</c>.</summary>
+/// <param name="Role">The name of an existing role.</param>
+public sealed record AssignRoleRequest([Required, MaxLength(256)] string Role);
