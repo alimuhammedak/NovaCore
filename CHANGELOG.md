@@ -51,6 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Authenticator-app two-factor authentication carries over: `/api/v1/auth/2fa/setup|enable|disable` for the signed-in
   caller, and a code step on the sign-in page. A wrong code now counts toward lockout like a wrong password. The
   authenticator app shows the host's application name.
+  The session endpoints carry over too: `/api/v1/auth/me`, `/api/v1/auth/change-password` and
+  `/api/v1/auth/logout-all`. The last two revoke every refresh token and authorization of the user and end the sign-in
+  session at the provider immediately (the cookie's security stamp is checked on every use); issued access tokens stay
+  valid until they expire. Signing out of a single session is the standard `/connect/revoke` and `/connect/endsession`.
 
 ### Changed
 

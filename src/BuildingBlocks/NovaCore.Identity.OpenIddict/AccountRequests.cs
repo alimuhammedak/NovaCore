@@ -17,3 +17,8 @@ public sealed record RegisterRequest(
 /// <summary>The body of <c>POST /api/v1/auth/2fa/enable</c> and <c>/2fa/disable</c>.</summary>
 /// <param name="Code">The current code from the authenticator app.</param>
 public sealed record TwoFactorCodeRequest([Required, Length(6, 8)] string Code);
+
+/// <summary>The body of <c>POST /api/v1/auth/change-password</c>.</summary>
+/// <param name="CurrentPassword">The password the caller signs in with now.</param>
+/// <param name="NewPassword">12 to 128 characters; length is the only rule (OWASP).</param>
+public sealed record ChangePasswordRequest([Required] string CurrentPassword, [Required, Length(12, 128)] string NewPassword);

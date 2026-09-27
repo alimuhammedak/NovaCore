@@ -46,3 +46,17 @@ override NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.GetHashCode() -> int
 override NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.ToString() -> string!
 static NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.operator !=(NovaCore.Identity.OpenIddict.TwoFactorCodeRequest? left, NovaCore.Identity.OpenIddict.TwoFactorCodeRequest? right) -> bool
 static NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.operator ==(NovaCore.Identity.OpenIddict.TwoFactorCodeRequest? left, NovaCore.Identity.OpenIddict.TwoFactorCodeRequest? right) -> bool
+NovaCore.Identity.OpenIddict.ChangePasswordRequest
+NovaCore.Identity.OpenIddict.ChangePasswordRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.ChangePasswordRequest!
+NovaCore.Identity.OpenIddict.ChangePasswordRequest.ChangePasswordRequest(string! CurrentPassword, string! NewPassword) -> void
+NovaCore.Identity.OpenIddict.ChangePasswordRequest.CurrentPassword.get -> string!
+NovaCore.Identity.OpenIddict.ChangePasswordRequest.CurrentPassword.init -> void
+NovaCore.Identity.OpenIddict.ChangePasswordRequest.Deconstruct(out string! CurrentPassword, out string! NewPassword) -> void
+NovaCore.Identity.OpenIddict.ChangePasswordRequest.Equals(NovaCore.Identity.OpenIddict.ChangePasswordRequest? other) -> bool
+NovaCore.Identity.OpenIddict.ChangePasswordRequest.NewPassword.get -> string!
+NovaCore.Identity.OpenIddict.ChangePasswordRequest.NewPassword.init -> void
+override NovaCore.Identity.OpenIddict.ChangePasswordRequest.Equals(object? obj) -> bool
+override NovaCore.Identity.OpenIddict.ChangePasswordRequest.GetHashCode() -> int
+override NovaCore.Identity.OpenIddict.ChangePasswordRequest.ToString() -> string!
+static NovaCore.Identity.OpenIddict.ChangePasswordRequest.operator !=(NovaCore.Identity.OpenIddict.ChangePasswordRequest? left, NovaCore.Identity.OpenIddict.ChangePasswordRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.ChangePasswordRequest.operator ==(NovaCore.Identity.OpenIddict.ChangePasswordRequest? left, NovaCore.Identity.OpenIddict.ChangePasswordRequest? right) -> bool

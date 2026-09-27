@@ -37,6 +37,10 @@ internal sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
 
     public void SignedOut(Guid userId) => logger.LogSignedOut(userId);
 
+    public void SessionsRevoked(Guid userId, string reason) => logger.LogSessionsRevoked(userId, reason);
+
+    public void PasswordChanged(Guid userId) => logger.LogPasswordChanged(userId);
+
     // Light masking: the first character and the domain, so logs don't store full addresses.
     private static string Mask(string? email)
     {
@@ -78,4 +82,10 @@ internal static partial class SecurityAuditLog
 
     [LoggerMessage(EventId = 15, Level = LogLevel.Information, Message = "SECURITY signed_out User={UserId}")]
     public static partial void LogSignedOut(this ILogger logger, Guid userId);
+
+    [LoggerMessage(EventId = 21, Level = LogLevel.Information, Message = "SECURITY password_changed User={UserId}")]
+    public static partial void LogPasswordChanged(this ILogger logger, Guid userId);
+
+    [LoggerMessage(EventId = 22, Level = LogLevel.Information, Message = "SECURITY sessions_revoked User={UserId} Reason={Reason}")]
+    public static partial void LogSessionsRevoked(this ILogger logger, Guid userId, string reason);
 }

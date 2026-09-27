@@ -450,7 +450,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - EC testinin Production host'una bir sender eklendi (yeni açılış kuralı).
     - Kasıtlı bozmalar (commit'lenmedi): link Host'tan üretilince ve var olan adres 409 dönünce 3 test, açılış kontrolü kaldırılınca 1 test kırmızıya döndü.
     - 172/172.
-  - [x] F3b.2c (commit: bir sonraki satırda): 2FA.
+  - [x] F3b.2c (fe206f6): 2FA.
     - Login sayfası `RequiresTwoFactor`'da `/account/login/2fa`'ya gidiyor: aynı sade form, antiforgery, yalnızca yerel ReturnUrl. Kod adımı iki faktör cookie'si olmadan açılmıyor, login'e dönüyor.
     - `TwoFactorAuthenticatorSignInAsync` hatalı kodu `AccessFailed` sayıyor, yani lockout'a gidiyor. F0.9'daki "hatalı 2FA kodu lockout sayacını artırmıyor" açığı kapandı.
     - `/api/v1/auth/2fa/setup|enable|disable` modüldeki gibi (bearer, `RequireAuthorization`). Doğrulanan gövde public `TwoFactorCodeRequest` (R-062).
@@ -466,6 +466,22 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - TOTP testte hesaplanıyor (`AuthenticatorCode`). HMAC-SHA1 için CA5350, MS'in "When to suppress" iznine dayanan dar ve gerekçeli bir `[SuppressMessage]` ile bastırıldı (R-063, Y-44).
     - Kasıtlı bozmalar (commit'lenmedi): kod adımı atlanınca 2 test, hatalı kod sayılmayınca lockout testi kırmızıya döndü.
     - 178/178.
+  - [x] F3b.2d (commit: bir sonraki satırda): Oturum uçları.
+    - Yeni uçlar modüldeki yollarında (bearer):
+      - `/api/v1/auth/me`: çekirdeğin çözdüğü izinleri de gösteriyor.
+      - `/change-password`: public `ChangePasswordRequest`. Identity stamp'i yeniliyor ve bütün token'lar iptal ediliyor.
+      - `/logout-all`: stamp yenileniyor; OpenIddict `RevokeBySubjectAsync` ile token'lar ve authorization'lar iptal ediliyor.
+    - Tek oturum çıkışı standart `/connect/revoke` + `/connect/endsession`; modüldeki JSON `/logout` taşınmadı (D-027).
+    - Sağlayıcı cookie'sinin `SecurityStampValidatorOptions.ValidationInterval`'ı sıfır (D-026 (6)). Böylece bu iki uç IdP oturumunu hemen bitiriyor.
+    - Verilmiş access token'lar süreleri (15 dk) dolana kadar geçerli; modülde de öyleydi, CHANGELOG'a yazıldı.
+    - Audit: password_changed, sessions_revoked.
+    - Testler (6, `SessionTests`):
+      - `/me` sunucuda çözülen izinlerle; anonim `/me` 401;
+      - logout-all ve parola değişikliği sonrası refresh `invalid_grant` ve authorize login'e dönüyor;
+      - yanlış mevcut parola hiçbir şeyi değiştirmiyor;
+      - kısa yeni parola validation hatası.
+    - Kasıtlı bozmalar (commit'lenmedi): varsayılan stamp aralığıyla 2 test, iptalsiz logout-all ile 1 test kırmızıya döndü.
+    - 184/184. Tam koşu artık ~1 dk: seri IdentityServer testlerinde her kullanıcı ve giriş PBKDF2 600k hesaplıyor.
 - [ ] F3b.3 Eski modülün emekliye ayrılması
 - [ ] F3b.4 docker-compose
 - [ ] F3b.5 Uçtan uca doğrulama

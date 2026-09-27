@@ -143,6 +143,10 @@ public static class IdentityServerHostingExtensions
         }));
         services.AddAntiforgery();
 
+        // The cookie is read only at /connect/* and /account/*, so checking its security stamp on every read is cheap, and
+        // a password change or "sign out everywhere" ends the provider session at once instead of within 30 minutes.
+        services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.Zero);
+
         services.AddOptions<IdentityServerOptions>()
             .BindConfiguration(IdentityServerOptions.SectionName)
             .Validate(
@@ -174,8 +178,9 @@ public static class IdentityServerHostingExtensions
     /// <summary>
     /// Maps the provider's endpoints: the authorization, token and end-session endpoints under <c>/connect</c> (OpenIddict
     /// validates the requests first) and the sign-in page at <c>/account/login</c>, which stay out of the OpenAPI
-    /// document; and the account API under <c>/api/v1/auth</c> (registration, email confirmation). The token endpoint,
-    /// the sign-in page and the account API use the <c>strict</c> rate limit.
+    /// document; and the account API under <c>/api/v1/auth</c> (registration, email confirmation, the current user,
+    /// password change, sign-out everywhere, two-factor authentication). The token endpoint, the sign-in page and the
+    /// account API use the <c>strict</c> rate limit.
     /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
     /// <returns><paramref name="endpoints"/>, for chaining.</returns>
