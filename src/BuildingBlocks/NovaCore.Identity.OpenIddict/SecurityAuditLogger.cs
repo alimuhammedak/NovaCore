@@ -27,6 +27,12 @@ internal sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
 
     public void AccountLockedOut(Guid userId, string? ip) => logger.LogAccountLockedOut(userId, ip);
 
+    public void TwoFactorChallenged(Guid userId) => logger.LogTwoFactorChallenged(userId);
+
+    public void TwoFactorEnabled(Guid userId) => logger.LogTwoFactorEnabled(userId);
+
+    public void TwoFactorDisabled(Guid userId) => logger.LogTwoFactorDisabled(userId);
+
     public void TokenRefreshed(Guid userId, string? ip) => logger.LogTokenRefreshed(userId, ip);
 
     public void SignedOut(Guid userId) => logger.LogSignedOut(userId);
@@ -57,6 +63,15 @@ internal static partial class SecurityAuditLog
 
     [LoggerMessage(EventId = 13, Level = LogLevel.Warning, Message = "SECURITY account_locked_out User={UserId} Ip={Ip}")]
     public static partial void LogAccountLockedOut(this ILogger logger, Guid userId, string? ip);
+
+    [LoggerMessage(EventId = 18, Level = LogLevel.Information, Message = "SECURITY two_factor_challenged User={UserId}")]
+    public static partial void LogTwoFactorChallenged(this ILogger logger, Guid userId);
+
+    [LoggerMessage(EventId = 19, Level = LogLevel.Information, Message = "SECURITY two_factor_enabled User={UserId}")]
+    public static partial void LogTwoFactorEnabled(this ILogger logger, Guid userId);
+
+    [LoggerMessage(EventId = 20, Level = LogLevel.Warning, Message = "SECURITY two_factor_disabled User={UserId}")]
+    public static partial void LogTwoFactorDisabled(this ILogger logger, Guid userId);
 
     [LoggerMessage(EventId = 14, Level = LogLevel.Information, Message = "SECURITY token_refreshed User={UserId} Ip={Ip}")]
     public static partial void LogTokenRefreshed(this ILogger logger, Guid userId, string? ip);

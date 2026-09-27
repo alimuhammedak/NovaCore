@@ -48,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Self-service registration and email confirmation (`/api/v1/auth/register`, `/api/v1/auth/confirm-email`) carry over
   too. The confirmation link now starts from `Jwt:Authority` instead of the request's Host header. Outside Development
   the host must register an `IEmailSender`; in Development emails go to the log.
+  Authenticator-app two-factor authentication carries over: `/api/v1/auth/2fa/setup|enable|disable` for the signed-in
+  caller, and a code step on the sign-in page. A wrong code now counts toward lockout like a wrong password. The
+  authenticator app shows the host's application name.
 
 ### Changed
 

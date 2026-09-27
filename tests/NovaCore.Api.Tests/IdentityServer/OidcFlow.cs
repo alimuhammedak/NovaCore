@@ -31,16 +31,43 @@ internal sealed partial class OidcFlow : IDisposable
     /// <summary>Signs <paramref name="email"/> in from scratch and redeems the code for tokens.</summary>
     public async Task<TokenSet> SignInAsync(string email, string password)
     {
+        var (verifier, afterPassword) = await BeginSignInAsync(email, password);
+        return await FinishSignInAsync(afterPassword, verifier);
+    }
+
+    /// <summary>Starts an authorization request and passes the password step; the response is where it leads.</summary>
+    public async Task<(string Verifier, HttpResponseMessage AfterPassword)> BeginSignInAsync(string email, string password)
+    {
         var (verifier, challenge) = NewPkce();
 
         var toLogin = await Browser.GetAsync(AuthorizeUri(challenge));
         Assert.Equal(HttpStatusCode.Redirect, toLogin.StatusCode);
 
-        var afterLogin = await SubmitLoginAsync(await Browser.GetAsync(toLogin.Headers.Location), email, password);
-        Assert.Equal(HttpStatusCode.Redirect, afterLogin.StatusCode);
+        return (verifier, await SubmitLoginAsync(await Browser.GetAsync(toLogin.Headers.Location), email, password));
+    }
 
-        var callback = await Browser.GetAsync(afterLogin.Headers.Location);
+    /// <summary>Follows the redirect back to the authorization endpoint and redeems the code it issues.</summary>
+    public async Task<TokenSet> FinishSignInAsync(HttpResponseMessage backToAuthorize, string verifier)
+    {
+        Assert.Equal(HttpStatusCode.Redirect, backToAuthorize.StatusCode);
+        Assert.StartsWith("/connect/authorize", backToAuthorize.Headers.Location!.OriginalString, StringComparison.Ordinal);
+
+        var callback = await Browser.GetAsync(backToAuthorize.Headers.Location);
         return await RedeemAsync(CodeFrom(callback), verifier);
+    }
+
+    /// <summary>Posts the authenticator-code form of <paramref name="codePage"/>.</summary>
+    public async Task<HttpResponseMessage> SubmitCodeAsync(HttpResponseMessage codePage, string code)
+    {
+        Assert.Equal(HttpStatusCode.OK, codePage.StatusCode);
+        var html = await codePage.Content.ReadAsStringAsync();
+
+        return await Browser.PostAsync("/account/login/2fa", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = HiddenValue(html, "__RequestVerificationToken"),
+            ["ReturnUrl"] = HiddenValue(html, "ReturnUrl"),
+            ["Code"] = code
+        }));
     }
 
     /// <summary>An authorization request for the test client; <paramref name="extra"/> adds or overrides parameters.</summary>
@@ -103,11 +130,17 @@ internal sealed partial class OidcFlow : IDisposable
         return Browser.PostAsync("/connect/token", new FormUrlEncodedContent(parameters));
     }
 
-    /// <summary>Calls <paramref name="path"/> with <paramref name="accessToken"/> as the bearer token, without cookies.</summary>
-    public async Task<HttpResponseMessage> CallApiAsync(string path, string accessToken)
+    /// <summary>Calls <paramref name="path"/> with <paramref name="accessToken"/> as the bearer token.</summary>
+    public async Task<HttpResponseMessage> CallApiAsync(string path, string accessToken) =>
+        await CallApiAsync(HttpMethod.Get, path, accessToken, body: null);
+
+    /// <summary>Sends <paramref name="body"/> (as JSON, when given) to <paramref name="path"/> with a bearer token.</summary>
+    public async Task<HttpResponseMessage> CallApiAsync(HttpMethod method, string path, string accessToken, object? body)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        using var request = new HttpRequestMessage(method, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        if (body is not null)
+            request.Content = JsonContent.Create(body);
         return await Browser.SendAsync(request);
     }
 

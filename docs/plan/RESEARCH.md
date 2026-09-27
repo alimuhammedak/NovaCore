@@ -468,3 +468,11 @@ Biçim:
   - Sonuç: bu SDK'da (10.0.300, targeting pack 10.0.8) generator yalnızca public request tiplerini kapsıyor. Eksik metadata hata ya da log üretmiyor (R-052).
 - Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/validation?view=aspnetcore-10.0#troubleshoot-generated-validation-metadata · https://learn.microsoft.com/aspnet/core/diagnostics/asp0034?view=aspnetcore-11.0 · yerel derleme (`-p:EmitCompilerGeneratedFiles=true`)
 - Sonuç: D-026'ya ek: eklentinin doğrulanan request gövdeleri (`RegisterRequest` ve sonrakiler) public, üst düzey record'lardır ve PublicAPI'de izlenir. Y-23 gereksiz public API'yi yasaklıyor; burada public olmaları doğrulamanın çalışmasının koşulu. Endpoint sınıfları internal kalıyor. Api host'unun `ValidationTests`'i bu uçları da kapsayacak (F3b.3a).
+
+### R-063: Testteki TOTP hesabı için CA5350 bastırması (2026-09-27, faz 3b)
+- Bulgu:
+  - 2FA testleri bir authenticator uygulamasının yerine kodu kendisi hesaplıyor. RFC 6238 ve ASP.NET Core Identity'nin doğrulayıcısı HMAC-SHA1 kullanıyor. Identity'nin `AuthenticatorTokenProvider.GenerateAsync`'i boş döndüğü için (kod uygulamada üretilir) sunucudan alınamıyor.
+  - `HMACSHA1` CA5350'yi tetikliyor. Kuralın dokümanı: *"Suppress a warning from this rule when the level of protection needed for the data does not require a security guarantee."* Testteki kod bir authenticator uygulamasını taklit ediyor ve güvenlik garantisi gerektirmiyor.
+  - Başka bir API ile (`IncrementalHash` + `HashAlgorithmName.SHA1`) analyzer'ı atlatmak Y-11'e aykırı olurdu.
+- Kaynak: https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca5350 · https://datatracker.ietf.org/doc/html/rfc6238
+- Sonuç: Y-44'ün izin verdiği kalıcı ve dar bastırma: yalnızca `tests/.../IdentityServer/AuthenticatorCode.For` üzerinde gerekçeli `[SuppressMessage]`.

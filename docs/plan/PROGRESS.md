@@ -434,7 +434,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - Testler (8, `SignInHardeningTests`): hash'te 600.000 iterasyon (v3 biçimi çözülerek), length-first politika (2), tekil e-posta, 5 hatada kilit (+ audit), onaysız hesap, bilinmeyen hesap ile yanlış parolanın aynı görünmesi, maskeli audit ve logda parola yok.
     - Kırmızıdan yeşile: sertleştirme öncesi eklentiye karşı 7/8 kırmızı (stash ile denendi), sonra yeşil.
     - 165/165.
-  - [x] F3b.2b (commit: bir sonraki satırda): Kayıt ve e-posta onayı.
+  - [x] F3b.2b (dbf4ef8): Kayıt ve e-posta onayı.
     - `/api/v1/auth/register` ve `/confirm-email` modüldeki yollarında (tag "Auth", "strict" rate limit). Kayıt, var olan adres için yeni kayıtla aynı yanıtı veriyor. Onay linki `Jwt:Authority`'den üretiliyor, Host header'dan değil; P0-6'daki host header zehirlenmesi kapandı.
     - Public `IEmailSender` (host implemente eder). Development'ta `LoggingEmailSender` (`TryAdd`), Production'da sender yoksa `EmailSenderStartupCheck` açılışı durduruyor. Eklenti kendi assembly'si için `services.AddValidation()` çağırıyor.
     - Varsayılan `User` rolüne atama F3b.2e'de, rol seed'iyle birlikte geliyor: rol yokken `AddToRoleAsync` hata veriyor.
@@ -450,6 +450,22 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - EC testinin Production host'una bir sender eklendi (yeni açılış kuralı).
     - Kasıtlı bozmalar (commit'lenmedi): link Host'tan üretilince ve var olan adres 409 dönünce 3 test, açılış kontrolü kaldırılınca 1 test kırmızıya döndü.
     - 172/172.
+  - [x] F3b.2c (commit: bir sonraki satırda): 2FA.
+    - Login sayfası `RequiresTwoFactor`'da `/account/login/2fa`'ya gidiyor: aynı sade form, antiforgery, yalnızca yerel ReturnUrl. Kod adımı iki faktör cookie'si olmadan açılmıyor, login'e dönüyor.
+    - `TwoFactorAuthenticatorSignInAsync` hatalı kodu `AccessFailed` sayıyor, yani lockout'a gidiyor. F0.9'daki "hatalı 2FA kodu lockout sayacını artırmıyor" açığı kapandı.
+    - `/api/v1/auth/2fa/setup|enable|disable` modüldeki gibi (bearer, `RequireAuthorization`). Doğrulanan gövde public `TwoFactorCodeRequest` (R-062).
+    - Authenticator uygulamasındaki etiket artık sabit "NovaCore" değil, host'un `IHostEnvironment.ApplicationName`'i.
+    - Audit: two_factor_challenged/enabled/disabled, bad-2fa-code.
+    - Testler (6, `TwoFactorTests`):
+      - etkinleştirme sonrası girişte kod adımı ve token;
+      - 5 hatalı kod kilitliyor;
+      - yanlış kod etkinleştirmiyor;
+      - biçimsiz kod validation hatası;
+      - devre dışı bırakınca adım kalkıyor;
+      - kod adımı parola adımı olmadan açılmıyor.
+    - TOTP testte hesaplanıyor (`AuthenticatorCode`). HMAC-SHA1 için CA5350, MS'in "When to suppress" iznine dayanan dar ve gerekçeli bir `[SuppressMessage]` ile bastırıldı (R-063, Y-44).
+    - Kasıtlı bozmalar (commit'lenmedi): kod adımı atlanınca 2 test, hatalı kod sayılmayınca lockout testi kırmızıya döndü.
+    - 178/178.
 - [ ] F3b.3 Eski modülün emekliye ayrılması
 - [ ] F3b.4 docker-compose
 - [ ] F3b.5 Uçtan uca doğrulama

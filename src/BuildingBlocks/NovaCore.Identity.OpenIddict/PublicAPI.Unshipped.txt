@@ -34,3 +34,15 @@ override NovaCore.Identity.OpenIddict.RegisterRequest.GetHashCode() -> int
 override NovaCore.Identity.OpenIddict.RegisterRequest.ToString() -> string!
 static NovaCore.Identity.OpenIddict.RegisterRequest.operator !=(NovaCore.Identity.OpenIddict.RegisterRequest? left, NovaCore.Identity.OpenIddict.RegisterRequest? right) -> bool
 static NovaCore.Identity.OpenIddict.RegisterRequest.operator ==(NovaCore.Identity.OpenIddict.RegisterRequest? left, NovaCore.Identity.OpenIddict.RegisterRequest? right) -> bool
+NovaCore.Identity.OpenIddict.TwoFactorCodeRequest
+NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.TwoFactorCodeRequest!
+NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Code.get -> string!
+NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Code.init -> void
+NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Deconstruct(out string! Code) -> void
+NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Equals(NovaCore.Identity.OpenIddict.TwoFactorCodeRequest? other) -> bool
+NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.TwoFactorCodeRequest(string! Code) -> void
+override NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Equals(object? obj) -> bool
+override NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.GetHashCode() -> int
+override NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.ToString() -> string!
+static NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.operator !=(NovaCore.Identity.OpenIddict.TwoFactorCodeRequest? left, NovaCore.Identity.OpenIddict.TwoFactorCodeRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.operator ==(NovaCore.Identity.OpenIddict.TwoFactorCodeRequest? left, NovaCore.Identity.OpenIddict.TwoFactorCodeRequest? right) -> bool
