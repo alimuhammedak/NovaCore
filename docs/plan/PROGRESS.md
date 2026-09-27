@@ -324,8 +324,13 @@ Plan onayı (2026-09-27). Kullanıcı kararı: 2c önce main'e merge edildi (`--
   - `ConfigurationValidationTests`: Production satırı artık `Jwt:Authority` bekliyor. Yeni satırlar: Production'da `http://` ve boş authority, Production'da anahtar, geçersiz URI. `JwtTokenServiceTests`'e anahtarsız issuance vakası eklendi.
   - README, appsettings, kök/BuildingBlocks/Identity CLAUDE.md ve CHANGELOG (Breaking configuration) güncellendi. 116/116.
   - Doğrulama sırasında bir kez `ConfigurationValidationTests`'in Cors satırı düştü. Bu R-055'teki açılış yarışı (aynı satır); ardından 10 tam koşu yeşil.
-- [ ] F3a.3 Test IdP yardımcısı — devam ediyor
+- [x] F3a.3 (af7e4a3): `CreateClientWithClaims` token'ı artık host'un HS256 `ITokenService`'i yerine factory'nin `TestIdentityProvider`'ıyla (RS256, `Jwt:Authority` + JWKS üzerinden doğrulanır) imzalıyor.
+  - `PermissionAuthorizationTests` ve `ValidationTests` değişmeden yeşil. Issuer bağlantısı (`BackchannelHttpHandler`) geçici olarak kaldırılınca bu iki sınıfta 15 test kırmızıya döndü (commit'lenmedi); yani artık test IdP'sine dayanıyorlar.
+  - `tests` altında `ITokenService` kullanan test kalmadı. Identity akış testleri (`AuthFlowTests`, `RefreshTokenExpiryTests`) modülün kendi HS256 token'larıyla Development'ta çalışıyor.
+  - `tests/CLAUDE.md`'ye "Tokens: an in-memory OpenID Connect issuer" bölümü eklendi. 116/116.
 - [ ] F3a.2 İzin çözümleme (alt adımlar: 2a resolver, 2b claims transformation)
+  - [ ] F3a.2a `IPermissionResolver` + Identity implementasyonu — devam ediyor
+  - [ ] F3a.2b Claims transformation + HybridCache
 
 ### Faz 3b
 - [ ] F3b.1 OpenIddict eklentisi

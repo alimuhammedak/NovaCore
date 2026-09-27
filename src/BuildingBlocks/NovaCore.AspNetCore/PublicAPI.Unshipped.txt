@@ -34,6 +34,8 @@ NovaCore.AspNetCore.Auth.JwtTokenService.JwtTokenService(Microsoft.Extensions.Op
 NovaCore.AspNetCore.Authorization.AuthorizationExtensions
 NovaCore.AspNetCore.Authorization.IPermissionDefinitionProvider
 NovaCore.AspNetCore.Authorization.IPermissionDefinitionProvider.GetPermissions() -> System.Collections.Generic.IReadOnlyCollection<NovaCore.AspNetCore.Authorization.PermissionDefinition!>!
+NovaCore.AspNetCore.Authorization.IPermissionResolver
+NovaCore.AspNetCore.Authorization.IPermissionResolver.GetPermissionsAsync(System.Security.Claims.ClaimsPrincipal! user, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyCollection<string!>!>!
 NovaCore.AspNetCore.Authorization.PermissionAuthorizationHandler
 NovaCore.AspNetCore.Authorization.PermissionAuthorizationHandler.PermissionAuthorizationHandler() -> void
 NovaCore.AspNetCore.Authorization.PermissionDefinition
