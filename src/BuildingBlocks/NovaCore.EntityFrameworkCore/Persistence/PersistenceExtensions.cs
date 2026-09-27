@@ -32,8 +32,9 @@ public static class PersistenceExtensions
         services.TryAddScoped<AuditableEntityInterceptor>();
         services.TryAddSingleton(TimeProvider.System);
 
-        // In-process domain-event dispatch — no commercial mediator required.
-        services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
+        // In-process domain-event dispatch, in the caller's scope: handlers are usually scoped (they use a DbContext).
+        services.TryAddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+        services.TryAddSingleton<DomainEventHandlerInvokers>();
 
         // Opt-in: apply every module's EF Core migrations on startup. Off by default so test hosts and DB-less runs
         // never block. Enable with Database:ApplyMigrations=true once SQL Server is reachable. The service is always

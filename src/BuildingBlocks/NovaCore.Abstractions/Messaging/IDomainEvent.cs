@@ -17,7 +17,7 @@ public interface IDomainEvent
 
 /// <summary>
 /// Base for domain events: <see cref="EventId"/> and <see cref="OccurredOnUtc"/> are captured once, when the
-/// event is created, so every reader (handlers, logs, a future outbox) sees the same values.
+/// event is created, so every reader (handlers, logs, the outbox) sees the same values.
 /// </summary>
 public abstract record DomainEvent : IDomainEvent
 {
@@ -43,10 +43,14 @@ public interface IDomainEventHandler<in TEvent>
     Task HandleAsync(TEvent domainEvent, CancellationToken cancellationToken = default);
 }
 
-/// <summary>Publishes domain events to every registered handler. The single seam for in-process eventing.</summary>
+/// <summary>
+/// Runs the handlers of domain events now, in the caller's DI scope, so they share its scoped services. Not durable: the
+/// events are gone if a handler or the process fails. The events an entity raises don't need it: saving the entity writes
+/// them to its module's outbox.
+/// </summary>
 public interface IDomainEventDispatcher
 {
-    /// <summary>Invokes every registered <see cref="IDomainEventHandler{TEvent}"/> for each event.</summary>
+    /// <summary>Invokes every registered <see cref="IDomainEventHandler{TEvent}"/> for each event, one after another.</summary>
     /// <param name="domainEvents">The events to publish.</param>
     /// <param name="cancellationToken">Cancels the dispatch.</param>
     Task DispatchAsync(IEnumerable<IDomainEvent> domainEvents, CancellationToken cancellationToken = default);

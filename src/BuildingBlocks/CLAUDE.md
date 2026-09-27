@@ -25,8 +25,10 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 
 - **`NovaCore.EntityFrameworkCore`** — persistence without ASP.NET Core: `AddModuleDbContext` (also a "ready"-tagged
   `AddDbContextCheck` per context, and the `OutboxInterceptor` on every module context), `AddOutbox()` (maps a module's
-  `outbox_messages`), `AddCorePersistence` (`AuditableEntityInterceptor`, `DomainEventDispatcher`,
-  `DatabaseMigrationService`, which migrates only when `Database:ApplyMigrations` is true). Depends on Abstractions,
+  `outbox_messages`), `AddCorePersistence` (`AuditableEntityInterceptor`, a scoped `IDomainEventDispatcher` that runs
+  handlers in the caller's scope, `DatabaseMigrationService`, which migrates only when `Database:ApplyMigrations` is
+  true). Handlers of an event type are resolved and invoked through a `DomainEventHandlerInvoker<TEvent>` built once per
+  type, so dispatching costs no reflection. Depends on Abstractions,
   EF Core and `Microsoft.Extensions` hosting/options/health-check packages only, never on AspNetCore (D-020).
   `OutboxInterceptor` adds the outbox rows in `SavingChanges`, which EF Core runs before it detects changes and saves,
   so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068).

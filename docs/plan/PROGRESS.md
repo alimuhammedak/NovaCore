@@ -619,7 +619,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
 ### Faz 4a
 Plan onayı 2026-09-28. Uygulama sırası F4a.1 → F4a.3 → F4a.2 (ID'ler sabit): F4a.2'nin dispatcher'ı handler'ları F4a.3'ün cache'li wrapper'ıyla çağırıyor.
 
-- [x] F4a.1 (commit: bir sonraki satırda): Event'lerin outbox'a yazılması.
+- [x] F4a.1 (4678ea3): Event'lerin outbox'a yazılması.
   - Event tamponu jenerik olmayan `Entity` tabanına taşındı (`Entity<TId> : Entity`). Mevcut kod aynen derleniyor.
     - **Sapma:** planda kurucu `private protected`'tı. PublicApiAnalyzers RS0022 verdi (türeyen `Entity<TId>` korumalı `Raise`'i dışarı açıyor), kurucu `protected` oldu (D-031 (2)).
   - `OutboxInterceptor` (public) `SavingChanges`'te her `Entity`'nin event'lerini `outbox_messages`'a ekliyor ve tamponu temizliyor.
@@ -637,8 +637,13 @@ Plan onayı 2026-09-28. Uygulama sırası F4a.1 → F4a.3 → F4a.2 (ID'ler sabi
     - Önce kırmızı: `AddOutbox` yokken derleme hatası.
   - `has-pending-model-changes` üç context'te temiz.
   - CHANGELOG, `src/Modules/CLAUDE.md` ve `src/BuildingBlocks/CLAUDE.md` güncellendi. R-068, R-069 ve D-031 yazıldı.
-- [ ] F4a.3 Eski dispatcher düzeltmesi (sıradaki)
-- [ ] F4a.2 Dispatcher
+- [x] F4a.3 (commit: bir sonraki satırda): Eski dispatcher düzeltmesi.
+  - `IDomainEventDispatcher` artık scoped (`TryAddScoped`): handler'lar çağıranın scope'undan çözülüyor. `DomainEventDispatcher` internal oldu, çünkü kurucusu internal cache'e bağlı (D-031 (7)).
+  - Reflection çağrısının yerine `DomainEventHandlerInvoker<TEvent>` geldi: handler'ları tipli çözüp tipli çağırıyor. Event tipi başına bir kez `MakeGenericType` ile kuruluyor ve `DomainEventHandlerInvokers` singleton'ında tutuluyor. F4a.2'nin dispatcher'ı da bunu kullanacak.
+  - Testler 178 → 181 (`DomainEventDispatcherTests`: çağıranın scope'u, bir event'in bütün handler'ları ve yalnız onlar, handler'sız event).
+    - Önce kırmızı: eski singleton'da 2 test `Cannot resolve scoped service ... from root provider` ile düştü.
+  - Abstractions'ta `IDomainEventDispatcher` ve `DomainEvent` belgeleri güncellendi ("a future outbox" → "the outbox"). CHANGELOG ve `src/BuildingBlocks/CLAUDE.md` da güncellendi.
+- [ ] F4a.2 Dispatcher (sıradaki)
 
 ### Faz 4b
 - [ ] F4b.1 Stok kararı

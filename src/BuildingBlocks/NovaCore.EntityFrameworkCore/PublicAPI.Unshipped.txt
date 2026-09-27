@@ -1,7 +1,4 @@
 #nullable enable
-NovaCore.EntityFrameworkCore.Messaging.DomainEventDispatcher
-NovaCore.EntityFrameworkCore.Messaging.DomainEventDispatcher.DispatchAsync(System.Collections.Generic.IEnumerable<NovaCore.Abstractions.Messaging.IDomainEvent!>! domainEvents, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-NovaCore.EntityFrameworkCore.Messaging.DomainEventDispatcher.DomainEventDispatcher(System.IServiceProvider! serviceProvider) -> void
 NovaCore.EntityFrameworkCore.Messaging.OutboxInterceptor
 NovaCore.EntityFrameworkCore.Messaging.OutboxInterceptor.OutboxInterceptor() -> void
 NovaCore.EntityFrameworkCore.Messaging.OutboxModelBuilderExtensions
