@@ -83,10 +83,15 @@ internal static class ConnectEndpoints
     private static async Task<IResult> Exchange(
         HttpContext context,
         UserManager<ApplicationUser> users,
-        SignInManager<ApplicationUser> signIn)
+        SignInManager<ApplicationUser> signIn,
+        IOpenIddictApplicationManager applications,
+        IOptions<JwtOptions> jwt)
     {
         var request = context.GetOpenIddictServerRequest()
                       ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+        if (request.IsClientCredentialsGrantType())
+            return await ServiceTokenAsync(request, applications, jwt.Value.Audience);
 
         if (!request.IsAuthorizationCodeGrantType() && !request.IsRefreshTokenGrantType())
             throw new InvalidOperationException("The grant type is not supported.");
@@ -109,6 +114,25 @@ internal static class ConnectEndpoints
             principal.Claims.Where(claim => claim.Type != NovaClaims.Permission),
             TokenValidationParameters.DefaultAuthenticationType, Claims.Name, Claims.Role);
         SetUserClaims(identity, user, await users.GetRolesAsync(user));
+        identity.SetDestinations(GetDestinations);
+
+        return Results.SignIn(new ClaimsPrincipal(identity), properties: null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    // OpenIddict has authenticated the client with its secret. The token speaks for the client itself: its "sub" is the
+    // client id, which the permission resolver maps to the client's configured permissions.
+    private static async Task<IResult> ServiceTokenAsync(
+        OpenIddictRequest request, IOpenIddictApplicationManager applications, string audience)
+    {
+        var application = await applications.FindByClientIdAsync(request.ClientId!)
+                          ?? throw new InvalidOperationException("The client application cannot be found.");
+
+        var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType, Claims.Name, Claims.Role);
+        identity
+            .SetClaim(Claims.Subject, request.ClientId)
+            .SetClaim(Claims.Name, await applications.GetDisplayNameAsync(application) ?? request.ClientId);
+        identity.SetScopes(request.GetScopes());
+        identity.SetResources(audience);
         identity.SetDestinations(GetDestinations);
 
         return Results.SignIn(new ClaimsPrincipal(identity), properties: null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);

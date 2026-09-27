@@ -1,8 +1,11 @@
+using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
@@ -68,14 +71,59 @@ public sealed class IdentityServerConfigurationTests
     public async Task A_host_outside_Development_can_sign_with_an_EC_key()
     {
         await using var host = await IdentityServerTestHost.StartAsync(Environments.Production, builder =>
+        {
             builder.Services.AddOpenIddict().AddServer(server => server
                 .AddEphemeralSigningKey(SecurityAlgorithms.EcdsaSha256)
-                .AddEphemeralEncryptionKey()));
+                .AddEphemeralEncryptionKey());
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Identity:Clients:1:ClientId"] = "worker",
+                ["Identity:Clients:1:ClientSecret"] = "worker-secret-for-tests",
+                ["Identity:Clients:1:Permissions:0"] = IdentityServerTestHost.ProbePermission
+            });
+        });
 
         var key = Assert.Single(await SigningKeysAsync(host));
-
         Assert.Equal("EC", key.GetProperty("kty").GetString());
         Assert.Equal(SecurityAlgorithms.EcdsaSha256, key.GetProperty("alg").GetString());
+
+        // The core accepts the ES256 token through the published key.
+        var client = host.CreateClient();
+        var token = await client.PostAsync("/connect/token", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = "worker",
+            ["client_secret"] = "worker-secret-for-tests"
+        }));
+        var accessToken = (await token.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("access_token").GetString()!;
+        Assert.Equal(SecurityAlgorithms.EcdsaSha256, new JsonWebToken(accessToken).Alg);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/probe")).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("ClientId", "0199a3c5-0000-7000-8000-000000000000", "must not be a Guid")]
+    [InlineData("RedirectUris:0", "callback", "must be absolute URIs")]
+    [InlineData("Permissions:0", "probe:read", "apply to service clients only")]
+    public async Task An_invalid_client_stops_the_host(string key, string value, string expectedInMessage)
+    {
+        // Changes the host's user-facing client (Identity:Clients:0).
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
+            configure: builder => builder.Configuration.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Identity:Clients:0:" + key] = value })));
+
+        Assert.Contains(expectedInMessage, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_service_client_without_a_secret_stops_the_host()
+    {
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
+            configure: builder => builder.Configuration.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Identity:Clients:1:ClientId"] = "worker" })));
+
+        Assert.Contains("needs a ClientSecret", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

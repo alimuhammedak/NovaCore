@@ -47,16 +47,21 @@ internal sealed partial class IdentityServerSeeder(
 
     private static OpenIddictApplicationDescriptor Describe(IdentityClientOptions client)
     {
+        var confidential = !string.IsNullOrEmpty(client.ClientSecret);
         var descriptor = new OpenIddictApplicationDescriptor
         {
             ClientId = client.ClientId,
-            ClientSecret = string.IsNullOrEmpty(client.ClientSecret) ? null : client.ClientSecret,
-            ClientType = string.IsNullOrEmpty(client.ClientSecret) ? ClientTypes.Public : ClientTypes.Confidential,
+            ClientSecret = confidential ? client.ClientSecret : null,
+            ClientType = confidential ? ClientTypes.Confidential : ClientTypes.Public,
             DisplayName = client.DisplayName,
             // First-party clients, configured by the host: no consent screen.
-            ConsentType = ConsentTypes.Implicit,
-            Permissions =
-            {
+            ConsentType = ConsentTypes.Implicit
+        };
+
+        if (client.SignsInUsers)
+        {
+            descriptor.Permissions.UnionWith(
+            [
                 Permissions.Endpoints.Authorization,
                 Permissions.Endpoints.Token,
                 Permissions.Endpoints.Revocation,
@@ -67,12 +72,16 @@ internal sealed partial class IdentityServerSeeder(
                 Permissions.Scopes.Profile,
                 Permissions.Scopes.Email,
                 Permissions.Scopes.Roles
-            },
-            Requirements = { Requirements.Features.ProofKeyForCodeExchange }
-        };
+            ]);
+            descriptor.Requirements.Add(Requirements.Features.ProofKeyForCodeExchange);
+            descriptor.RedirectUris.UnionWith(client.RedirectUris);
+            descriptor.PostLogoutRedirectUris.UnionWith(client.PostLogoutRedirectUris);
+        }
+        else
+        {
+            descriptor.Permissions.UnionWith([Permissions.Endpoints.Token, Permissions.GrantTypes.ClientCredentials]);
+        }
 
-        descriptor.RedirectUris.UnionWith(client.RedirectUris);
-        descriptor.PostLogoutRedirectUris.UnionWith(client.PostLogoutRedirectUris);
         return descriptor;
     }
 

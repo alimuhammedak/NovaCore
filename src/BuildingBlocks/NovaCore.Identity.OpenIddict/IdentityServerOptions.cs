@@ -9,9 +9,10 @@ internal sealed class IdentityServerOptions
     public const string SectionName = "Identity";
 
     /// <summary>
-    /// The client applications, synced into the store when <see cref="IdentitySeedOptions.SeedOnStartup"/> is true. Each
-    /// signs users in through its redirect URIs (Authorization Code with PKCE, refresh tokens): public without a secret,
-    /// confidential with one.
+    /// The client applications, synced into the store when <see cref="IdentitySeedOptions.SeedOnStartup"/> is true. A
+    /// client with redirect URIs signs users in (Authorization Code with PKCE, refresh tokens): public without a secret,
+    /// confidential with one. A client without them is a service: it authenticates with its secret (client credentials)
+    /// and holds the <see cref="IdentityClientOptions.Permissions"/> configured for it.
     /// </summary>
     [ValidateEnumeratedItems]
     public List<IdentityClientOptions> Clients { get; set; } = [];
@@ -36,6 +37,14 @@ internal sealed class IdentityClientOptions
 
     /// <summary>Where the provider may send the browser after sign-out.</summary>
     public List<Uri> PostLogoutRedirectUris { get; set; } = [];
+
+    /// <summary>
+    /// A service client's permissions, e.g. <c>catalog:products:read</c>. The permission resolver grants them to its
+    /// tokens, whose <c>sub</c> is the client id. A client that signs users in gets its users' permissions instead.
+    /// </summary>
+    public List<string> Permissions { get; set; } = [];
+
+    public bool SignsInUsers => RedirectUris.Count > 0;
 }
 
 /// <summary>Startup seeding (<c>Identity:Seed</c>).</summary>

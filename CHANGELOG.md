@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Identity:Clients` and are synced into the store when `Identity:Seed:SeedOnStartup` is true. Refresh tokens rotate;
   reusing a redeemed one after OpenIddict's 30-second leeway revokes every token of that authorization, and a refresh
   is refused once the user is gone, can't sign in or is locked out.
+  Service clients (configured without redirect URIs, with a secret) get tokens with client credentials; their `sub`
+  is the client id and they hold the `Permissions` configured for them.
 
 ### Changed
 

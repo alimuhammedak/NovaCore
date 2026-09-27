@@ -1,23 +1,31 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
 
 namespace NovaCore.Identity.OpenIddict;
 
 /// <summary>
-/// Resolves a caller's permissions from the identity store by the token's <c>sub</c>: the <c>permission</c> claims of
-/// every role the user holds, plus the user's own direct grants.
+/// Resolves a caller's permissions by the token's <c>sub</c>. A user (a Guid subject) holds the <c>permission</c> claims
+/// of every role they hold in the store, plus their own direct grants. A service client (its client id as the subject)
+/// holds the permissions configured for it in <c>Identity:Clients</c>.
 /// </summary>
 internal sealed class IdentityPermissionResolver(
     UserManager<ApplicationUser> userManager,
-    RoleManager<ApplicationRole> roleManager) : IPermissionResolver
+    RoleManager<ApplicationRole> roleManager,
+    IOptions<IdentityServerOptions> options) : IPermissionResolver
 {
     public async Task<IReadOnlyCollection<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken cancellationToken)
     {
-        // User ids are Guids and the store throws on anything else, so any other subject holds nothing here.
-        if (!Guid.TryParse(user.FindFirstValue(NovaClaims.Subject), out var userId))
-            return [];
+        var subject = user.FindFirstValue(NovaClaims.Subject);
+
+        // Client ids are never Guids (validated on start), so a subject that isn't one is a client or unknown.
+        if (!Guid.TryParse(subject, out var userId))
+        {
+            var client = options.Value.Clients.Find(client => !client.SignsInUsers && client.ClientId == subject);
+            return client?.Permissions ?? [];
+        }
 
         var account = await userManager.FindByIdAsync(userId.ToString());
         if (account is null)

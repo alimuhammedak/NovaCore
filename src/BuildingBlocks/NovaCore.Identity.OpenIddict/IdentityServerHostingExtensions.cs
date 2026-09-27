@@ -21,7 +21,8 @@ public static class IdentityServerHostingExtensions
     /// protocol (Authorization Code with PKCE, refresh tokens, client credentials) from <c>/connect/*</c>. Its issuer is
     /// <c>Jwt:Authority</c>, so the core validates its access tokens like any other provider's: through discovery and
     /// the published keys. The access tokens are signed JWTs for the <c>Jwt:Audience</c> API. The permission resolver
-    /// reads the store, so users get the permissions of their roles.
+    /// gives users the permissions of their roles (from the store) and service clients the permissions configured for
+    /// them (<c>Identity:Clients</c>).
     /// </summary>
     /// <remarks>
     /// The host registers <see cref="IdentityServerDbContext"/> with its database provider (<c>AddModuleDbContext</c>) and
@@ -55,7 +56,8 @@ public static class IdentityServerHostingExtensions
                 server
                     .AllowAuthorizationCodeFlow()
                     .RequireProofKeyForCodeExchange()
-                    .AllowRefreshTokenFlow();
+                    .AllowRefreshTokenFlow()
+                    .AllowClientCredentialsFlow();
 
                 // S256 only: a "plain" challenge is the verifier itself, so it protects nothing once it leaks (RFC 9700 §2.1.1).
                 server.Configure(options => options.CodeChallengeMethods.Remove(CodeChallengeMethods.Plain));
@@ -117,8 +119,15 @@ public static class IdentityServerHostingExtensions
                 "Identity:Clients:n:ClientId must be unique.")
             .Validate(
                 identity => identity.Clients.TrueForAll(client =>
-                    client.RedirectUris.Count > 0 && client.RedirectUris.Concat(client.PostLogoutRedirectUris).All(uri => uri.IsAbsoluteUri)),
-                "Identity:Clients:n:RedirectUris needs at least one entry, and every redirect URI must be absolute.")
+                    client.RedirectUris.Concat(client.PostLogoutRedirectUris).All(uri => uri.IsAbsoluteUri)),
+                "Identity:Clients:n:RedirectUris and PostLogoutRedirectUris must be absolute URIs.")
+            .Validate(
+                identity => identity.Clients.TrueForAll(client => client.SignsInUsers || !string.IsNullOrEmpty(client.ClientSecret)),
+                "Identity:Clients:n without RedirectUris is a service client (client credentials) and needs a ClientSecret.")
+            .Validate(
+                identity => identity.Clients.TrueForAll(client => !client.SignsInUsers || client.Permissions.Count == 0),
+                "Identity:Clients:n:Permissions apply to service clients only: a client with RedirectUris acts for its users, "
+                + "who get their own permissions.")
             .ValidateOnStart();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<IdentityServerOptions>, IdentityServerOptionsValidator>());
         services.AddHostedService<IdentityServerSeeder>();

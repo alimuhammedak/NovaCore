@@ -371,7 +371,7 @@ Plan onayı (2026-09-27). Kullanıcı kararı: 2c önce main'e merge edildi (`--
 ### Faz 3b
 Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29 (D-028, Development simetrik anahtarı kalkar). Model kararları D-026, araştırmalar R-059…. Başlangıçta main'in `/openapi/v1.json`'u scratchpad'e kaydedildi (29.460 bayt, commit'lenmedi). Alt adımlar: F3b.1a iskelet + sunucu, 1b Authorization Code + PKCE + refresh, 1c client credentials; F3b.2a sertleştirme + audit, 2b kayıt/onay, 2c 2FA, 2d oturum uçları, 2e admin + rol seed'i; F3b.3a Api geçişi + modülün silinmesi, 3b çekirdek temizliği, 3c dokümanlar; F3b.5a OpenAPI/Scalar, 5b tarayıcı. Eklenti, eski modül Api host'unda dururken her commit'in yeşil kalması için bir tüketici test host'unda test ediliyor (D-026 (12)).
 
-- [ ] F3b.1 OpenIddict eklentisi (alt adımlar: 1a iskelet + sunucu, 1b Authorization Code + PKCE + refresh, 1c client credentials)
+- [x] F3b.1 OpenIddict eklentisi (alt adımlar: 1a iskelet + sunucu, 1b Authorization Code + PKCE + refresh, 1c client credentials)
   - [x] F3b.1a (47e72ab): Yeni packable `NovaCore.Identity.OpenIddict` (yalnızca `NovaCore.AspNetCore`'u referans alıyor). Paketler: `OpenIddict.Server.AspNetCore` ve `OpenIddict.EntityFrameworkCore` 7.7.1 (CPM + allowlist, hook onaylı).
     - İçerik: `IdentityServerDbContext` (Identity + OpenIddict, şema `identity`, migration yok), `ApplicationUser`/`ApplicationRole`, `AddCoreIdentityServer`.
     - `AddCoreIdentityServer`: issuer = `Jwt:Authority`, PKCE zorunlu, access token şifrelemesi kapalı, 15 dk / 7 gün. Development'ta ephemeral anahtar. `OpenIddictServerOptions` `ValidateOnStart` ile bağlı.
@@ -388,7 +388,7 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
     - **Sürpriz:** OpenIddict `plain` PKCE yöntemini de varsayılan olarak açık tutuyor. Discovery testi bunu yakaladı (kırmızı) ve `plain` listeden silindi (RFC 9700 §2.1.1, R-059).
     - Kasıtlı bozmalar (commit'lenmedi): `ValidateOnStart` kaldırılınca iki açılış testi, issuer ataması kaldırılınca issuer ve Authority testleri kırmızıya döndü.
     - 136/136.
-  - [x] F3b.1b (commit bu satırı taşıyan commit'tir, bkz. `git log`): Authorization Code + PKCE ve refresh.
+  - [x] F3b.1b (d67697b): Authorization Code + PKCE ve refresh.
     - `MapCoreIdentityServer`:
       - `/connect/authorize`: passthrough; cookie yoksa login'e challenge; prompt=none/login ve max_age; implicit consent; kalıcı authorization.
       - `/connect/token`: code/refresh; kullanıcı hâlâ var mı, giriş yapabilir mi, kilitli mi kontrol edilir; roller yeniden yazılır.
@@ -409,6 +409,21 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
       - (3) Yeni testlerin paralel yükü R-055 yarışını tam koşuların 4'te 3'üne çıkardı. Testler `DisableParallelization` koleksiyonuna alındı, host'lar sınıf başına paylaşıldı; ardından 13/13 tam koşu yeşil (R-055 ek gözlem).
     - Kasıtlı bozmalar (commit'lenmedi): antiforgery kontrolü, open redirect koruması, lockout kontrolü, endsession sign-out ve 0 leeway kaldırılınca ilgili testler kırmızıya döndü.
     - 149/149.
+  - [x] F3b.1c (commit: bir sonraki satırda): Client credentials.
+    - Redirect URI'si olmayan client bir servis sayılıyor: secret zorunlu, izinleri `Identity:Clients:n:Permissions`'tan geliyor.
+    - Token endpoint'i client credentials grant'ını karşılıyor: `sub` = client id, `name` = görünen ad, `aud` = `Jwt:Audience`.
+    - Resolver Guid olmayan `sub`'ı yapılandırılmış servis client'ı olarak çözüyor.
+    - Seed descriptor'ı client türüne göre izin veriyor (servis: yalnızca token endpoint + client_credentials).
+    - Yeni açılış kuralları: izin yalnızca servis client'ında; secret'sız servis yasak; redirect URI'leri mutlak.
+    - Testler (8):
+      - izinli servis 200, izinsiz servis 403;
+      - yanlış secret 401 `invalid_client` (RFC 6749 §5.2);
+      - kullanıcı client'ı client_credentials kullanamıyor;
+      - dört yapılandırma kuralı;
+      - EC anahtarlı Production host'unda ES256 token çekirdekten geçiyor (PLAN F3b.1 "RS256/ES256").
+    - Kasıtlı bozma (commit'lenmedi): resolver client izinlerini döndürmeyince iki test kırmızıya döndü.
+    - 157/157 (üç ardışık tam koşu).
+  - F3b.1 kabul kriteri: uçtan uca token akışı çalışıyor (Authorization Code + PKCE, refresh, client credentials; RS256 ve ES256).
 - [ ] F3b.2 Sertleştirmelerin taşınması
 - [ ] F3b.3 Eski modülün emekliye ayrılması
 - [ ] F3b.4 docker-compose
