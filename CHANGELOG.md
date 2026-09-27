@@ -126,7 +126,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `AddCoreAuthorization` registers a claims transformation that discards any `permission` claim in the token and adds
   the permissions a registered `IPermissionResolver` returns. They are cached in HybridCache per `sub` and security
   stamp (`NovaClaims.SecurityStamp`) for `Cache:PermissionExpiration` (default 5 minutes, validated on start), so a role
-  change reaches a signed-in user within that time. A host must register an `IPermissionResolver`; the Identity module
+  change reaches a signed-in user within that time. A host must register an `IPermissionResolver`, or it refuses to
+  start in any environment; the Identity module
   registers `IdentityPermissionResolver` (role and direct permission claims from its store), and its access tokens no
   longer carry `permission` claims.
 

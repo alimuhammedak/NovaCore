@@ -1,9 +1,10 @@
 namespace NovaCore.AspNetCore.Identity;
 
 /// <summary>
-/// The raw JWT claim names NovaCore issues and validates against. We disable inbound claim mapping
-/// (<c>MapInboundClaims = false</c>) and use these short names consistently across token creation,
-/// validation, and <see cref="HttpContextCurrentUser"/> — so there is exactly one spelling of each.
+/// The raw claim names NovaCore reads. Inbound claim mapping is off (<c>MapInboundClaims = false</c>), so an access
+/// token's <c>sub</c>, <c>name</c>, <c>email</c> and <c>role</c> claims arrive with these short names, and
+/// <see cref="HttpContextCurrentUser"/> reads the same spelling. <see cref="Permission"/> is the exception: it is added
+/// on the server, never taken from the token.
 /// </summary>
 public static class NovaClaims
 {

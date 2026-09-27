@@ -67,7 +67,10 @@ So tokens go through the real Authority → metadata → JWKS path with no netwo
   for a fresh subject.
 - Resolved permissions are cached (`Cache:PermissionExpiration`). `FakeClockApiFactory` drives the memory cache's
   clock too (`MemoryCacheOptions.Clock`: HybridCache's local entries expire by it, not by `TimeProvider`, R-057), so
-  `PermissionResolutionTests` moves the clock past the lifetime instead of waiting.
+  `PermissionResolutionTests` moves the clock past the lifetime instead of waiting. **Gotcha:** the Identity module
+  stamps its tokens from that fake clock while JWT validation reads the real one (R-058), so never log in through
+  Identity after a shared fixture's clock was advanced (the token would be "not yet valid", 401). That is why
+  `RoleChangeTests` has its own host.
 
 ## Test configuration — in-memory config is enough
 

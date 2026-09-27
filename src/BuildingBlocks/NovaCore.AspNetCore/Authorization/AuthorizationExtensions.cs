@@ -14,13 +14,14 @@ public static class AuthorizationExtensions
     /// caller the permissions <see cref="IPermissionResolver"/> resolves on the server, cached in HybridCache per
     /// subject and security stamp for <c>Cache:PermissionExpiration</c>. Permission claims in the access token are
     /// discarded. Needs <c>AddCoreAuthentication</c>, <c>AddCoreCaching</c> and a registered
-    /// <see cref="IPermissionResolver"/> (the identity integration brings it); it replaces any other
-    /// <see cref="IClaimsTransformation"/>.
+    /// <see cref="IPermissionResolver"/> (the identity integration brings it; without one the host does not start); it
+    /// replaces any other <see cref="IClaimsTransformation"/>.
     /// </summary>
     public static IServiceCollection AddCoreAuthorization(this IServiceCollection services)
     {
         services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
         services.AddScoped<IClaimsTransformation, PermissionClaimsTransformation>();
+        services.AddHostedService<PermissionResolverStartupCheck>();
         services.AddAuthorization();
         return services;
     }

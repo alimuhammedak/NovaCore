@@ -326,8 +326,8 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
   claim'lerini atar ve `IPermissionResolver`'ın döndürdüklerini ekler. Identity modülü bunları kullanıcının rollerinden
   ve doğrudan izinlerinden okur (`IdentityPermissionResolver`). Sonuç HybridCache'te `sub` + security stamp anahtarıyla
   `Cache:PermissionExpiration` (varsayılan 5 dk) boyunca tutulur: bir rol değişikliği oturum açmış kullanıcıya en geç bu
-  sürede yansır, yeni bir security stamp'li token cache'i atlar. `Administrator` rolü (token'daki rol claim'i)
-  super-admin'dir, tüm kontrolleri geçer.
+  sürede yansır, yeni bir security stamp'li token cache'i atlar. Host'ta bir `IPermissionResolver` kayıtlı değilse
+  uygulama açılmaz. `Administrator` rolü (token'daki rol claim'i) super-admin'dir, tüm kontrolleri geçer.
 - **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder hepsini toplayıp
   rollere bağlar (`User` rolü = iş modüllerinin yalnızca `:read` izinleri — least privilege).
 

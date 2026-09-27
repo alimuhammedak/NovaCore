@@ -22,8 +22,9 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options, TimeProvider t
         if (string.IsNullOrWhiteSpace(jwt.SigningKey))
         {
             throw new InvalidOperationException(
-                "Issuing access tokens locally needs Jwt:SigningKey, which is accepted in Development only. "
-                + "Elsewhere access tokens come from the OpenID Connect provider at Jwt:Authority.");
+                "Issuing access tokens locally needs Jwt:SigningKey (HS256). It is accepted in Development only, and "
+                + "when Jwt:Authority is set no development key is filled in, so set it explicitly there. Outside "
+                + "Development access tokens come from the OpenID Connect provider at Jwt:Authority.");
         }
 
         var now = timeProvider.GetUtcNow();
