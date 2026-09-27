@@ -6,9 +6,10 @@ namespace NovaCore.EntityFrameworkCore.Messaging;
 public static class OutboxModelBuilderExtensions
 {
     /// <summary>
-    /// Maps the outbox (the <c>outbox_messages</c> table) in the context's default schema. <see cref="OutboxInterceptor"/>
-    /// writes the domain events raised on the context's entities there, in the save that saves the entities. Call it from
-    /// <c>OnModelCreating</c> of every module DbContext, then add a migration.
+    /// Maps the outbox in the context's default schema: <c>outbox_messages</c>, where <see cref="OutboxInterceptor"/>
+    /// writes the domain events raised on the context's entities in the save that saves the entities, and
+    /// <c>outbox_consumers</c>, where the outbox dispatcher records the handlers that have handled each event. Call it
+    /// from <c>OnModelCreating</c> of every module DbContext, then add a migration.
     /// </summary>
     /// <param name="modelBuilder">The module's model builder.</param>
     /// <returns><paramref name="modelBuilder"/>, for chaining.</returns>
@@ -19,7 +20,17 @@ public static class OutboxModelBuilderExtensions
             message.ToTable("outbox_messages");
             message.HasKey(m => m.Id);
             message.HasIndex(m => m.EventId).IsUnique();
+            // The dispatcher reads the waiting messages in Id order.
+            message.HasIndex(m => new { m.ProcessedOnUtc, m.Id });
             message.Property(m => m.Type).HasMaxLength(512);
+            message.Property(m => m.Error).HasMaxLength(OutboxDispatcher.MaxErrorLength);
+        });
+
+        modelBuilder.Entity<OutboxConsumer>(consumer =>
+        {
+            consumer.ToTable("outbox_consumers");
+            consumer.HasKey(c => new { c.EventId, c.Handler });
+            consumer.Property(c => c.Handler).HasMaxLength(256);
         });
 
         return modelBuilder;

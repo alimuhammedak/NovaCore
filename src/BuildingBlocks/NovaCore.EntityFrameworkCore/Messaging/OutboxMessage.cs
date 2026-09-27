@@ -20,4 +20,13 @@ internal sealed class OutboxMessage
 
     /// <summary>The event's <see cref="Abstractions.Messaging.IDomainEvent.OccurredOnUtc"/>.</summary>
     public required DateTimeOffset OccurredOnUtc { get; init; }
+
+    /// <summary>When every handler had handled the event; null while it waits in the outbox.</summary>
+    public DateTimeOffset? ProcessedOnUtc { get; init; }
+
+    /// <summary>The failed deliveries so far. At <see cref="OutboxDispatcher.MaxAttempts"/> the message is no longer tried.</summary>
+    public int Attempts { get; init; }
+
+    /// <summary>The last failure: the exception's type and message.</summary>
+    public string? Error { get; init; }
 }

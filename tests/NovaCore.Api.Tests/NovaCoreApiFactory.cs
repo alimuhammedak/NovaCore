@@ -25,15 +25,19 @@ namespace NovaCore.Api.Tests;
 /// Boots the real Program host in-memory (Development), with migrations and seeding off. JWT validation points at an
 /// in-memory OpenID Connect issuer (<see cref="IdentityProvider"/>). Every DbContext (the modules' and the identity
 /// provider's) is swapped to its own in-memory SQLite database, so the database health checks and the provider's flows
-/// run without a real SQL Server. Outside Development the host gets what a production host must bring: signing and
-/// encryption keys for the identity provider and an email sender.
+/// run without a real SQL Server. The module databases start with their schema, as after the migrations, because the
+/// host's outbox dispatcher reads their outboxes from the start. Outside Development the host gets what a production
+/// host must bring: signing and encryption keys for the identity provider and an email sender.
 /// </summary>
 public class NovaCoreApiFactory : WebApplicationFactory<Program>
 {
-    // One open connection per module keeps each in-memory database alive for the factory's lifetime.
-    private readonly SqliteConnection _identityConnection = new("DataSource=:memory:");
-    private readonly SqliteConnection _catalogConnection = new("DataSource=:memory:");
-    private readonly SqliteConnection _paymentsConnection = new("DataSource=:memory:");
+    // A named in-memory database per context, shared by every connection with its name: each DbContext opens its own
+    // connection, because the outbox dispatcher reads the module databases in the background while requests use them, and
+    // a SqliteConnection isn't thread-safe (docs/plan/RESEARCH.md R-069). These open connections keep the databases alive
+    // for the factory's lifetime.
+    private readonly SqliteConnection _identityDatabase = OpenSharedInMemoryDatabase();
+    private readonly SqliteConnection _catalogDatabase = OpenSharedInMemoryDatabase();
+    private readonly SqliteConnection _paymentsDatabase = OpenSharedInMemoryDatabase();
 
     // The SQLite contexts get their own EF internal provider: the app still registers SQL Server, and EF forbids two
     // providers in one container.
@@ -47,9 +51,13 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
 
     public NovaCoreApiFactory()
     {
-        _identityConnection.Open();
-        _catalogConnection.Open();
-        _paymentsConnection.Open();
+        using var catalog = new CatalogDbContext(
+            new DbContextOptionsBuilder<CatalogDbContext>().UseSqlite(_catalogDatabase).Options);
+        catalog.Database.EnsureCreated();
+
+        using var payments = new PaymentsDbContext(
+            new DbContextOptionsBuilder<PaymentsDbContext>().UseSqlite(_paymentsDatabase).Options);
+        payments.Database.EnsureCreated();
     }
 
     /// <summary>The host environment the app boots in. Override to test environment-specific wiring.</summary>
@@ -127,7 +135,8 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
             services.AddScoped<IPermissionResolver>(provider => new GrantingPermissionResolver(
                 _grants, (IPermissionResolver)ActivatorUtilities.CreateInstance(provider, hostResolver.ImplementationType!)));
 
-            ReplaceWithSqlite<IdentityServerDbContext>(services, options => options.UseSqlite(_identityConnection));
+            ReplaceWithSqlite<IdentityServerDbContext>(services,
+                options => options.UseSqlite(_identityDatabase.ConnectionString));
 
             // A production host brings keys (certificates, stood in for by ephemeral keys) and a real email sender.
             if (EnvironmentName != Environments.Development)
@@ -135,8 +144,9 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
                 services.AddOpenIddict().AddServer(server => server.AddEphemeralSigningKey().AddEphemeralEncryptionKey());
                 services.AddSingleton<IEmailSender>(new CapturingEmailSender());
             }
-            ReplaceWithSqlite<CatalogDbContext>(services, options => options.UseSqlite(_catalogConnection));
-            ReplaceWithSqlite<PaymentsDbContext>(services, options => options.UseSqlite(_paymentsConnection));
+            ReplaceWithSqlite<CatalogDbContext>(services, options => options.UseSqlite(_catalogDatabase.ConnectionString));
+            ReplaceWithSqlite<PaymentsDbContext>(services,
+                options => options.UseSqlite(_paymentsDatabase.ConnectionString));
         });
     }
 
@@ -172,14 +182,23 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
     {
         if (disposing)
         {
-            _identityConnection.Dispose();
-            _catalogConnection.Dispose();
-            _paymentsConnection.Dispose();
+            _identityDatabase.Dispose();
+            _catalogDatabase.Dispose();
+            _paymentsDatabase.Dispose();
             _sqliteServices.Dispose();
             IdentityProvider.Dispose();
         }
 
         base.Dispose(disposing);
+    }
+
+    // No pooling: a pooled connection would keep the database alive after the factory closes this one.
+    private static SqliteConnection OpenSharedInMemoryDatabase()
+    {
+        var connection = new SqliteConnection(
+            $"Data Source=novacore-tests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared;Pooling=False");
+        connection.Open();
+        return connection;
     }
 
     private sealed class GrantingPermissionResolver(

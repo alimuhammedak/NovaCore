@@ -637,13 +637,37 @@ Plan onayı 2026-09-28. Uygulama sırası F4a.1 → F4a.3 → F4a.2 (ID'ler sabi
     - Önce kırmızı: `AddOutbox` yokken derleme hatası.
   - `has-pending-model-changes` üç context'te temiz.
   - CHANGELOG, `src/Modules/CLAUDE.md` ve `src/BuildingBlocks/CLAUDE.md` güncellendi. R-068, R-069 ve D-031 yazıldı.
-- [x] F4a.3 (commit: bir sonraki satırda): Eski dispatcher düzeltmesi.
+- [x] F4a.3 (fecd64c): Eski dispatcher düzeltmesi.
   - `IDomainEventDispatcher` artık scoped (`TryAddScoped`): handler'lar çağıranın scope'undan çözülüyor. `DomainEventDispatcher` internal oldu, çünkü kurucusu internal cache'e bağlı (D-031 (7)).
   - Reflection çağrısının yerine `DomainEventHandlerInvoker<TEvent>` geldi: handler'ları tipli çözüp tipli çağırıyor. Event tipi başına bir kez `MakeGenericType` ile kuruluyor ve `DomainEventHandlerInvokers` singleton'ında tutuluyor. F4a.2'nin dispatcher'ı da bunu kullanacak.
   - Testler 178 → 181 (`DomainEventDispatcherTests`: çağıranın scope'u, bir event'in bütün handler'ları ve yalnız onlar, handler'sız event).
     - Önce kırmızı: eski singleton'da 2 test `Cannot resolve scoped service ... from root provider` ile düştü.
   - Abstractions'ta `IDomainEventDispatcher` ve `DomainEvent` belgeleri güncellendi ("a future outbox" → "the outbox"). CHANGELOG ve `src/BuildingBlocks/CLAUDE.md` da güncellendi.
-- [ ] F4a.2 Dispatcher (sıradaki)
+- [x] F4a.2 (commit: bir sonraki satırda): Dispatcher.
+  - `OutboxDispatcher : BackgroundService` (internal), `AddCorePersistence` migration servisinden sonra kaydediyor.
+    - Açılışta bir tur, sonra `PeriodicTimer(5 sn, TimeProvider)`.
+    - Outbox'ı map'leyen her context'te `Id` üzerinden 50'lik keyset parçaları: `ProcessedOnUtc IS NULL AND Attempts < 10`.
+    - Mesaj başına handler'lar için ayrı DI scope. Bookkeeping context'i handler'larınkinden ayrı.
+  - Processed tablosu `outbox_consumers`, anahtarı (EventId, Handler): biten handler kaydediliyor, yeniden denemede atlanıyor. Hepsi bitince `ProcessedOnUtc` (`ExecuteUpdate`).
+  - Hata: change tracker temizleniyor, `Attempts + 1` ve `Error` (≤ 2000 karakter) yazılıyor, Warning log; 10. denemede Error log ve mesaj bırakılıyor.
+  - Tip `Type.GetType` ile çözülüyor ve `IDomainEvent` olmalı. Tur düzeyindeki hata döngü sınırında yakalanıp loglanıyor. Açık transaction yok.
+  - `OutboxDispatch` migration'ları: `Attempts`, `Error`, `ProcessedOnUtc`, (`ProcessedOnUtc`, `Id`) index'i ve `outbox_consumers`.
+  - Test altyapısı (D-031 (8), R-069):
+    - `NovaCoreApiFactory`'nin üç context'i adlandırılmış paylaşılabilir in-memory SQLite'a geçti (`Pooling=False`, factory başına benzersiz ad, açık tutulan bir bağlantı). Catalog ve Payments şeması ctor'da oluşturuluyor.
+    - **Sürpriz:** dispatcher Api host'unda da çalıştığı için `HealthEndpointsTests`'in "eksik dosya" testi kırmızıya döndü. Dispatcher dosyayı `ReadWriteCreate` ile açıp oluşturuyor, health check de onu sağlıklı görüyordu. Test artık `Mode=ReadWrite` kullanıyor.
+  - Testler 181 → 187 (`OutboxDispatcherTests`, 6):
+    - bir kez işlenir (sonraki turlar ve yeniden başlatılan host tekrar teslim etmiyor);
+    - başarısız handler yeniden deneniyor, başarılı olan tekrar çalışmıyor;
+    - 10 denemede bırakılıyor;
+    - handler'sız event işlenmiş sayılıyor;
+    - `IDomainEvent` olmayan tip başarısız deneme sayılıyor;
+    - retrying execution strategy altında, bookkeeping yazımına bir kez enjekte edilen geçici hatada handler bir kez çalışıyor.
+  - Önce kırmızı: 6/6 `no such column: Attempts`.
+  - **Sürpriz:** `FakeTimeProvider.Advance(1 dk)` 5 sn'lik periyodik zamanlayıcıyı 12 kez tetikliyor. İlk tetik bekleyeni serbest bırakıyor, sonrakiler birikiyor; tek advance iki tur çalıştırabiliyor. Poison testi bu yüzden "tam olarak k" yerine son duruma kadar ilerletiyor. Teknik tests/CLAUDE.md'de.
+  - Kasıtlı bozma (commit'lenmedi): handler atlama kapatılınca yeniden deneme testi kırmızıya döndü.
+  - 187/187 (iki tam koşu).
+  - `has-pending-model-changes` üç context'te temiz.
+  - Güncellenenler: README (Domain event'ler ve outbox, cross-cutting tablosu, Veritabanı, Test), kök `CLAUDE.md` (Persistence), `src/BuildingBlocks/CLAUDE.md`, `src/Modules/CLAUDE.md` (handler kaydı, idempotency, Contracts'ta event), `tests/CLAUDE.md`, CHANGELOG, `Program.cs` yorumu, memory `novacore-stack`.
 
 ### Faz 4b
 - [ ] F4b.1 Stok kararı
@@ -768,6 +792,14 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 3b, code review) `IdentityPermissionResolver` rol başına iki sorgu atıyor (N+1). Cache'li; eski modülden geldi.
 - (Faz 3b, code review) `SecurePolicy = Always` yalnızca uygulama cookie'sinde. 2FA kullanıcı cookie'si ve antiforgery cookie'si varsayılanda. Forwarded headers'sız bir TLS proxy'si arkasında `Secure` bayrağı olmadan çıkıyorlar (yukarıdaki Faz 0 `ForwardedHeaders` maddesiyle ilgili).
 - (Faz 3b, F3b.5b, R-066) Scalar'da OAuth2 şeması seçili ama token'sız kalınca elle eklenen `Authorization` başlığı işe yaramıyor (401). Normal kullanımda Scalar popup'la token alıyor; built-in browser popup'ı aynı sekmede açtığı için bu tarayıcıda denenemedi. Gerçek bir tarayıcıda Scalar'ın popup akışı bir kez elle denenmeli.
+
+- (Faz 4a, plan kapsamı dışı) **Birden çok uygulama örneği:** dispatcher veritabanı başına tek örnek varsayıyor. İki host aynı outbox'u okursa aynı mesajı ikisi de teslim edebilir. Çözüm bir claim/lease olabilir (örneğin koşullu `ExecuteUpdate` ile kilit süresi). SQLite `DateTimeOffset` karşılaştırmasını çeviremediği için süre alanının tipi test tarafını da etkiler (R-068).
+- (Faz 4a, plan kapsamı dışı) Outbox ve `outbox_consumers` satırları hiç silinmiyor. MS Idempotent Consumer tekrar teslim penceresinden uzun bir saklama süresi öneriyor. İşlenmiş mesajları ve kayıtlarını belli bir süre sonra silen bir temizlik gerekecek (OpenIddict kayıtları için olan maddeyle birlikte ele alınabilir).
+- (Faz 4a, plan kapsamı dışı) Yeniden deneme her turda (5 sn) yapılıyor, geri çekilme (backoff) yok. 10 deneme yaklaşık 50 saniye sürüyor; bundan uzun süren bir bağımlılık kesintisi mesajı incelemeye düşürür. Aralık, parça boyu ve deneme sayısı sabit (Y-19). Bir tüketici ihtiyaç duyarsa options'a taşınabilir.
+- (Faz 4a → 4b) Teslim gecikmesi en fazla bir tur (5 sn); event zincirinde her halka bir tur ekliyor. 4b event tabanlı stok rezervasyonunu seçerse (F4b.1), kaydın ardından dispatcher'a sinyal veren anında teslim düşünülebilir.
+- (Faz 4a) `IDomainEventDispatcher`'ın `src`'de çağıranı yok. PLAN F4a.3 gereği düzeltildi ve korunuyor, ama entity event'leri outbox'tan dağıtılıyor. Faz 5'te (ya da kullanıcı kararıyla) kaldırılması değerlendirilebilir.
+- (Faz 4a, R-068) `src/Modules/CLAUDE.md` Guid v7 anahtarları için "friendly to SQL Server clustering" diyor. SQL Server `uniqueidentifier`'ı son 6 bayta göre sıralıyor, v7'nin zaman damgası ise baştaki baytlarda; yani anahtarlar SQL Server sırasında artan değil ve Catalog/Payments'ın clustered PK'ları rastgele sırayla dolar. Çözüm için belge düzeltmesi ya da anahtar stratejisi kararı gerekir (örneğin `SequentialGuidValueGenerator`). Kapsam dışı.
+- (Faz 4a) Outbox interceptor'ını `AddModuleDbContext` ekliyor, audit interceptor'ını ise hâlâ her modül kendisi ekliyor. İkisini aynı yere toplamak modül kaydını kısaltır; modül ve CLAUDE.md değişikliği gerektiği için yapılmadı.
 
 ## Son devir notu
 

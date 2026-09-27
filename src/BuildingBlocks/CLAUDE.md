@@ -32,6 +32,11 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   EF Core and `Microsoft.Extensions` hosting/options/health-check packages only, never on AspNetCore (D-020).
   `OutboxInterceptor` adds the outbox rows in `SavingChanges`, which EF Core runs before it detects changes and saves,
   so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068).
+  `AddCorePersistence` also registers `OutboxDispatcher` (a `BackgroundService`): a pass at startup, then every 5 seconds
+  on a `PeriodicTimer` driven by `TimeProvider`. It reads each outbox in `Id` order in keyset batches, gives each message
+  a DI scope for its handlers and records the finished handlers in `outbox_consumers`. It opens no transaction, so every
+  query and write is a retriable unit of the context's execution strategy. The interval, batch size and 10 attempts are
+  constants: no consumer needs them configurable yet (Y-19).
 
 **Add-ons** (optional, one third-party library each; they may reference AspNetCore/Abstractions only):
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`), `NovaCore.Scalar`

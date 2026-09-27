@@ -18,9 +18,9 @@ public static class PersistenceExtensions
 
     /// <summary>
     /// Registers the persistence services every module DbContext relies on: the audit-stamping interceptor, the
-    /// in-process domain-event dispatcher and the startup migrations, which run only when
-    /// <c>Database:ApplyMigrations</c> is true. Call it before registering the modules, so the migrations run before any
-    /// module's own hosted services.
+    /// in-process domain-event dispatcher, the startup migrations, which run only when <c>Database:ApplyMigrations</c> is
+    /// true, and the outbox dispatcher, a background service that delivers the events in every module's outbox to their
+    /// handlers. Call it before registering the modules, so the migrations run before any module's own hosted services.
     /// </summary>
     /// <param name="builder">The host application builder.</param>
     /// <returns><paramref name="builder"/>, for chaining.</returns>
@@ -43,6 +43,9 @@ public static class PersistenceExtensions
             .BindConfiguration(DatabaseOptions.SectionName)
             .ValidateOnStart();
         services.AddHostedService<DatabaseMigrationService>();
+
+        // Delivers the events in the module outboxes. Registered after the migrations, so it starts after them.
+        services.AddHostedService<OutboxDispatcher>();
 
         return builder;
     }

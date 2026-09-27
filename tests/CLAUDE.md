@@ -44,11 +44,27 @@ checks run without a database. Two non-obvious requirements, both load-bearing:
    .AddEntityFrameworkSqlite().BuildServiceProvider()` + `.UseInternalServiceProvider(...)`). The app still
    registers SQL Server, and EF forbids two providers in one container.
 
-The SQLite connections are opened in the factory ctor and disposed in `Dispose` to keep the in-memory databases
-alive for the test class. A test that needs a schema creates it (`EnsureCreated`); the others just need the
-databases to be reachable. Outside Development the factory also brings what a production host must: ephemeral
-signing/encryption keys for the identity provider (standing in for certificates) and an email sender. A subclass can call `ReplaceWithSqlite` again to point one context elsewhere, e.g. at a missing file
-to make its health check fail (`HealthEndpointsTests`).
+Each context gets a **named, shareable in-memory database** (`Mode=Memory;Cache=Shared;Pooling=False`, a unique name
+per factory). Each context instance opens its own connection to it, and the factory holds one connection open so the
+database lives as long as the factory. One connection object shared by every context would break: the host's outbox
+dispatcher reads the module databases in the background while requests use them, and a `SqliteConnection` isn't
+thread-safe (docs/plan/RESEARCH.md R-069). The Catalog and Payments schemas are created in the factory ctor, as after the
+migrations, so the dispatcher's passes find their outboxes. A test that needs another schema (the identity store's)
+creates it (`EnsureCreated`). Outside Development the factory also brings what a production host must: ephemeral
+signing/encryption keys for the identity provider (standing in for certificates) and an email sender. A subclass can
+call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsTests` points one at a missing file with
+`Mode=ReadWrite`: the dispatcher opens it too, and the default mode would create the file.
+
+## Background work: the outbox dispatcher
+
+`OutboxDispatcherTests` drive the dispatcher on a small host (`AddCorePersistence` + a sample context) with a
+`FakeTimeProvider`:
+- The first pass runs when the host starts; every clock advance past the 5-second interval makes another.
+- Save the first messages **before** starting the host, then wait for their effect. Once the first pass has shown up,
+  the dispatcher's `PeriodicTimer` exists and no later advance is lost: ticks during a pass are kept, not dropped.
+- Wait on visible effects (the outbox row, the handler log), polling with a timeout. One advance can yield two passes,
+  so assert "at least" or keep advancing until the end state; to show that a pass ran, save a later "barrier"
+  message and wait for it.
 
 ## Tokens: an in-memory OpenID Connect issuer
 

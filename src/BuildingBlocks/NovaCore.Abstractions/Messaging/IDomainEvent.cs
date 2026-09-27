@@ -30,7 +30,11 @@ public abstract record DomainEvent : IDomainEvent
     public DateTimeOffset OccurredOnUtc { get; init; } = DateTimeOffset.UtcNow;
 }
 
-/// <summary>Handles a specific <see cref="IDomainEvent"/>. Resolved and invoked by the dispatcher.</summary>
+/// <summary>
+/// Handles a specific <see cref="IDomainEvent"/>. Register it in DI, usually scoped. For every saved event of its type
+/// the outbox dispatcher runs it in a DI scope of its own, at least once: after a failure, or if the process stops
+/// before its success is recorded, it runs again. Make it idempotent.
+/// </summary>
 /// <typeparam name="TEvent">The event type this handler reacts to.</typeparam>
 [SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix",
     Justification = "'Domain event handler' is the established domain term, and this is an interface, not an event-handler delegate (docs/plan/DECISIONS.md D-011, R-034).")]
@@ -46,7 +50,7 @@ public interface IDomainEventHandler<in TEvent>
 /// <summary>
 /// Runs the handlers of domain events now, in the caller's DI scope, so they share its scoped services. Not durable: the
 /// events are gone if a handler or the process fails. The events an entity raises don't need it: saving the entity writes
-/// them to its module's outbox.
+/// them to its module's outbox, and the outbox dispatcher delivers them from there.
 /// </summary>
 public interface IDomainEventDispatcher
 {

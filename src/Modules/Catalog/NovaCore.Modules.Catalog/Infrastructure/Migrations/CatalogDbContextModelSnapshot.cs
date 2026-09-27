@@ -23,6 +23,23 @@ namespace NovaCore.Modules.Catalog.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("NovaCore.EntityFrameworkCore.Messaging.OutboxConsumer", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Handler")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("ProcessedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("EventId", "Handler");
+
+                    b.ToTable("outbox_consumers", "catalog");
+                });
+
             modelBuilder.Entity("NovaCore.EntityFrameworkCore.Messaging.OutboxMessage", b =>
                 {
                     b.Property<long>("Id")
@@ -31,14 +48,24 @@ namespace NovaCore.Modules.Catalog.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<Guid>("EventId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("OccurredOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ProcessedOnUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Type")
@@ -50,6 +77,8 @@ namespace NovaCore.Modules.Catalog.Infrastructure.Migrations
 
                     b.HasIndex("EventId")
                         .IsUnique();
+
+                    b.HasIndex("ProcessedOnUtc", "Id");
 
                     b.ToTable("outbox_messages", "catalog");
                 });

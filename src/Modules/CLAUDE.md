@@ -42,6 +42,11 @@ Use `Catalog` as the reference implementation (full CRUD + contracts); `Payments
 - **Domain events:** an entity records one with `Raise(new SomethingHappened(...))` (a record deriving from
   `DomainEvent`). Saving the entity writes the event to the module's `outbox_messages` table in the same transaction.
   `ModuleRegistrationTests` checks that every module context maps the outbox.
+  - The outbox dispatcher delivers it. Register a handler explicitly in `AddModule`:
+    `services.AddScoped<IDomainEventHandler<SomethingHappened>, DoSomething>()`.
+  - A handler gets a DI scope of its own (its own DbContext) and runs **at least once**, so make it idempotent.
+  - An event another module handles lives in the publisher's `*.Contracts` project, because modules reference each
+    other only through Contracts.
 - **Guard every endpoint** with `.RequirePermission(<M>Permissions.X)` (or `.RequireAuthorization()` only
   when no finer permission applies).
 - **Validate write DTOs with DataAnnotations** on the request record (`[Required, MaxLength(200)] string Name`).

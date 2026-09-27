@@ -21,7 +21,7 @@ builder.AddCoreObservability();                    // OpenTelemetry metrics + tr
 // Core.
 builder.AddCoreDefaults();                         // health checks + resilient HttpClients
 builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth, rate limiting, CORS
-builder.AddCorePersistence();                      // audit interceptor, domain events, opt-in startup migrations
+builder.AddCorePersistence();                      // audit interceptor, domain events + outbox dispatcher, opt-in startup migrations
 
 // The OpenID Connect provider (add-on), issuing the tokens Jwt:Authority points at. Its store lives in this host: the
 // provider and the migrations are the host's choice. After AddCorePersistence, so migrations run before its seeding.
