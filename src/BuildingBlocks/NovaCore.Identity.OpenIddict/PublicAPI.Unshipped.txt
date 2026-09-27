@@ -72,3 +72,4 @@ override NovaCore.Identity.OpenIddict.AssignRoleRequest.GetHashCode() -> int
 override NovaCore.Identity.OpenIddict.AssignRoleRequest.ToString() -> string!
 static NovaCore.Identity.OpenIddict.AssignRoleRequest.operator !=(NovaCore.Identity.OpenIddict.AssignRoleRequest? left, NovaCore.Identity.OpenIddict.AssignRoleRequest? right) -> bool
 static NovaCore.Identity.OpenIddict.AssignRoleRequest.operator ==(NovaCore.Identity.OpenIddict.AssignRoleRequest? left, NovaCore.Identity.OpenIddict.AssignRoleRequest? right) -> bool
+const NovaCore.Identity.OpenIddict.IdentityServerHostingExtensions.OpenApiSecuritySchemeId = "OAuth2" -> string!

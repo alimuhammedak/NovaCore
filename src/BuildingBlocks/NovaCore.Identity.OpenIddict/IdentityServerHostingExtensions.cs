@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -16,6 +17,12 @@ namespace NovaCore.Identity.OpenIddict;
 /// <summary>Service registration for the OpenID Connect provider.</summary>
 public static class IdentityServerHostingExtensions
 {
+    /// <summary>
+    /// The key of the provider's OAuth 2.0 (Authorization Code with PKCE) security scheme in the OpenAPI document, for an
+    /// API explorer to preselect, e.g. Scalar's <c>AddPreferredSecuritySchemes</c> and <c>AddAuthorizationCodeFlow</c>.
+    /// </summary>
+    public const string OpenApiSecuritySchemeId = "OAuth2";
+
     /// <summary>
     /// Adds an OpenID Connect provider to the host: ASP.NET Core Identity stores the accounts and OpenIddict serves the
     /// protocol (Authorization Code with PKCE, refresh tokens, client credentials) from <c>/connect/*</c>. Its issuer is
@@ -164,6 +171,9 @@ public static class IdentityServerHostingExtensions
 
         services.AddScoped<IPermissionResolver, IdentityPermissionResolver>();
         services.AddPermissionDefinitions<IdentityPermissionProvider>();
+
+        // Every OpenAPI document declares the sign-in flow, so an API explorer can get a token from this provider.
+        services.ConfigureAll<OpenApiOptions>(options => options.AddDocumentTransformer<OAuthSecuritySchemeTransformer>());
 
         return builder;
     }

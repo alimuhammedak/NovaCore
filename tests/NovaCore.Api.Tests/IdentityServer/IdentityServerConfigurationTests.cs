@@ -49,6 +49,21 @@ public sealed class IdentityServerConfigurationTests
     }
 
     [Fact]
+    public async Task The_OpenAPI_document_declares_the_sign_in_flow()
+    {
+        await using var host = await IdentityServerTestHost.StartAsync();
+
+        var document = await host.CreateClient().GetFromJsonAsync<JsonElement>("/openapi/v1.json");
+
+        var scheme = document.GetProperty("components").GetProperty("securitySchemes").GetProperty("OAuth2");
+        Assert.Equal("oauth2", scheme.GetProperty("type").GetString());
+        var flow = scheme.GetProperty("flows").GetProperty("authorizationCode");
+        Assert.Equal(IdentityServerTestHost.Authority + "/connect/authorize", flow.GetProperty("authorizationUrl").GetString());
+        Assert.Equal(IdentityServerTestHost.Authority + "/connect/token", flow.GetProperty("tokenUrl").GetString());
+        Assert.True(flow.GetProperty("scopes").TryGetProperty("openid", out _));
+    }
+
+    [Fact]
     public async Task Development_keys_are_RSA()
     {
         await using var host = await IdentityServerTestHost.StartAsync();

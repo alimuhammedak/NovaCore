@@ -75,6 +75,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of the end-of-life v1 all-in-one). New `docker-compose.keycloak.yml` adds an optional Keycloak `26.7.4` with an
   example `novacore` realm (`deploy/keycloak/novacore-realm.json`: a public PKCE client for Scalar, the `novacore.api`
   audience, realm roles as a `role` claim) on `http://localhost:8180`. `.env.example` lists the compose passwords.
+- The OpenAPI document declares the identity provider's Authorization Code flow (`OAuth2` scheme, under
+  `Jwt:Authority`), and `NovaCore.Scalar` has a `MapCoreScalar(Action<ScalarOptions>)` overload. The Api host uses it
+  to sign Scalar in with PKCE as the `scalar` client (`Identity:Clients` in `appsettings.Development.json`).
 
 ### Changed
 

@@ -9,6 +9,7 @@ using NovaCore.Modules.Payments;
 using NovaCore.OpenTelemetry;
 using NovaCore.Scalar;
 using NovaCore.Serilog;
+using Scalar.AspNetCore;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,7 +43,14 @@ var app = builder.Build();
 
 app.UseSerilogRequestLogging();                    // one log line per request, wrapping the rest of the pipeline
 app.UseCoreWeb();                                  // security headers, exception handling, auth, rate limiter, OpenAPI (Development)
-app.MapCoreScalar();                               // Scalar UI at /scalar/v1 (Development)
+app.MapCoreScalar(scalar => scalar                // Scalar UI at /scalar/v1 (Development), signing in through
+    .AddPreferredSecuritySchemes(IdentityServerHostingExtensions.OpenApiSecuritySchemeId)   // the host's own provider
+    .AddAuthorizationCodeFlow(IdentityServerHostingExtensions.OpenApiSecuritySchemeId, flow =>
+    {
+        flow.ClientId = "scalar";                  // Identity:Clients in appsettings.Development.json
+        flow.Pkce = Pkce.Sha256;
+        flow.SelectedScopes = ["openid", "profile", "email", "roles"];
+    }));
 app.MapCoreIdentityServer();                       // /connect/*, the sign-in page, /api/v1/auth/* and /api/v1/admin/*
 app.MapModules();                                  // every module's endpoints
 app.MapDefaultEndpoints();                         // /health (readiness) and /alive (liveness), Development only
