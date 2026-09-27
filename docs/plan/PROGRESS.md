@@ -12,7 +12,7 @@
 | 2a | ✅ tamam | `faz/2a-paket-yapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2b | ✅ tamam | `faz/2b-konfigurasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2c | ✅ tamam | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | 2026-09-26 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
-| 3a | ⏳ başlamadı | | | | |
+| 3a | ✅ tamam | `faz/3a-kimlik-dogrulama` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
 | 3b | ⏳ başlamadı | | | | |
 | 4a | ⏳ başlamadı | | | | |
 | 4b | ⏳ başlamadı | | | | |
@@ -309,9 +309,64 @@ Plan onayı (2026-09-26): kullanıcı kararları Q-25 (boş Guid kuralı özel `
   - Atlandı ("Sonraya bırakılanlar"a yazıldı): iki farklı validation 400 başlığı, Catalog/Payments için geçerli gövde testi yok (F5.3). Kök CLAUDE.md'deki mediator cümlesi zaten listedeydi (Faz 0, F0.6).
 
 ### Faz 3a
-- [ ] F3a.1 JWT doğrulama (Authority/JWKS)
-- [ ] F3a.2 İzin çözümleme
-- [ ] F3a.3 Test IdP yardımcısı
+Plan onayı (2026-09-27). Kullanıcı kararı: 2c önce main'e merge edildi (`--no-ff`, push yok). Model kararları D-024, araştırmalar R-056…R-058. Uygulama sırası F3a.1 → F3a.3 → F3a.2 (D-017 örneği, ID'ler sabit): F3a.1'in kabul testi RSA token istediği için `TestIdentityProvider` F3a.1'de doğuyor, F3a.3 mevcut testleri ona bağlıyor, F3a.2 testleri bir kez daha (sunucu tarafı izinlere) taşıyor. F3a.2 iki alt adım: 2a resolver + Identity implementasyonu, 2b claims transformation. Başlangıçta main'in `/openapi/v1.json`'u scratchpad'e kaydedildi (29.460 bayt, commit'lenmedi).
+
+- [x] F3a.1 (9327877): `Jwt:Authority` eklendi. JwtBearer issuer'ı ve imza anahtarlarını OIDC discovery + JWKS'ten alıyor. Kabul edilen algoritmalar RS/PS/ES 256–512.
+  - Simetrik `Jwt:SigningKey` yalnızca Development'ta geçerli (D-024 (1)): Development dışında `https` Authority zorunlu ve anahtar açılışı durduruyor. Development'ta ikisi de boşsa geliştirme anahtarı devreye giriyor. Anahtar varken HS256 ve `Jwt:Issuer` Authority'ninkilere ekleniyor; JwtBearer ikisini birleştiriyor (R-056).
+  - `JwtTokenService` anahtar yokken `Jwt:SigningKey`'i adlandıran bir `InvalidOperationException` fırlatıyor. Eskiden IdentityModel'in `ArgumentException`'ı 400'e dönüşürdü.
+  - Metot adı `AddCoreAuthentication` olarak kaldı (D-024 (2)). PublicAPI: `JwtOptions.Authority`.
+  - Yeni `TestIdentityProvider` (bellek içi RSA, discovery + JWKS bir `HttpMessageHandler` üzerinden). Factory bunu `BackchannelHttpHandler` olarak bağlıyor ve `Jwt:Authority`'yi her ortamda ona ayarlıyor. `SigningKey` yalnızca Development'ta ayarlanıyor.
+  - Yeni `JwtValidationTests` (7 vaka):
+    - Authority'nin RS256 token'ı 200.
+    - Yanlış issuer, yanlış audience, yabancı anahtar ve süresi dolmuş token 401.
+    - Production'da https metadata ile RS256 kabul, geliştirme anahtarıyla imzalı HS256 red.
+  - Kırmızıdan yeşile: pozitif ve Production testleri önce kırmızıydı. Ret testleri Authority yokken zaten yeşildi, bu yüzden issuer/audience/lifetime doğrulaması geçici olarak kapatıldı: üçü kırmızıya döndü (commit'lenmedi).
+  - `ConfigurationValidationTests`: Production satırı artık `Jwt:Authority` bekliyor. Yeni satırlar: Production'da `http://` ve boş authority, Production'da anahtar, geçersiz URI. `JwtTokenServiceTests`'e anahtarsız issuance vakası eklendi.
+  - README, appsettings, kök/BuildingBlocks/Identity CLAUDE.md ve CHANGELOG (Breaking configuration) güncellendi. 116/116.
+  - Doğrulama sırasında bir kez `ConfigurationValidationTests`'in Cors satırı düştü. Bu R-055'teki açılış yarışı (aynı satır); ardından 10 tam koşu yeşil.
+- [x] F3a.3 (af7e4a3): `CreateClientWithClaims` token'ı artık host'un HS256 `ITokenService`'i yerine factory'nin `TestIdentityProvider`'ıyla (RS256, `Jwt:Authority` + JWKS üzerinden doğrulanır) imzalıyor.
+  - `PermissionAuthorizationTests` ve `ValidationTests` değişmeden yeşil. Issuer bağlantısı (`BackchannelHttpHandler`) geçici olarak kaldırılınca bu iki sınıfta 15 test kırmızıya döndü (commit'lenmedi); yani artık test IdP'sine dayanıyorlar.
+  - `tests` altında `ITokenService` kullanan test kalmadı. Identity akış testleri (`AuthFlowTests`, `RefreshTokenExpiryTests`) modülün kendi HS256 token'larıyla Development'ta çalışıyor.
+  - `tests/CLAUDE.md`'ye "Tokens: an in-memory OpenID Connect issuer" bölümü eklendi. 116/116.
+- [x] F3a.2 İzin çözümleme (alt adımlar: 2a resolver, 2b claims transformation). İzinler sunucuda çözülüyor, token'dan okunmuyor; rol değişikliği cache TTL'i içinde yansıyor.
+  - [x] F3a.2a (5063f54): Yeni public `IPermissionResolver` (`GetPermissionsAsync(ClaimsPrincipal, CancellationToken)`). Identity modülü `IdentityPermissionResolver`'ı scoped kaydediyor: `sub` → kullanıcı → rollerin `permission` claim'leri ∪ kullanıcının doğrudan izinleri. Guid olmayan, bilinmeyen ya da eksik `sub` boş döner (store Guid olmayan id'de exception fırlatıyor).
+    - Yeni `IdentityPermissionResolverTests` (4 vaka), önce derlenmedi. Bu alt adımda resolver'ı henüz tüketen yok; token'a izin gömen eski kod 2b'de kalkıyor. 120/120.
+  - [x] F3a.2b (7d5558d): `AddCoreAuthorization` internal `PermissionClaimsTransformation`'ı kaydediyor. Kimliği doğrulanmış principal klonlanıyor, token'daki tüm `permission` claim'leri atılıyor ve `IPermissionResolver`'ın döndürdükleri ekleniyor.
+    - Önbellek: HybridCache, anahtar `novacore:permissions:{sub}:{stamp}` (kaçışlı), süre yeni `Cache:PermissionExpiration` (varsayılan 5 dk, pozitif olmalı, D-024 (4)). Caller token'ı `None` (D-024 (6)).
+    - Public API: `NovaClaims.SecurityStamp` (`AspNet.Identity.SecurityStamp`, R-057).
+    - Identity'nin token'ları artık `permission` claim'i taşımıyor. `AuthTokenService` yalnızca rolleri yazıyor, `RoleManager` bağımlılığı kalktı.
+    - Testler (önce kırmızı görüldü, 6 hata):
+      - Factory'ye sunucu tarafı izin deposu eklendi (`CreateClientWithPermissions`, `GrantPermissions`). Dekoratör resolver issuer'a bakıyor: test IdP'sinin konuları depodan (verilmemişse boş), Identity'nin token'ları host'un resolver'ından.
+      - İlk denemede dekoratör konuya göre ayırıyordu. Bu yüzden rastgele `sub`'lar Identity DB'sine düşüp 500 verdi; issuer'a göre ayrım bunu çözdü.
+      - `FakeClockApiFactory` `MemoryCacheOptions.Clock`'u da sahte saate bağlıyor (HybridCache L1 süresi `TimeProvider`'ı değil bunu kullanıyor, R-057).
+      - `PermissionAuthorizationTests` sunucu tarafı izinlere geçti; yeni vaka: token'daki izin claim'i hiçbir şey açmıyor.
+      - Yeni `PermissionResolutionTests`: iptal edilen izin TTL dolana kadar geçerli; yeni stamp cache'i atlıyor.
+      - Rol değişikliği kabul testi: Identity kullanıcısı login → 403 → rol eklendi → aynı token TTL içinde 403 → saat ilerleyince 200. Code review'da ayrı sınıfa (`RoleChangeTests`) taşındı.
+      - `ConfigurationValidationTests`: `Cache:PermissionExpiration` satırı.
+    - Kasıtlı bozmalar (commit'lenmedi): claim silme kapatılınca token-claim testi, stamp anahtardan çıkarılınca stamp testi kırmızıya döndü.
+    - README, kök/BuildingBlocks/Identity/tests CLAUDE.md, CHANGELOG (Breaking behaviour) ve memory `novacore-security` güncellendi. 125/125.
+- Faz doğrulaması (2026-09-27):
+  - `restore --force`: temiz, NU uyarısı yok.
+  - `build -c Release --no-incremental`: 0 uyarı, 0 hata.
+  - `test`: 125/125 (review düzeltmelerinden sonra 127/127, üç ardışık koşu).
+  - `list package --vulnerable --include-transitive`: 12 projenin hepsi temiz.
+  - `has-pending-model-changes` (3 context): değişiklik yok.
+  - OpenAPI: faz başında main'den alınan `/openapi/v1.json` ile faz sonundaki belge **bayt bayt aynı** (29.460 bayt).
+  - Smoke run (Development, yerel SQL Server açık, DB'ye yazılmadı):
+    - `/alive` 200, `/health` 200, `/api/v1/products` anonim 401.
+    - Geliştirme anahtarıyla imzalı Administrator token'ı `/products` 200 aldı. `/auth/me`: roller `[Administrator]`, izinler `[]`; bilinmeyen `sub` gerçek Identity store'undan boş çözüldü.
+    - Yalnızca `permission: catalog:products:read` claim'i taşıyan token `/products` 403 aldı, `/me`'de izinler `[]`.
+  - Production açılışı:
+    - `Jwt:Authority` yokken host `Jwt:Authority must be the absolute URI of an OpenID Connect provider…` mesajıyla durdu.
+    - `Jwt:SigningKey` verilince `Jwt:SigningKey (a symmetric HS256 key) is accepted in Development only…` ile durdu.
+- Faz sonu code review (xhigh), 10 bulgu:
+  - Düzeltildi (f0a5bf2):
+    - (1) Rol değişikliği testi sıraya bağımlıydı. Identity token'ı fixture'ın paylaşılan sahte saatinden damgalıyor; başka bir test saati önce ilerletirse login token'ı "henüz geçerli değil" (401) oluyordu. Login'den önce saati ilerleterek yeniden üretildi. Test kendi host'u olan `RoleChangeTests`'e taşındı.
+    - (2) `IPermissionResolver` kayıtlı değilse yalnızca Development'ta (ValidateOnBuild) açılış duruyordu; Production'da her kimlikli istek 500 verirdi. Yeni internal `PermissionResolverStartupCheck` (hosted service, `IServiceProviderIsService`) her ortamda açılışı durduruyor. Yeni `PermissionResolverStartupCheckTests` önce kırmızı görüldü. Böylece D-024 (7)'deki "açılış durur" sonucu her ortamda doğru; mekanizma DI doğrulaması değil bu kontrol.
+    - (3) `IPermissionResolver` dokümanı artık sonucun `sub` + stamp başına cache'lendiğini ve token'a (scope, client, audience) göre değişmemesi gerektiğini söylüyor.
+    - (4) Anahtarsız issuance mesajı, Development'ta Authority varken geliştirme anahtarının doldurulmadığını da söylüyor.
+    - (5) `NovaClaims` sınıf özeti artık izinlerin token'dan geldiğini söylemiyor.
+  - Atlandı ("Sonraya bırakılanlar"a yazıldı): super-admin bypass'ının token rolüne dayanması, Development'ta issuer ve anahtarın bağsız birleşmesi, cache değerinin her okumada deserialize edilmesi, factory'deki dispose sırası, test yardımcılarındaki tekrar.
 
 ### Faz 3b
 - [ ] F3b.1 OpenIddict eklentisi
@@ -369,6 +424,7 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-24 | F2b.5: `/health` ve `/alive` production'da nasıl korunsun? (yalnızca dev / yönetim portu (LocalPort) / yetkilendirme) | F2b.5 | **Yalnızca Development** (2026-09-25, kullanıcı; R-049) → D-022 |
 | Q-25 | F2c.1: `CreatePayment.ProductId`'nin boş Guid kuralı (`NotEmpty`) hazır bir DataAnnotations attribute'uyla ifade edilemiyor (`[Required]` Guid.Empty'yi reddetmez). Nasıl ifade edilsin? | F2c.1 | **Özel `ValidationAttribute`** (2026-09-26, kullanıcı; R-052): `CreatePayment` içinde private nested. MS'in tek değerli kural yolu, hata diğer alan hatalarıyla aynı yanıtta gelir → D-023 |
 | Q-26 | F2c.1: `ExceptionHandlerOrderTests` silinecek `ValidationExceptionHandler`'ın sırasını test ediyor. Silinsin mi? (Y-44) | F2c.1e | **Sil** (2026-09-26, kullanıcı). Köprü D-019 gereği gidiyor, validation 400 yolunu `ValidationTests` koruyor. |
+| Q-27 | Faz 3b'nin IdP'si: OpenIddict eklentisi (PLAN F3b.1–3, Keycloak yalnızca F3b.4'te opsiyonel), yalnızca Keycloak ya da ikisi birden? (PLAN: 3a sonunda sorulur) | F3b.1'den önce | **Açık.** 2026-09-27'de soruldu. Kullanıcı önce fark açıklaması istedi (auth sunucusu kurmak gerekir mi, ikisi birden ne kazandırır, biri eksik kalırsa ne olur); açıklama faz raporunda. Karar 3b başında alınacak. |
 
 ## Sonraya bırakılanlar
 
@@ -417,32 +473,47 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 2c, code review → F5.3) Catalog ve Payments için geçerli gövdeyle uçtan uca test yok. `ValidationTests` yalnızca reddedilen gövdeleri sabitliyor, `PermissionAuthorizationTests`'teki POST 403'te duruyor. Geçerli girdiyi yanlışlıkla reddeden bir attribute değişikliği yakalanmaz. F5.3'ün (Catalog/Payments entegrasyon testleri) kapsamına giriyor.
 - (Faz 2c, R-052) Record ctor parametrelerindeki DataAnnotations (`[MaxLength]`, `[Range]`, `[Length]`) OpenAPI şemasına yansımıyor. Faz sonunda belge main ile bayt bayt aynıydı. FluentValidation döneminde de şemada kısıt yoktu, yani bu bir gerileme değil. Kısıtları belgeye taşımanın yolu araştırılmadı.
 - (Faz 2c) Y-10'un yerini Y-44 aldı, ama iki yer hâlâ Y-10 diyor: `tests/CLAUDE.md` ("never weaken one to pass (Y-10)") ve `Directory.Build.props`'taki `TreatWarningsAsErrors` yorumu. Kök CLAUDE.md'deki aynı not yukarıda (Faz 2a, F2a.5).
-- (Faz 2b → Faz 3a) Token üretimi `TimeProvider`'dan okuyor, JwtBearer'ın lifetime doğrulaması (IdentityModel) ise gerçek saatten. Sahte saatli testler bu yüzden gerçek "şimdi"den başlıyor (R-050). F3a.1'de doğrulama yeniden yazılırken `TimeProvider` ile hizalanabilir.
+- (Faz 2b → Faz 3a; **F3a.1'de değerlendirildi, yapılmadı**, R-058: `TokenValidationParameters`'ta `TimeProvider` yok, tek yol varsayılan doğrulamanın yerini alan bir `LifetimeValidator` delegesi.) Token üretimi `TimeProvider`'dan okuyor, JwtBearer'ın lifetime doğrulaması (IdentityModel) ise gerçek saatten. Sahte saatli testler bu yüzden gerçek "şimdi"den başlıyor (R-050). F3a.1'de doğrulama yeniden yazılırken `TimeProvider` ile hizalanabilir.
+
+- (Faz 3a → F3b.3) Çekirdekteki `ITokenService`/`JwtTokenService`/`AccessToken` ve `JwtOptions`'ın issuance alanlarının (`AccessTokenMinutes`, `RefreshTokenDays`) tek tüketicisi Identity modülü (D-024 (3)). Modülle birlikte kaldırılmalı. O gün HS256 üreten bir issuer kalmayacak; Development'taki simetrik doğrulamanın (`Jwt:SigningKey`) kalıp kalmayacağına karar verilmeli (ör. `dotnet user-jwts` için).
+- (Faz 3a, code review → 3b) **Super-admin bypass'ı token'daki rol claim'ine dayanıyor.** `Administrator` rolünden çıkarılan bir kullanıcı, token'ın ömrü boyunca (Identity'de 15 dk) her izni geçmeye devam ediyor. İzinler ise cache TTL'iyle yansıyor. IdP 3b'de gelirken super-admin de sunucu tarafında çözülmeli (resolver'dan dönen bir işaret ya da rol).
+- (Faz 3a, code review) Development'ta hem `Jwt:Authority` hem `Jwt:SigningKey` varsa JwtBearer issuer'ları ve anahtarları bağsız birleştiriyor (R-056): Authority'nin issuer'ını taşıyan ama HS256 geliştirme anahtarıyla imzalanmış bir token kabul ediliyor. Yalnızca Development. Simetrik mod 3b'de yeniden değerlendirilince (yukarıdaki madde) birlikte ele alınmalı.
+- (Faz 3a → 3b) İzin önbelleğinin anahtarında `iss` yok (PLAN: `sub` + stamp). OIDC'de `sub` yalnızca issuer içinde tekil. Tek Authority ile sorun yok, ama Development/test'te iki issuer (test IdP + Identity) ve 3b'de OpenIddict + Keycloak birlikte güvenilirse `sub` çakışabilir. İkinci bir issuer desteklenirken anahtara `iss` eklenmeli.
+- (Faz 3a, code review) İzin önbelleğinin değeri `string[]`. HybridCache bunu değişmez saymadığı için her L1 okumasında JSON'dan yeniden üretiyor, yani her kimlikli istekte küçük bir deserialize maliyeti var. `[ImmutableObject(true)]` işaretli bir tip bunu önler, ama L2 (Redis) eklenince serileştirilebilir kalması doğrulanmalı.
+- (Faz 3a, code review) `NovaCoreApiFactory.Dispose`, `TestIdentityProvider`'ı (ve SQLite bağlantılarını) host durdurulmadan önce dispose ediyor. Düşük risk; kapanışta metadata yenilenirse `ObjectDisposedException` görülebilir.
+- (Faz 3a, code review) Test yardımcıları tekrarı büyüdü: Identity kullanıcısı oluşturma artık üç yerde (`AuthFlowTests`, `RefreshTokenExpiryTests`, `RoleChangeTests`), "Catalog şemasını oluştur" iki yerde (`PermissionAuthorizationTests`, `JwtValidationTests`). Yukarıdaki Faz 2b maddesiyle birlikte ele alınmalı.
+- (Faz 3a → 3b) Keycloak rolleri düz `role` claim'i olarak değil `realm_access.roles` içinde geliyor. Super-admin kontrolü ve bir Keycloak resolver'ı bunları eşlemeli. OpenAPI belgesi hâlâ düz Bearer şeması yayımlıyor; Scalar için OAuth2/OIDC akışı F3b.5'in işi.
+- (Faz 3a) DECISIONS D-024 (7) "eksikse DI doğrulaması açılışı durdurur" diyor. Code review'dan sonra açılışı her ortamda `PermissionResolverStartupCheck` durduruyor (DI doğrulaması yalnızca Development'ta). Sonuç aynı, mekanizmanın adı farklı. Satırı düzeltmek korunan dosyada kullanıcı onayı ister.
 
 ## Son devir notu
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-26, Faz 2c bitti.** 2026-09-27'de kullanıcı onayıyla `faz/2c-yerlesik-karsiliklar` main'e merge edildi (`--no-ff`). `main` push'lanmadı.
+**2026-09-27, Faz 3a bitti** ve kullanıcı onayıyla `faz/3a-kimlik-dogrulama` main'e merge edildi (`--no-ff`). `main` push'lanmadı (2c ve 3a yerelde).
 
 - **Yapılanlar:**
-  - Validation (F2c.1a–1e): FluentValidation yerine .NET 10'un yerleşik Minimal API validation'ı. Kurallar request record'larının parametrelerinde DataAnnotations. Her modül `AddModule` içinde `services.AddValidation()` çağırıyor (generator yalnızca çağıran assembly'yi kapsar, R-052). Boş Guid kuralı `CreatePayment` içinde private nested bir `ValidationAttribute` (Q-25). `NovaCore.FluentValidation` köprüsü ve `ExceptionHandlerOrderTests` silindi (D-019, Q-26). `ValidationTests` validate edilen 13 request şeklinin 400 yanıtını sabitliyor.
-  - Yetkilendirme (F2c.2): `RequirePermissionAttribute : AuthorizeAttribute, IAuthorizationRequirementData` mevcut `PermissionRequirement`'ı taşıyor. `PermissionPolicyProvider` ve `HasPermissionAttribute` silindi. `RequirePermission(...)` imzası aynı. `PermissionAuthorizationTests` 200/403'ü sabitliyor.
-  - Cache (F2c.3): `ICacheService`/`HybridCacheService` silindi, tüketiciler `HybridCache`'i doğrudan enjekte ediyor. `EXTEXP0018` bastırması kalktı (R-054).
-  - Paketler (F2c.4): FluentValidation CPM'den ve allowlist'ten çıktı.
-  - Test yardımcısı: `NovaCoreApiFactory.CreateClientWithClaims(...)` host'un `ITokenService`'iyle imzalı token üretiyor, kullanıcı seed'i gerekmiyor.
-  - `ExplicitRegistrationTests` (Y-20) artık tüm `src`'yi tarıyor. `*FromAssembly*` yardımcılarını ve `DefinedTypes`/`ExportedTypes` property'lerini de yakalıyor, EF'in `ApplyConfigurationsFromAssembly`'si hariç (D-023 (5)).
-  - Testler 89 → 106. OpenAPI belgesi main ile bayt bayt aynı.
-  - Kararlar: D-023 (model; (3)'teki Guid kuralı kullanıcı, Q-25), Q-26 (kullanıcı). Araştırmalar: R-052…R-055.
+  - Doğrulama (F3a.1): JwtBearer artık `Jwt:Authority`'ye (OIDC sağlayıcısı) karşı doğruluyor. Issuer ve anahtarlar discovery + JWKS'ten geliyor, yalnızca asimetrik algoritmalar (RS/PS/ES) kabul ediliyor.
+    - Simetrik `Jwt:SigningKey` yalnızca Development'ta geçerli (D-024 (1)). Development dışında `https` Authority zorunlu ve anahtar açılışı durduruyor. Development'ta ikisi de boşsa geliştirme anahtarı kullanılıyor.
+    - Identity modülünün HS256 token'ları bu yüzden yalnızca Development ve testte doğrulanıyor (Q-04, D-002).
+  - Test IdP'si (F3a.1/F3a.3): `TestIdentityProvider` (bellek içi RSA; discovery + JWKS bir `HttpMessageHandler` ile). Factory bunu `Jwt:Authority` ve `BackchannelHttpHandler` olarak bağlıyor; `CreateClientWithClaims` RS256 imzalıyor.
+  - İzinler (F3a.2):
+    - Public `IPermissionResolver`; Identity'de implementasyonu `IdentityPermissionResolver`.
+    - `PermissionClaimsTransformation` token'daki `permission` claim'lerini atıyor, çözülen izinleri HybridCache'te `sub` + security stamp anahtarıyla `Cache:PermissionExpiration` (5 dk) boyunca tutuyor.
+    - Resolver kayıtlı değilse host her ortamda açılmıyor (`PermissionResolverStartupCheck`).
+    - Identity token'ları artık izin taşımıyor.
+  - Testler 106 → 127. OpenAPI belgesi main ile bayt bayt aynı.
+  - Kararlar: D-024 (model). Araştırmalar: R-056…R-058. Kullanıcı kararı: 2c'nin önce merge edilmesi.
 - **Sürprizler:**
-  - Validation 400'ünün `title`'ı framework varsayılanına geçti ("One or more validation errors occurred."). `Result` yolundaki validation hataları hâlâ "Validation failed" diyor ("Sonraya bırakılanlar").
-  - DataAnnotations kısıtları OpenAPI şemasına yansımıyor. Belge değişmedi.
-  - Açılışta hata bekleyen testler yük altında ara sıra `ObjectDisposedException` alıyor (R-055). Framework yarışı, F2c'den önce de vardı, CI'da aralıklı kırmızıya yol açabilir. Çözüm yolu kullanıcı kararı.
-  - `dotnet run --environment Development` ortamı ayarlamıyor. Smoke run için `ASPNETCORE_ENVIRONMENT=Development` gerekiyor.
-- **Sonraki fazın (3a) bilmesi gerekenler:**
-  - F3a.1 (Authority/JWKS doğrulaması) `CreateClientWithClaims`'i etkiler: yardımcı bugün host'un simetrik anahtarlı `ITokenService`'ini kullanıyor. F3a.3'teki bellek içi RSA test IdP'si onun yerini almalı. `ValidationTests` ve `PermissionAuthorizationTests` bu yardımcıya dayanıyor.
-  - F3a.2 (sunucu tarafında izin çözümleme): `PermissionAuthorizationHandler` bugün JWT'deki `permission` claim'ine bakıyor. `PermissionAuthorizationTests` izinleri token claim'i olarak veriyor; claim transformation'a geçince bu testlerin kurulumu değişmeli. HybridCache `AddCoreCaching` ile kayıtlı, doğrudan enjekte edilir (Y-15: sarmalayıcı yok).
-  - Token üretimi `TimeProvider`'dan, JwtBearer lifetime doğrulaması gerçek saatten okuyor (R-050). F3a.1'de hizalanabilir.
-  - Açık "Sonraya bırakılanlar" maddeleri: R-055 aralıklı test hatası, iki validation başlığı, `BadHttpRequestException` → 500, health check timeout, test yardımcılarındaki tekrar, OTel'in erken okuması, eski Y-10 atıfları, mediator cümlesi.
-- **Bekleyen:** `main`'in push'u ve önizleme yayını (tag + GitHub Packages) ayrı kullanıcı kararları.
-- **Sıradaki:** yeni oturumda `/novacore-phase 3a`.
+  - HybridCache'in L1 süresi `TimeProvider`'ı değil `MemoryCacheOptions.Clock`'u kullanıyor (R-057). Sahte saatli testlerde ikisi de bağlanmalı.
+  - IdentityModel'de `TimeProvider` yok (R-058). Identity token'ları sahte saatten, JWT doğrulaması gerçek saatten okuyor: paylaşılan bir fixture'da saat ilerledikten sonra Identity ile login olunamıyor (`RoleChangeTests` bu yüzden ayrı; `tests/CLAUDE.md`'de gotcha olarak yazıldı).
+  - Development'ta resolver dekoratörü konuya göre ayırınca test IdP'sinin rastgele `sub`'ları Identity DB'sine gitti. Ayrım issuer'a göre yapılıyor.
+  - R-055 açılış yarışı bir kez daha görüldü (Cors satırı), sonra 10+ koşu yeşil.
+- **Sonraki fazın (3b) bilmesi gerekenler:**
+  - **IdP seçimi açık (Q-27).** Faz sonunda soruldu, kullanıcı önce farkların açıklanmasını istedi. 3b plan onayından önce karar alınmalı: F3b.1–F3b.3'ün kapsamı buna bağlı.
+  - Yeni IdP entegrasyonu bir `IPermissionResolver` kaydetmeli (yoksa host açılmaz). Sonucu `sub` + stamp'e göre cache'lendiği için token'a (scope, client) bağlı olmamalı.
+  - OpenIddict access token'ına `AspNet.Identity.SecurityStamp` (`NovaClaims.SecurityStamp`) yazılırsa, kimlik bilgisi değişikliğinden sonraki yeni token cache'i atlar.
+  - F3b.3'te Identity ile birlikte çekirdekteki `ITokenService`/`JwtTokenService`/`AccessToken` ve issuance alanları kalkmalı; Development simetrik modunun kalıp kalmayacağına karar verilmeli.
+  - Super-admin bypass'ı hâlâ token rolüne dayanıyor. Keycloak rolleri `realm_access.roles`'ta. İzin anahtarına ikinci bir issuer ile `iss` eklenmeli. Hepsi "Sonraya bırakılanlar"da.
+  - Açık diğer maddeler: R-055, iki validation başlığı, `BadHttpRequestException` → 500, health check timeout, test yardımcılarındaki tekrar, OTel'in erken okuması, eski Y-10 atıfları, mediator cümlesi, D-024 (7) ifadesi.
+- **Bekleyen:** IdP seçimi (Q-27); `main` push'u ve önizleme yayını ayrı kullanıcı kararları.
+- **Sıradaki:** yeni oturumda `/novacore-phase 3b` (önce Q-27).

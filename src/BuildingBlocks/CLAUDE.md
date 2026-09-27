@@ -16,7 +16,9 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 
 - **`NovaCore.AspNetCore`** — the web host: `IModule` + `AddModule<TModule>()`/`MapModules`, `AddCoreDefaults`
   (health + HttpClient resilience), `AddCoreWeb`/`UseCoreWeb`, `GlobalExceptionHandler` (RFC 9457) and the
-  `AppException` types, `ResultHttpExtensions.ToHttpResult`, JWT auth (`AddCoreAuthentication`), permission authz
+  `AppException` types, `ResultHttpExtensions.ToHttpResult`, JWT auth (`AddCoreAuthentication`: `Jwt:Authority` +
+  JWKS, a Development-only symmetric key), permission authz (`IPermissionResolver` + a claims transformation that
+  resolves permissions on the server and caches them in HybridCache)
   (`Authorization/`), the OpenAPI document, `SecurityHeadersMiddleware`, HybridCache (`AddCoreCaching`). Depends on
   Abstractions + `FrameworkReference Microsoft.AspNetCore.App`, never on EntityFrameworkCore.
 

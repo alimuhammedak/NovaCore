@@ -1,9 +1,10 @@
 namespace NovaCore.AspNetCore.Identity;
 
 /// <summary>
-/// The raw JWT claim names NovaCore issues and validates against. We disable inbound claim mapping
-/// (<c>MapInboundClaims = false</c>) and use these short names consistently across token creation,
-/// validation, and <see cref="HttpContextCurrentUser"/> — so there is exactly one spelling of each.
+/// The raw claim names NovaCore reads. Inbound claim mapping is off (<c>MapInboundClaims = false</c>), so an access
+/// token's <c>sub</c>, <c>name</c>, <c>email</c> and <c>role</c> claims arrive with these short names, and
+/// <see cref="HttpContextCurrentUser"/> reads the same spelling. <see cref="Permission"/> is the exception: it is added
+/// on the server, never taken from the token.
 /// </summary>
 public static class NovaClaims
 {
@@ -19,6 +20,16 @@ public static class NovaClaims
     /// <summary>A role the user belongs to (<c>role</c>). Emitted once per role.</summary>
     public const string Role = "role";
 
-    /// <summary>Fine-grained permission claim, e.g. <c>catalog:products:create</c>. Emitted once per permission.</summary>
+    /// <summary>
+    /// Fine-grained permission, e.g. <c>catalog:products:create</c>, one claim per permission. Added on the server from
+    /// <c>IPermissionResolver</c> when the request is authenticated; the same claim in an access token is discarded.
+    /// </summary>
     public const string Permission = "permission";
+
+    /// <summary>
+    /// The security stamp, a value that changes when the user's credentials do (ASP.NET Core Identity's claim type).
+    /// Optional: when the identity provider puts it in the access token, a token issued after such a change gets freshly
+    /// resolved permissions instead of cached ones.
+    /// </summary>
+    public const string SecurityStamp = "AspNet.Identity.SecurityStamp";
 }

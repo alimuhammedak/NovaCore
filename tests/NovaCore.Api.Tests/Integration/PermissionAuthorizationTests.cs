@@ -11,10 +11,11 @@ using Xunit;
 namespace NovaCore.Api.Tests.Integration;
 
 /// <summary>
-/// Permission-based authorization end to end, with tokens that carry exactly the claims under test: a permission claim
-/// grants its endpoint and nothing else, the Administrator role grants every endpoint, and an authenticated caller
-/// without the permission gets 403 (anonymous callers get 401, <see cref="AuthGateTests"/>). Written against the dynamic
-/// policy provider before F2c.2 replaced it with <c>RequirePermissionAttribute</c> (IAuthorizationRequirementData).
+/// Permission-based authorization end to end: a permission granted on the server opens its endpoint and nothing else,
+/// the Administrator role (a token claim) opens every endpoint, an authenticated caller without the permission gets 403
+/// (anonymous callers get 401, <see cref="AuthGateTests"/>), and a permission claim in the token itself grants nothing
+/// (PLAN F3a.2). Written against the dynamic policy provider before F2c.2 replaced it with
+/// <c>RequirePermissionAttribute</c> (IAuthorizationRequirementData).
 /// </summary>
 public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>, IAsyncLifetime
 {
@@ -29,9 +30,9 @@ public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : I
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
-    public async Task A_permission_claim_grants_its_endpoint()
+    public async Task A_granted_permission_opens_its_endpoint()
     {
-        using var client = ClientWith(new Claim(NovaClaims.Permission, CatalogPermissions.ProductsRead));
+        using var client = _factory.CreateClientWithPermissions(CatalogPermissions.ProductsRead);
 
         var response = await client.GetAsync("/api/v1/products");
 
@@ -39,9 +40,9 @@ public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : I
     }
 
     [Fact]
-    public async Task A_permission_claim_does_not_grant_another_endpoint()
+    public async Task A_granted_permission_does_not_open_another_endpoint()
     {
-        using var client = ClientWith(new Claim(NovaClaims.Permission, CatalogPermissions.ProductsRead));
+        using var client = _factory.CreateClientWithPermissions(CatalogPermissions.ProductsRead);
 
         var response = await client.PostAsJsonAsync("/api/v1/products", new { name = "Widget", price = 9.99m, stock = 5 });
 
@@ -61,7 +62,17 @@ public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : I
     [Fact]
     public async Task An_authenticated_caller_without_the_permission_is_forbidden()
     {
-        using var client = ClientWith();
+        using var client = _factory.CreateClientWithPermissions();
+
+        var response = await client.GetAsync("/api/v1/products");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_permission_claim_in_the_token_grants_nothing()
+    {
+        using var client = ClientWith(new Claim(NovaClaims.Permission, CatalogPermissions.ProductsRead));
 
         var response = await client.GetAsync("/api/v1/products");
 

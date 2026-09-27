@@ -17,8 +17,10 @@ Design is grounded in the OWASP Authentication / Password Storage / OAuth2 cheat
 - **Anti-enumeration:** login failures return a uniform **401 "Invalid credentials"** regardless of cause
   (unknown user / bad password / lockout). Registration returns the same generic message whether or not
   the email already exists. Don't add responses that leak account existence.
-- **Claims contract:** issue/validate the raw names in `NovaClaims` (`sub`/`name`/`email`/`role`/`permission`)
-  with `MapInboundClaims = false`. The `Administrator` role is the super-admin and bypasses permission checks
+- **Claims contract:** issue the raw names in `NovaClaims` (`sub`/`name`/`email`/`role`) with
+  `MapInboundClaims = false`. Permissions are **not** in the token: the core resolves them per request through
+  `IdentityPermissionResolver` (role + direct `permission` claims in the store) and discards any `permission` claim a
+  token carries. The `Administrator` role is the super-admin and bypasses permission checks
   (`HttpContextCurrentUser.SuperAdminRole`).
 - **Audit, don't print secrets.** Route security events through `ISecurityAuditLogger` (it masks emails).
   Never log passwords, raw refresh tokens, or full JWTs.
@@ -34,7 +36,9 @@ Design is grounded in the OWASP Authentication / Password Storage / OAuth2 cheat
 
 ## Production checklist (must be true before shipping)
 
-- `Jwt:SigningKey` set from user-secrets/env (≥ 32 bytes) — the dev fallback only exists in Development.
+- This module signs HS256 tokens with `Jwt:SigningKey`, which the core accepts **in Development only** (D-024):
+  outside Development the host requires `Jwt:Authority` (an OpenID Connect provider) and refuses a signing key, so
+  this module's login cannot issue tokens there. It is retired in F3b.3; don't extend its token issuance (Y-07).
 - A real `IEmailSender` is registered by the host. `LoggingEmailSender` (logs the confirmation link) is wired only in
   Development; anywhere else `EmailSenderStartupCheck` stops startup if no `IEmailSender` is registered.
 - TLS/HTTPS enforced at the edge (HSTS is wired for non-dev).

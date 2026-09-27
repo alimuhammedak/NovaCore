@@ -46,7 +46,7 @@ dotnet ef database update --project src/Modules/Identity/NovaCore.Modules.Identi
 # 3) İlk admin + roller + izinler için seed (parolayı user-secrets ile ver — repoya YAZMA)
 dotnet user-secrets --project src/Api/NovaCore.Api set "Identity:Seed:AdminPassword" "Admin!Passw0rd-2026"
 
-# 4) Çalıştır (seed'i aç: Jwt:SigningKey'i prod'da mutlaka ayarla)
+# 4) Çalıştır (Development: Jwt:Authority boşken geliştirme anahtarı devreye girer; prod'da Jwt:Authority zorunlu)
 Identity__Seed__SeedOnStartup=true dotnet run --project src/Api/NovaCore.Api
 ```
 
@@ -302,13 +302,19 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
 - **Email confirmation** zorunlu (dev'de link loglanır), **TOTP 2FA** (authenticator app, iki adımlı login).
 
 ### Token mimarisi
-- Kısa ömürlü **access JWT** (HS256, 15 dk) — `sub`, `name`, `email`, `role*`, `permission*` claim'leri.
+- **Doğrulama (çekirdek):** API access token'ı bir OpenID Connect sağlayıcısına karşı doğrular: `Jwt:Authority`.
+  Issuer ve imza anahtarları sağlayıcının metadata'sından ve JWKS'inden keşfedilir, yalnızca asimetrik algoritmalar
+  (RS/PS/ES) kabul edilir. Simetrik `Jwt:SigningKey` (HS256) **yalnızca Development'ta** geçerlidir; başka ortamda host
+  açılmaz (MS JWT rehberi: *"Asymmetric keys should always be used"*).
+- **Identity modülünün kendi token'ları** (eski yol, F3b.3'te emekliye ayrılacak): kısa ömürlü **access JWT** (HS256,
+  15 dk) — `sub`, `name`, `email`, `role*` claim'leri (izinler token'a girmez, aşağıya bakın). HS256 olduğu için
+  yalnızca Development'ta ve testlerde doğrulanır.
 - Uzun ömürlü **refresh token** (256-bit, **DB'de SHA-256 hash'li**, 7 gün).
 - **Rotation:** her `/auth/refresh`'te yeni refresh, eskisi iptal.
 - **Reuse detection + family revocation:** tüketilmiş bir refresh tekrar gelirse **tüm token ailesi iptal**
   + `ERR refresh_token_reuse_detected` audit log'u (hırsızlık tespiti — OWASP OAuth2).
-- **JWT validation sertleştirme:** algoritma pin'i (`HS256`), issuer/audience zorunlu, `ClockSkew = 30s`,
-  `MapInboundClaims = false`, prod'da `RequireHttpsMetadata = true`.
+- **JWT validation sertleştirme:** algoritma listesi sabit (asimetrik; HS256 yalnızca Development anahtarıyla),
+  issuer/audience zorunlu, `ClockSkew = 30s`, `MapInboundClaims = false`, prod'da `RequireHttpsMetadata = true`.
 
 ### Yetkilendirme (authorization) — permission-based
 - Roller (Identity) **+ ince taneli izinler**. İzinler `module:resource:action` (ör. `catalog:products:create`).
@@ -316,7 +322,12 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
   taşır, `PermissionAuthorizationHandler` onu denetler. Özel policy provider ya da izin başına bir named policy yok.
   Kullanım: `endpoint.RequirePermission("catalog:products:create")` veya handler'da `[RequirePermission(...)]`.
   Anonim istek 401, izni olmayan istek 403 alır.
-- İzinler login'de **JWT claim** olarak gömülür; `Administrator` rolü super-admin (tüm kontrolleri geçer).
+- İzinler **sunucu tarafında çözülür**, token'dan okunmaz. Bir `IClaimsTransformation` token'daki `permission`
+  claim'lerini atar ve `IPermissionResolver`'ın döndürdüklerini ekler. Identity modülü bunları kullanıcının rollerinden
+  ve doğrudan izinlerinden okur (`IdentityPermissionResolver`). Sonuç HybridCache'te `sub` + security stamp anahtarıyla
+  `Cache:PermissionExpiration` (varsayılan 5 dk) boyunca tutulur: bir rol değişikliği oturum açmış kullanıcıya en geç bu
+  sürede yansır, yeni bir security stamp'li token cache'i atlar. Host'ta bir `IPermissionResolver` kayıtlı değilse
+  uygulama açılmaz. `Administrator` rolü (token'daki rol claim'i) super-admin'dir, tüm kontrolleri geçer.
 - **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder hepsini toplayıp
   rollere bağlar (`User` rolü = iş modüllerinin yalnızca `:read` izinleri — least privilege).
 
@@ -341,7 +352,8 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
   (`ISecurityAuditLogger`, e-posta maskeli, parola/token loglanmaz).
 - **Seed:** roller (`Administrator`, `User`) + tüm modül izinleri + opsiyonel admin (parola user-secrets ile).
 
-> **Üretimde mutlaka:** `Jwt:SigningKey` ayarla (≥32 bayt, user-secrets/env), TLS/HTTPS'i edge'de zorla,
+> **Üretimde mutlaka:** `Jwt:Authority`'yi token'ları imzalayan OpenID Connect sağlayıcısına (https) ayarla
+> (`Jwt:SigningKey` Development dışında reddedilir), TLS/HTTPS'i edge'de zorla,
 > gerçek bir `IEmailSender` (SMTP/SendGrid) tak, admin parolasını güçlü ver. `LoggingEmailSender` yalnızca
 > Development'ta kayıtlıdır. Diğer ortamlarda `IEmailSender` kayıtlı değilse uygulama açılışta anlamlı bir hatayla durur.
 
@@ -361,9 +373,9 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
 {
   "ConnectionStrings": { "Database": "Server=localhost;Database=NovaCore;Trusted_Connection=True;TrustServerCertificate=True;Encrypt=True;" },
   "Database":      { "ApplyMigrations": false },   // true: açılışta migration uygula
-  "Jwt":           { "Issuer": "novacore", "Audience": "novacore.api", "SigningKey": "", "AccessTokenMinutes": 15, "RefreshTokenDays": 7 },
+  "Jwt":           { "Authority": "", "Issuer": "novacore", "Audience": "novacore.api", "SigningKey": "", "AccessTokenMinutes": 15, "RefreshTokenDays": 7 },
   "Identity":      { "Seed": { "SeedOnStartup": false, "AdminEmail": "admin@novacore.local", "AdminPassword": "" } },
-  "Cache":         { "DefaultExpiration": "00:05:00" },
+  "Cache":         { "DefaultExpiration": "00:05:00", "PermissionExpiration": "00:05:00" },
   "RateLimiting":  { "PermitLimit": 100, "WindowSeconds": 60 },   // /auth grubu 1/10'unu kullanır ("strict")
   "Cors":          { "AllowedOrigins": [] },        // boş = her ortamda her origin'e izin (credentials olmadan)
   "Seq":           { "ServerUrl": "" }              // dolu = Seq'e log gönder
@@ -371,15 +383,18 @@ Tasarım, OWASP cheat sheet'lerine ve Microsoft Learn'e göre sertleştirilmişt
 ```
 Çevre değişkeni `OTEL_EXPORTER_OTLP_ENDPOINT` doluysa traces/metrics OTLP ile dışa aktarılır (ör. Jaeger).
 
-> **Üretim:** `Jwt:SigningKey` zorunludur (≥32 bayt). Development'ta yoksa otomatik dev anahtarı üretilir.
+> **Üretim:** `Jwt:Authority` zorunludur (mutlak `https` URI), `Jwt:SigningKey` verilemez. Development'ta ikisi de
+> boşsa sabit bir geliştirme anahtarı kullanılır.
 > Gizli değerler için `dotnet user-secrets` kullanın.
 
 Bu bölümler options pattern ile bağlanır ve **uygulama açılırken doğrulanır** (`ValidateOnStart`). Geçersiz bir değer
 host'u, ayarın adını veren bir hatayla durdurur:
 
-- `Jwt`: `Issuer`/`Audience` boş olamaz, `SigningKey` en az 32 bayt (Development dışında zorunlu),
+- `Jwt`: `Issuer`/`Audience` boş olamaz. `Authority` Development dışında zorunlu ve `https`, Development'ta verilirse
+  mutlak bir URI. `SigningKey` yalnızca Development'ta ve en az 32 bayt,
   `AccessTokenMinutes` ≥ 1, `RefreshTokenDays` 1–36.500.
-- `RateLimiting`: `PermitLimit` ve `WindowSeconds` ≥ 1. `Cache:DefaultExpiration` pozitif bir süre.
+- `RateLimiting`: `PermitLimit` ve `WindowSeconds` ≥ 1. `Cache:DefaultExpiration` ve `Cache:PermissionExpiration`
+  pozitif birer süre.
 - `Cors:AllowedOrigins`: her giriş çıplak bir origin olmalı (`https://app.example.com`): yol, sondaki `/` ve `*` yok.
 - `Database:ApplyMigrations`: `true`/`false`.
 

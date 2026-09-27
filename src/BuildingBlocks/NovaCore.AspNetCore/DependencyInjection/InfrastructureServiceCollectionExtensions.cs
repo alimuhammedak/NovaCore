@@ -32,8 +32,9 @@ public static class InfrastructureServiceCollectionExtensions
 
     /// <summary>
     /// Registers <see cref="HybridCache"/> (L1 in-memory), with the default entry lifetime from
-    /// <c>Cache:DefaultExpiration</c> (validated on start). Consumers inject <see cref="HybridCache"/> directly. To add
-    /// an L2 distributed tier, register an <c>IDistributedCache</c> (e.g. Redis) — HybridCache adopts it automatically.
+    /// <c>Cache:DefaultExpiration</c>; <c>Cache:PermissionExpiration</c> bounds how long resolved permissions are cached
+    /// (both validated on start). Consumers inject <see cref="HybridCache"/> directly. To add an L2 distributed tier,
+    /// register an <c>IDistributedCache</c> (e.g. Redis) — HybridCache adopts it automatically.
     /// </summary>
     public static IServiceCollection AddCoreCaching(this IServiceCollection services)
     {
@@ -41,6 +42,8 @@ public static class InfrastructureServiceCollectionExtensions
             .BindConfiguration(CacheOptions.SectionName)
             .Validate(cache => cache.DefaultExpiration > TimeSpan.Zero,
                 "Cache:DefaultExpiration must be a positive time span, e.g. 00:05:00.")
+            .Validate(cache => cache.PermissionExpiration > TimeSpan.Zero,
+                "Cache:PermissionExpiration must be a positive time span, e.g. 00:05:00.")
             .ValidateOnStart();
 
         services.AddHybridCache();

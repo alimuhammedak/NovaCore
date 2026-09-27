@@ -25,4 +25,15 @@ public class JwtTokenServiceTests
         Assert.Equal(now.AddMinutes(15), accessToken.ExpiresAtUtc);
         Assert.Equal(15 * 60, accessToken.ExpiresInSeconds);
     }
+
+    [Fact]
+    public void Issuing_without_a_signing_key_says_why()
+    {
+        // Outside Development there is no symmetric key (D-024), so a local issuer has nothing to sign with.
+        var service = new JwtTokenService(Options.Create(new JwtOptions()), TimeProvider.System);
+
+        var error = Assert.Throws<InvalidOperationException>(() => service.CreateAccessToken([new Claim("sub", "42")]));
+
+        Assert.Contains("Jwt:SigningKey", error.Message, StringComparison.Ordinal);
+    }
 }

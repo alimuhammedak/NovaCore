@@ -73,6 +73,7 @@ public sealed class IdentityModule : IModule
 
         services.AddPermissionDefinitions<IdentityPermissionProvider>();
         services.AddScoped<IAuthTokenService, AuthTokenService>();
+        services.AddScoped<IPermissionResolver, IdentityPermissionResolver>(); // the core resolves permissions through it
         services.AddSingleton<ISecurityAuditLogger, SecurityAuditLogger>();
 
         // LoggingEmailSender writes confirmation links (tokens) to the log: Development only. Elsewhere the host must

@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -7,7 +9,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using NovaCore.AspNetCore.Auth;
+using Microsoft.IdentityModel.JsonWebTokens;
+using NovaCore.AspNetCore.Authorization;
+using NovaCore.AspNetCore.Identity;
 using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Identity.Infrastructure;
@@ -16,9 +20,10 @@ using NovaCore.Modules.Payments.Infrastructure;
 namespace NovaCore.Api.Tests;
 
 /// <summary>
-/// Boots the real Program host in-memory (Development), with a fixed signing key and migrations off.
-/// Every module's DbContext is swapped to its own in-memory SQLite database, so the full auth flow
-/// (register/login/refresh/permissions) and the database health checks run without a real SQL Server.
+/// Boots the real Program host in-memory (Development), with migrations off. JWT validation points at an in-memory
+/// OpenID Connect issuer (<see cref="IdentityProvider"/>); in Development the Identity module's own HS256 tokens are
+/// also accepted, through a fixed signing key. Every module's DbContext is swapped to its own in-memory SQLite database,
+/// so the full auth flow (register/login/refresh/permissions) and the database health checks run without a real SQL Server.
 /// </summary>
 public class NovaCoreApiFactory : WebApplicationFactory<Program>
 {
@@ -33,6 +38,10 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
         .AddEntityFrameworkSqlite()
         .BuildServiceProvider();
 
+    // Permissions granted on the server to subjects of IdentityProvider's tokens (none unless granted). Other tokens,
+    // the Identity module's own, are resolved by the host's resolver from the Identity store.
+    private readonly ConcurrentDictionary<string, string[]> _grants = new();
+
     public NovaCoreApiFactory()
     {
         _identityConnection.Open();
@@ -43,18 +52,36 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
     /// <summary>The host environment the app boots in. Override to test environment-specific wiring.</summary>
     protected virtual string EnvironmentName => Environments.Development;
 
+    /// <summary>The issuer the host trusts through <c>Jwt:Authority</c>, in every environment.</summary>
+    public TestIdentityProvider IdentityProvider { get; } = new();
+
     /// <summary>
-    /// A client whose bearer token carries exactly <paramref name="claims"/>, signed by the host's own
-    /// <see cref="ITokenService"/>: exercises authorization and validation without seeding users.
+    /// A client whose bearer token carries exactly <paramref name="claims"/>, issued by <see cref="IdentityProvider"/>
+    /// (RS256, validated through the host's <c>Jwt:Authority</c>): exercises authorization and validation without
+    /// seeding users.
     /// </summary>
     public HttpClient CreateClientWithClaims(params Claim[] claims)
     {
-        var token = Services.GetRequiredService<ITokenService>().CreateAccessToken(claims);
-
         var client = CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", IdentityProvider.CreateToken(claims));
         return client;
     }
+
+    /// <summary>
+    /// A client for a fresh subject holding exactly <paramref name="permissions"/>. The core takes permissions from
+    /// <see cref="IPermissionResolver"/>, never from the token (PLAN F3a.2), so they are granted on the server; any other
+    /// subject of <see cref="IdentityProvider"/> holds none.
+    /// </summary>
+    public HttpClient CreateClientWithPermissions(params string[] permissions)
+    {
+        var subject = Guid.NewGuid().ToString();
+        GrantPermissions(subject, permissions);
+        return CreateClientWithClaims(new Claim(NovaClaims.Subject, subject));
+    }
+
+    /// <summary>Sets the permissions the server resolves for <paramref name="subject"/>, replacing earlier grants.</summary>
+    public void GrantPermissions(string subject, params string[] permissions) => _grants[subject] = permissions;
 
     // DECISIONS Y-26: captive dependencies and root-resolved scoped services fail the host build in every environment,
     // not only in Development where they are on by default (R-029).
@@ -77,7 +104,11 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Jwt:SigningKey"] = "novacore-integration-test-signing-key-0123456789-abcdef",
+                ["Jwt:Authority"] = TestIdentityProvider.Issuer,
+                // The symmetric key is Development-only (D-024): elsewhere it stops the host.
+                ["Jwt:SigningKey"] = EnvironmentName == Environments.Development
+                    ? "novacore-integration-test-signing-key-0123456789-abcdef"
+                    : null,
                 ["Jwt:AccessTokenMinutes"] = "15",
                 ["Database:ApplyMigrations"] = "false",
                 ["Identity:Seed:SeedOnStartup"] = "false",
@@ -88,6 +119,16 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            // Configure (not PostConfigure): JwtBearer builds its metadata backchannel in PostConfigure (R-056).
+            services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
+                options => options.BackchannelHttpHandler = IdentityProvider.Handler);
+
+            // IdentityProvider's subjects resolve to their grants; Identity's own tokens to the host's resolver.
+            var hostResolver = services.Single(d => d.ServiceType == typeof(IPermissionResolver));
+            services.Remove(hostResolver);
+            services.AddScoped<IPermissionResolver>(provider => new GrantingPermissionResolver(
+                _grants, (IPermissionResolver)ActivatorUtilities.CreateInstance(provider, hostResolver.ImplementationType!)));
+
             ReplaceWithSqlite<IdentityDbContext>(services, options => options.UseSqlite(_identityConnection));
             ReplaceWithSqlite<CatalogDbContext>(services, options => options.UseSqlite(_catalogConnection));
             ReplaceWithSqlite<PaymentsDbContext>(services, options => options.UseSqlite(_paymentsConnection));
@@ -127,8 +168,24 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
             _catalogConnection.Dispose();
             _paymentsConnection.Dispose();
             _sqliteServices.Dispose();
+            IdentityProvider.Dispose();
         }
 
         base.Dispose(disposing);
+    }
+
+    private sealed class GrantingPermissionResolver(
+        IReadOnlyDictionary<string, string[]> grants, IPermissionResolver hostResolver) : IPermissionResolver
+    {
+        public Task<IReadOnlyCollection<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken cancellationToken)
+        {
+            if (user.FindFirstValue(JwtRegisteredClaimNames.Iss) != TestIdentityProvider.Issuer)
+                return hostResolver.GetPermissionsAsync(user, cancellationToken);
+
+            return Task.FromResult<IReadOnlyCollection<string>>(
+                user.FindFirstValue(NovaClaims.Subject) is { } subject && grants.TryGetValue(subject, out var granted)
+                    ? granted
+                    : []);
+        }
     }
 }
