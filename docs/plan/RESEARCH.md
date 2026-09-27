@@ -568,3 +568,16 @@ Biçim:
 - Sonuç (D-031):
   - Test factory'sinin context'leri her işlemde kendi bağlantısını açar, factory başına benzersiz adlı paylaşılabilir in-memory veritabanları kullanılır ve bir bağlantı açık tutulur.
   - Dispatcher testleri de aynı yolu kullanır.
+
+### R-070: Faz 4a code review: outbox'ta `DetectChanges`, durdurmada hata filtresi, kaydı tutulamayan handler (2026-09-28, faz 4a; kaynak + kırmızı test)
+- Soru: Review'daki bulgular gerçek mi? Düzeltmeleri güvenli mi?
+- Bulgu:
+  - `ChangeTracker.Entries()` ve `Entries<TEntity>()` bilerek `DetectChanges` çağırıyor. MS: DetectChanges'ten önce bir navigation koleksiyonuna eklenen yeni entity "does not appear as a tracked entity", sonra "is tracked as Added". Interceptor bunu kapatırsa (review #13), navigation'la eklenen bir entity'nin event'leri outbox'a yazılmadan SaveChanges'in kendi DetectChanges'iyle kaydedilir. Yani ek DetectChanges gerekli. Düzeltilmedi, koda "neden" yorumu eklendi.
+  - `BackgroundService.ExecuteTask`, `ExecuteAsync`'in task'ı. Durdurmada `OperationCanceledException` dışında bir hata `ExecuteAsync`'ten kaçarsa task faulted olur ve host bunu hata olarak loglar. Eski filtre `when (!token.IsCancellationRequested)`, durdurma başladıktan sonra her hatayı dışarı bırakıyordu. Kırmızı test: iptalde kendi hatasını atan bir handler dispatcher'ı faulted bıraktı.
+  - SQL Server'da `nvarchar(256)` kolona daha uzun bir değer yazmak hata veriyor. Kapalı generic bir handler'ın `FullName`'i tip argümanının assembly-qualified adını (sürüm dahil) taşıdığı için 256'yı kolayca geçiyor. Handler yan etkilerini commit ettikten sonra kaydı yazılamazsa her denemede yeniden çalışırdı. SQLite uzunluk uygulamadığı için test, adın uzunluğunu dispatcher'ın kendi kontrolüyle sınıyor.
+- Kaynak: https://learn.microsoft.com/ef/core/change-tracking/change-detection · https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.changetracking.changetracker.entries · https://learn.microsoft.com/aspnet/core/fundamentals/host/hosted-services#backgroundservice-base-class · https://learn.microsoft.com/dotnet/core/compatibility/core-libraries/6.0/hosting-exception-handling
+- Sonuç:
+  - Kaydı tutulamayacak (256 karakterden uzun adlı) handler çalıştırılmıyor, deneme başarısız sayılıyor.
+  - Her kayıttan sonra change tracker boşaltılıyor ve ad `finished`'e ekleniyor. Aynı handler tipinin ikinci kaydı atlanıyor.
+  - İki catch filtresi yalnızca host'un kendi iptalini dışarı bırakıyor.
+  - Belgelerde handler scope'u (mesaj başına, paylaşılan) ve sıra garantisi (yok) düzeltildi.

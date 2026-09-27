@@ -12,6 +12,9 @@ namespace NovaCore.EntityFrameworkCore.Messaging;
 /// detects changes and saves, so the outbox rows share the save's transaction: the events are committed with the entity
 /// changes or not at all. <see cref="PersistenceExtensions.AddModuleDbContext{TContext}"/> adds it to every module context.
 /// If a context's entities raise events but its model has no outbox, the save fails rather than drop them.
+/// The buffers are cleared as the events join the save. If the save fails, their rows stay in that context like the
+/// entity changes do: retry <c>SaveChanges</c> on the same context. An entity re-added to another context has no events
+/// left.
 /// </summary>
 public sealed class OutboxInterceptor : SaveChangesInterceptor
 {
@@ -36,6 +39,7 @@ public sealed class OutboxInterceptor : SaveChangesInterceptor
         if (context is null)
             return;
 
+        // Entries runs DetectChanges, which starts tracking entities added through navigations: their events count too.
         var raisers = context.ChangeTracker.Entries<Entity>()
             .Select(entry => entry.Entity)
             .Where(entity => entity.DomainEvents.Count > 0)

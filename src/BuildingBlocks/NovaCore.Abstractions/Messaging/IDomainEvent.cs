@@ -31,9 +31,10 @@ public abstract record DomainEvent : IDomainEvent
 }
 
 /// <summary>
-/// Handles a specific <see cref="IDomainEvent"/>. Register it in DI, usually scoped. For every saved event of its type
-/// the outbox dispatcher runs it in a DI scope of its own, at least once: after a failure, or if the process stops
-/// before its success is recorded, it runs again. Make it idempotent.
+/// Handles a specific <see cref="IDomainEvent"/>. Register it in DI, usually scoped. The outbox dispatcher runs it for
+/// every saved event of its type, at least once: after a failure, or if the process stops before its success is
+/// recorded, it runs again, so make it idempotent. The handlers of one event share a DI scope, as the handlers of one
+/// request would: save what you change.
 /// </summary>
 /// <typeparam name="TEvent">The event type this handler reacts to.</typeparam>
 [SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix",

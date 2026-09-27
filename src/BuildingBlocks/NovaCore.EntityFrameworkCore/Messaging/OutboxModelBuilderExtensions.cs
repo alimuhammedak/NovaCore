@@ -30,7 +30,7 @@ public static class OutboxModelBuilderExtensions
         {
             consumer.ToTable("outbox_consumers");
             consumer.HasKey(c => new { c.EventId, c.Handler });
-            consumer.Property(c => c.Handler).HasMaxLength(256);
+            consumer.Property(c => c.Handler).HasMaxLength(OutboxDispatcher.MaxHandlerLength);
         });
 
         return modelBuilder;

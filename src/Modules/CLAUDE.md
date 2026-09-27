@@ -44,7 +44,8 @@ Use `Catalog` as the reference implementation (full CRUD + contracts); `Payments
   `ModuleRegistrationTests` checks that every module context maps the outbox.
   - The outbox dispatcher delivers it. Register a handler explicitly in `AddModule`:
     `services.AddScoped<IDomainEventHandler<SomethingHappened>, DoSomething>()`.
-  - A handler gets a DI scope of its own (its own DbContext) and runs **at least once**, so make it idempotent.
+  - Each handler runs **at least once**, so make it idempotent. The handlers of one event share a DI scope (and its
+    DbContext instances), as in a request, so each saves what it changes.
   - An event another module handles lives in the publisher's `*.Contracts` project, because modules reference each
     other only through Contracts.
 - **Guard every endpoint** with `.RequirePermission(<M>Permissions.X)` (or `.RequireAuthorization()` only

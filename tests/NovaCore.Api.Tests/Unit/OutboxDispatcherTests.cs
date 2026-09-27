@@ -46,17 +46,19 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
         void Handlers(IServiceCollection services) =>
             services.AddScoped<IDomainEventHandler<OrderPlaced>, RecordingHandler>();
 
-        var host = await CreateHostAsync(Handlers);
-        var first = await SaveOrderAsync(host);
-        await host.StartAsync(TestContext.Current.CancellationToken);
-        await WaitUntilAsync(async () => (await MessageAsync(first)).ProcessedOnUtc is not null);
+        Guid first, second;
+        using (var host = await CreateHostAsync(Handlers))
+        {
+            first = await SaveOrderAsync(host);
+            await host.StartAsync(TestContext.Current.CancellationToken);
+            await WaitUntilAsync(async () => (await MessageAsync(first)).ProcessedOnUtc is not null);
 
-        // Each later pass shows up as the next saved event being handled.
-        var second = await SaveOrderAsync(host);
-        _clock.Advance(NextPass);
-        await WaitUntilAsync(async () => (await MessageAsync(second)).ProcessedOnUtc is not null);
-        await host.StopAsync(TestContext.Current.CancellationToken);
-        host.Dispose();
+            // Each later pass shows up as the next saved event being handled.
+            second = await SaveOrderAsync(host);
+            _clock.Advance(NextPass);
+            await WaitUntilAsync(async () => (await MessageAsync(second)).ProcessedOnUtc is not null);
+            await host.StopAsync(TestContext.Current.CancellationToken);
+        }
 
         // A host started over the same database does not hand the handled events over again.
         using var restarted = await CreateHostAsync(Handlers);
@@ -121,6 +123,55 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
         Assert.Null(message.ProcessedOnUtc);
         Assert.Contains(AlwaysFailsHandler.Failure, message.Error, StringComparison.Ordinal);
         Assert.Equal(10, _log.Calls.Count(call => call.EventId == poisoned));
+    }
+
+    [Fact]
+    public async Task A_handler_registered_twice_runs_once()
+    {
+        using var host = await CreateHostAsync(services => services
+            .AddScoped<IDomainEventHandler<OrderPlaced>, RecordingHandler>()
+            .AddScoped<IDomainEventHandler<OrderPlaced>, RecordingHandler>());
+        var placed = await SaveOrderAsync(host);
+
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(async () => (await MessageAsync(placed)).ProcessedOnUtc is not null);
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal([(nameof(RecordingHandler), placed)], _log.Calls);
+        Assert.Equal(0, (await MessageAsync(placed)).Attempts);
+    }
+
+    [Fact]
+    public async Task A_handler_whose_name_does_not_fit_its_record_is_not_run()
+    {
+        // Without a record, every retry would run it again.
+        var handlerType = typeof(GenericHandler<AMarkerWhoseNameMakesTheClosedGenericHandlerNameLongerThanTheTwoHundredFiftySixCharactersItsRecordKeeps>);
+        Assert.True(handlerType.FullName!.Length > 256);
+        using var host = await CreateHostAsync(services =>
+            services.AddScoped(typeof(IDomainEventHandler<OrderPlaced>), handlerType));
+        var placed = await SaveOrderAsync(host);
+
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(async () => (await MessageAsync(placed)).Attempts == 1);
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(_log.Calls);
+        Assert.Contains("256", (await MessageAsync(placed)).Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Stopping_the_host_during_a_delivery_does_not_fault_the_dispatcher()
+    {
+        using var host = await CreateHostAsync(services =>
+            services.AddScoped<IDomainEventHandler<OrderPlaced>, FailsWhenStoppedHandler>());
+        await SaveOrderAsync(host);
+
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => Task.FromResult(_log.Calls.Count == 1));
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        var dispatcher = host.Services.GetServices<IHostedService>().OfType<BackgroundService>().Single();
+        Assert.False(dispatcher.ExecuteTask!.IsFaulted, dispatcher.ExecuteTask.Exception?.ToString());
     }
 
     [Fact]
@@ -312,6 +363,35 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
         {
             log.Record(nameof(AlwaysFailsHandler), domainEvent.EventId);
             throw new InvalidOperationException(Failure);
+        }
+    }
+
+    // A closed generic handler's full name carries its type argument's assembly-qualified name, version included.
+    private sealed class GenericHandler<TMarker>(HandlerLog log) : IDomainEventHandler<OrderPlaced>
+    {
+        public Task HandleAsync(OrderPlaced domainEvent, CancellationToken cancellationToken = default)
+        {
+            log.Record(nameof(GenericHandler<TMarker>), domainEvent.EventId);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class AMarkerWhoseNameMakesTheClosedGenericHandlerNameLongerThanTheTwoHundredFiftySixCharactersItsRecordKeeps;
+
+    // Waits for the host to stop, then fails with an exception of its own, as a library cut short might.
+    private sealed class FailsWhenStoppedHandler(HandlerLog log) : IDomainEventHandler<OrderPlaced>
+    {
+        public async Task HandleAsync(OrderPlaced domainEvent, CancellationToken cancellationToken = default)
+        {
+            log.Record(nameof(FailsWhenStoppedHandler), domainEvent.EventId);
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new InvalidOperationException("The delivery was cut short.");
+            }
         }
     }
 

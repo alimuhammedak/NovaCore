@@ -55,7 +55,8 @@ public static class PersistenceExtensions
     /// the context and tagged <c>ready</c>) that reports whether its database can be reached.
     /// Each module keeps its own context (and its own schema) — the modular-monolith boundary at the DB level.
     /// The context always gets <see cref="OutboxInterceptor"/>, which writes the domain events its entities raise to its
-    /// outbox; the module maps that with <see cref="OutboxModelBuilderExtensions.AddOutbox"/>.
+    /// outbox; the module maps that with <see cref="OutboxModelBuilderExtensions.AddOutbox"/>. The dispatcher that
+    /// delivers them comes from <see cref="AddCorePersistence"/>: without it, events are written and never delivered.
     /// Also registers <see cref="AuditableEntityInterceptor"/> (and the <see cref="TimeProvider"/> it stamps with), which
     /// module contexts add to their options, so the context resolves whether or not the host has called
     /// <see cref="AddCorePersistence"/> yet.

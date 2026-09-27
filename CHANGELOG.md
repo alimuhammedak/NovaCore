@@ -87,7 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (migration `Outbox`: `catalog.outbox_messages`, `payments.outbox_messages`); neither raises events yet.
 - Transactional outbox, dispatch side: `AddCorePersistence` registers a background service that delivers the events in
   every module's outbox to their `IDomainEventHandler<T>`s. It runs a pass at startup, then every 5 seconds on
-  `TimeProvider`, in the order the events were written, and gives each message a DI scope of its own. Each handler that
+  `TimeProvider`, oldest message first. A failed message is retried after newer ones, so there is no ordering
+  guarantee. Each message gets a DI scope, which its handlers share. Each handler that
   finishes is recorded in `outbox_consumers`, so a retried message doesn't run those handlers again. A failed delivery
   is retried on the next pass; after 10 attempts the message stays in the outbox with its last error, for inspection.
   No transaction of its own: it works under `EnableRetryOnFailure`. Delivery is at least once and handlers must be

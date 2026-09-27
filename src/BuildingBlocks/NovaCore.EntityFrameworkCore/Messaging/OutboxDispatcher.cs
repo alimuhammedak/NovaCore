@@ -10,11 +10,12 @@ namespace NovaCore.EntityFrameworkCore.Messaging;
 
 /// <summary>
 /// Delivers the events waiting in every module's outbox to their <see cref="IDomainEventHandler{TEvent}"/>s: a pass
-/// when the host starts, then one every <see cref="PollingInterval"/>, messages in the order they were written.
+/// when the host starts, then one every <see cref="PollingInterval"/>, oldest message first. A message that fails is
+/// retried on a later pass, after newer ones, so there is no ordering guarantee.
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
-/// <item>Each message gets a DI scope of its own for its handlers.</item>
+/// <item>Each message gets a DI scope for its handlers, which they share.</item>
 /// <item>A handler that finishes is recorded in <c>outbox_consumers</c>, and a retry of the message skips it. Once
 /// every handler has finished, the message is marked processed.</item>
 /// <item>A failure counts an attempt; the next pass tries again. After <see cref="MaxAttempts"/> the message stays in
@@ -41,6 +42,9 @@ internal sealed partial class OutboxDispatcher(
 
     /// <summary>The longest failure text kept in <see cref="OutboxMessage.Error"/>.</summary>
     public const int MaxErrorLength = 2000;
+
+    /// <summary>The longest handler type name <see cref="OutboxConsumer.Handler"/> keeps.</summary>
+    public const int MaxHandlerLength = 256;
 
     private const int BatchSize = 50;
 
@@ -86,9 +90,10 @@ internal sealed partial class OutboxDispatcher(
             }
             while (batch.Count == BatchSize);
         }
-        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            // The loop's boundary: an unreachable database or a missing table must not stop the host.
+            // The loop's boundary: an unreachable database or a missing table must not stop the host. Only the host's own
+            // stop gets through.
             LogPassFailed(contextType.Name, exception);
         }
     }
@@ -115,6 +120,12 @@ internal sealed partial class OutboxDispatcher(
                     if (finished.Contains(name))
                         continue;
 
+                    // The record is what keeps a retry from running the handler again: a handler that can't have one
+                    // doesn't run.
+                    if (name.Length > MaxHandlerLength)
+                        throw new InvalidOperationException(
+                            $"The handler type name '{name}' is longer than the {MaxHandlerLength} characters its outbox record keeps.");
+
                     await invoker.InvokeAsync(handler, domainEvent, cancellationToken);
 
                     outbox.Add(new OutboxConsumer
@@ -124,13 +135,17 @@ internal sealed partial class OutboxDispatcher(
                         ProcessedOnUtc = timeProvider.GetUtcNow()
                     });
                     await outbox.SaveChangesAsync(cancellationToken);
+
+                    // The pass's context stays empty, and a second registration of the same handler type is skipped.
+                    outbox.ChangeTracker.Clear();
+                    finished.Add(name);
                 }
             }
 
             var processedOnUtc = timeProvider.GetUtcNow();
             await row.ExecuteUpdateAsync(set => set.SetProperty(stored => stored.ProcessedOnUtc, processedOnUtc), cancellationToken);
         }
-        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             // A record that failed to save must not ride along with the next one.
             outbox.ChangeTracker.Clear();

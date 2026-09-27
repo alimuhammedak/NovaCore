@@ -643,7 +643,7 @@ Plan onayı 2026-09-28. Uygulama sırası F4a.1 → F4a.3 → F4a.2 (ID'ler sabi
   - Testler 178 → 181 (`DomainEventDispatcherTests`: çağıranın scope'u, bir event'in bütün handler'ları ve yalnız onlar, handler'sız event).
     - Önce kırmızı: eski singleton'da 2 test `Cannot resolve scoped service ... from root provider` ile düştü.
   - Abstractions'ta `IDomainEventDispatcher` ve `DomainEvent` belgeleri güncellendi ("a future outbox" → "the outbox"). CHANGELOG ve `src/BuildingBlocks/CLAUDE.md` da güncellendi.
-- [x] F4a.2 (commit: bir sonraki satırda): Dispatcher.
+- [x] F4a.2 (04b21ec): Dispatcher.
   - `OutboxDispatcher : BackgroundService` (internal), `AddCorePersistence` migration servisinden sonra kaydediyor.
     - Açılışta bir tur, sonra `PeriodicTimer(5 sn, TimeProvider)`.
     - Outbox'ı map'leyen her context'te `Id` üzerinden 50'lik keyset parçaları: `ProcessedOnUtc IS NULL AND Attempts < 10`.
@@ -668,6 +668,29 @@ Plan onayı 2026-09-28. Uygulama sırası F4a.1 → F4a.3 → F4a.2 (ID'ler sabi
   - 187/187 (iki tam koşu).
   - `has-pending-model-changes` üç context'te temiz.
   - Güncellenenler: README (Domain event'ler ve outbox, cross-cutting tablosu, Veritabanı, Test), kök `CLAUDE.md` (Persistence), `src/BuildingBlocks/CLAUDE.md`, `src/Modules/CLAUDE.md` (handler kaydı, idempotency, Contracts'ta event), `tests/CLAUDE.md`, CHANGELOG, `Program.cs` yorumu, memory `novacore-stack`.
+- Faz doğrulaması (2026-09-28, code review'dan önce):
+  - `restore --force`: NU uyarısı yok.
+  - Release `--no-incremental`: 0 uyarı, 0 hata.
+  - Test: 187/187 (Release ve Debug).
+  - `list package --vulnerable`: 12 projede açık yok.
+  - `has-pending-model-changes`: üç context'te temiz.
+- [x] Code review düzeltmeleri (commit: bir sonraki satırda): `code-review` (xhigh, `main...faz/4a-outbox`) 15 bulgu verdi.
+  - Kapsam içi gerçek hatalar düzeltildi; yeni testlerin üçü de düzeltmeden önce kırmızıydı (R-070). Testler 187 → 190.
+    - (#1) Kaydı tutulamayan handler her denemede yeniden çalışırdı. Örnek: kapalı generic bir handler'ın adı sürümlü tip argümanıyla 256 karakteri geçer ve SQL Server kaydı reddeder. Böyle bir handler artık hiç çalıştırılmıyor, deneme başarısız sayılıyor.
+    - (#7) Aynı handler tipinin iki kaydı ilk teslimde iki kez çalışıp denemeyi düşürüyordu. Başarılı handler'ın adı teslim içinde `finished`'e ekleniyor.
+    - (#4) Tur boyunca tek context'te biriken kayıtlar her `SaveChanges`'i yavaşlatıyordu (birikmiş kuyrukta O(n²)). Her kayıttan sonra `ChangeTracker.Clear()`.
+    - (#6) Durdurma sırasında `OperationCanceledException` dışındaki hatalar dispatcher'ı faulted bırakıyordu. Filtreler artık yalnızca host'un kendi iptalini dışarı bırakıyor.
+    - (#14) Test: ilk host başarısız bir beklemede açık kalıyordu. Artık `using` bloğunda.
+  - Belge düzeltmeleri:
+    - (#2) Handler'lar mesaj başına bir scope'u paylaşıyor; `IDomainEventHandler` belgesi ve `src/Modules/CLAUDE.md` "kendi scope'u" diyordu.
+    - (#10) Sıra garantisi yok (README, CHANGELOG, XML doc).
+    - (#15) `tests/CLAUDE.md`'deki "Unit: No host" ifadesi.
+    - (#8) `OutboxMessage.Type`: generic tip argümanları sürüm taşır.
+    - (#11) `AddCorePersistence` olmadan event'ler teslim edilmez.
+    - (#3) Başarısız kayıttan sonra event'lerin durumu.
+  - Gerekli değil (#13): interceptor'daki `DetectChanges`, navigation'la eklenen yeni entity'leri takibe alıyor. Kapatmak event kaybettirirdi (R-070). Neden'i koda yorum olarak yazıldı.
+  - Kapsam dışı ve belgelenmiş bulgular "Sonraya bırakılanlar"da: #3, #5, #8, #9, #12.
+  - D-kaydı gerekmedi: düzeltmeler uygulama ayrıntısı; D-031'le çelişen bir şey yok.
 
 ### Faz 4b
 - [ ] F4b.1 Stok kararı
@@ -800,6 +823,11 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4a) `IDomainEventDispatcher`'ın `src`'de çağıranı yok. PLAN F4a.3 gereği düzeltildi ve korunuyor, ama entity event'leri outbox'tan dağıtılıyor. Faz 5'te (ya da kullanıcı kararıyla) kaldırılması değerlendirilebilir.
 - (Faz 4a, R-068) `src/Modules/CLAUDE.md` Guid v7 anahtarları için "friendly to SQL Server clustering" diyor. SQL Server `uniqueidentifier`'ı son 6 bayta göre sıralıyor, v7'nin zaman damgası ise baştaki baytlarda; yani anahtarlar SQL Server sırasında artan değil ve Catalog/Payments'ın clustered PK'ları rastgele sırayla dolar. Çözüm için belge düzeltmesi ya da anahtar stratejisi kararı gerekir (örneğin `SequentialGuidValueGenerator`). Kapsam dışı.
 - (Faz 4a) Outbox interceptor'ını `AddModuleDbContext` ekliyor, audit interceptor'ını ise hâlâ her modül kendisi ekliyor. İkisini aynı yere toplamak modül kaydını kısaltır; modül ve CLAUDE.md değişikliği gerektiği için yapılmadı.
+- (Faz 4a, code review #3) Interceptor event tamponunu event'ler kayda katılırken temizliyor. Kayıt başarısız olur ve aynı entity örneği *yeni* bir context'e eklenirse event'leri kalmamış olur. Örnek: execution strategy'yle elle yazılmış, entity'yi blok dışında oluşturan bir yeniden deneme bloğu. Belgelendi (aynı context'te `SaveChanges`'i yeniden dene). Kalıcı çözüm için tamponu `SavedChanges`'te temizlemek ve zaten izlenen `EventId`'leri atlamak gerekir; açık transaction'da commit hatası yine kapsanmaz.
+- (Faz 4a, code review #5) Başarısız bir tur her tick'te (5 sn) modül başına Error logluyor ve geri çekilmiyor. Örnek: migration uygulanmamış bir geliştirme veritabanında dakikada 24 hata logu. Context başına artan bekleme ya da seri başına tek log düşünülebilir.
+- (Faz 4a, code review #8) Generic bir event'in saklanan tip adı, tip argümanlarının sürümlü assembly-qualified adlarını taşıyor. Sürümü düşüren bir dağıtımdan sonra `Type.GetType` bağlanamayabilir. Çok uzun bir ad 512 karakteri geçerse iş kaydının kendisi SQL Server'da düşer. Belgelendi; sürümsüz ad üretmek `TypeName` ile ayrıştırma gerektirir.
+- (Faz 4a, code review #9) Modül outbox'ları bir turda sırayla işleniyor. Erişilemeyen bir modül veritabanı (`EnableRetryOnFailure` geri çekilmesiyle) diğer modüllerin teslimini dakikalarca bekletebilir. Modüller aynı SQL Server'ı kullandığı sürece etkisi yok.
+- (Faz 4a, code review #12) `outbox_consumers`'ın clustered anahtarı (uniqueidentifier, nvarchar(256)) geniş ve SQL Server sırasında rastgele. Outbox tablosu için R-068'de kullanılan gerekçenin aynısı geçerli. Mesaj satırının `bigint Id`'si + Handler (FK ve cascade delete ile, temizlik için de uygun) daha iyi olur. D-031 (5)'i değiştirir; tablo boşken, ilk kullanımdan önce yapmak ucuz.
 
 ## Son devir notu
 

@@ -281,8 +281,9 @@ outbox**): entity değişikliği ve event ya birlikte kalıcı olur ya hiç olma
 
 `AddCorePersistence`'ın kaydettiği `OutboxDispatcher` (bir `BackgroundService`) outbox'lardaki event'leri
 `IDomainEventHandler<T>`'lere dağıtır:
-- açılışta bir tur çalışır, sonra 5 saniyede bir, event'ler yazıldıkları sırayla;
-- her mesaj için ayrı bir DI scope açar;
+- açılışta bir tur çalışır, sonra 5 saniyede bir. Önce en eski mesaj alınır, ama hata alan bir mesaj sonraki turda
+  daha yenilerinden sonra denenir: sıra garantisi yoktur;
+- her mesaj için bir DI scope açar; o mesajın handler'ları bu scope'u paylaşır;
 - işini bitiren handler'ı `outbox_consumers`'a (processed tablosu) yazar. Hata olursa mesaj sonraki turda yeniden
   denenir, ama başarılı handler'lar tekrar çalışmaz;
 - 10 denemeden sonra mesajı inceleme için outbox'ta bırakır.

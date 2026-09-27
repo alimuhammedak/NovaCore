@@ -12,7 +12,10 @@ internal sealed class OutboxMessage
     /// <summary>The event's <see cref="Abstractions.Messaging.IDomainEvent.EventId"/>; unique in the outbox.</summary>
     public required Guid EventId { get; init; }
 
-    /// <summary>The event's CLR type: <c>"Namespace.Type, Assembly"</c>, with no assembly version.</summary>
+    /// <summary>
+    /// The event's CLR type: <c>"Namespace.Type, Assembly"</c>, without the assembly's version. A generic event's type
+    /// arguments keep their full assembly-qualified names, versions included.
+    /// </summary>
     public required string Type { get; init; }
 
     /// <summary>The event serialized with System.Text.Json as its runtime type.</summary>
