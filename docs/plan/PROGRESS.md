@@ -13,7 +13,7 @@
 | 2b | ✅ tamam | `faz/2b-konfigurasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2c | ✅ tamam | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | 2026-09-26 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
 | 3a | ✅ tamam | `faz/3a-kimlik-dogrulama` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
-| 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | |
+| 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
 | 4a | ⏳ başlamadı | | | | |
 | 4b | ⏳ başlamadı | | | | |
 | 5 | ⏳ başlamadı | | | | |
@@ -749,7 +749,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-27, Faz 3b bitti** (`faz/3b-idp`, 17 commit). Merge kullanıcı onayı bekliyor. `main` push'lanmadı (2c, 3a yerelde).
+**2026-09-27, Faz 3b bitti** (`faz/3b-idp`, 17 commit) ve kullanıcı onayıyla main'e merge edildi (`--no-ff`). `main` push'lanmadı (2c, 3a ve 3b yerelde).
 
 - **Yapılanlar:**
   - Yeni eklenti `NovaCore.Identity.OpenIddict` (D-025, D-026). ASP.NET Core Identity + OpenIddict 7.7.1 ile:
@@ -774,5 +774,5 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - Faz 4a (outbox) eklentiye dokunmuyor. Modül DbContext'leri ve `DomainEventDispatcher` değişmedi.
   - Api artık 3 DbContext ile açılıyor: Catalog, Payments ve eklentinin `IdentityServerDbContext`'i. `EnableRetryOnFailure` OpenIddict store'larıyla uyumlu (R-064). Outbox'ın execution strategy uyumu (F4a.2) aynı kalıbı izleyebilir.
   - Testlerde tüm context'ler SQLite. Eklenti testleri kendi host'unda (`IdentityServerTestHost`).
-- **Bekleyen:** `faz/3b-idp` → `main` merge onayı. `main` push'u ve önizleme yayını ayrı kullanıcı kararları. "Sonraya bırakılanlar"a 15 yeni madde eklendi (10'u code review'dan).
-- **Sıradaki:** merge'den sonra yeni oturumda `/novacore-phase 4a`.
+- **Bekleyen:** `main` push'u ve önizleme yayını ayrı kullanıcı kararları. "Sonraya bırakılanlar"a 15 yeni madde eklendi (10'u code review'dan).
+- **Sıradaki:** yeni oturumda `/novacore-phase 4a`.
