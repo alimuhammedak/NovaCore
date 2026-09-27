@@ -424,7 +424,7 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-24 | F2b.5: `/health` ve `/alive` production'da nasıl korunsun? (yalnızca dev / yönetim portu (LocalPort) / yetkilendirme) | F2b.5 | **Yalnızca Development** (2026-09-25, kullanıcı; R-049) → D-022 |
 | Q-25 | F2c.1: `CreatePayment.ProductId`'nin boş Guid kuralı (`NotEmpty`) hazır bir DataAnnotations attribute'uyla ifade edilemiyor (`[Required]` Guid.Empty'yi reddetmez). Nasıl ifade edilsin? | F2c.1 | **Özel `ValidationAttribute`** (2026-09-26, kullanıcı; R-052): `CreatePayment` içinde private nested. MS'in tek değerli kural yolu, hata diğer alan hatalarıyla aynı yanıtta gelir → D-023 |
 | Q-26 | F2c.1: `ExceptionHandlerOrderTests` silinecek `ValidationExceptionHandler`'ın sırasını test ediyor. Silinsin mi? (Y-44) | F2c.1e | **Sil** (2026-09-26, kullanıcı). Köprü D-019 gereği gidiyor, validation 400 yolunu `ValidationTests` koruyor. |
-| Q-27 | Faz 3b'nin IdP'si: OpenIddict eklentisi (PLAN F3b.1–3, Keycloak yalnızca F3b.4'te opsiyonel), yalnızca Keycloak ya da ikisi birden? (PLAN: 3a sonunda sorulur) | F3b.1'den önce | **Açık.** 2026-09-27'de soruldu. Kullanıcı önce fark açıklaması istedi (auth sunucusu kurmak gerekir mi, ikisi birden ne kazandırır, biri eksik kalırsa ne olur); açıklama faz raporunda. Karar 3b başında alınacak. |
+| Q-27 | Faz 3b'nin IdP'si: OpenIddict eklentisi (PLAN F3b.1–3, Keycloak yalnızca F3b.4'te opsiyonel), yalnızca Keycloak ya da ikisi birden? (PLAN: 3a sonunda sorulur) | F3b.1'den önce | **OpenIddict eklentisi, Keycloak opsiyonel** (2026-09-27, kullanıcı; önce farkların açıklanmasını istedi, açıklama faz raporunda). PLAN F3b.1–F3b.5 olduğu gibi geçerli → D-025 |
 
 ## Sonraya bırakılanlar
 
@@ -509,11 +509,11 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - Development'ta resolver dekoratörü konuya göre ayırınca test IdP'sinin rastgele `sub`'ları Identity DB'sine gitti. Ayrım issuer'a göre yapılıyor.
   - R-055 açılış yarışı bir kez daha görüldü (Cors satırı), sonra 10+ koşu yeşil.
 - **Sonraki fazın (3b) bilmesi gerekenler:**
-  - **IdP seçimi açık (Q-27).** Faz sonunda soruldu, kullanıcı önce farkların açıklanmasını istedi. 3b plan onayından önce karar alınmalı: F3b.1–F3b.3'ün kapsamı buna bağlı.
+  - **IdP: OpenIddict eklentisi, Keycloak yalnızca F3b.4'te opsiyonel compose servisi** (Q-27, D-025). PLAN F3b adımları olduğu gibi geçerli.
   - Yeni IdP entegrasyonu bir `IPermissionResolver` kaydetmeli (yoksa host açılmaz). Sonucu `sub` + stamp'e göre cache'lendiği için token'a (scope, client) bağlı olmamalı.
   - OpenIddict access token'ına `AspNet.Identity.SecurityStamp` (`NovaClaims.SecurityStamp`) yazılırsa, kimlik bilgisi değişikliğinden sonraki yeni token cache'i atlar.
   - F3b.3'te Identity ile birlikte çekirdekteki `ITokenService`/`JwtTokenService`/`AccessToken` ve issuance alanları kalkmalı; Development simetrik modunun kalıp kalmayacağına karar verilmeli.
   - Super-admin bypass'ı hâlâ token rolüne dayanıyor. Keycloak rolleri `realm_access.roles`'ta. İzin anahtarına ikinci bir issuer ile `iss` eklenmeli. Hepsi "Sonraya bırakılanlar"da.
   - Açık diğer maddeler: R-055, iki validation başlığı, `BadHttpRequestException` → 500, health check timeout, test yardımcılarındaki tekrar, OTel'in erken okuması, eski Y-10 atıfları, mediator cümlesi, D-024 (7) ifadesi.
-- **Bekleyen:** IdP seçimi (Q-27); `main` push'u ve önizleme yayını ayrı kullanıcı kararları.
-- **Sıradaki:** yeni oturumda `/novacore-phase 3b` (önce Q-27).
+- **Bekleyen:** `main` push'u ve önizleme yayını ayrı kullanıcı kararları.
+- **Sıradaki:** yeni oturumda `/novacore-phase 3b`.
