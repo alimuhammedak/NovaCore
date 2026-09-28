@@ -3,6 +3,7 @@
   <!--
     Payments module. Talks to Catalog ONLY through NovaCore.Modules.Catalog.Contracts — never the
     Catalog module or its database. That decoupling is what keeps the monolith genuinely modular.
+    Its own contracts (NovaCore.Modules.Payments.Contracts) hold the events it publishes.
   -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
@@ -18,6 +19,7 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.AspNetCore\NovaCore.AspNetCore.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.EntityFrameworkCore\NovaCore.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\Catalog\NovaCore.Modules.Catalog.Contracts\NovaCore.Modules.Catalog.Contracts.csproj" />
+    <ProjectReference Include="..\NovaCore.Modules.Payments.Contracts\NovaCore.Modules.Payments.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

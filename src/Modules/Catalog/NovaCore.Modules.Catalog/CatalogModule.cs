@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NovaCore.Abstractions.Messaging;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Modules;
 using NovaCore.EntityFrameworkCore.Persistence;
@@ -12,6 +13,7 @@ using NovaCore.Modules.Catalog.Contracts;
 using NovaCore.Modules.Catalog.Features;
 using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Catalog.Internal;
+using NovaCore.Modules.Payments.Contracts;
 
 namespace NovaCore.Modules.Catalog;
 
@@ -41,6 +43,9 @@ public sealed class CatalogModule : IModule
 
         // The module's public, in-process API for other modules.
         services.AddScoped<IProductCatalog, ProductCatalog>();
+
+        // Reserves a payment's stock when the Payments module asks (PaymentCreated, delivered by the outbox).
+        services.AddScoped<IDomainEventHandler<PaymentCreated>, ReserveStockForPayment>();
 
         // Declare this module's permissions so the Identity seeder can wire them to roles.
         services.AddPermissionDefinitions<CatalogPermissionProvider>();

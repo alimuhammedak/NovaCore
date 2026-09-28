@@ -67,6 +67,26 @@ call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsT
   so assert "at least" or keep advancing until the end state; to show that a pass ran, save a later "barrier"
   message and wait for it.
 
+On the Api host the dispatcher runs too. With `FakeClockApiFactory` its timer follows the fake clock:
+`OutboxDelivery.RunUntilAsync(factory.Clock, condition)` advances it by the polling interval until the effect shows up
+(`StockReservationTests` runs a payment from POST to Completed this way). A module's handler can also be called
+directly with `factory.HandleAsync(event)` (`ModuleTestData`), the way the dispatcher calls it.
+
+A pass may be running whenever a test acts: the first pass at startup, or one queued by an earlier test's clock
+advances in the same class fixture. So:
+- a test that hands a request to a handler itself saves it with `AddPaymentForDirectHandlingAsync`, which keeps the
+  request out of the outbox;
+- a test that needs several requests past `CreatePayment`'s check saves them with `AddPaymentAsync` instead of racing
+  POSTs against that pass.
+
+`GET /api/v1/payments` orders by a `DateTimeOffset`, which SQLite can't translate (R-068), so tests read payments from
+the database (`PaymentStatusAsync`).
+
+`StockRaceApiFactory` (a `FakeClockApiFactory`) plays a concurrent writer for `StockConcurrencyTests`.
+`ChangeStockBeforeNextSave(productId, stock)` makes the next Catalog save that modifies or deletes the product first
+see another connection set its stock. The change lands between the save's read and its write. An update that changes
+nothing sends no `UPDATE`, so the request must really change the product.
+
 ## Tokens: an in-memory OpenID Connect issuer
 
 The core validates access tokens against `Jwt:Authority` (D-002, D-024). `TestIdentityProvider` is that authority for

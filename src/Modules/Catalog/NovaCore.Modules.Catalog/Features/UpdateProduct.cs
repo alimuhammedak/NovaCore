@@ -28,6 +28,7 @@ public static class UpdateProduct
             .RequirePermission(CatalogPermissions.ProductsUpdate)
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
 
     private static async Task<IResult> Handle(
@@ -41,7 +42,17 @@ public static class UpdateProduct
             return Result.Failure(Error.NotFound("product.not_found", $"Product '{id}' was not found.")).ToHttpResult();
 
         product.Update(request.Name, request.Description, request.Price, request.Stock);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // A sale took stock after the product was read (Stock is a concurrency token): writing the requested stock
+            // over it would undo the sale. The caller reads the product again and decides.
+            return Result.Failure(Error.Conflict("product.concurrency_conflict",
+                $"Product '{id}' changed while it was being updated. Read it again and retry.")).ToHttpResult();
+        }
 
         return Result.Success().ToHttpResult();
     }

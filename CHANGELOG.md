@@ -94,6 +94,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   No transaction of its own: it works under `EnableRetryOnFailure`. Delivery is at least once and handlers must be
   idempotent. One dispatcher per database is assumed. Migration `OutboxDispatch` adds `Attempts`, `Error` and
   `ProcessedOnUtc` to `outbox_messages`, and the `outbox_consumers` table.
+- Stock reservation (sample modules, D-034): a payment now takes its product's stock, so a product can no longer be sold
+  without limit. The two modules keep the stock and the payment consistent through the outbox:
+  - A payment is saved pending together with its `PaymentCreated` event. The event lives in the new
+    `NovaCore.Modules.Payments.Contracts` project, which other modules reference instead of the Payments module.
+  - The Catalog module's `ReserveStockForPayment` takes the stock with `Product.RemoveStock`, or refuses when the
+    product is gone, inactive or short of stock. Stock never goes below zero. Its answer is a `StockReservation` row
+    keyed by the payment, saved with the stock change and with a `StockReserved` or `StockReservationFailed` event
+    (`NovaCore.Modules.Catalog.Contracts`). A redelivered request finds the row and changes nothing.
+  - The Payments module's answer handler completes or fails the payment. A payment settles once; the same answer again
+    changes nothing, and the other answer is refused.
+  - `POST /api/v1/payments` still answers 201 with a pending payment and keeps its 404/400/409 checks. The outcome shows
+    up in `GET /api/v1/payments` within two dispatcher passes when the deliveries succeed; each failed delivery adds a
+    pass. Two requests for the last unit can both be accepted; one of them then fails. Migration `StockReservations`
+    adds `catalog.stock_reservations`.
 
 ### Changed
 
@@ -199,6 +213,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking (API):** the domain-event buffer (`DomainEvents`, `Raise`, `ClearDomainEvents`) moved from `Entity<TId>` to
   a new non-generic base class, `Entity`, so the persistence layer can read any entity's events without its key type.
   Code that derives from `Entity<TId>` or `AuditableEntity<TId>` compiles unchanged.
+- `PUT` and `DELETE /api/v1/products/{id}` (Catalog sample module) answer 409 with code `product.concurrency_conflict`
+  when the product's stock changed after the request read it. `Stock` is now a concurrency token, so a write can't
+  undo a sale. The OpenAPI document lists the 409 response for both. Migration `StockConcurrencyToken` only brings the
+  model snapshot up to date; the schema doesn't change.
 - **Breaking (API and behaviour):** `IDomainEventDispatcher` is registered scoped and resolves the handlers from the
   caller's scope; as a singleton it resolved them from the root provider, which failed for scoped handlers. Each event
   type's handlers are invoked through a cached, strongly typed wrapper instead of `MethodInfo.Invoke` per call.
@@ -217,6 +235,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `FluentValidation` and `FluentValidation.DependencyInjectionExtensions` packages: they are gone from central
   package management and from the package-policy allowlist, since nothing uses them after the move to built-in
   validation.
+- `Payment.Refund()` and `PaymentStatus.Refunded` (Payments sample module): nothing called them.
 
 ### Security
 

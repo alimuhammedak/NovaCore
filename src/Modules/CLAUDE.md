@@ -14,7 +14,10 @@ Subtree rules for `src/Modules/`. See the repo-root `CLAUDE.md` for global stand
 4. Add a `ProjectReference` from `src/Api/NovaCore.Api` and one line to its `Program.cs`:
    `builder.AddModule<<M>Module>();` (modules map their endpoints in the order they are added).
 
-Use `Catalog` as the reference implementation (full CRUD + contracts); `Payments` shows cross-module use.
+Use `Catalog` as the reference implementation (full CRUD + contracts); `Payments` shows cross-module use. Together
+they show a cross-module write through events both ways (DECISIONS D-034): a payment is saved pending with
+`PaymentCreated` (`Payments.Contracts`), Catalog's `ReserveStockForPayment` takes the stock or refuses and answers with
+`StockReserved`/`StockReservationFailed` (`Catalog.Contracts`), and Payments' `SettlePayment` completes or fails it.
 
 ## Anatomy of a module
 
@@ -28,7 +31,8 @@ Use `Catalog` as the reference implementation (full CRUD + contracts); `Payments
   ignores `DomainEvents`), and a `IDesignTimeDbContextFactory<>` (so `dotnet ef` works offline with the module as `-p`
   and `-s`).
 - **`Contracts/`** — for a module others consume, expose a **separate `*.Contracts` project**
-  (interfaces + DTOs only). Consumers reference the Contracts project, **never** the module.
+  (interfaces, DTOs and the events it publishes; `NovaCore.Abstractions` only, for `DomainEvent`). Consumers reference the
+  Contracts project, **never** the module.
 - **`Authorization/`** — `<M>Permissions` constants (`module:resource:action`) + an
   `IPermissionDefinitionProvider`; register with `AddPermissionDefinitions<...>()` in the module.
 - **`Mapping/`** — Mapperly static partial mappers; add a `ProjectToDto` IQueryable projection for lists.
@@ -46,8 +50,16 @@ Use `Catalog` as the reference implementation (full CRUD + contracts); `Payments
     `services.AddScoped<IDomainEventHandler<SomethingHappened>, DoSomething>()`.
   - Each handler runs **at least once**, so make it idempotent. The handlers of one event share a DI scope (and its
     DbContext instances), as in a request, so each saves what it changes.
+  - A handler that changes state keeps a record keyed by the message's business id, saves it in the same `SaveChanges`
+    as the change, and returns early when it finds it (`StockReservation`, keyed by the payment). The dispatcher's
+    `outbox_consumers` record is written after the handler's own save, so it can't stop a second run after a crash.
   - An event another module handles lives in the publisher's `*.Contracts` project, because modules reference each
     other only through Contracts.
+- **A value that concurrent writes change is a concurrency token** (`Product.Stock`: `IsConcurrencyToken()`,
+  application-managed so the SQLite tests enforce it too). A write over a value that changed after it was read then
+  throws `DbUpdateConcurrencyException` instead of overwriting it. An endpoint answers 409
+  (`product.concurrency_conflict`) so the caller reads again; an event handler lets it fail, and the outbox retries the
+  delivery on the next pass with a fresh read.
 - **Guard every endpoint** with `.RequirePermission(<M>Permissions.X)` (or `.RequireAuthorization()` only
   when no finer permission applies).
 - **Validate write DTOs with DataAnnotations** on the request record (`[Required, MaxLength(200)] string Name`).

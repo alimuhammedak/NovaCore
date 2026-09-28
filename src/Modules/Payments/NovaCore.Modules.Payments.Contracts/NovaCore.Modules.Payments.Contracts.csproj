@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Payments.Contracts: what other modules may know of the Payments module, the events it publishes. The Catalog module
+    references this to reserve a payment's stock, never the Payments module itself. Pure records, no implementation, no
+    EF; NovaCore.Abstractions only for the DomainEvent base.
+    Not a NuGet package: the modules are sample code, and only the building blocks ship as packages
+    (docs/plan/DECISIONS.md D-001, D-020).
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.Abstractions\NovaCore.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

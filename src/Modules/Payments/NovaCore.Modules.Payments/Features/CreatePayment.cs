@@ -13,8 +13,11 @@ using NovaCore.Modules.Payments.Infrastructure;
 namespace NovaCore.Modules.Payments.Features;
 
 /// <summary>
-/// Create a payment for a product. The cross-module showcase: Payments validates and prices the
-/// product via <see cref="IProductCatalog"/> (an in-process contract) — never by touching Catalog's tables.
+/// Create a payment for a product. The cross-module showcase: Payments checks and prices the product via
+/// <see cref="IProductCatalog"/> (an in-process contract) — never by touching Catalog's tables — and saves the payment as
+/// pending. Its <c>PaymentCreated</c> asks the Catalog module for the stock through the outbox, and the answer settles
+/// the payment (<see cref="SettlePayment"/>). The checks here answer the common cases at once; the reservation is the
+/// one that counts, so two requests for the last unit can both be accepted and one of them fail.
 /// </summary>
 public static class CreatePayment
 {
