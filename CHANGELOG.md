@@ -79,6 +79,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The OpenAPI document declares the identity provider's Authorization Code flow (`OAuth2` scheme, under
   `Jwt:Authority`), and `NovaCore.Scalar` has a `MapCoreScalar(Action<ScalarOptions>)` overload. The Api host uses it
   to sign Scalar in with PKCE as the `scalar` client (`Identity:Clients` in `appsettings.Development.json`).
+- Transactional outbox, write side: the domain events an entity raises are written to its module's `outbox_messages`
+  table by the SaveChanges that saves the entity, in the same transaction, and the entity's buffer is cleared.
+  `modelBuilder.AddOutbox()` (`NovaCore.EntityFrameworkCore.Messaging`) maps the table in the context's schema, and
+  `AddModuleDbContext` adds the writing `OutboxInterceptor` to every module context. A context whose entities raise
+  events without an outbox in its model fails the save instead of dropping them. Catalog and Payments map the outbox
+  (migration `Outbox`: `catalog.outbox_messages`, `payments.outbox_messages`); neither raises events yet.
+- Transactional outbox, dispatch side: `AddCorePersistence` registers a background service that delivers the events in
+  every module's outbox to their `IDomainEventHandler<T>`s. It runs a pass at startup, then every 5 seconds on
+  `TimeProvider`, oldest message first. A failed message is retried after newer ones, so there is no ordering
+  guarantee. Each message gets a DI scope, which its handlers share. Each handler that
+  finishes is recorded in `outbox_consumers`, so a retried message doesn't run those handlers again. A failed delivery
+  is retried on the next pass; after 10 attempts the message stays in the outbox with its last error, for inspection.
+  No transaction of its own: it works under `EnableRetryOnFailure`. Delivery is at least once and handlers must be
+  idempotent. One dispatcher per database is assumed. Migration `OutboxDispatch` adds `Attempts`, `Error` and
+  `ProcessedOnUtc` to `outbox_messages`, and the `outbox_consumers` table.
 
 ### Changed
 
@@ -181,6 +196,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start in any environment; the Identity module
   registers `IdentityPermissionResolver` (role and direct permission claims from its store), and its access tokens no
   longer carry `permission` claims.
+- **Breaking (API):** the domain-event buffer (`DomainEvents`, `Raise`, `ClearDomainEvents`) moved from `Entity<TId>` to
+  a new non-generic base class, `Entity`, so the persistence layer can read any entity's events without its key type.
+  Code that derives from `Entity<TId>` or `AuditableEntity<TId>` compiles unchanged.
+- **Breaking (API and behaviour):** `IDomainEventDispatcher` is registered scoped and resolves the handlers from the
+  caller's scope; as a singleton it resolved them from the root provider, which failed for scoped handlers. Each event
+  type's handlers are invoked through a cached, strongly typed wrapper instead of `MethodInfo.Invoke` per call.
+  `DomainEventDispatcher` is now internal; use `IDomainEventDispatcher`.
 
 ### Removed
 

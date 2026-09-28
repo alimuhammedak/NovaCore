@@ -179,7 +179,7 @@ builder.AddCoreObservability();                    // OpenTelemetry metrics + tr
 // Çekirdek
 builder.AddCoreDefaults();                         // health + resilient HttpClients
 builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth, rate limit, CORS
-builder.AddCorePersistence();                      // audit interceptor, domain event'ler, opt-in startup migration
+builder.AddCorePersistence();                      // audit interceptor, domain event'ler + outbox dispatcher, opt-in startup migration
 
 // Kimlik sağlayıcı (eklenti): Jwt:Authority'nin gösterdiği token'ları üretir; store'u ve migration'ları host'ta
 builder.AddCoreIdentityServer();
@@ -272,6 +272,28 @@ if (product.Stock < request.Qty) return Error.Conflict(...);
 Bu, ileride bir modülü mikroservise ayırmayı ucuz tutar: contract aynı kalır, çağrı in-process'ten
 HTTP/mesaj kuyruğuna döner.
 
+### Domain event'ler ve outbox
+
+Bir entity olayı `Raise(new SiparisVerildi(...))` ile kaydeder. Event, `DomainEvent`'ten türeyen bir record'dur.
+Kaydeden SaveChanges event'i modülün `outbox_messages` tablosuna aynı transaction içinde yazar (**transactional
+outbox**): entity değişikliği ve event ya birlikte kalıcı olur ya hiç olmaz. Bu işi `OutboxInterceptor` yapar;
+`AddModuleDbContext` onu her modül context'ine ekler, modül tabloyu `modelBuilder.AddOutbox()` ile map'ler.
+
+`AddCorePersistence`'ın kaydettiği `OutboxDispatcher` (bir `BackgroundService`) outbox'lardaki event'leri
+`IDomainEventHandler<T>`'lere dağıtır:
+- açılışta bir tur çalışır, sonra 5 saniyede bir. Önce en eski mesaj alınır, ama hata alan bir mesaj sonraki turda
+  daha yenilerinden sonra denenir: sıra garantisi yoktur;
+- her mesaj için bir DI scope açar; o mesajın handler'ları bu scope'u paylaşır;
+- işini bitiren handler'ı `outbox_consumers`'a (processed tablosu) yazar. Hata olursa mesaj sonraki turda yeniden
+  denenir, ama başarılı handler'lar tekrar çalışmaz;
+- 10 denemeden sonra mesajı inceleme için outbox'ta bırakır.
+
+Garanti **en az bir kez**dir: bir handler'ın kendi kaydıyla bu işaret arasında süreç ölürse handler bir kez daha
+çalışır. Handler'lar bu yüzden idempotent yazılır. Veritabanı başına tek dispatcher varsayılır.
+
+Handler DI'a açıkça kaydedilir: `services.AddScoped<IDomainEventHandler<SiparisVerildi>, StokDus>()`. Başka bir
+modülün tepki vereceği event, yayımlayan modülün `*.Contracts` projesinde durur.
+
 ---
 
 ## Cross-Cutting Concern'ler
@@ -286,6 +308,7 @@ HTTP/mesaj kuyruğuna döner.
 | **Mapping** | Mapperly (source-gen) | `[Mapper]` statik partial sınıflar, EF-translatable `ProjectToDto` |
 | **Auth** | JWT doğrulama (`Jwt:Authority`) + OpenIddict/Identity sağlayıcı eklentisi + permission-based | bkz. [Güvenlik & Yetkilendirme](#güvenlik--yetkilendirme) |
 | **Auditing** | EF Core `SaveChangesInterceptor` | `AuditableEntityInterceptor` — CreatedBy/ModifiedAt merkezî |
+| **Domain event'ler** | Transactional outbox + `BackgroundService` | `OutboxInterceptor` aynı transaction'da yazar, `OutboxDispatcher` en az bir kez dağıtır (bkz. [Modüller Arası İletişim](#modüller-arası-iletişim)) |
 | **Rate limiting** | Yerleşik `AddRateLimiter` | IP bazlı fixed-window + `"strict"` adlı policy |
 | **Health** | Yerleşik Health Checks + `AddDbContextCheck` | `/health` (her modül DB'si, "ready" etiketi) + `/alive`, yalnızca Development |
 | **API docs** | `Microsoft.AspNetCore.OpenApi` + Scalar | Bearer security scheme transformer ile; Scalar UI `NovaCore.Scalar` eklentisinde (`MapCoreScalar`) |
@@ -444,7 +467,7 @@ Her modül **kendi DbContext'ine + kendi SQL Server şemasına** sahiptir (`cata
 `HasDefaultSchema`), migration geçmişi de şema bazında ayrılır (`__EFMigrationsHistory`). Kimlik sağlayıcının
 `IdentityServerDbContext`'i (`identity` şeması) eklenti paketinden gelir; sağlayıcıyı ve migration'ları host seçer, bu
 yüzden migration'ları Api projesindedir (`src/Api/NovaCore.Api/Identity/Migrations`). Sınırlar veritabanı düzeyinde
-uygulanır.
+uygulanır. Her modül şemasında outbox tabloları da vardır: `outbox_messages` ve `outbox_consumers`.
 
 ```bash
 # Yeni migration (modül = hem -p hem -s; design-time factory sayesinde DB gerekmez)
@@ -469,6 +492,9 @@ dotnet test
 - **Unit:** `Result<T>`, `PaginationRequest`/`PagedList<T>` davranışları.
 - **Integration:** gerçek host'u `WebApplicationFactory` ile ayağa kaldırır; her DbContext testte **in-memory
   SQLite**'a takılır. Token'ları bellek içi bir OpenID Connect issuer'ı (`TestIdentityProvider`) üretir.
+- **Outbox:** event'in entity ile aynı transaction'da yazıldığı (iki yönlü rollback) ve bir mesajın her handler'a bir
+  kez teslim edildiği test edilir. Dispatcher testleri sahte saatle (`FakeTimeProvider`) çalışır: yeniden deneme,
+  10 denemede bırakma ve retrying execution strategy altında çalışma da bu testlerde.
 - **Kimlik sağlayıcı:** eklenti, yalnızca çekirdek + eklentiden kurulan bir host'ta (`IdentityServer/`) uçtan uca test
   edilir: Authorization Code + PKCE, refresh **rotation** ve **reuse** (zincir iptali), client credentials, sertleştirmeler,
   2FA, oturum uçları, admin API'si. `IdentityServerWiringTests` aynı akışı Api host'unun kendisinde dener.

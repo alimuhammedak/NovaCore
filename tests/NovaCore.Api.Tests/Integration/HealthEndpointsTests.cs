@@ -76,7 +76,10 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>Catalog points at a SQLite file that does not exist, so its DbContext check cannot connect.</summary>
+    /// <summary>
+    /// Catalog points at a SQLite file that does not exist, so its DbContext check cannot connect. <c>Mode=ReadWrite</c>
+    /// makes opening it fail rather than create it: the host's outbox dispatcher opens it too.
+    /// </summary>
     private sealed class UnreachableCatalogApiFactory : NovaCoreApiFactory
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -84,8 +87,8 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
             base.ConfigureWebHost(builder);
 
             var missingFile = Path.Combine(Path.GetTempPath(), $"novacore-missing-{Guid.NewGuid():N}.db");
-            builder.ConfigureServices(services =>
-                ReplaceWithSqlite<CatalogDbContext>(services, options => options.UseSqlite($"Data Source={missingFile}")));
+            builder.ConfigureServices(services => ReplaceWithSqlite<CatalogDbContext>(services,
+                options => options.UseSqlite($"Data Source={missingFile};Mode=ReadWrite")));
         }
     }
 }

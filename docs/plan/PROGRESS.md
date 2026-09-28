@@ -14,7 +14,7 @@
 | 2c | ✅ tamam | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | 2026-09-26 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
 | 3a | ✅ tamam | `faz/3a-kimlik-dogrulama` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
 | 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
-| 4a | ⏳ başlamadı | | | | |
+| 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`, push yok) |
 | 4b | ⏳ başlamadı | | | | |
 | 5 | ⏳ başlamadı | | | | |
 
@@ -617,9 +617,85 @@ Plan onayı (2026-09-27). Kullanıcı kararları: Q-28 (D-027, tam parite), Q-29
   - Tarayıcı raporu: F3b.5b.
 
 ### Faz 4a
-- [ ] F4a.1 Event'lerin outbox'a yazılması
-- [ ] F4a.2 Dispatcher
-- [ ] F4a.3 Eski dispatcher düzeltmesi
+Plan onayı 2026-09-28. Uygulama sırası F4a.1 → F4a.3 → F4a.2 (ID'ler sabit): F4a.2'nin dispatcher'ı handler'ları F4a.3'ün cache'li wrapper'ıyla çağırıyor.
+
+- [x] F4a.1 (4678ea3): Event'lerin outbox'a yazılması.
+  - Event tamponu jenerik olmayan `Entity` tabanına taşındı (`Entity<TId> : Entity`). Mevcut kod aynen derleniyor.
+    - **Sapma:** planda kurucu `private protected`'tı. PublicApiAnalyzers RS0022 verdi (türeyen `Entity<TId>` korumalı `Raise`'i dışarı açıyor), kurucu `protected` oldu (D-031 (2)).
+  - `OutboxInterceptor` (public) `SavingChanges`'te her `Entity`'nin event'lerini `outbox_messages`'a ekliyor ve tamponu temizliyor.
+    - EF interceptor'ı `DetectChanges`'ten ve execution strategy'nin sardığı `StateManager.SaveChanges`'ten önce çağırdığı için satırlar aynı transaction'da (R-068).
+    - Modelde outbox yokken event gelirse kayıt açıklayıcı bir `InvalidOperationException` ile duruyor.
+  - `AddModuleDbContext` interceptor'ı her modül context'ine kendisi ekliyor. Catalog ve Payments `modelBuilder.AddOutbox()` çağırıyor. `Outbox` migration'ları: `bigint IDENTITY` anahtar, unique `EventId`.
+  - `NovaCoreApiFactory.ReplaceWithSqlite` interceptor'ı da ekliyor.
+  - Testler 172 → 178:
+    - `OutboxInterceptorTests` (5):
+      - yazım ve içeriğin geri dönüşü;
+      - iki yönlü rollback: reddedilen outbox satırı entity'yi, reddedilen entity outbox satırını geri alıyor. Hangi insert önce çalışırsa çalışsın aynı transaction kanıtlanıyor;
+      - outbox'sız context;
+      - event'siz kayıt.
+    - `ModuleRegistrationTests`: her modül context'i outbox'ı map'liyor.
+    - Önce kırmızı: `AddOutbox` yokken derleme hatası.
+  - `has-pending-model-changes` üç context'te temiz.
+  - CHANGELOG, `src/Modules/CLAUDE.md` ve `src/BuildingBlocks/CLAUDE.md` güncellendi. R-068, R-069 ve D-031 yazıldı.
+- [x] F4a.3 (fecd64c): Eski dispatcher düzeltmesi.
+  - `IDomainEventDispatcher` artık scoped (`TryAddScoped`): handler'lar çağıranın scope'undan çözülüyor. `DomainEventDispatcher` internal oldu, çünkü kurucusu internal cache'e bağlı (D-031 (7)).
+  - Reflection çağrısının yerine `DomainEventHandlerInvoker<TEvent>` geldi: handler'ları tipli çözüp tipli çağırıyor. Event tipi başına bir kez `MakeGenericType` ile kuruluyor ve `DomainEventHandlerInvokers` singleton'ında tutuluyor. F4a.2'nin dispatcher'ı da bunu kullanacak.
+  - Testler 178 → 181 (`DomainEventDispatcherTests`: çağıranın scope'u, bir event'in bütün handler'ları ve yalnız onlar, handler'sız event).
+    - Önce kırmızı: eski singleton'da 2 test `Cannot resolve scoped service ... from root provider` ile düştü.
+  - Abstractions'ta `IDomainEventDispatcher` ve `DomainEvent` belgeleri güncellendi ("a future outbox" → "the outbox"). CHANGELOG ve `src/BuildingBlocks/CLAUDE.md` da güncellendi.
+- [x] F4a.2 (04b21ec): Dispatcher.
+  - `OutboxDispatcher : BackgroundService` (internal), `AddCorePersistence` migration servisinden sonra kaydediyor.
+    - Açılışta bir tur, sonra `PeriodicTimer(5 sn, TimeProvider)`.
+    - Outbox'ı map'leyen her context'te `Id` üzerinden 50'lik keyset parçaları: `ProcessedOnUtc IS NULL AND Attempts < 10`.
+    - Mesaj başına handler'lar için ayrı DI scope. Bookkeeping context'i handler'larınkinden ayrı.
+  - Processed tablosu `outbox_consumers`, anahtarı (EventId, Handler): biten handler kaydediliyor, yeniden denemede atlanıyor. Hepsi bitince `ProcessedOnUtc` (`ExecuteUpdate`).
+  - Hata: change tracker temizleniyor, `Attempts + 1` ve `Error` (≤ 2000 karakter) yazılıyor, Warning log; 10. denemede Error log ve mesaj bırakılıyor.
+  - Tip `Type.GetType` ile çözülüyor ve `IDomainEvent` olmalı. Tur düzeyindeki hata döngü sınırında yakalanıp loglanıyor. Açık transaction yok.
+  - `OutboxDispatch` migration'ları: `Attempts`, `Error`, `ProcessedOnUtc`, (`ProcessedOnUtc`, `Id`) index'i ve `outbox_consumers`.
+  - Test altyapısı (D-031 (8), R-069):
+    - `NovaCoreApiFactory`'nin üç context'i adlandırılmış paylaşılabilir in-memory SQLite'a geçti (`Pooling=False`, factory başına benzersiz ad, açık tutulan bir bağlantı). Catalog ve Payments şeması ctor'da oluşturuluyor.
+    - **Sürpriz:** dispatcher Api host'unda da çalıştığı için `HealthEndpointsTests`'in "eksik dosya" testi kırmızıya döndü. Dispatcher dosyayı `ReadWriteCreate` ile açıp oluşturuyor, health check de onu sağlıklı görüyordu. Test artık `Mode=ReadWrite` kullanıyor.
+  - Testler 181 → 187 (`OutboxDispatcherTests`, 6):
+    - bir kez işlenir (sonraki turlar ve yeniden başlatılan host tekrar teslim etmiyor);
+    - başarısız handler yeniden deneniyor, başarılı olan tekrar çalışmıyor;
+    - 10 denemede bırakılıyor;
+    - handler'sız event işlenmiş sayılıyor;
+    - `IDomainEvent` olmayan tip başarısız deneme sayılıyor;
+    - retrying execution strategy altında, bookkeeping yazımına bir kez enjekte edilen geçici hatada handler bir kez çalışıyor.
+  - Önce kırmızı: 6/6 `no such column: Attempts`.
+  - **Sürpriz:** `FakeTimeProvider.Advance(1 dk)` 5 sn'lik periyodik zamanlayıcıyı 12 kez tetikliyor. İlk tetik bekleyeni serbest bırakıyor, sonrakiler birikiyor; tek advance iki tur çalıştırabiliyor. Poison testi bu yüzden "tam olarak k" yerine son duruma kadar ilerletiyor. Teknik tests/CLAUDE.md'de.
+  - Kasıtlı bozma (commit'lenmedi): handler atlama kapatılınca yeniden deneme testi kırmızıya döndü.
+  - 187/187 (iki tam koşu).
+  - `has-pending-model-changes` üç context'te temiz.
+  - Güncellenenler: README (Domain event'ler ve outbox, cross-cutting tablosu, Veritabanı, Test), kök `CLAUDE.md` (Persistence), `src/BuildingBlocks/CLAUDE.md`, `src/Modules/CLAUDE.md` (handler kaydı, idempotency, Contracts'ta event), `tests/CLAUDE.md`, CHANGELOG, `Program.cs` yorumu, memory `novacore-stack`.
+- Faz doğrulaması (2026-09-28, code review'dan önce):
+  - `restore --force`: NU uyarısı yok.
+  - Release `--no-incremental`: 0 uyarı, 0 hata.
+  - Test: 187/187 (Release ve Debug).
+  - `list package --vulnerable`: 12 projede açık yok.
+  - `has-pending-model-changes`: üç context'te temiz.
+- [x] Code review düzeltmeleri (96ddf10): `code-review` (xhigh, `main...faz/4a-outbox`) 15 bulgu verdi.
+  - Kapsam içi gerçek hatalar düzeltildi; yeni testlerin üçü de düzeltmeden önce kırmızıydı (R-070). Testler 187 → 190.
+    - (#1) Kaydı tutulamayan handler her denemede yeniden çalışırdı. Örnek: kapalı generic bir handler'ın adı sürümlü tip argümanıyla 256 karakteri geçer ve SQL Server kaydı reddeder. Böyle bir handler artık hiç çalıştırılmıyor, deneme başarısız sayılıyor.
+    - (#7) Aynı handler tipinin iki kaydı ilk teslimde iki kez çalışıp denemeyi düşürüyordu. Başarılı handler'ın adı teslim içinde `finished`'e ekleniyor.
+    - (#4) Tur boyunca tek context'te biriken kayıtlar her `SaveChanges`'i yavaşlatıyordu (birikmiş kuyrukta O(n²)). Her kayıttan sonra `ChangeTracker.Clear()`.
+    - (#6) Durdurma sırasında `OperationCanceledException` dışındaki hatalar dispatcher'ı faulted bırakıyordu. Filtreler artık yalnızca host'un kendi iptalini dışarı bırakıyor.
+    - (#14) Test: ilk host başarısız bir beklemede açık kalıyordu. Artık `using` bloğunda.
+  - Belge düzeltmeleri:
+    - (#2) Handler'lar mesaj başına bir scope'u paylaşıyor; `IDomainEventHandler` belgesi ve `src/Modules/CLAUDE.md` "kendi scope'u" diyordu.
+    - (#10) Sıra garantisi yok (README, CHANGELOG, XML doc).
+    - (#15) `tests/CLAUDE.md`'deki "Unit: No host" ifadesi.
+    - (#8) `OutboxMessage.Type`: generic tip argümanları sürüm taşır.
+    - (#11) `AddCorePersistence` olmadan event'ler teslim edilmez.
+    - (#3) Başarısız kayıttan sonra event'lerin durumu.
+  - Gerekli değil (#13): interceptor'daki `DetectChanges`, navigation'la eklenen yeni entity'leri takibe alıyor. Kapatmak event kaybettirirdi (R-070). Neden'i koda yorum olarak yazıldı.
+  - Kapsam dışı ve belgelenmiş bulgular "Sonraya bırakılanlar"da: #3, #5, #8, #9, #12.
+  - D-kaydı gerekmedi: düzeltmeler uygulama ayrıntısı; D-031'le çelişen bir şey yok.
+- Faz doğrulaması, düzeltmelerden sonra (2026-09-28):
+  - Release `--no-incremental`: 0 uyarı, 0 hata.
+  - Test: 190/190 (Release ve Debug).
+  - `has-pending-model-changes`: üç context'te temiz.
+  - Outbox testleri art arda 3 koşuda yeşil.
 
 ### Faz 4b
 - [ ] F4b.1 Stok kararı
@@ -745,34 +821,52 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 3b, code review) `SecurePolicy = Always` yalnızca uygulama cookie'sinde. 2FA kullanıcı cookie'si ve antiforgery cookie'si varsayılanda. Forwarded headers'sız bir TLS proxy'si arkasında `Secure` bayrağı olmadan çıkıyorlar (yukarıdaki Faz 0 `ForwardedHeaders` maddesiyle ilgili).
 - (Faz 3b, F3b.5b, R-066) Scalar'da OAuth2 şeması seçili ama token'sız kalınca elle eklenen `Authorization` başlığı işe yaramıyor (401). Normal kullanımda Scalar popup'la token alıyor; built-in browser popup'ı aynı sekmede açtığı için bu tarayıcıda denenemedi. Gerçek bir tarayıcıda Scalar'ın popup akışı bir kez elle denenmeli.
 
+- (Faz 4a, plan kapsamı dışı) **Birden çok uygulama örneği:** dispatcher veritabanı başına tek örnek varsayıyor. İki host aynı outbox'u okursa aynı mesajı ikisi de teslim edebilir. Çözüm bir claim/lease olabilir (örneğin koşullu `ExecuteUpdate` ile kilit süresi). SQLite `DateTimeOffset` karşılaştırmasını çeviremediği için süre alanının tipi test tarafını da etkiler (R-068).
+- (Faz 4a, plan kapsamı dışı) Outbox ve `outbox_consumers` satırları hiç silinmiyor. MS Idempotent Consumer tekrar teslim penceresinden uzun bir saklama süresi öneriyor. İşlenmiş mesajları ve kayıtlarını belli bir süre sonra silen bir temizlik gerekecek (OpenIddict kayıtları için olan maddeyle birlikte ele alınabilir).
+- (Faz 4a, plan kapsamı dışı) Yeniden deneme her turda (5 sn) yapılıyor, geri çekilme (backoff) yok. 10 deneme yaklaşık 50 saniye sürüyor; bundan uzun süren bir bağımlılık kesintisi mesajı incelemeye düşürür. Aralık, parça boyu ve deneme sayısı sabit (Y-19). Bir tüketici ihtiyaç duyarsa options'a taşınabilir.
+- (Faz 4a → 4b) Teslim gecikmesi en fazla bir tur (5 sn); event zincirinde her halka bir tur ekliyor. 4b event tabanlı stok rezervasyonunu seçerse (F4b.1), kaydın ardından dispatcher'a sinyal veren anında teslim düşünülebilir.
+- (Faz 4a) `IDomainEventDispatcher`'ın `src`'de çağıranı yok. PLAN F4a.3 gereği düzeltildi ve korunuyor, ama entity event'leri outbox'tan dağıtılıyor. Faz 5'te (ya da kullanıcı kararıyla) kaldırılması değerlendirilebilir.
+- (Faz 4a, R-068) `src/Modules/CLAUDE.md` Guid v7 anahtarları için "friendly to SQL Server clustering" diyor. SQL Server `uniqueidentifier`'ı son 6 bayta göre sıralıyor, v7'nin zaman damgası ise baştaki baytlarda; yani anahtarlar SQL Server sırasında artan değil ve Catalog/Payments'ın clustered PK'ları rastgele sırayla dolar. Çözüm için belge düzeltmesi ya da anahtar stratejisi kararı gerekir (örneğin `SequentialGuidValueGenerator`). Kapsam dışı.
+- (Faz 4a) Outbox interceptor'ını `AddModuleDbContext` ekliyor, audit interceptor'ını ise hâlâ her modül kendisi ekliyor. İkisini aynı yere toplamak modül kaydını kısaltır; modül ve CLAUDE.md değişikliği gerektiği için yapılmadı.
+- (Faz 4a, code review #3) Interceptor event tamponunu event'ler kayda katılırken temizliyor. Kayıt başarısız olur ve aynı entity örneği *yeni* bir context'e eklenirse event'leri kalmamış olur. Örnek: execution strategy'yle elle yazılmış, entity'yi blok dışında oluşturan bir yeniden deneme bloğu. Belgelendi (aynı context'te `SaveChanges`'i yeniden dene). Kalıcı çözüm için tamponu `SavedChanges`'te temizlemek ve zaten izlenen `EventId`'leri atlamak gerekir; açık transaction'da commit hatası yine kapsanmaz.
+- (Faz 4a, code review #5) Başarısız bir tur her tick'te (5 sn) modül başına Error logluyor ve geri çekilmiyor. Örnek: migration uygulanmamış bir geliştirme veritabanında dakikada 24 hata logu. Context başına artan bekleme ya da seri başına tek log düşünülebilir.
+- (Faz 4a, code review #8) Generic bir event'in saklanan tip adı, tip argümanlarının sürümlü assembly-qualified adlarını taşıyor. Sürümü düşüren bir dağıtımdan sonra `Type.GetType` bağlanamayabilir. Çok uzun bir ad 512 karakteri geçerse iş kaydının kendisi SQL Server'da düşer. Belgelendi; sürümsüz ad üretmek `TypeName` ile ayrıştırma gerektirir.
+- (Faz 4a, code review #9) Modül outbox'ları bir turda sırayla işleniyor. Erişilemeyen bir modül veritabanı (`EnableRetryOnFailure` geri çekilmesiyle) diğer modüllerin teslimini dakikalarca bekletebilir. Modüller aynı SQL Server'ı kullandığı sürece etkisi yok.
+- (Faz 4a, code review #12) `outbox_consumers`'ın clustered anahtarı (uniqueidentifier, nvarchar(256)) geniş ve SQL Server sırasında rastgele. Outbox tablosu için R-068'de kullanılan gerekçenin aynısı geçerli. Mesaj satırının `bigint Id`'si + Handler (FK ve cascade delete ile, temizlik için de uygun) daha iyi olur. D-031 (5)'i değiştirir; tablo boşken, ilk kullanımdan önce yapmak ucuz.
+
 ## Son devir notu
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-27, Faz 3b bitti** (`faz/3b-idp`, 17 commit) ve kullanıcı onayıyla main'e merge edildi (`--no-ff`). `main` push'lanmadı (2c, 3a ve 3b yerelde).
+**2026-09-28, Faz 4a bitti** (`faz/4a-outbox`, 5 commit) ve kullanıcı onayıyla main'e merge edildi (`--no-ff`). `main` push'lanmadı (2c'den beri yerelde).
 
-- **Yapılanlar:**
-  - Yeni eklenti `NovaCore.Identity.OpenIddict` (D-025, D-026). ASP.NET Core Identity + OpenIddict 7.7.1 ile:
-    - Authorization Code + PKCE (yalnızca S256), rolling refresh token (30 sn leeway, tekrar kullanımda zincir iptali), client credentials;
-    - issuer `Jwt:Authority`; access token imzalı ve şifresiz JWT. Çekirdek bunu discovery + JWKS ile her sağlayıcı gibi doğruluyor;
-    - anahtarlar Development'ta ephemeral, diğer ortamlarda host sertifika ekliyor, yoksa açılış duruyor.
-  - Eski modülün bütün özellikleri eklentide (D-027, tam parite): sertleştirmeler, audit, kayıt ve onay, TOTP 2FA, `/me`, parola değiştirme, logout-all, admin ve seed.
-  - Giriş sayfası sade HTML (antiforgery handler'da). Sağlayıcı oturumu Identity cookie'si; API'nin varsayılan şeması Bearer kalıyor.
-  - Api host'u eklentiyi kendi authority'si olarak çalıştırıyor. `IdentityServerDbContext` migration'ları Api'de (R-060). `NovaCore.Modules.Identity` silindi.
-  - Çekirdekte token üretimi ve Development simetrik anahtarı kaldırıldı. `Jwt:Authority` her ortamda zorunlu (D-028).
-  - Compose imajları pinlendi, opsiyonel Keycloak overlay'i ve örnek realm eklendi. OpenAPI'de `OAuth2` şeması var, Scalar PKCE ile giriş yapıyor. Tarayıcıda uçtan uca denendi.
-  - Code review'dan 3 güvenlik ve doğruluk düzeltmesi (D-030).
-  - Testler 127 → 172. Kararlar: D-025…D-030. Araştırmalar: R-059…R-067.
+- **Yapılanlar (D-031, R-068…R-070):**
+  - Yazma tarafı (F4a.1): event tamponu jenerik olmayan `Entity` tabanında. `OutboxInterceptor` event'leri entity ile aynı SaveChanges içinde `outbox_messages`'a yazıyor. `AddModuleDbContext` interceptor'ı her modül context'ine kendisi ekliyor, modüller `modelBuilder.AddOutbox()` çağırıyor.
+  - Eski dispatcher (F4a.3): `IDomainEventDispatcher` scoped, handler'lar tipli ve cache'li `DomainEventHandlerInvoker<TEvent>` ile çağrılıyor. `DomainEventDispatcher` internal.
+  - Dağıtım (F4a.2): `OutboxDispatcher` (BackgroundService, `AddCorePersistence`).
+    - Açılışta bir tur, sonra `PeriodicTimer(5 sn, TimeProvider)`.
+    - Mesaj başına bir DI scope; o mesajın handler'ları scope'u paylaşıyor.
+    - Biten handler `outbox_consumers`'a yazılıyor ve yeniden denemede atlanıyor. 10 denemeden sonra mesaj incelemeye bırakılıyor.
+    - Açık transaction yok. Garanti en az bir kez, sıra garantisi yok.
+  - Migration'lar: Catalog ve Payments'ta `Outbox` + `OutboxDispatch`.
+  - Test altyapısı: Api test host'unun context'leri adlandırılmış, paylaşılabilir in-memory SQLite'ta. Catalog ve Payments şeması hazır.
+  - Code review: 15 bulgu. 5'i kod ve 1'i test olmak üzere düzeltildi, bir kısmının belgesi düzeltildi; 5'i "Sonraya bırakılanlar"da; 1'i gereksiz çıktı.
+  - Testler 172 → 190.
 - **Sürprizler:**
-  - OpenIddict `plain` PKCE'yi varsayılan olarak açık tutuyor.
-  - Pipeline'da antiforgery middleware'i yok, `[FromForm]` 500 veriyordu (R-061).
-  - Validation generator internal tipleri atlıyor (R-062).
-  - Çekirdeğin claims transformation'ı OpenIddict'in şemasında da çalışıyor ve izinleri token'a sızdırıyordu (D-029 (3)).
-  - `SignInManager` onaysız hesapta parolaya bakmıyor. Cookie'nin `IssuedUtc`'si her yenilemede kayıyor (R-067).
-  - R-055 yarışı sıklaştı; eklenti testleri `DisableParallelization` koleksiyonunda.
-- **Sonraki fazın (4a) bilmesi gerekenler:**
-  - Faz 4a (outbox) eklentiye dokunmuyor. Modül DbContext'leri ve `DomainEventDispatcher` değişmedi.
-  - Api artık 3 DbContext ile açılıyor: Catalog, Payments ve eklentinin `IdentityServerDbContext`'i. `EnableRetryOnFailure` OpenIddict store'larıyla uyumlu (R-064). Outbox'ın execution strategy uyumu (F4a.2) aynı kalıbı izleyebilir.
-  - Testlerde tüm context'ler SQLite. Eklenti testleri kendi host'unda (`IdentityServerTestHost`).
-- **Bekleyen:** `main` push'u ve önizleme yayını ayrı kullanıcı kararları. "Sonraya bırakılanlar"a 15 yeni madde eklendi (10'u code review'dan).
-- **Sıradaki:** yeni oturumda `/novacore-phase 4a`.
+  - `private protected` taban kurucusu RS0022 verdi, `protected` oldu.
+  - Dispatcher Api host'unda da çalışıyor: health testindeki eksik SQLite dosyasını `ReadWriteCreate` ile oluşturuyordu (`Mode=ReadWrite` ile çözüldü).
+  - `FakeTimeProvider.Advance` periyodik zamanlayıcıyı birden çok tetikliyor, tek advance iki tur çalıştırabiliyor (tests/CLAUDE.md).
+  - Hook dosyasını (`.claude/hooks/package-policy.json`) düzenlemeyi auto-mode sınıflandırıcısı engelledi (aşağıda).
+- **Bekleyen (kullanıcı):**
+  - Kullanıcı DECISIONS (ve diğer korunan plan dosyaları) düzenlenirken onay istenmemesini istedi ("bütün fazlar bitince geri alırız"). Onayı `package-guard.js` hook'u `package-policy.json`'daki `protectedPaths` üzerinden istiyor. Model hook dosyasını değiştiremediği için satırları kullanıcının kendisinin silmesi gerekiyor: `docs/plan/PLAN.md`, `docs/plan/DECISIONS.md`.
+  - Silindikten sonra D-032 olarak kaydedilmeli ve Faz 5 sonunda geri almak için "Sonraya bırakılanlar"a yazılmalı. Bu fazda D-031'den sonra DECISIONS'a yazılmadı.
+  - `main` push'u ve önizleme yayını ayrı kullanıcı kararları.
+- **Sonraki fazın (4b) bilmesi gerekenler:**
+  - F4b.1'deki karar (senkron `ReserveStockAsync` ya da event) için altyapı hazır. Event seçilirse:
+    - modüller arası event yayımlayanın `*.Contracts` projesinde durur (Payments'ın Contracts projesi henüz yok);
+    - handler'lar idempotent yazılır;
+    - her halka en fazla bir tur (5 sn) gecikme ekler.
+  - Modüller henüz `Raise` çağırmıyor.
+  - `outbox_consumers`'ın anahtarını (EventId, Handler) → (mesaj `Id`, Handler) değiştirmek tablo boşken ucuz ("Sonraya bırakılanlar", code review #12).
+  - Api host testlerinde dispatcher gerçek saatle 5 sn'de bir çalışıyor. Event akışını Api host'unda test etmek için `FakeClockApiFactory` + saat ilerletme ya da görünür etkiyi bekleme gerekir (`OutboxDispatcherTests`'teki teknik).
+- **Sıradaki:** yeni oturumda `/novacore-phase 4b`.

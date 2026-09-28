@@ -18,9 +18,9 @@ public static class PersistenceExtensions
 
     /// <summary>
     /// Registers the persistence services every module DbContext relies on: the audit-stamping interceptor, the
-    /// in-process domain-event dispatcher and the startup migrations, which run only when
-    /// <c>Database:ApplyMigrations</c> is true. Call it before registering the modules, so the migrations run before any
-    /// module's own hosted services.
+    /// in-process domain-event dispatcher, the startup migrations, which run only when <c>Database:ApplyMigrations</c> is
+    /// true, and the outbox dispatcher, a background service that delivers the events in every module's outbox to their
+    /// handlers. Call it before registering the modules, so the migrations run before any module's own hosted services.
     /// </summary>
     /// <param name="builder">The host application builder.</param>
     /// <returns><paramref name="builder"/>, for chaining.</returns>
@@ -32,8 +32,9 @@ public static class PersistenceExtensions
         services.TryAddScoped<AuditableEntityInterceptor>();
         services.TryAddSingleton(TimeProvider.System);
 
-        // In-process domain-event dispatch — no commercial mediator required.
-        services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
+        // In-process domain-event dispatch, in the caller's scope: handlers are usually scoped (they use a DbContext).
+        services.TryAddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+        services.TryAddSingleton<DomainEventHandlerInvokers>();
 
         // Opt-in: apply every module's EF Core migrations on startup. Off by default so test hosts and DB-less runs
         // never block. Enable with Database:ApplyMigrations=true once SQL Server is reachable. The service is always
@@ -43,6 +44,9 @@ public static class PersistenceExtensions
             .ValidateOnStart();
         services.AddHostedService<DatabaseMigrationService>();
 
+        // Delivers the events in the module outboxes. Registered after the migrations, so it starts after them.
+        services.AddHostedService<OutboxDispatcher>();
+
         return builder;
     }
 
@@ -50,6 +54,9 @@ public static class PersistenceExtensions
     /// Registers a module's DbContext, advertises it for generic startup migration and adds a health check (named after
     /// the context and tagged <c>ready</c>) that reports whether its database can be reached.
     /// Each module keeps its own context (and its own schema) — the modular-monolith boundary at the DB level.
+    /// The context always gets <see cref="OutboxInterceptor"/>, which writes the domain events its entities raise to its
+    /// outbox; the module maps that with <see cref="OutboxModelBuilderExtensions.AddOutbox"/>. The dispatcher that
+    /// delivers them comes from <see cref="AddCorePersistence"/>: without it, events are written and never delivered.
     /// Also registers <see cref="AuditableEntityInterceptor"/> (and the <see cref="TimeProvider"/> it stamps with), which
     /// module contexts add to their options, so the context resolves whether or not the host has called
     /// <see cref="AddCorePersistence"/> yet.
@@ -63,8 +70,15 @@ public static class PersistenceExtensions
         Action<IServiceProvider, DbContextOptionsBuilder> configure)
         where TContext : DbContext
     {
-        services.AddDbContext<TContext>(configure);
+        // The outbox interceptor is added here rather than by each module: a module that forgot it would lose its events
+        // without an error.
+        services.AddDbContext<TContext>((provider, options) =>
+        {
+            configure(provider, options);
+            options.AddInterceptors(provider.GetRequiredService<OutboxInterceptor>());
+        });
         services.AddSingleton(new ModuleDbContextDescriptor(typeof(TContext)));
+        services.TryAddSingleton<OutboxInterceptor>();
         services.TryAddScoped<AuditableEntityInterceptor>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddHealthChecks().AddDbContextCheck<TContext>(tags: [ReadyTag]);

@@ -24,8 +24,9 @@ Use `Catalog` as the reference implementation (full CRUD + contracts); `Payments
 - **`Domain/`** — entities derive from `AuditableEntity<Guid>` (Guid v7 keys — friendly to SQL Server
   clustering). Keep setters private; mutate through methods.
 - **`Infrastructure/`** — `<M>DbContext` (`public const string Schema`, `HasDefaultSchema(Schema)`,
-  `ApplyConfigurationsFromAssembly`), `IEntityTypeConfiguration<>` per entity, and a
-  `IDesignTimeDbContextFactory<>` (so `dotnet ef` works offline with the module as `-p` and `-s`).
+  `ApplyConfigurationsFromAssembly`, `modelBuilder.AddOutbox()`), `IEntityTypeConfiguration<>` per entity (each
+  ignores `DomainEvents`), and a `IDesignTimeDbContextFactory<>` (so `dotnet ef` works offline with the module as `-p`
+  and `-s`).
 - **`Contracts/`** — for a module others consume, expose a **separate `*.Contracts` project**
   (interfaces + DTOs only). Consumers reference the Contracts project, **never** the module.
 - **`Authorization/`** — `<M>Permissions` constants (`module:resource:action`) + an
@@ -37,6 +38,16 @@ Use `Catalog` as the reference implementation (full CRUD + contracts); `Payments
 - **DbContext registration:** `services.AddModuleDbContext<<M>DbContext>((sp, o) => { o.UseSqlServer(cfg
   .GetConnectionString("Database"), sql => { sql.MigrationsHistoryTable("__EFMigrationsHistory", Schema);
   sql.EnableRetryOnFailure(); }); o.AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>()); });`
+  `AddModuleDbContext` adds the `OutboxInterceptor` itself; the context maps the table with `modelBuilder.AddOutbox()`.
+- **Domain events:** an entity records one with `Raise(new SomethingHappened(...))` (a record deriving from
+  `DomainEvent`). Saving the entity writes the event to the module's `outbox_messages` table in the same transaction.
+  `ModuleRegistrationTests` checks that every module context maps the outbox.
+  - The outbox dispatcher delivers it. Register a handler explicitly in `AddModule`:
+    `services.AddScoped<IDomainEventHandler<SomethingHappened>, DoSomething>()`.
+  - Each handler runs **at least once**, so make it idempotent. The handlers of one event share a DI scope (and its
+    DbContext instances), as in a request, so each saves what it changes.
+  - An event another module handles lives in the publisher's `*.Contracts` project, because modules reference each
+    other only through Contracts.
 - **Guard every endpoint** with `.RequirePermission(<M>Permissions.X)` (or `.RequireAuthorization()` only
   when no finer permission applies).
 - **Validate write DTOs with DataAnnotations** on the request record (`[Required, MaxLength(200)] string Name`).

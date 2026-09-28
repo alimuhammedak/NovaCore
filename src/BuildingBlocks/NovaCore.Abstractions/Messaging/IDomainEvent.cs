@@ -17,7 +17,7 @@ public interface IDomainEvent
 
 /// <summary>
 /// Base for domain events: <see cref="EventId"/> and <see cref="OccurredOnUtc"/> are captured once, when the
-/// event is created, so every reader (handlers, logs, a future outbox) sees the same values.
+/// event is created, so every reader (handlers, logs, the outbox) sees the same values.
 /// </summary>
 public abstract record DomainEvent : IDomainEvent
 {
@@ -30,7 +30,12 @@ public abstract record DomainEvent : IDomainEvent
     public DateTimeOffset OccurredOnUtc { get; init; } = DateTimeOffset.UtcNow;
 }
 
-/// <summary>Handles a specific <see cref="IDomainEvent"/>. Resolved and invoked by the dispatcher.</summary>
+/// <summary>
+/// Handles a specific <see cref="IDomainEvent"/>. Register it in DI, usually scoped. The outbox dispatcher runs it for
+/// every saved event of its type, at least once: after a failure, or if the process stops before its success is
+/// recorded, it runs again, so make it idempotent. The handlers of one event share a DI scope, as the handlers of one
+/// request would: save what you change.
+/// </summary>
 /// <typeparam name="TEvent">The event type this handler reacts to.</typeparam>
 [SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix",
     Justification = "'Domain event handler' is the established domain term, and this is an interface, not an event-handler delegate (docs/plan/DECISIONS.md D-011, R-034).")]
@@ -43,10 +48,14 @@ public interface IDomainEventHandler<in TEvent>
     Task HandleAsync(TEvent domainEvent, CancellationToken cancellationToken = default);
 }
 
-/// <summary>Publishes domain events to every registered handler. The single seam for in-process eventing.</summary>
+/// <summary>
+/// Runs the handlers of domain events now, in the caller's DI scope, so they share its scoped services. Not durable: the
+/// events are gone if a handler or the process fails. The events an entity raises don't need it: saving the entity writes
+/// them to its module's outbox, and the outbox dispatcher delivers them from there.
+/// </summary>
 public interface IDomainEventDispatcher
 {
-    /// <summary>Invokes every registered <see cref="IDomainEventHandler{TEvent}"/> for each event.</summary>
+    /// <summary>Invokes every registered <see cref="IDomainEventHandler{TEvent}"/> for each event, one after another.</summary>
     /// <param name="domainEvents">The events to publish.</param>
     /// <param name="cancellationToken">Cancels the dispatch.</param>
     Task DispatchAsync(IEnumerable<IDomainEvent> domainEvents, CancellationToken cancellationToken = default);

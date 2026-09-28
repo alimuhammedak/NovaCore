@@ -10,7 +10,8 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 **Core** (BCL and Microsoft packages only, D-003; enforced by `PackageDependencyTests`):
 
 - **`NovaCore.Abstractions`** — BCL only. **No `FrameworkReference`, no NuGet, no ASP.NET, no EF.**
-  Home of `Result`/`Result<T>`/`Error`, `PagedList<T>`/`PaginationRequest`, `Entity`/`AuditableEntity`,
+  Home of `Result`/`Result<T>`/`Error`, `PagedList<T>`/`PaginationRequest`, `Entity<TId>`/`AuditableEntity<TId>`
+  (their domain-event buffer lives on the non-generic `Entity` base, so persistence reads it without the key type),
   `IDomainEvent` (events derive from the `DomainEvent` record, which fixes `EventId`/`OccurredOnUtc` at
   creation), `ICurrentUser`. If a new type needs a framework, it does **not** belong here.
 
@@ -23,9 +24,19 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   Abstractions + `FrameworkReference Microsoft.AspNetCore.App`, never on EntityFrameworkCore.
 
 - **`NovaCore.EntityFrameworkCore`** — persistence without ASP.NET Core: `AddModuleDbContext` (also a "ready"-tagged
-  `AddDbContextCheck` per context), `AddCorePersistence` (`AuditableEntityInterceptor`, `DomainEventDispatcher`,
-  `DatabaseMigrationService`, which migrates only when `Database:ApplyMigrations` is true). Depends on Abstractions,
+  `AddDbContextCheck` per context, and the `OutboxInterceptor` on every module context), `AddOutbox()` (maps a module's
+  `outbox_messages`), `AddCorePersistence` (`AuditableEntityInterceptor`, a scoped `IDomainEventDispatcher` that runs
+  handlers in the caller's scope, `DatabaseMigrationService`, which migrates only when `Database:ApplyMigrations` is
+  true). Handlers of an event type are resolved and invoked through a `DomainEventHandlerInvoker<TEvent>` built once per
+  type, so dispatching costs no reflection. Depends on Abstractions,
   EF Core and `Microsoft.Extensions` hosting/options/health-check packages only, never on AspNetCore (D-020).
+  `OutboxInterceptor` adds the outbox rows in `SavingChanges`, which EF Core runs before it detects changes and saves,
+  so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068).
+  `AddCorePersistence` also registers `OutboxDispatcher` (a `BackgroundService`): a pass at startup, then every 5 seconds
+  on a `PeriodicTimer` driven by `TimeProvider`. It reads each outbox in `Id` order in keyset batches, gives each message
+  a DI scope for its handlers and records the finished handlers in `outbox_consumers`. It opens no transaction, so every
+  query and write is a retriable unit of the context's execution strategy. The interval, batch size and 10 attempts are
+  constants: no consumer needs them configurable yet (Y-19).
 
 **Add-ons** (optional, one third-party library each; they may reference AspNetCore/Abstractions only):
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`), `NovaCore.Scalar`

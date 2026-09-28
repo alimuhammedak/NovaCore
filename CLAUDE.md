@@ -120,6 +120,13 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
   generic startup migration (`DatabaseMigrationService`, registered by `AddCorePersistence`; it migrates only when
   `Database:ApplyMigrations` is true).
 
+- **Domain events go through a transactional outbox.** An entity `Raise`s a `DomainEvent` record; the save that saves
+  the entity writes it to the module's `outbox_messages` in the same transaction (`OutboxInterceptor`, added by
+  `AddModuleDbContext`; the context calls `modelBuilder.AddOutbox()`). `OutboxDispatcher`, a `BackgroundService` from
+  `AddCorePersistence`, delivers the events to their `IDomainEventHandler<T>`s: each message in its own DI scope, each
+  handler once (`outbox_consumers` records the finished ones), retried on later passes, left for inspection after 10
+  failures. Delivery is at least once, so handlers must be idempotent; one dispatcher per database (D-031, R-068).
+
 - **Security** is a first-class subsystem. The core only *validates* access tokens (D-002): JWT bearer against an
   OpenID Connect provider, `Jwt:Authority` (issuer + JWKS discovered, asymmetric algorithms only), required in every
   environment (D-028). Permission-based authorization lives in
