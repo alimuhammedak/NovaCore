@@ -94,6 +94,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   No transaction of its own: it works under `EnableRetryOnFailure`. Delivery is at least once and handlers must be
   idempotent. One dispatcher per database is assumed. Migration `OutboxDispatch` adds `Attempts`, `Error` and
   `ProcessedOnUtc` to `outbox_messages`, and the `outbox_consumers` table.
+- Stock reservation, Payments side (sample modules, D-034): a payment is saved pending together with its
+  `PaymentCreated` event, in the new `NovaCore.Modules.Payments.Contracts` project that other modules reference instead
+  of the Payments module. The Catalog module's answer settles it: `StockReserved` completes it, `StockReservationFailed`
+  fails it (both in `NovaCore.Modules.Catalog.Contracts`). A payment settles once; the same answer again changes
+  nothing, and the other answer is refused.
 
 ### Changed
 
@@ -217,6 +222,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `FluentValidation` and `FluentValidation.DependencyInjectionExtensions` packages: they are gone from central
   package management and from the package-policy allowlist, since nothing uses them after the move to built-in
   validation.
+- `Payment.Refund()` and `PaymentStatus.Refunded` (Payments sample module): nothing called them.
 
 ### Security
 

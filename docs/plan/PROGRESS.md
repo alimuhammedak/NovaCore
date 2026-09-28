@@ -702,11 +702,16 @@ Plan onayı 2026-09-28. Uygulama sırası F4a.1 → F4a.3 → F4a.2 (ID'ler sabi
 ### Faz 4b
 Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-034). F4b.2 üç alt adıma bölündü (D-035 (8)).
 
-- [x] F4b.1 (commit: bir sonraki satırda): Stok kararı.
+- [x] F4b.1 (cf51371): Stok kararı.
   - Kullanıcı event akışını seçti (Q-30 → D-034). Diğer iki seçenek: senkron contract, senkron rezervasyon + event'le ödeme kaydı.
   - Uygulama kararları D-035'te, kaynaklar R-075'te. Kod değişmedi.
-- [ ] F4b.2a Payments tarafı: ödeme `PaymentCreated` yayımlar, cevapla sonuçlanır (sıradaki)
-- [ ] F4b.2b Catalog tarafı: stoğu ayırır ve cevap verir
+- [x] F4b.2a (commit: bir sonraki satırda): Payments tarafı.
+  - Yeni `NovaCore.Modules.Payments.Contracts` projesi (`PaymentCreated`), yalnızca `NovaCore.Abstractions`'a bağlı; slnx'e eklendi. `Catalog.Contracts`'a `StockReserved` ve `StockReservationFailed` eklendi, o da artık `NovaCore.Abstractions`'a bağlı.
+  - `Payment` kurucusu `PaymentCreated`'ı raise ediyor. `Complete()`/`Fail()` yalnızca Pending'den çalışıyor, aynı sonuç tekrar gelirse değişiklik yok, diğer geçişler `InvalidOperationException`. `Refund()` ve `PaymentStatus.Refunded` silindi (şema değişmedi, durum string kolon).
+  - `SettlePayment` (internal) iki handler taşıyor; `PaymentsModule` onları açıkça kaydediyor. Bilinmeyen ödeme `InvalidOperationException`.
+  - Bu adımdan sonra `PaymentCreated`'ın handler'ı yok: dispatcher onu işlenmiş sayıyor, ödeme Pending kalıyor (F4b.2b'ye kadar bugünkü davranış).
+  - Testler 190 → 200: `PaymentTests` (5) ve `PaymentSettlementTests` (5). Önce kırmızı: tipler olmadığı için derleme hatası.
+- [ ] F4b.2b Catalog tarafı: stoğu ayırır ve cevap verir (sıradaki)
 - [ ] F4b.2c Stok eşzamanlılık belirteci
 - [ ] F4b.3 Eşzamanlılık testi
 - [ ] F5.3 Test borcu (Faz 5'ten taşındı, D-033)

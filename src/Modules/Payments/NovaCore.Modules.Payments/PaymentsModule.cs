@@ -4,9 +4,11 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NovaCore.Abstractions.Messaging;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Modules;
 using NovaCore.EntityFrameworkCore.Persistence;
+using NovaCore.Modules.Catalog.Contracts;
 using NovaCore.Modules.Payments.Authorization;
 using NovaCore.Modules.Payments.Features;
 using NovaCore.Modules.Payments.Infrastructure;
@@ -37,6 +39,10 @@ public sealed class PaymentsModule : IModule
         });
 
         services.AddPermissionDefinitions<PaymentsPermissionProvider>();
+
+        // Settles a payment when the Catalog module answers its PaymentCreated; the outbox delivers the answer.
+        services.AddScoped<IDomainEventHandler<StockReserved>, SettlePayment.WhenStockReserved>();
+        services.AddScoped<IDomainEventHandler<StockReservationFailed>, SettlePayment.WhenStockReservationFailed>();
 
         // Built-in validation: generated per assembly, so each module calls it itself (docs/plan/RESEARCH.md R-052).
         services.AddValidation();
