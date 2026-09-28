@@ -832,6 +832,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4a, code review #5) Başarısız bir tur her tick'te (5 sn) modül başına Error logluyor ve geri çekilmiyor. Örnek: migration uygulanmamış bir geliştirme veritabanında dakikada 24 hata logu. Context başına artan bekleme ya da seri başına tek log düşünülebilir.
 - (Faz 4a, code review #8) Generic bir event'in saklanan tip adı, tip argümanlarının sürümlü assembly-qualified adlarını taşıyor. Sürümü düşüren bir dağıtımdan sonra `Type.GetType` bağlanamayabilir. Çok uzun bir ad 512 karakteri geçerse iş kaydının kendisi SQL Server'da düşer. Belgelendi; sürümsüz ad üretmek `TypeName` ile ayrıştırma gerektirir.
 - (Faz 4a, code review #9) Modül outbox'ları bir turda sırayla işleniyor. Erişilemeyen bir modül veritabanı (`EnableRetryOnFailure` geri çekilmesiyle) diğer modüllerin teslimini dakikalarca bekletebilir. Modüller aynı SQL Server'ı kullandığı sürece etkisi yok.
+- (Faz 4a → **Faz 5 sonu, unutulmamalı**) D-032: `docs/plan/DECISIONS.md` `.claude/hooks/package-policy.json` `protectedPaths` listesinden kullanıcı tarafından geçici olarak çıkarıldı. Bütün fazlar bitince satır geri eklenir (hook dosyası olduğu için kullanıcı ekler ya da onaylar); DECISIONS başlığındaki "hook onay ister" notu o zaman yeniden geçerli olur.
 - (Faz 4a, code review #12) `outbox_consumers`'ın clustered anahtarı (uniqueidentifier, nvarchar(256)) geniş ve SQL Server sırasında rastgele. Outbox tablosu için R-068'de kullanılan gerekçenin aynısı geçerli. Mesaj satırının `bigint Id`'si + Handler (FK ve cascade delete ile, temizlik için de uygun) daha iyi olur. D-031 (5)'i değiştirir; tablo boşken, ilk kullanımdan önce yapmak ucuz.
 
 ## Son devir notu
@@ -858,8 +859,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - `FakeTimeProvider.Advance` periyodik zamanlayıcıyı birden çok tetikliyor, tek advance iki tur çalıştırabiliyor (tests/CLAUDE.md).
   - Hook dosyasını (`.claude/hooks/package-policy.json`) düzenlemeyi auto-mode sınıflandırıcısı engelledi (aşağıda).
 - **Bekleyen (kullanıcı):**
-  - Kullanıcı DECISIONS (ve diğer korunan plan dosyaları) düzenlenirken onay istenmemesini istedi ("bütün fazlar bitince geri alırız"). Onayı `package-guard.js` hook'u `package-policy.json`'daki `protectedPaths` üzerinden istiyor. Model hook dosyasını değiştiremediği için satırları kullanıcının kendisinin silmesi gerekiyor: `docs/plan/PLAN.md`, `docs/plan/DECISIONS.md`.
-  - Silindikten sonra D-032 olarak kaydedilmeli ve Faz 5 sonunda geri almak için "Sonraya bırakılanlar"a yazılmalı. Bu fazda D-031'den sonra DECISIONS'a yazılmadı.
+  - DECISIONS düzenlemesi artık onay istemiyor. Kullanıcı `docs/plan/DECISIONS.md`'yi hook'un `protectedPaths` listesinden kendisi çıkardı; model hook dosyasını değiştiremiyor. Karar D-032'de, Faz 5 sonunda geri eklenecek ("Sonraya bırakılanlar").
   - `main` push'u ve önizleme yayını ayrı kullanıcı kararları.
 - **Sonraki fazın (4b) bilmesi gerekenler:**
   - F4b.1'deki karar (senkron `ReserveStockAsync` ya da event) için altyapı hazır. Event seçilirse:

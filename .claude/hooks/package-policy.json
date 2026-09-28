@@ -25,7 +25,6 @@
   ],
   "protectedPaths": [
     "docs/plan/PLAN.md",
-    "docs/plan/DECISIONS.md",
     ".claude/settings.json",
     ".claude/hooks/"
   ]
