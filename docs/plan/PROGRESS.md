@@ -16,6 +16,8 @@
 | 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4b | ⏳ başlamadı | | | | |
+| 4c | ⏳ başlamadı | | | | |
+| 4d | ⏳ başlamadı (koşullu, F4d.1) | | | | |
 | 5 | ⏳ başlamadı | | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
@@ -701,12 +703,29 @@ Plan onayı 2026-09-28. Uygulama sırası F4a.1 → F4a.3 → F4a.2 (ID'ler sabi
 - [ ] F4b.1 Stok kararı
 - [ ] F4b.2 Uygulama
 - [ ] F4b.3 Eşzamanlılık testi
+- [ ] F5.3 Test borcu (Faz 5'ten taşındı, D-033)
+
+### Faz 4c
+- [ ] F4c.1 Güvenli varsayılanlar (FallbackPolicy, CORS)
+- [ ] F4c.2 Super-admin sunucu tarafında
+- [ ] F4c.3 Forwarded headers
+- [ ] F4c.4 Projenin hata eşlemesi
+- [ ] F4c.5 Tipli yanıt sözleşmesi
+- [ ] F4c.6 Data Protection anahtar deposu koruması
+- [ ] F4c.7 Outbox şeması ve bakımı
+
+### Faz 4d (koşullu)
+- [ ] F4d.1 IdP modeli kararı
+- [ ] F4d.2 Parola sıfırlama ve onay e-postasını yeniden gönderme
+- [ ] F4d.3 Kurtarma koduyla giriş
+- [ ] F4d.4 Güvenlik düzeltmeleri
+- [ ] F4d.5 Token temizliği
 
 ### Faz 5
-- [ ] F5.1 Template
+- [ ] F5.1 Template package
 - [ ] F5.2 Tüketici smoke testi
-- [ ] F5.3 Test borcu
-- [ ] F5.4 1.0.0 kararı
+- [~] F5.3 → Faz 4b'ye taşındı (D-033)
+- [ ] F5.4 Yayın kararı
 - [ ] F5.5 Final dokümanlar
 
 ## Açık sorular (Q)
@@ -748,6 +767,27 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 ## Sonraya bırakılanlar
 
 Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konular. Her faz sonunda kullanıcı bunları gözden geçirir.
+
+**D-033 ile plana alınanlar (2026-09-28).** Aşağıdaki maddeler artık bir adıma bağlı. O adım bitince madde üstü çizilir.
+- Forwarded headers yok (Faz 0) ve proxy arkasında cookie'lerin `Secure` bayrağı (Faz 3b) → F4c.3.
+- Y-31 testinin `IResult` kör noktası (Faz 0, F0.7) → F4c.5.
+- `BadHttpRequestException`'ın 500 dönmesi (Faz 2b) → F4c.4.
+- Super-admin bypass'ının token rolüne dayanması (Faz 3a) → F4c.2.
+- `outbox_consumers` anahtarı (Faz 4a, #12) ve işlenmiş mesajların hiç silinmemesi (Faz 4a) → F4c.7.
+- Parola sıfırlama, onay e-postasını yeniden gönderme, `User` rolü yokken kayıtta 500 (Faz 3b) → F4d.2.
+- Kurtarma kodları (Faz 3b) → F4d.3.
+- Logout CSRF, giriş zamanlama farkı, `change-password` lockout'u (Faz 3b) → F4d.4.
+- OpenIddict kayıtlarının temizlenmemesi (Faz 3b) → F4d.5.
+- Template'in paket kimliğini taşıması (Faz 1, F5.1) → F5.1.
+- Catalog/Payments uçtan uca testleri (Faz 2c) → F5.3 (4b'de).
+
+**D-033 ile bilerek plana alınmayanlar.** Bugün bir tüketicileri yok (Y-14). Madde, yanındaki koşul gerçekleşince plana alınır:
+- `UseCoreWeb`'e kimlik doğrulama ile yetkilendirme arasında bir middleware yeri. *Koşul:* bir proje yetkilendirmeden önce kimliğe bağlı bir middleware'e (ör. tenant çözümü) ihtiyaç duyar. Bugün proje kendi middleware'ini `UseCoreWeb`'den sonra ekleyebiliyor.
+- İzin önbelleğinin anahtarına `iss` ya da ek bir bölümleme. *Koşul:* ikinci bir issuer'a güvenilir, ya da izinler kullanıcıdan başka bir şeye (ör. tenant) göre değişir. Bu yapılmadan önce iki issuer'dan gelen aynı `sub` başka bir kullanıcının izinlerini alabilir (Faz 3a maddesi).
+- Request timeouts middleware'i (R-073). *Koşul:* uzun süren bir uç ya da bir OWASP API4 bulgusu.
+- Outbox'ın birden çok örnekte çalışması (kilit/lease) ve mesajda trace bağlamı. *Koşul:* proje yatayda ölçeklenir, ya da event zincirlerini trace'te izlemek gerekir.
+- `ApplicationUser` genişletme ve token'a claim ekleme kancası. *Koşul:* bir proje kullanıcıya bağlı ek bir claim ister.
+- BFF paketi ya da şablonu (R-073). *Koşul:* iki proje tarayıcı frontend'i için aynı BFF'e ihtiyaç duyar. O güne kadar README önerisi (F5.5) yeterli.
 
 - xUnit v3 → 4.x ve xunit.runner.visualstudio 4.x major güncellemesi (F0.2 kapsamı dışında). Kaynak: `dotnet list package --outdated`, 2026-09-24.
 - (Faz 0, Q-09) `Microsoft.Extensions.Caching.Hybrid` ve `Microsoft.Extensions.Http.Resilience` 10.0.0 → 10.10.0, `Microsoft.NET.Test.Sdk` 18.6.0 → 18.10.1. Açıkları yok. Hybrid için F2c.3, Resilience için F2a.2 (eklenti paketi) uygun yer olabilir.
@@ -839,34 +879,27 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-28, Faz 4a bitti** (`faz/4a-outbox`, 5 commit) ve kullanıcı onayıyla main'e merge edildi (`--no-ff`). `main`, kullanıcı isteğiyle GitHub'a push'landı (3b ve 4a'nın 27 commit'i, yalnızca `main`; 2c ve 3a 2026-09-27'de push'lanmıştı; faz branch'leri yerelde, hepsi merge edilmiş). Push'ta CI koşusu 36385969576 başladı, sonucu bu oturumda izlenmedi.
+**2026-09-28, faz dışı oturum: tüketici hazırlığı araştırması ve plan düzenlemesi (D-033).** Kod değişmedi. Faz 4a'nın bitişi ve merge'ü önceki nottaki gibi (`main` GitHub'a push'landı, CI koşusu 36385969576'nın sonucu izlenmedi).
 
-- **Yapılanlar (D-031, R-068…R-070):**
-  - Yazma tarafı (F4a.1): event tamponu jenerik olmayan `Entity` tabanında. `OutboxInterceptor` event'leri entity ile aynı SaveChanges içinde `outbox_messages`'a yazıyor. `AddModuleDbContext` interceptor'ı her modül context'ine kendisi ekliyor, modüller `modelBuilder.AddOutbox()` çağırıyor.
-  - Eski dispatcher (F4a.3): `IDomainEventDispatcher` scoped, handler'lar tipli ve cache'li `DomainEventHandlerInvoker<TEvent>` ile çağrılıyor. `DomainEventDispatcher` internal.
-  - Dağıtım (F4a.2): `OutboxDispatcher` (BackgroundService, `AddCorePersistence`).
-    - Açılışta bir tur, sonra `PeriodicTimer(5 sn, TimeProvider)`.
-    - Mesaj başına bir DI scope; o mesajın handler'ları scope'u paylaşıyor.
-    - Biten handler `outbox_consumers`'a yazılıyor ve yeniden denemede atlanıyor. 10 denemeden sonra mesaj incelemeye bırakılıyor.
-    - Açık transaction yok. Garanti en az bir kez, sıra garantisi yok.
-  - Migration'lar: Catalog ve Payments'ta `Outbox` + `OutboxDispatch`.
-  - Test altyapısı: Api test host'unun context'leri adlandırılmış, paylaşılabilir in-memory SQLite'ta. Catalog ve Payments şeması hazır.
-  - Code review: 15 bulgu. 5'i kod ve 1'i test olmak üzere düzeltildi, bir kısmının belgesi düzeltildi; 5'i "Sonraya bırakılanlar"da; 1'i gereksiz çıktı.
-  - Testler 172 → 190.
-- **Sürprizler:**
-  - `private protected` taban kurucusu RS0022 verdi, `protected` oldu.
-  - Dispatcher Api host'unda da çalışıyor: health testindeki eksik SQLite dosyasını `ReadWriteCreate` ile oluşturuyordu (`Mode=ReadWrite` ile çözüldü).
-  - `FakeTimeProvider.Advance` periyodik zamanlayıcıyı birden çok tetikliyor, tek advance iki tur çalıştırabiliyor (tests/CLAUDE.md).
-  - Hook dosyasını (`.claude/hooks/package-policy.json`) düzenlemeyi auto-mode sınıflandırıcısı engelledi (aşağıda).
-- **Bekleyen (kullanıcı):**
-  - DECISIONS düzenlemesi artık onay istemiyor. Kullanıcı `docs/plan/DECISIONS.md`'yi hook'un `protectedPaths` listesinden kendisi çıkardı; model hook dosyasını değiştiremiyor. Karar D-032'de, Faz 5 sonunda geri eklenecek ("Sonraya bırakılanlar").
-  - Önizleme yayını (tag, paket) ayrı bir kullanıcı kararı. CI koşusu 36385969576'nın sonucu 4b başında kontrol edilmeli.
-- **Sonraki fazın (4b) bilmesi gerekenler:**
-  - F4b.1'deki karar (senkron `ReserveStockAsync` ya da event) için altyapı hazır. Event seçilirse:
-    - modüller arası event yayımlayanın `*.Contracts` projesinde durur (Payments'ın Contracts projesi henüz yok);
+- **Yapılanlar:**
+  - Araştırma: "NovaCore'u sıfırdan açılan projelerin altyapısı yapmak için ne eksik, ne fazla, sorumluluk nasıl bölünür?" Sonuç [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md)'de, kaynaklar R-071…R-074'te.
+  - Plan kullanıcı isteğiyle yeniden düzenlendi (D-033):
+    - 4b daraltıldı. Id bazlı eşitlik ve genel `Product` invariant'ları çıktı, F5.3 4b'ye geldi.
+    - Yeni Faz 4c: güvenli varsayılanlar, super-admin, forwarded headers, hata eşlemesi, tipli sonuçlar, Data Protection, outbox bakımı.
+    - Yeni koşullu Faz 4d: kimlik eklentisinin üretim eksikleri.
+    - Faz 5 template package, smoke test ve yayın kararına odaklandı; 1.0 ilk gerçek projeden sonraya bırakıldı.
+  - "Sonraya bırakılanlar"ın başına iki blok eklendi: plana alınan maddeler ve bilerek alınmayanlar (tetik koşuluyla).
+  - `.claude/skills/novacore-phase/SKILL.md` faz sırasını artık PLAN'dan okuyor.
+- **Bekleyen (kullanıcı):** F4b.1 (stok rezervasyonu: senkron contract ya da event), F4d.1 (IdP modeli), F5.4 (yayın kanalı ve ilk sürüm). Hepsi kendi fazının başında sorulur.
+- **Sonraki fazın (4b) bilmesi gerekenler** (4a'dan devralınan):
+  - F4b.1'deki iki seçenek için de altyapı hazır. Event seçilirse:
+    - modüller arası event'i yayımlayan modülün `*.Contracts` projesinde durur (Payments'ın Contracts projesi henüz yok);
     - handler'lar idempotent yazılır;
     - her halka en fazla bir tur (5 sn) gecikme ekler.
+    - Y-18'e dikkat: eventual consistency yalnızca gerçekten gereken yerde kullanılır.
   - Modüller henüz `Raise` çağırmıyor.
-  - `outbox_consumers`'ın anahtarını (EventId, Handler) → (mesaj `Id`, Handler) değiştirmek tablo boşken ucuz ("Sonraya bırakılanlar", code review #12).
-  - Api host testlerinde dispatcher gerçek saatle 5 sn'de bir çalışıyor. Event akışını Api host'unda test etmek için `FakeClockApiFactory` + saat ilerletme ya da görünür etkiyi bekleme gerekir (`OutboxDispatcherTests`'teki teknik).
+  - `Payment.Complete/Fail/Refund` hiçbir yerde çağrılmıyor (F4b.2 kullanılmayanları siler).
+  - Api host testlerinde dispatcher gerçek saatle 5 sn'de bir çalışıyor. Event akışını orada test etmek için `FakeClockApiFactory` + saat ilerletme ya da görünür etkiyi bekleme gerekir (`OutboxDispatcherTests`'teki teknik).
+  - `outbox_consumers` anahtar değişikliği artık F4c.7'de. 4b yalnızca test verisi üretir, yani sıralama bir maliyet getirmez.
+  - 4b'nin başında CI koşusu 36385969576'nın sonucu kontrol edilmeli.
 - **Sıradaki:** yeni oturumda `/novacore-phase 4b`.

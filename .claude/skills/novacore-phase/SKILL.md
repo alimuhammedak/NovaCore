@@ -36,7 +36,7 @@ Sırayla ve eksiksiz oku:
 Ardından şunları kontrol et. Biri başarısızsa **dur ve kullanıcıya bildir**, çözüm üretmeye başlama:
 
 - **Argüman:** `$ARGUMENTS` boşsa PROGRESS'teki sıradaki fazı öner ve sor.
-- **Bağımlılık:** Önceki fazların hepsi `✅ tamam` mı? (Sıra: 0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 5)
+- **Bağımlılık:** Önceki fazların hepsi `✅ tamam` mı? Sıra PLAN.md'deki "Faz sırası ve bağımlılıklar" bölümündedir, buraya kopyalanmaz. Koşullu bir faz atlandıysa `✅ tamam (atlandı)` sayılır.
 - **Açık sorular:** Bu fazın ihtiyaç duyduğu Q-kayıtları cevaplanmış mı? Cevaplanmamışsa `AskUserQuestion` ile şimdi sor.
 - **Çalışma ağacı:** Temiz mi? Değilse neyin değiştiğini göster ve ne yapılacağını sor.
 - **Devam eden faz:** Faz `🔄 devam ediyor` veya `⏸ duraklatıldı` durumundaysa bu bir devamdır. Son devir notunu ve işaretlenmemiş ilk adımı esas al, tamamlanmış adımları tekrar yapma.

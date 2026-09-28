@@ -19,9 +19,9 @@
 ## Faz sırası ve bağımlılıklar
 
 ```
-0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 5
+0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 4c → 4d → 5
 ```
-Bir faza başlamadan önce kendisinden önceki tüm fazlar PROGRESS.md'de "tamam" olarak işaretlenmiş olmalıdır.
+Bir faza başlamadan önce kendisinden önceki tüm fazlar PROGRESS.md'de "tamam" olarak işaretlenmiş olmalıdır. 4d koşulludur: F4d.1'deki karar fazı gereksiz kılarsa faz `✅ tamam (atlandı)` olarak işaretlenir. 4c ve 4d, 2026-09-28'de tüketici hazırlığı araştırmasıyla eklendi (D-033, [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md)).
 
 ---
 
@@ -144,22 +144,83 @@ git log --oneline
 | F4a.2 | **Dispatcher.** `OutboxDispatcher : BackgroundService` scope başına çalışır. `EventId` ile idempotent (processed tablosu), retry yapar ve execution strategy ile uyumludur. | aynı | Test: bir mesaj yalnızca bir kez işlenir |
 | F4a.3 | **Eski dispatcher düzeltmesi.** Singleton dispatcher'ın scope sorunu giderilir. Reflection çağrısı cache'lenmiş generic wrapper'a çevrilir. | Messaging | Scoped handler ile test |
 
-## Faz 4b: Örnek modüller (referans implementasyon)
+## Faz 4b: Referans modüller (doğruluk ve event akışı)
+
+**Amaç:** Catalog ve Payments, NovaCore'un repo içindeki referans uygulaması ve paketlerin gerçek kullanım testidir. Bu faz iki açığı kapatır:
+- Ödeme stoğu kontrol ediyor ama düşmüyor, yani sınırsız satış mümkün (ANALYSIS P1-5).
+- 4a'nın outbox'ını hiçbir modül kullanmıyor.
+
+Şablon (F5.1) bu modülleri kopyalamaz (D-033).
 
 | ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
 |---|---|---|---|
 | F4b.1 | **Karar (kullanıcı).** Stok rezervasyonu senkron bir contract (`ReserveStockAsync`) ile mi yapılacak, event ile mi? Karar DECISIONS'a yazılır. | — | D-kaydı |
-| F4b.2 | **Uygulama.** Seçilen yöntem uygulanır. Ayrıca `Payment` durum makinesi, `Product` invariant'ları ve Id bazlı entity eşitliği eklenir. | Catalog, Payments, Abstractions | Birim testleri |
+| F4b.2 | **Uygulama.** Seçilen yöntem uygulanır. Entity'ye yalnızca bu akışın gerektirdiği kurallar girer: stok eksiye düşmez; akış `Payment`'ın durumunu değiştiriyorsa yalnızca geçerli geçişlere izin verilir. Akışın kullanmadığı durum metotları silinir (bugün hiçbiri çağrılmıyor). | Catalog, Payments (event seçilirse `Payments.Contracts`) | Birim testleri |
 | F4b.3 | **Eşzamanlılık testi.** Aynı ürün için iki eşzamanlı ödemede stok eksiye düşmez. | tests | Yeşil |
+| F5.3 | **Test borcu (Faz 5'ten taşındı, ID korunur, D-033).** Catalog ve Payments için geçerli gövdeyle uçtan uca entegrasyon testleri: ürünü oluştur, oku, güncelle, sil; ödeme yap. Testcontainers opsiyoneldir ve paket hook onayı gerektirir. | tests | Yeşil |
+
+**Bu fazda yapılmayacaklar:**
+- Abstractions'ta Id bazlı entity eşitliği: kodda entity karşılaştıran yok (Y-14).
+- Akışın gerektirmediği genel `Product` invariant'ları: basit CRUD'da anemik entity kabul edilir (Y-16).
+- Çekirdek paketlerde değişiklik: 4c'nin işi. 4b bir çekirdek sorunu bulursa sapma protokolü uygulanır.
 
 ---
 
-## Faz 5: Template, tüketici testi, 1.0 hazırlığı
+## Faz 4c: Tüketici hazırlığı (çekirdek)
+
+**Amaç:** Paketleri, sıfırdan açılan bir projenin üretimde güvenle kullanabileceği hale getirmek:
+- güvenli varsayılanlar,
+- proxy arkasında doğru davranış,
+- projenin kendi hata eşlemesini ekleyebilmesi,
+- tipli API sözleşmesi,
+- tek event yolu.
+
+Public API değişiklikleri ilk yayından önce burada toplanır. Gerekçe ve kaynaklar: [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md), R-071…R-074.
 
 | ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
 |---|---|---|---|
-| F5.1 | **Template.** Yalnızca Api host + 1 örnek modül üretir ve NovaCore paketlerine PackageReference ile bağlanır. | `.template.config`, template içeriği | `dotnet new novacore` ile build alınır |
-| F5.2 | **Tüketici smoke testi (CI).** Paketler pack edilir, yerel feed'e konur, `dotnet new` ile proje üretilir, build ve test çalıştırılır. | CI | Yeşil |
-| F5.3 | **Test borcu.** Catalog ve Payments için entegrasyon testleri yazılır. Testcontainers opsiyoneldir ve paket hook onayı gerektirir. | tests | Yeşil |
-| F5.4 | **1.0.0 kararı (kullanıcı).** Onaylanırsa `PublicAPI.Shipped` güncellenir ve package validation baseline ayarlanır. | props | Karar D-kaydı |
-| F5.5 | **Final dokümanlar.** README (tüketici odaklı), CHANGELOG ve memory güncellenir. | dokümanlar | — |
+| F4c.1 | **Güvenli varsayılanlar (R-073).** `AddCoreAuthorization` `FallbackPolicy = RequireAuthenticatedUser` kurar. Kasıtlı olarak açık uçlar `AllowAnonymous` alır: kimlik eklentisinin giriş, kayıt ve onay sayfaları ile `/connect/*` uçları, health, OpenAPI belgesi ve Scalar. `Cors:AllowedOrigins` boşsa Development dışında hiçbir origin'e izin verilmez; bugün her origin'e izin veriliyor. | `NovaCore.AspNetCore` (Authorization, Hosting, Web), `NovaCore.Identity.OpenIddict`, `NovaCore.Scalar` | Test: yetki meta verisi olmayan bir uç anonim çağrıya 401 döner; listelenen açık uçlar anonim çalışır; Production'da boş CORS listesiyle `Access-Control-Allow-Origin` dönmez |
+| F4c.2 | **Super-admin sunucu tarafında.** `Administrator` bypass'ı token'daki rol claim'ine değil, sunucuda çözülen bilgiye dayanır (yöntem fazda araştırılır, `IPermissionResolver` sözleşmesi değişebilir). Rolünden çıkarılan kullanıcı `Cache:PermissionExpiration` içinde yetkisini kaybeder. | `Authorization/*`, `Identity/HttpContextCurrentUser.cs`, eklentinin resolver'ı | Test: rolü kaldırılan admin, önbellek süresi dolunca 403 alır |
+| F4c.3 | **Proxy arkasında doğru istemci (R-072).** `UseCoreWeb`, `UseForwardedHeaders`'ı pipeline'ın başına koyar. Güvenilen proxy'ler ve ağlar config'ten okunur ve açılışta doğrulanır. Liste boşsa başlıklar işlenmez (framework varsayılanı). | `Web/CoreWebExtensions.cs`, yeni options | Test: güvenilen proxy'den gelen `X-Forwarded-For` rate limiter'ın istemciyi ayırdığı IP'yi belirler, güvenilmeyen kaynaktan gelen yok sayılır; `X-Forwarded-Proto: https` isteğin şemasını https yapar |
+| F4c.4 | **Projenin hata eşlemesi (R-073).** Exception → durum kodu eşlemesi `ExceptionHandlerOptions.StatusCodeSelector` ve ProblemDetails özelleştirmesine taşınır. Böylece projenin `IExceptionHandler`'ları kayıt sırasından bağımsız olarak önce çalışır. `ArgumentException`, `FormatException`, `KeyNotFoundException` ve `UnauthorizedAccessException` artık 4xx'e eşlenmez: bunlar kod hatasıdır ve 500 döner. `BadHttpRequestException` kendi durum kodunu döner. `AppException` ailesi kalır. | `Exceptions/*`, `DependencyInjection/*`, `Web/CoreWebExtensions.cs` | Test: `AddCoreWeb`'den sonra kaydedilen bir handler çalışır; `ArgumentException` mesajsız 500 döner; bozuk JSON gövdesi 400 döner |
+| F4c.5 | **Tipli yanıt sözleşmesi (R-073).** `Result`/`Result<T>`'nin HTTP'ye dönüşümü, başarı tipini handler'ın imzasında taşıyan `Results<…>` union'larına geçer. Modül ve eklenti handler'ları geçirilir; başarı için elle yazılan `.Produces<T>()` kalkar. | `Http/ResultHttpExtensions.cs`, modül `Features/*`, eklenti uçları, `EndpointContractTests` | OpenAPI belgesindeki yanıt şemaları aynı kalır ya da zenginleşir (fark raporlanır); Y-31 testi `IResult` kör noktası olmadan çalışır |
+| F4c.6 | **Data Protection anahtar deposu (R-072).** Kimlik eklentisi, Development dışında açıkça yapılandırılmış bir anahtar deposu yoksa açılışı anlamlı bir hatayla durdurur (F0.5'teki `IEmailSender` kalıbı). Depoyu host seçer. | `NovaCore.Identity.OpenIddict` | Test: Production'da depo yokken host açılmaz, depo varken açılır; Development etkilenmez |
+| F4c.7 | **Outbox şeması ve bakımı.** `outbox_consumers`'ın anahtarı (EventId, Handler) → (mesaj `Id`, Handler) olur ve cascade delete'li bir FK eklenir (4a code review #12; D-031 (5)'i değiştirir). İşlenmiş mesajlar sabit bir saklama süresinden sonra silinir (R-068). Kullanılmayan `IDomainEventDispatcher`/`DomainEventDispatcher` kaldırılır: üretim kodunda çağıranı yok, outbox dispatcher invoker'ları doğrudan kullanıyor (Y-13). Modül migration'ları yenilenir. | `NovaCore.EntityFrameworkCore/Messaging`, `NovaCore.Abstractions/Messaging`, modül migration'ları, testler | Test: işlenmiş mesaj saklama süresinden sonra silinir, tüketici kayıtları da onunla gider; `has-pending-model-changes` temiz |
+
+**Bu fazda yapılmayacaklar:** Aşağıdakilerin bugün bir tüketicisi yok (Y-14). Hepsi PROGRESS → "Sonraya bırakılanlar"da, ne zaman gerekeceğini söyleyen koşuluyla duruyor.
+- `UseCoreWeb`'e kimlik doğrulama ile yetkilendirme arasında bir middleware yeri. Bugün proje kendi middleware'ini `UseCoreWeb`'den sonra ekleyebiliyor.
+- İzin önbelleğinin anahtarına `iss` ya da ek bir bölümleme eklemek (tek Authority).
+- Request timeouts.
+- Outbox'ın birden çok örnekte çalışması için kilit ve trace bağlamı taşıma.
+- `ApplicationUser` genişletme ve token'a claim ekleme kancası.
+- BFF paketi.
+
+---
+
+## Faz 4d: Kimlik eklentisi üretim eksikleri (koşullu)
+
+**Amaç:** `NovaCore.Identity.OpenIddict`'i, kullanıcıları olan bir ürünün IdP'si olabilecek hale getirmek. Yalnızca ilk proje yerleşik IdP'yi kullanacaksa yapılır (F0.9 gibi).
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F4d.1 | **Karar (kullanıcı).** İlk proje hangi IdP modelini kullanacak: (a) kendi host'unda eklenti, (b) projeler arası tek bir merkezi IdP (eklenti ayrı bir host'ta), (c) harici IdP (Entra, Keycloak). (a) ya da (b) seçilirse faz yürür, (c) seçilirse atlanır. | — | D-kaydı |
+| F4d.2 | **Parola sıfırlama ve onay e-postasının yeniden gönderilmesi.** Yanıtlar hesabın varlığını ele vermez, uçlar "strict" rate limit altındadır. `User` rolü yoksa kayıt 500 vermez. | eklenti, testler | Uçtan uca test: sıfırlama linkiyle yeni parola belirlenir; bilinmeyen e-postaya aynı yanıt döner |
+| F4d.3 | **Kurtarma koduyla giriş.** Giriş sayfasının 2FA adımı kurtarma kodunu da kabul eder. Kod tek kullanımlıktır. | eklenti | Test |
+| F4d.4 | **Güvenlik düzeltmeleri.** `/connect/endsession` bir onay formu gösterir (logout CSRF). Bilinmeyen kullanıcıda sahte bir hash doğrulaması yapılır, böylece yanıt süresi hesabın varlığını ele vermez. `change-password`'da yanlış parola lockout sayacını artırır. | eklenti | Her biri için test |
+| F4d.5 | **Token temizliği.** Süresi dolmuş OpenIddict token ve authorization kayıtları periyodik olarak temizlenir (`PruneAsync`, yeni paket yok). | eklenti | Test: süresi dolmuş kayıt temizlenir |
+
+**Bu fazda yapılmayacaklar:** userinfo, Razor/Identity UI, reference token (D-026); `ApplicationUser` genişletme (Y-14).
+
+---
+
+## Faz 5: Şablon, dağıtım, yayın hazırlığı
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F5.1 | **Template (R-074).** Ayrı bir template package projesi (`PackageType=Template`, şablonlar `content/` klasöründe). NovaCore paketlerine PackageReference ile bağlanır. Şablonun ürettikleri:<br>• Api host ve 1 örnek modül.<br>• Test projesi: factory ve test IdP.<br>• CI: restore, build, test, `has-pending-model-changes` ve context başına migration bundle.<br>• Üretim kontrol listesini içeren `appsettings`.<br>• Development dışı için bir health probe örneği (R-049).<br>Kimlik seçeneği MS şablonlarındaki `--auth` gibi bir parametredir: yerleşik IdP (eklenti) ya da yalnızca `Jwt:Authority`. Log hattı tektir; hangisi olacağı fazda bir R-kaydıyla seçilir. Repo'ya özgü dosyalar şablona girmez: BuildingBlocks kaynağı, `docs/plan`, `.claude/`, `release.yml`, PublicAPI dosyaları, yazar kimliği. | yeni template package projesi, `.template.config` taşınır | `dotnet new novacore` iki kimlik seçeneğiyle de build ve test geçer; üretilen projede repo'ya özgü dosya yok |
+| F5.2 | **Tüketici smoke testi (CI).** Paketler pack edilir ve yerel feed'e konur. Template package kurulur, her kimlik seçeneğiyle bir proje üretilir, build ve test çalıştırılır. | CI | Yeşil |
+| F5.3 | **Faz 4b'ye taşındı (D-033).** | — | — |
+| F5.4 | **Yayın kararı (kullanıcı).** (1) Kanal: GitHub Packages (D-013; tüketen her proje ve CI bir token taşır) ya da nuget.org (D-013 değişir). (2) İlk sürüm: önerilen `0.x-preview`. 1.0.0 (`PublicAPI.Shipped` ve package validation baseline) ilk gerçek proje bu sürümle çalıştıktan sonra ayrı bir kararla verilir. (3) Tag ve yayın kullanıcı onayıyla yapılır. | props, gerekirse `release.yml` | Karar D-kaydı |
+| F5.5 | **Final dokümanlar.** README tüketici odaklı olur ve şunları içerir:<br>• Sorumluluk modeli ve yeni proje kontrol listesi ([proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md) §2).<br>• Projenin `PostConfigure` ile ezebileceği ayarlar tablosu.<br>• Tarayıcı uygulamaları için BFF önerisi.<br>• Nesne düzeyi yetki (resource-based authorization) rehberi.<br>• Migration dağıtımı (bundle ya da script).<br>CHANGELOG, CLAUDE.md dosyaları ve memory güncellenir. Kullanıcı DECISIONS.md'yi hook korumasına geri ekler (D-032). | dokümanlar | — |
+
+**Bu fazda yapılmayacaklar:** BFF şablonu ya da paketi (Y-14), yeni çekirdek özelliği.

@@ -581,3 +581,44 @@ Biçim:
   - Her kayıttan sonra change tracker boşaltılıyor ve ad `finished`'e ekleniyor. Aynı handler tipinin ikinci kaydı atlanıyor.
   - İki catch filtresi yalnızca host'un kendi iptalini dışarı bırakıyor.
   - Belgelerde handler scope'u (mesaj başına, paylaşılan) ve sıra garantisi (yok) düzeltildi.
+
+### R-071: Ortak altyapının dağıtım modeli ve tüketiciye açılan ayarlar (2026-09-28, faz dışı; kaynak)
+- Soru: Microsoft ortak host varsayılanlarını nasıl dağıtıyor? Paketle dağıtılan bir kütüphane tüketiciye nasıl ayar noktası sunmalı?
+- Bulgu:
+  - Aspire ServiceDefaults bir NuGet paketi değil, çözüme eklenen bir proje. İçinde OpenTelemetry (metrik, trace ve log), health, service discovery ve HTTP resilience var. Sayfa kodun "intended as a starting point" olduğunu ve serbestçe değiştirilebileceğini söylüyor.
+  - Aspire'ın `MapDefaultEndpoints`'i health uçlarını yalnızca Development'ta açıyor. Gerekçe: bu uçları başka ortamlarda açmanın "security implications" var. D-022 bununla aynı.
+  - Kütüphane yazarları için Options rehberi, tüketicinin ayar verebilmesi için `Action<TOptions>` ya da `IConfiguration` alan extension metot overload'ları gösteriyor.
+- Kaynak: https://aspire.dev/get-started/csharp-service-defaults/ · https://learn.microsoft.com/dotnet/core/extensions/options-library-authors · https://learn.microsoft.com/dotnet/fundamentals/networking/telemetry/metrics#reuse-service-defaults-project-without-aspire-orchestration
+- Sonuç: Bilgi amaçlı. Sorumluluk modelinin gerekçesi: [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md) §2.
+
+### R-072: Üretimde barındırma: forwarded headers, Data Protection anahtarları, migration dağıtımı (2026-09-28, faz dışı; kaynak)
+- Soru: NovaCore ile kurulan bir proje gerçek bir sunucuya çıktığında framework'ün beklediği ama NovaCore'un yapmadığı ne var?
+- Bulgu:
+  - **Forwarded headers:** IIS out-of-process dışında middleware varsayılan olarak kapalı. Açılınca da `ForwardedHeaders.None` ile başlıyor. Diğer middleware'lerden önce, en geç `UseHsts`'ten önce çalışmalı. Başlıkları yalnızca `KnownProxies`/`KnownNetworks`'teki proxy'lerden kabul ediyor.
+  - **Data Protection:** Docker'da anahtarlar kalıcı bir volume'a ya da harici bir sağlayıcıya yazılmalı. Web farm'da varsayılan yapılandırma "isn't generally appropriate". `PersistKeysToDbContext`, Microsoft'un `Microsoft.AspNetCore.DataProtection.EntityFrameworkCore` paketinde.
+  - **Migration dağıtımı:** EF, otomatik dağıtım için migration bundle, SQL'in gözden geçirilmesi gerekiyorsa idempotent script öneriyor. Runtime migration EF 9'dan beri kilitli ve ödünleşimleriyle kabul edilebilir. Ama gözden geçirme, en az yetki ya da yüksek erişilebilirlik gerekiyorsa ayrı bir dağıtım adımı tercih ediliyor. Şemayı değiştiren hesap uygulamanın çalışma zamanı hesabından ayrı olmalı.
+- Kaynak: https://learn.microsoft.com/aspnet/core/host-and-deploy/proxy-load-balancer?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/security/data-protection/configuration/default-settings?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/host-and-deploy/web-farm?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/security/data-protection/implementation/key-storage-providers?view=aspnetcore-10.0 · https://learn.microsoft.com/ef/core/managing-schemas/migrations/applying
+- Sonuç: [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md) E4, E5, E8. Karar bekliyor (K4).
+
+### R-073: Güvenli varsayılanlar ve API sözleşmesi (2026-09-28, faz dışı; kaynak)
+- Soru: Kaynaklar, yeni bir projenin varsayılan olarak hangi davranışla başlamasını öneriyor?
+- Bulgu:
+  - **Fallback policy:** Yetkilendirme meta verisi olmayan bir endpoint FallbackPolicy'ye düşer. FallbackPolicy varsayılan olarak `null`, yani yetki istenmez. MS, varsayılan olarak kimlik doğrulama istemenin tercih edilen yolunun fallback policy olduğunu söylüyor.
+  - **Exception handler'lar:** Kayıt sırasıyla çalışır, ilk `true` zinciri keser. `UseExceptionHandler`'ın yedek yolu, yani ProblemDetails yanıtı ya da `StatusCodeSelector`, yalnızca her `TryHandleAsync` `false` dönerse kullanılır.
+  - **Yanıt tipleri:** `Produces` endpoint'in davranışını kısıtlamaz. `Results<T1,…>` meta veriyi kendisi taşır ve bildirilmeyen bir yanıt tipini derleme hatasına çevirir.
+  - **Exception'lar:** "Do not use throwing or catching exceptions as a means of normal program flow."
+  - **Zaman aşımı:** ASP.NET Core varsayılan olarak istekleri zaman aşımına uğratmıyor. Request timeouts middleware'i açıkça eklenmeli.
+  - **Nesne düzeyi yetki:** Resource-based authorization `IAuthorizationService.AuthorizeAsync(user, resource, requirement)` ile yapılır.
+  - **Entegrasyon testleri:** MS'in önerdiği yol `ConfigureTestServices` içinde bir `TestAuthHandler` ile kimlik doğrulamayı taklit etmek.
+  - **Tarayıcı istemcileri:** Public OIDC/OAuth istemcileri web uygulamaları için artık önerilmiyor. Tarayıcı uygulamaları için BFF öneriliyor: token'lar sunucuda kalır, tarayıcıda yalnızca HttpOnly bir cookie olur.
+  - **OWASP API Security Top 10 2023:** API1 Broken Object Level Authorization 2019'dan beri birinci sırada. API4 Unrestricted Resource Consumption ve API5 Broken Function Level Authorization da listede.
+- Kaynak: https://learn.microsoft.com/aspnet/core/security/authorization/policies?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/fundamentals/error-handling?view=aspnetcore-10.0#iexceptionhandler · https://learn.microsoft.com/aspnet/core/fundamentals/openapi/include-metadata?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/fundamentals/best-practices?view=aspnetcore-10.0#minimize-exceptions · https://learn.microsoft.com/aspnet/core/performance/timeouts?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/security/authorization/resource-based?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/test/integration-tests?view=aspnetcore-10.0#mock-authentication · https://learn.microsoft.com/aspnet/core/security/authentication/configure-oidc-web-authentication?view=aspnetcore-10.0#backend-for-frontend-bff-security-architecture · https://learn.microsoft.com/aspnet/core/security/authentication/configure-jwt-bearer-authentication?view=aspnetcore-10.0#recommended-approaches-to-create-a-jwt · https://owasp.org/API-Security/editions/2023/en/0x00-toc/
+- Sonuç: [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md) E2, E3, E6, E10, E11, E12, F3, K3. Karar bekliyor (K4).
+
+### R-074: Şablon ve paket dağıtımı (2026-09-28, faz dışı; kaynak)
+- Soru: NovaCore bir projeye nasıl ulaştırılmalı?
+- Bulgu:
+  - .NET şablonları bir template package olarak dağıtılır: `PackageType=Template` ayarlı, şablonların `content` klasöründe durduğu bir paketleme projesi (`dotnet new templatepack`). NovaCore'un bugünkü `template.json`'u bir kaynak klasörü vermediği için repo kökünü kopyalıyor.
+  - GitHub Packages'ın NuGet registry'si, paket herkese açık olsa bile indirmek için `read:packages` yetkili bir token ya da `GITHUB_TOKEN` istiyor.
+- Kaynak: https://learn.microsoft.com/dotnet/core/tools/templates#template-packages · https://learn.microsoft.com/dotnet/core/tutorials/cli-templates-create-template-package · https://docs.github.com/en/enterprise-cloud@latest/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry
+- Sonuç: [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md) E1, F1, K1. Karar kullanıcının.
