@@ -727,14 +727,19 @@ Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-0
   - Testler 212 → 214: `StockConcurrencyTests` (PUT ve DELETE, 409; eşzamanlı satışın stoğu korunuyor). Önce kırmızı: belirteç yokken ikisi de 204 aldı. Kasıtlı bozma (commit'lenmedi): belirteç kapatılınca ikisi de yine kırmızı.
   - **Sürpriz:** hiçbir alanı değiştirmeyen PUT UPDATE göndermiyor, dolayısıyla çakışmıyor (doğru davranış). Test gerçek bir yeniden stoklama yapıyor.
   - Güncellenenler: README (Modüller Arası İletişim), `src/Modules/CLAUDE.md` (belirteç kalıbı), `tests/CLAUDE.md`, CHANGELOG.
-- [x] F4b.3 (commit: bir sonraki satırda): Eşzamanlılık testi.
+- [x] F4b.3 (b43bdd7): Eşzamanlılık testi.
   - `StockConcurrencyTests`'e gerçek dispatcher'la iki test eklendi:
     - Son birim için aynı anda iki ödeme: ikisi de 201 Pending, sonra biri Completed biri Failed, stok 0.
     - Rezervasyon stoğu okuduktan sonra başka bir satış son birimi alıyor: ilk teslim `DbUpdateConcurrencyException` ile düşüyor (`Attempts` = 1), yeniden deneme yeni stoğu okuyup reddediyor. Ödeme Failed, stok 0.
   - Testler 214 → 216. Adımın kapsamı yalnızca test olduğu ve davranış F4b.2b/F4b.2c'de geldiği için testler yazıldıkları anda yeşildi.
   - Kasıtlı bozma (commit'lenmedi): stok kontrolü kapatılınca ilk test (iki ödeme de Completed), belirteç kapatılınca ikinci test (bayat stokla Completed) kırmızıya döndü.
   - README Test bölümü güncellendi.
-- [ ] F5.3 Test borcu (Faz 5'ten taşındı, D-033) (sıradaki)
+- [x] F5.3 (commit: bir sonraki satırda): Test borcu (Faz 5'ten taşındı, D-033).
+  - `CatalogEndpointsTests` (3): geçerli gövdeyle oluşturma (201 + Location), okuma, aramayla listeleme; güncelleme (204, yeni değerlerle okunuyor); silme (204, ardından 404 `product.not_found`).
+  - "Ödeme yap" maddesini F4b.2b'deki `StockReservationTests` karşılıyor (POST'tan Completed'a, dispatcher'la).
+  - Testcontainers eklenmedi (D-035 (7)).
+  - Testler 216 → 219. Mevcut davranışı sabitledikleri için kırmızı aşamaları yok.
+  - "Sonraya bırakılanlar"daki Faz 2c maddesi ve D-033 listesindeki satır kapandı.
 
 ### Faz 4c
 - [ ] F4c.1 Güvenli varsayılanlar (FallbackPolicy, CORS)
@@ -811,7 +816,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - Logout CSRF, giriş zamanlama farkı, `change-password` lockout'u (Faz 3b) → F4d.4.
 - OpenIddict kayıtlarının temizlenmemesi (Faz 3b) → F4d.5.
 - Template'in paket kimliğini taşıması (Faz 1, F5.1) → F5.1.
-- Catalog/Payments uçtan uca testleri (Faz 2c) → F5.3 (4b'de).
+- ~~Catalog/Payments uçtan uca testleri (Faz 2c) → F5.3 (4b'de).~~ → F5.3'te yapıldı (Faz 4b).
 
 **D-033 ile bilerek plana alınmayanlar.** Bugün bir tüketicileri yok (Y-14). Madde, yanındaki koşul gerçekleşince plana alınır:
 - `UseCoreWeb`'e kimlik doğrulama ile yetkilendirme arasında bir middleware yeri. *Koşul:* bir proje yetkilendirmeden önce kimliğe bağlı bir middleware'e (ör. tenant çözümü) ihtiyaç duyar. Bugün proje kendi middleware'ini `UseCoreWeb`'den sonra ekleyebiliyor.
@@ -861,7 +866,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - Olası yollar: upstream'e bildirmek; açılış doğrulamasını `IStartupValidator` sarmalayıcısı ile yakalamak (hosted service hatalarını kapsamaz); bu testleri `WebApplicationFactory` dışında kurmak. Karar test altyapısını değiştireceği için kullanıcıya bırakıldı.
 - (Faz 2c) README "Paket / Lisans Tablosu"ndaki `Microsoft.EntityFrameworkCore / Extensions.Hosting.Abstractions / Configuration.Binder` satırı eskimiş. EF paketi F2b'den beri Binder yerine `Options.ConfigurationExtensions` ve `Diagnostics.HealthChecks.EntityFrameworkCore` kullanıyor. F2c.4 aynı tabloda yalnızca FluentValidation satırını sildi.
 - (Faz 2c, code review) **İki farklı validation 400 başlığı:** Yerleşik validation "One or more validation errors occurred." diyor (D-023 (4)). `Result` üzerinden dönen `ErrorType.Validation` (`ResultHttpExtensions.TitleFor`) ve `AppException` validation'ı (`GlobalExceptionHandler`) hâlâ "Validation failed" diyor. F2c'den önce ikisi de "Validation failed" idi. İki yanıtın `type`'ı zaten farklıydı (RFC 9110 / `httpstatuses.io`). Hizalamak public davranış değişikliği, F2c'nin kapsamı dışında.
-- (Faz 2c, code review → F5.3) Catalog ve Payments için geçerli gövdeyle uçtan uca test yok. `ValidationTests` yalnızca reddedilen gövdeleri sabitliyor, `PermissionAuthorizationTests`'teki POST 403'te duruyor. Geçerli girdiyi yanlışlıkla reddeden bir attribute değişikliği yakalanmaz. F5.3'ün (Catalog/Payments entegrasyon testleri) kapsamına giriyor.
+- ~~(Faz 2c, code review → F5.3)~~ → Faz 4b'de çözüldü: `CatalogEndpointsTests` (ürün oluştur, oku, listele, güncelle, sil) ve `StockReservationTests` (POST'tan Completed'a ödeme). Eski not: Catalog ve Payments için geçerli gövdeyle uçtan uca test yok. `ValidationTests` yalnızca reddedilen gövdeleri sabitliyor, `PermissionAuthorizationTests`'teki POST 403'te duruyor. Geçerli girdiyi yanlışlıkla reddeden bir attribute değişikliği yakalanmaz. F5.3'ün (Catalog/Payments entegrasyon testleri) kapsamına giriyor.
 - (Faz 2c, R-052) Record ctor parametrelerindeki DataAnnotations (`[MaxLength]`, `[Range]`, `[Length]`) OpenAPI şemasına yansımıyor. Faz sonunda belge main ile bayt bayt aynıydı. FluentValidation döneminde de şemada kısıt yoktu, yani bu bir gerileme değil. Kısıtları belgeye taşımanın yolu araştırılmadı.
 - (Faz 2c) Y-10'un yerini Y-44 aldı, ama iki yer hâlâ Y-10 diyor: `tests/CLAUDE.md` ("never weaken one to pass (Y-10)") ve `Directory.Build.props`'taki `TreatWarningsAsErrors` yorumu. Kök CLAUDE.md'deki aynı not yukarıda (Faz 2a, F2a.5).
 - (Faz 2b → Faz 3a; **F3a.1'de değerlendirildi, yapılmadı**, R-058: `TokenValidationParameters`'ta `TimeProvider` yok, tek yol varsayılan doğrulamanın yerini alan bir `LifetimeValidator` delegesi.) Token üretimi `TimeProvider`'dan okuyor, JwtBearer'ın lifetime doğrulaması (IdentityModel) ise gerçek saatten. Sahte saatli testler bu yüzden gerçek "şimdi"den başlıyor (R-050). F3a.1'de doğrulama yeniden yazılırken `TimeProvider` ile hizalanabilir.
@@ -896,7 +901,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4a, plan kapsamı dışı) **Birden çok uygulama örneği:** dispatcher veritabanı başına tek örnek varsayıyor. İki host aynı outbox'u okursa aynı mesajı ikisi de teslim edebilir. Çözüm bir claim/lease olabilir (örneğin koşullu `ExecuteUpdate` ile kilit süresi). SQLite `DateTimeOffset` karşılaştırmasını çeviremediği için süre alanının tipi test tarafını da etkiler (R-068).
 - (Faz 4a, plan kapsamı dışı) Outbox ve `outbox_consumers` satırları hiç silinmiyor. MS Idempotent Consumer tekrar teslim penceresinden uzun bir saklama süresi öneriyor. İşlenmiş mesajları ve kayıtlarını belli bir süre sonra silen bir temizlik gerekecek (OpenIddict kayıtları için olan maddeyle birlikte ele alınabilir).
 - (Faz 4a, plan kapsamı dışı) Yeniden deneme her turda (5 sn) yapılıyor, geri çekilme (backoff) yok. 10 deneme yaklaşık 50 saniye sürüyor; bundan uzun süren bir bağımlılık kesintisi mesajı incelemeye düşürür. Aralık, parça boyu ve deneme sayısı sabit (Y-19). Bir tüketici ihtiyaç duyarsa options'a taşınabilir.
-- (Faz 4a → 4b) Teslim gecikmesi en fazla bir tur (5 sn); event zincirinde her halka bir tur ekliyor. 4b event tabanlı stok rezervasyonunu seçerse (F4b.1), kaydın ardından dispatcher'a sinyal veren anında teslim düşünülebilir.
+- (Faz 4a → 4b; **4b'de yapılmadı**) Teslim gecikmesi en fazla bir tur (5 sn); event zincirinde her halka bir tur ekliyor. 4b event akışını seçti (D-034), bu yüzden ödemenin sonucu en fazla iki tur (yaklaşık 10 sn) sonra görünüyor. Kayıttan sonra dispatcher'a sinyal veren anında teslim bir çekirdek değişikliği; 4b'nin kapsamı dışında. *Koşul:* bir tüketici bu gecikmeyi sorun eder.
 - (Faz 4a) `IDomainEventDispatcher`'ın `src`'de çağıranı yok. PLAN F4a.3 gereği düzeltildi ve korunuyor, ama entity event'leri outbox'tan dağıtılıyor. Faz 5'te (ya da kullanıcı kararıyla) kaldırılması değerlendirilebilir.
 - (Faz 4a, R-068) `src/Modules/CLAUDE.md` Guid v7 anahtarları için "friendly to SQL Server clustering" diyor. SQL Server `uniqueidentifier`'ı son 6 bayta göre sıralıyor, v7'nin zaman damgası ise baştaki baytlarda; yani anahtarlar SQL Server sırasında artan değil ve Catalog/Payments'ın clustered PK'ları rastgele sırayla dolar. Çözüm için belge düzeltmesi ya da anahtar stratejisi kararı gerekir (örneğin `SequentialGuidValueGenerator`). Kapsam dışı.
 - (Faz 4a) Outbox interceptor'ını `AddModuleDbContext` ekliyor, audit interceptor'ını ise hâlâ her modül kendisi ekliyor. İkisini aynı yere toplamak modül kaydını kısaltır; modül ve CLAUDE.md değişikliği gerektiği için yapılmadı.
