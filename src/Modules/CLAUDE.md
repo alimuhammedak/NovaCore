@@ -55,6 +55,11 @@ they show a cross-module write through events both ways (DECISIONS D-034): a pay
     `outbox_consumers` record is written after the handler's own save, so it can't stop a second run after a crash.
   - An event another module handles lives in the publisher's `*.Contracts` project, because modules reference each
     other only through Contracts.
+- **A value that concurrent writes change is a concurrency token** (`Product.Stock`: `IsConcurrencyToken()`,
+  application-managed so the SQLite tests enforce it too). A write over a value that changed after it was read then
+  throws `DbUpdateConcurrencyException` instead of overwriting it. An endpoint answers 409
+  (`product.concurrency_conflict`) so the caller reads again; an event handler lets it fail, and the outbox retries the
+  delivery on the next pass with a fresh read.
 - **Guard every endpoint** with `.RequirePermission(<M>Permissions.X)` (or `.RequireAuthorization()` only
   when no finer permission applies).
 - **Validate write DTOs with DataAnnotations** on the request record (`[Required, MaxLength(200)] string Name`).

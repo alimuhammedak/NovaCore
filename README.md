@@ -290,6 +290,10 @@ Stoğu kesinleştiren kontrol rezervasyondur; `CreatePayment`'taki kontrol yaln�
 Son birim için gelen iki istek ikisi de 201 alabilir, ama biri sonra Failed olur. Sonuç en fazla iki dispatcher turu
 sonra (yaklaşık 10 sn) `GET /api/v1/payments`'ta görünür.
 
+Stoğa aynı anda yazan iki işlem birbirinin üstüne yazamaz, çünkü `Product.Stock` bir concurrency token'dır. Ürün uç
+noktaları (`PUT`/`DELETE`) okuduktan sonra değişmiş bir stokta 409 `product.concurrency_conflict` döner; rezervasyonun
+teslimi ise düşer ve outbox onu bir sonraki turda güncel stokla yeniden dener.
+
 ### Domain event'ler ve outbox
 
 Bir entity olayı `Raise(new SiparisVerildi(...))` ile kaydeder. Event, `DomainEvent`'ten türeyen bir record'dur.

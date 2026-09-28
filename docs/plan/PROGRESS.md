@@ -711,7 +711,7 @@ Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-0
   - `SettlePayment` (internal) iki handler taşıyor; `PaymentsModule` onları açıkça kaydediyor. Bilinmeyen ödeme `InvalidOperationException`.
   - Bu adımdan sonra `PaymentCreated`'ın handler'ı yok: dispatcher onu işlenmiş sayıyor, ödeme Pending kalıyor (F4b.2b'ye kadar bugünkü davranış).
   - Testler 190 → 200: `PaymentTests` (5) ve `PaymentSettlementTests` (5). Önce kırmızı: tipler olmadığı için derleme hatası.
-- [x] F4b.2b (commit: bir sonraki satırda): Catalog tarafı; akış uçtan uca çalışıyor.
+- [x] F4b.2b (3deb3c8): Catalog tarafı; akış uçtan uca çalışıyor.
   - `Product.RemoveStock(int)` `Result` dönüyor: aktif olmayan ürün `product.inactive`, yetersiz stok `product.insufficient_stock` ile reddediliyor ve stok değişmiyor. `quantity <= 0` `ArgumentOutOfRangeException`.
   - `StockReservation`: anahtarı PaymentId, durumu Reserved ya da Refused, `Reason` ret kodu. `Reserve`/`Refuse` cevap event'ini raise ediyor. Tablo `stock_reservations`, `products`'a FK yok. Migration `StockReservations`.
   - `ReserveStockForPayment` (internal handler): rezervasyon zaten varsa çıkıyor, ürün yoksa `product.not_found`, her şey tek `SaveChanges`'te. `CatalogModule` handler'ı açıkça kaydediyor; Catalog artık Payments.Contracts'ı referans alıyor.
@@ -720,8 +720,14 @@ Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-0
   - Test tekniği: handler'ı doğrudan çağıran testler ödemeyi outbox'a koymuyor (`ClearDomainEvents`). Aksi hâlde dispatcher'ın ilk turu aynı talebi aynı anda teslim edebilirdi.
   - `has-pending-model-changes` üç context'te de temiz.
   - Güncellenenler: README (proje ağacı, uç nokta tablosu, Modüller Arası İletişim, Domain event'ler, Test), `src/Modules/CLAUDE.md`, `tests/CLAUDE.md`, CHANGELOG.
-- [ ] F4b.2c Stok eşzamanlılık belirteci (sıradaki)
-- [ ] F4b.3 Eşzamanlılık testi
+- [x] F4b.2c (commit: bir sonraki satırda): Stok eşzamanlılık belirteci.
+  - `ProductConfiguration`: `Stock` artık `IsConcurrencyToken()`. `has-pending-model-changes` fark görmedi (belirteç şemayı değiştirmiyor), bu yüzden migration eklenmedi.
+  - `UpdateProduct` ve `DeleteProduct` `DbUpdateConcurrencyException`'ı 409 `product.concurrency_conflict`'e çeviriyor; iki uca `.ProducesProblem(409)` eklendi (OpenAPI belgesine yeni yanıt).
+  - Test altyapısı: `NovaCoreApiFactory.CatalogConnectionString` (protected); `FakeClockApiFactory` artık sealed değil; yeni `StockRaceApiFactory` ve iç `CompetingStockWrite` interceptor'ı. Interceptor, ürünü değiştiren bir sonraki kayıttan önce stoğu başka bir bağlantıyla değiştiriyor.
+  - Testler 212 → 214: `StockConcurrencyTests` (PUT ve DELETE, 409; eşzamanlı satışın stoğu korunuyor). Önce kırmızı: belirteç yokken ikisi de 204 aldı. Kasıtlı bozma (commit'lenmedi): belirteç kapatılınca ikisi de yine kırmızı.
+  - **Sürpriz:** hiçbir alanı değiştirmeyen PUT UPDATE göndermiyor, dolayısıyla çakışmıyor (doğru davranış). Test gerçek bir yeniden stoklama yapıyor.
+  - Güncellenenler: README (Modüller Arası İletişim), `src/Modules/CLAUDE.md` (belirteç kalıbı), `tests/CLAUDE.md`, CHANGELOG.
+- [ ] F4b.3 Eşzamanlılık testi (sıradaki)
 - [ ] F5.3 Test borcu (Faz 5'ten taşındı, D-033)
 
 ### Faz 4c

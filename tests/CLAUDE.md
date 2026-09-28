@@ -75,6 +75,11 @@ handler itself, keep that request out of the outbox (`ClearDomainEvents` before 
 first pass may deliver it at the same time. `GET /api/v1/payments` orders by a `DateTimeOffset`, which SQLite can't
 translate (R-068), so tests read payments from the database.
 
+`StockRaceApiFactory` (a `FakeClockApiFactory`) plays a concurrent writer for `StockConcurrencyTests`.
+`ChangeStockBeforeNextSave(productId, stock)` makes the next Catalog save that modifies or deletes the product first
+see another connection set its stock. The change lands between the save's read and its write. An update that changes
+nothing sends no `UPDATE`, so the request must really change the product.
+
 ## Tokens: an in-memory OpenID Connect issuer
 
 The core validates access tokens against `Jwt:Authority` (D-002, D-024). `TestIdentityProvider` is that authority for

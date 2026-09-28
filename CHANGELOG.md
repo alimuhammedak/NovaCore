@@ -212,6 +212,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking (API):** the domain-event buffer (`DomainEvents`, `Raise`, `ClearDomainEvents`) moved from `Entity<TId>` to
   a new non-generic base class, `Entity`, so the persistence layer can read any entity's events without its key type.
   Code that derives from `Entity<TId>` or `AuditableEntity<TId>` compiles unchanged.
+- `PUT` and `DELETE /api/v1/products/{id}` (Catalog sample module) answer 409 with code `product.concurrency_conflict`
+  when the product's stock changed after the request read it. `Stock` is now a concurrency token, so a write can't
+  undo a sale. The OpenAPI document lists the 409 response for both.
 - **Breaking (API and behaviour):** `IDomainEventDispatcher` is registered scoped and resolves the handlers from the
   caller's scope; as a singleton it resolved them from the root provider, which failed for scoped handlers. Each event
   type's handlers are invoked through a cached, strongly typed wrapper instead of `MethodInfo.Invoke` per call.

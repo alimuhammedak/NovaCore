@@ -19,7 +19,8 @@ public static class DeleteProduct
             .WithSummary("Delete a product")
             .RequirePermission(CatalogPermissions.ProductsDelete)
             .Produces(StatusCodes.Status204NoContent)
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
     private static async Task<IResult> Handle(
         Guid id,
@@ -31,7 +32,17 @@ public static class DeleteProduct
             return Result.Failure(Error.NotFound("product.not_found", $"Product '{id}' was not found.")).ToHttpResult();
 
         dbContext.Products.Remove(product);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // A sale took stock after the product was read (Stock is a concurrency token). The caller reads it again
+            // and decides.
+            return Result.Failure(Error.Conflict("product.concurrency_conflict",
+                $"Product '{id}' changed while it was being deleted. Read it again and retry.")).ToHttpResult();
+        }
 
         return Result.Success().ToHttpResult();
     }

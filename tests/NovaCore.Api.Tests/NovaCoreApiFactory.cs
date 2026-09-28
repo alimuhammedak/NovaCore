@@ -63,6 +63,9 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
     /// <summary>The host environment the app boots in. Override to test environment-specific wiring.</summary>
     protected virtual string EnvironmentName => Environments.Development;
 
+    /// <summary>The Catalog database, for a subclass that registers the Catalog context again (<c>ReplaceWithSqlite</c>).</summary>
+    protected string CatalogConnectionString => _catalogDatabase.ConnectionString;
+
     /// <summary>The issuer the host trusts through <c>Jwt:Authority</c>, in every environment.</summary>
     public TestIdentityProvider IdentityProvider { get; } = new();
 
