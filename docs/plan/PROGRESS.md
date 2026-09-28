@@ -14,7 +14,7 @@
 | 2c | ✅ tamam | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | 2026-09-26 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
 | 3a | ✅ tamam | `faz/3a-kimlik-dogrulama` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
 | 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
-| 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | |
+| 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`, push yok) |
 | 4b | ⏳ başlamadı | | | | |
 | 5 | ⏳ başlamadı | | | | |
 
@@ -838,7 +838,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-28, Faz 4a bitti** (`faz/4a-outbox`, 5 commit). Merge kullanıcı onayı bekliyor. `main` push'lanmadı (2c'den beri yerelde).
+**2026-09-28, Faz 4a bitti** (`faz/4a-outbox`, 5 commit) ve kullanıcı onayıyla main'e merge edildi (`--no-ff`). `main` push'lanmadı (2c'den beri yerelde).
 
 - **Yapılanlar (D-031, R-068…R-070):**
   - Yazma tarafı (F4a.1): event tamponu jenerik olmayan `Entity` tabanında. `OutboxInterceptor` event'leri entity ile aynı SaveChanges içinde `outbox_messages`'a yazıyor. `AddModuleDbContext` interceptor'ı her modül context'ine kendisi ekliyor, modüller `modelBuilder.AddOutbox()` çağırıyor.
@@ -860,7 +860,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - **Bekleyen (kullanıcı):**
   - Kullanıcı DECISIONS (ve diğer korunan plan dosyaları) düzenlenirken onay istenmemesini istedi ("bütün fazlar bitince geri alırız"). Onayı `package-guard.js` hook'u `package-policy.json`'daki `protectedPaths` üzerinden istiyor. Model hook dosyasını değiştiremediği için satırları kullanıcının kendisinin silmesi gerekiyor: `docs/plan/PLAN.md`, `docs/plan/DECISIONS.md`.
   - Silindikten sonra D-032 olarak kaydedilmeli ve Faz 5 sonunda geri almak için "Sonraya bırakılanlar"a yazılmalı. Bu fazda D-031'den sonra DECISIONS'a yazılmadı.
-  - `faz/4a-outbox` → `main` merge onayı.
+  - `main` push'u ve önizleme yayını ayrı kullanıcı kararları.
 - **Sonraki fazın (4b) bilmesi gerekenler:**
   - F4b.1'deki karar (senkron `ReserveStockAsync` ya da event) için altyapı hazır. Event seçilirse:
     - modüller arası event yayımlayanın `*.Contracts` projesinde durur (Payments'ın Contracts projesi henüz yok);
@@ -869,4 +869,4 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - Modüller henüz `Raise` çağırmıyor.
   - `outbox_consumers`'ın anahtarını (EventId, Handler) → (mesaj `Id`, Handler) değiştirmek tablo boşken ucuz ("Sonraya bırakılanlar", code review #12).
   - Api host testlerinde dispatcher gerçek saatle 5 sn'de bir çalışıyor. Event akışını Api host'unda test etmek için `FakeClockApiFactory` + saat ilerletme ya da görünür etkiyi bekleme gerekir (`OutboxDispatcherTests`'teki teknik).
-- **Sıradaki:** merge onayından sonra yeni oturumda `/novacore-phase 4b`.
+- **Sıradaki:** yeni oturumda `/novacore-phase 4b`.
