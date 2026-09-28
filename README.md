@@ -522,6 +522,9 @@ dotnet test
 - **Stok rezervasyonu:** Catalog ve Payments handler'ları doğrudan çağrılarak test edilir: rezervasyon, üç ret
   nedeni, tekrar teslimde değişiklik olmaması, ödemenin bir kez sonuçlanması. Bir test de akışın tamamını Api host'unda
   gerçek dispatcher'la sahte saati ilerleterek dener (POST'tan Completed'a).
+- **Eşzamanlılık:** son birim için aynı anda gelen iki ödemeden biri Completed, biri Failed olur ve stok 0'da kalır.
+  Bir test interceptor'ı başka bir yazarı taklit eder: okunduktan sonra değişen stok, ürün uçlarında 409 döndürür.
+  Rezervasyonun teslimi ise düşer ve güncel stokla yeniden denenir.
 - **Kimlik sağlayıcı:** eklenti, yalnızca çekirdek + eklentiden kurulan bir host'ta (`IdentityServer/`) uçtan uca test
   edilir: Authorization Code + PKCE, refresh **rotation** ve **reuse** (zincir iptali), client credentials, sertleştirmeler,
   2FA, oturum uçları, admin API'si. `IdentityServerWiringTests` aynı akışı Api host'unun kendisinde dener.

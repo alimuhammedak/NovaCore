@@ -720,15 +720,21 @@ Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-0
   - Test tekniği: handler'ı doğrudan çağıran testler ödemeyi outbox'a koymuyor (`ClearDomainEvents`). Aksi hâlde dispatcher'ın ilk turu aynı talebi aynı anda teslim edebilirdi.
   - `has-pending-model-changes` üç context'te de temiz.
   - Güncellenenler: README (proje ağacı, uç nokta tablosu, Modüller Arası İletişim, Domain event'ler, Test), `src/Modules/CLAUDE.md`, `tests/CLAUDE.md`, CHANGELOG.
-- [x] F4b.2c (commit: bir sonraki satırda): Stok eşzamanlılık belirteci.
+- [x] F4b.2c (b5f43bc): Stok eşzamanlılık belirteci.
   - `ProductConfiguration`: `Stock` artık `IsConcurrencyToken()`. `has-pending-model-changes` fark görmedi (belirteç şemayı değiştirmiyor), bu yüzden migration eklenmedi.
   - `UpdateProduct` ve `DeleteProduct` `DbUpdateConcurrencyException`'ı 409 `product.concurrency_conflict`'e çeviriyor; iki uca `.ProducesProblem(409)` eklendi (OpenAPI belgesine yeni yanıt).
   - Test altyapısı: `NovaCoreApiFactory.CatalogConnectionString` (protected); `FakeClockApiFactory` artık sealed değil; yeni `StockRaceApiFactory` ve iç `CompetingStockWrite` interceptor'ı. Interceptor, ürünü değiştiren bir sonraki kayıttan önce stoğu başka bir bağlantıyla değiştiriyor.
   - Testler 212 → 214: `StockConcurrencyTests` (PUT ve DELETE, 409; eşzamanlı satışın stoğu korunuyor). Önce kırmızı: belirteç yokken ikisi de 204 aldı. Kasıtlı bozma (commit'lenmedi): belirteç kapatılınca ikisi de yine kırmızı.
   - **Sürpriz:** hiçbir alanı değiştirmeyen PUT UPDATE göndermiyor, dolayısıyla çakışmıyor (doğru davranış). Test gerçek bir yeniden stoklama yapıyor.
   - Güncellenenler: README (Modüller Arası İletişim), `src/Modules/CLAUDE.md` (belirteç kalıbı), `tests/CLAUDE.md`, CHANGELOG.
-- [ ] F4b.3 Eşzamanlılık testi (sıradaki)
-- [ ] F5.3 Test borcu (Faz 5'ten taşındı, D-033)
+- [x] F4b.3 (commit: bir sonraki satırda): Eşzamanlılık testi.
+  - `StockConcurrencyTests`'e gerçek dispatcher'la iki test eklendi:
+    - Son birim için aynı anda iki ödeme: ikisi de 201 Pending, sonra biri Completed biri Failed, stok 0.
+    - Rezervasyon stoğu okuduktan sonra başka bir satış son birimi alıyor: ilk teslim `DbUpdateConcurrencyException` ile düşüyor (`Attempts` = 1), yeniden deneme yeni stoğu okuyup reddediyor. Ödeme Failed, stok 0.
+  - Testler 214 → 216. Adımın kapsamı yalnızca test olduğu ve davranış F4b.2b/F4b.2c'de geldiği için testler yazıldıkları anda yeşildi.
+  - Kasıtlı bozma (commit'lenmedi): stok kontrolü kapatılınca ilk test (iki ödeme de Completed), belirteç kapatılınca ikinci test (bayat stokla Completed) kırmızıya döndü.
+  - README Test bölümü güncellendi.
+- [ ] F5.3 Test borcu (Faz 5'ten taşındı, D-033) (sıradaki)
 
 ### Faz 4c
 - [ ] F4c.1 Güvenli varsayılanlar (FallbackPolicy, CORS)
