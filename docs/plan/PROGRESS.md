@@ -15,7 +15,7 @@
 | 3a | ✅ tamam | `faz/3a-kimlik-dogrulama` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-27) |
 | 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
-| 4b | 🔄 devam ediyor | `faz/4b-referans-moduller` | 2026-09-28 | | |
+| 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | |
 | 4c | ⏳ başlamadı | | | | |
 | 4d | ⏳ başlamadı (koşullu, F4d.1) | | | | |
 | 5 | ⏳ başlamadı | | | | |
@@ -746,7 +746,7 @@ Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-0
   - Test: 219/219 (Release ve Debug).
   - `list package --vulnerable`: 13 projede açık yok.
   - `has-pending-model-changes`: üç context'te temiz.
-- [x] Code review düzeltmeleri (commit: bir sonraki satırda): `code-review` (xhigh, `main...faz/4b-referans-moduller`) 13 bulgu verdi.
+- [x] Code review düzeltmeleri (cd91b05): `code-review` (xhigh, `main...faz/4b-referans-moduller`) 13 bulgu verdi.
   - Düzeltilenler:
     - (#1) `Two_payments_for_the_last_unit_sell_it_once` kararsızdı. Açılıştaki tur ya da sınıfın önceki bir testinin saat ilerletmesinden kalan tur, ilk ödemenin stoğunu ikinci POST'un kontrolünden önce ayırabiliyordu; ikinci POST 409 alırdı. Ödemeler artık doğrudan, outbox'a yazılarak kaydediliyor. Kasıtlı bozma: stok kontrolü kapatılınca test yine kırmızı.
     - (#6) Stok belirteci modeli değiştirmişti ama snapshot güncellenmemişti; `has-pending-model-changes` belirteci görmüyor. Boş `StockConcurrencyToken` migration'ı snapshot'ı modelle eşitliyor, şema değişmiyor. Kural: `src/Modules/CLAUDE.md`, "After adding/altering an entity, generate a migration".
@@ -757,6 +757,11 @@ Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-0
   - Değişiklik gerekmedi: (#4) `PaymentStatus.Refunded`'ın silinmesi. `Refund()` hiç çağrılmadığı için bu değerle yazılmış satır olamaz.
   - Kapsam dışı ya da kabul edildi, "Sonraya bırakılanlar"da: #2 (zaten listedeydi), #3, #5, #9, #13.
   - `tests/CLAUDE.md` yeni yardımcılara ve "arka planda süren tur" tuzağına göre güncellendi. Testler 219/219.
+- Faz doğrulaması, düzeltmelerden sonra (2026-09-28):
+  - Release `--no-incremental`: 0 uyarı, 0 hata.
+  - Test: 219/219 (Release).
+  - `has-pending-model-changes`: üç context'te temiz.
+  - Akış ve eşzamanlılık testleri art arda 3 koşuda yeşil (27/27).
 
 ### Faz 4c
 - [ ] F4c.1 Güvenli varsayılanlar (FallbackPolicy, CORS)
@@ -942,27 +947,30 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-28, faz dışı oturum: tüketici hazırlığı araştırması ve plan düzenlemesi (D-033).** Kod değişmedi. Faz 4a'nın bitişi ve merge'ü önceki nottaki gibi (`main` GitHub'a push'landı, CI koşusu 36385969576'nın sonucu izlenmedi).
+**2026-09-28, Faz 4b: Referans modüller (tamam, merge bekliyor).** Branch `faz/4b-referans-moduller`, 8 commit. Oturum `/novacore-phase 4c` ile başladı; 4b başlamadığı için bağımlılık kontrolünde durduruldu, kullanıcı 4b'yi başlattı.
 
 - **Yapılanlar:**
-  - Araştırma: "NovaCore'u sıfırdan açılan projelerin altyapısı yapmak için ne eksik, ne fazla, sorumluluk nasıl bölünür?" Sonuç [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md)'de, kaynaklar R-071…R-074'te.
-  - Plan kullanıcı isteğiyle yeniden düzenlendi (D-033):
-    - 4b daraltıldı. Id bazlı eşitlik ve genel `Product` invariant'ları çıktı, F5.3 4b'ye geldi.
-    - Yeni Faz 4c: güvenli varsayılanlar, super-admin, forwarded headers, hata eşlemesi, tipli sonuçlar, Data Protection, outbox bakımı.
-    - Yeni koşullu Faz 4d: kimlik eklentisinin üretim eksikleri.
-    - Faz 5 template package, smoke test ve yayın kararına odaklandı; 1.0 ilk gerçek projeden sonraya bırakıldı.
-  - "Sonraya bırakılanlar"ın başına iki blok eklendi: plana alınan maddeler ve bilerek alınmayanlar (tetik koşuluyla).
-  - `.claude/skills/novacore-phase/SKILL.md` faz sırasını artık PLAN'dan okuyor.
-- **Bekleyen (kullanıcı):** F4b.1 (stok rezervasyonu: senkron contract ya da event), F4d.1 (IdP modeli), F5.4 (yayın kanalı ve ilk sürüm). Hepsi kendi fazının başında sorulur.
-- **Sonraki fazın (4b) bilmesi gerekenler** (4a'dan devralınan):
-  - F4b.1'deki iki seçenek için de altyapı hazır. Event seçilirse:
-    - modüller arası event'i yayımlayan modülün `*.Contracts` projesinde durur (Payments'ın Contracts projesi henüz yok);
-    - handler'lar idempotent yazılır;
-    - her halka en fazla bir tur (5 sn) gecikme ekler.
-    - Y-18'e dikkat: eventual consistency yalnızca gerçekten gereken yerde kullanılır.
-  - Modüller henüz `Raise` çağırmıyor.
-  - `Payment.Complete/Fail/Refund` hiçbir yerde çağrılmıyor (F4b.2 kullanılmayanları siler).
-  - Api host testlerinde dispatcher gerçek saatle 5 sn'de bir çalışıyor. Event akışını orada test etmek için `FakeClockApiFactory` + saat ilerletme ya da görünür etkiyi bekleme gerekir (`OutboxDispatcherTests`'teki teknik).
-  - `outbox_consumers` anahtar değişikliği artık F4c.7'de. 4b yalnızca test verisi üretir, yani sıralama bir maliyet getirmez.
-  - 4b'nin başında CI koşusu 36385969576'nın sonucu kontrol edilmeli.
-- **Sıradaki:** yeni oturumda `/novacore-phase 4b`.
+  - F4b.1: kullanıcı event akışını seçti (Q-30, D-034). Uygulama kararları D-035'te, kaynaklar R-075'te.
+  - F4b.2a–c:
+    - Payments ödemeyi Pending kaydediyor ve `PaymentCreated`'ı yayımlıyor (yeni `Payments.Contracts` projesi).
+    - Catalog stoğu ayırıyor ya da reddediyor. Cevap, anahtarı PaymentId olan bir `StockReservation`; `StockReserved` ya da `StockReservationFailed` event'iyle birlikte yazılıyor.
+    - Payments ödemeyi Completed ya da Failed yapıyor.
+    - `Product.Stock` bir concurrency token; PUT/DELETE çakışmada 409 dönüyor.
+    - Migration'lar: `StockReservations` ve `StockConcurrencyToken` (yalnızca snapshot).
+  - F4b.3: eşzamanlılık testleri: son birim için iki ödeme, okunduktan sonra başka bir satışın aldığı stok.
+  - F5.3: Catalog CRUD uçtan uca testleri. Ödemenin uçtan uca testi `StockReservationTests`'te.
+  - Code review'daki 13 bulgunun 7'si düzeltildi, 1'i gereksizdi, 5'i "Sonraya bırakılanlar"a yazıldı.
+  - Testler 190 → 219.
+- **Sürprizler:**
+  - SQLite `DateTimeOffset`'e göre ORDER BY çeviremiyor, bu yüzden `GET /payments` test veritabanında 500 dönüyor. Testler ödemenin durumunu veritabanından okuyor.
+  - Hiçbir alanı değiştirmeyen bir PUT UPDATE göndermiyor, dolayısıyla çakışmıyor (doğru davranış).
+  - Concurrency token `has-pending-model-changes`'te görünmüyor ama model snapshot'ını değiştiriyor; boş bir migration gerekti (review #6).
+  - Api host'unda önceki testten kalan bir dispatcher turu, aynı anda gönderilen HTTP istekleriyle yarışabiliyor (review #1). Çözüm `ModuleTestData`'daki yardımcılar.
+- **Bekleyen (kullanıcı):** 4b'nin `main`'e merge'ü. Yerel `main`, `origin/main`'den 1 commit ileride (D-033 plan commit'i push edilmedi). F4d.1 (IdP modeli) ve F5.4 kendi fazlarının başında sorulacak.
+- **Sonraki fazın (4c) bilmesi gerekenler:**
+  - F4c.5 (tipli sonuçlar): `UpdateProduct`/`DeleteProduct`'ın yeni 409 yolunu da kapsamalı. `CreatePayment` 201 ve `Pending` dönmeye devam ediyor.
+  - F4c.1 (FallbackPolicy): modül uçlarının hepsi `RequirePermission` taşıyor. Event handler'ları HTTP dışında çalıştığı için etkilenmez.
+  - F4c.4 (hata eşlemesi): `DbUpdateConcurrencyException` bugün modüllerde uç başına 409'a çevriliyor (review #9). Çekirdeğin eşlemesi modüllere bir kanca verirse bu çeviri oraya toplanabilir.
+  - F4c.7 (outbox şeması): `outbox_consumers`'a artık Catalog ve Payments handler'ları kayıt yazıyor. Anahtar değişikliği migration'ı mevcut satırları dönüştürmeli; henüz yayın yok, veri yalnızca geliştirme veritabanlarında. F4c.7'nin silmesi planlanan `IDomainEventDispatcher`'ı modüller kullanmıyor.
+  - Test altyapısı: `FakeClockApiFactory` artık sealed değil. Yeni yardımcılar `StockRaceApiFactory`, `ModuleTestData` ve `OutboxDelivery.RunUntilAsync` (tests/CLAUDE.md).
+- **Sıradaki:** merge onayından sonra yeni bir oturumda `/novacore-phase 4c`.
