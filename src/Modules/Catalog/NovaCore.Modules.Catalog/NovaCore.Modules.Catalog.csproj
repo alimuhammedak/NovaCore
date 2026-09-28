@@ -3,6 +3,7 @@
   <!--
     Catalog module: a vertical-slice business module. Owns its domain, its DbContext (schema
     "catalog"), its endpoints. References NovaCore.AspNetCore and NovaCore.EntityFrameworkCore for the host plumbing and its own Contracts.
+    Reserves a payment's stock when the Payments module asks, so it references Payments.Contracts — never the Payments module.
   -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
@@ -18,6 +19,7 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.AspNetCore\NovaCore.AspNetCore.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\NovaCore.EntityFrameworkCore\NovaCore.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\NovaCore.Modules.Catalog.Contracts\NovaCore.Modules.Catalog.Contracts.csproj" />
+    <ProjectReference Include="..\..\Payments\NovaCore.Modules.Payments.Contracts\NovaCore.Modules.Payments.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

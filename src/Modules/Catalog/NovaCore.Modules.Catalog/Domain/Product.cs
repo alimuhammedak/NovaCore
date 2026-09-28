@@ -1,4 +1,5 @@
 using NovaCore.Abstractions.Entities;
+using NovaCore.Abstractions.Results;
 
 namespace NovaCore.Modules.Catalog.Domain;
 
@@ -30,6 +31,25 @@ public sealed class Product : AuditableEntity<Guid>
         Description = description;
         Price = price;
         Stock = stock;
+    }
+
+    /// <summary>
+    /// Takes <paramref name="quantity"/> units out of stock for a payment. Stock never goes below zero: an inactive
+    /// product, or one short of stock, refuses and keeps its stock.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="quantity"/> is not positive: it would add stock.</exception>
+    public Result RemoveStock(int quantity)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
+
+        if (!IsActive)
+            return Result.Failure(Error.Conflict("product.inactive", $"Product '{Name}' is not available."));
+        if (Stock < quantity)
+            return Result.Failure(Error.Conflict("product.insufficient_stock",
+                $"Only {Stock} unit(s) of '{Name}' are in stock."));
+
+        Stock -= quantity;
+        return Result.Success();
     }
 
     public void Deactivate() => IsActive = false;

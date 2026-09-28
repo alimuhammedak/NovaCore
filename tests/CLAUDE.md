@@ -67,6 +67,14 @@ call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsT
   so assert "at least" or keep advancing until the end state; to show that a pass ran, save a later "barrier"
   message and wait for it.
 
+On the Api host the dispatcher runs too. With `FakeClockApiFactory` its timer follows the fake clock:
+`OutboxDelivery.RunUntilAsync(factory.Clock, condition)` advances it by the polling interval until the effect shows up
+(`StockReservationTests` runs a payment from POST to Completed this way). A module's handler can also be called
+directly: resolve `IDomainEventHandler<T>` from a scope, as the dispatcher does. When the test hands a request to a
+handler itself, keep that request out of the outbox (`ClearDomainEvents` before saving). Otherwise the dispatcher's
+first pass may deliver it at the same time. `GET /api/v1/payments` orders by a `DateTimeOffset`, which SQLite can't
+translate (R-068), so tests read payments from the database.
+
 ## Tokens: an in-memory OpenID Connect issuer
 
 The core validates access tokens against `Jwt:Authority` (D-002, D-024). `TestIdentityProvider` is that authority for

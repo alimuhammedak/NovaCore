@@ -65,7 +65,7 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 | `/api/v1/auth/2fa/*` | TOTP iki-faktör (setup/enable/disable) |
 | `/api/v1/admin/*` | Kullanıcı/rol/izin yönetimi (permission korumalı) |
 | `/api/v1/products` | Catalog modülü (CRUD, permission korumalı) |
-| `/api/v1/payments` | Payments modülü (Catalog'a contract üzerinden bağlı) |
+| `/api/v1/payments` | Payments modülü (Catalog'a contract ve event'lerle bağlı) |
 
 > SQL Server olmadan da uygulama açılır ve `/openapi`, validation/401 kapıları çalışır. `/health` bu durumda
 > `Unhealthy` (503) döner, çünkü modül veritabanlarına ulaşamaz. DB'ye dokunan endpoint'ler düzgün bir
@@ -155,9 +155,10 @@ NovaCore.slnx
 │   │
 │   ├── Modules/
 │   │   ├── Catalog/
-│   │   │   ├── NovaCore.Modules.Catalog.Contracts/  # IProductCatalog + ProductInfo (dışa açılan tek yüzey)
+│   │   │   ├── NovaCore.Modules.Catalog.Contracts/  # IProductCatalog + ProductInfo, StockReserved/StockReservationFailed (dışa açılan tek yüzey)
 │   │   │   └── NovaCore.Modules.Catalog/            # CatalogModule, Domain, Features/, Infrastructure/ (schema: catalog)
 │   │   └── Payments/
+│   │       ├── NovaCore.Modules.Payments.Contracts/ # PaymentCreated (Catalog'un tepki verdiği event)
 │   │       └── NovaCore.Modules.Payments/           # PaymentsModule (schema: payments) — Catalog'a Contracts ile bağlı
 │   │
 │   └── Api/
@@ -272,6 +273,23 @@ if (product.Stock < request.Qty) return Error.Conflict(...);
 Bu, ileride bir modülü mikroservise ayırmayı ucuz tutar: contract aynı kalır, çağrı in-process'ten
 HTTP/mesaj kuyruğuna döner.
 
+**Stok rezervasyonu: iki yönlü event akışı.** Stoğu düşmek iki modülün ayrı DbContext'lerine yazmak demek ve bu
+context'ler ortak bir transaction paylaşmaz. Bu yüzden ödeme ile stok, outbox üzerinden event'lerle tutarlı tutulur
+(DECISIONS D-034):
+
+1. `CreatePayment` yukarıdaki kontrolleri yapar ve ödemeyi **Pending** olarak kaydeder. `Payment`'ın raise ettiği
+   `PaymentCreated` (`NovaCore.Modules.Payments.Contracts`) aynı transaction'da outbox'a yazılır. Yanıt 201 + `Pending`.
+2. Catalog'un `ReserveStockForPayment` handler'ı stoğu `Product.RemoveStock` ile düşer ya da talebi reddeder (ürün
+   yok, aktif değil ya da stok yetmiyor). Cevap, ödemenin id'siyle anahtarlanan bir `StockReservation` kaydıdır. Bu
+   kayıt, stok değişikliği ve cevap event'i (`StockReserved` / `StockReservationFailed`, `Catalog.Contracts`) tek
+   `SaveChanges`'te yazılır. Aynı talep ikinci kez teslim edilirse kaydı bulur ve hiçbir şey yapmaz.
+3. Payments'ın `SettlePayment` handler'ı ödemeyi **Completed** ya da **Failed** yapar. Ödeme yalnızca bir kez
+   sonuçlanır; aynı cevap tekrar gelirse değişiklik olmaz.
+
+Stoğu kesinleştiren kontrol rezervasyondur; `CreatePayment`'taki kontrol yalnızca yaygın durumlara hızlı cevap verir.
+Son birim için gelen iki istek ikisi de 201 alabilir, ama biri sonra Failed olur. Sonuç en fazla iki dispatcher turu
+sonra (yaklaşık 10 sn) `GET /api/v1/payments`'ta görünür.
+
 ### Domain event'ler ve outbox
 
 Bir entity olayı `Raise(new SiparisVerildi(...))` ile kaydeder. Event, `DomainEvent`'ten türeyen bir record'dur.
@@ -291,8 +309,10 @@ outbox**): entity değişikliği ve event ya birlikte kalıcı olur ya hiç olma
 Garanti **en az bir kez**dir: bir handler'ın kendi kaydıyla bu işaret arasında süreç ölürse handler bir kez daha
 çalışır. Handler'lar bu yüzden idempotent yazılır. Veritabanı başına tek dispatcher varsayılır.
 
-Handler DI'a açıkça kaydedilir: `services.AddScoped<IDomainEventHandler<SiparisVerildi>, StokDus>()`. Başka bir
-modülün tepki vereceği event, yayımlayan modülün `*.Contracts` projesinde durur.
+Handler DI'a açıkça kaydedilir: `services.AddScoped<IDomainEventHandler<PaymentCreated>, ReserveStockForPayment>()`.
+Başka bir modülün tepki vereceği event, yayımlayan modülün `*.Contracts` projesinde durur. Durum değiştiren bir
+handler, tekrar teslime karşı iş anahtarıyla bir kayıt tutar ve onu değişikliğiyle aynı `SaveChanges`'te yazar
+(`StockReservation`). `outbox_consumers` kaydı bunun yerine geçmez, çünkü handler'ın kendi kaydıyla atomik değildir.
 
 ---
 
@@ -495,10 +515,13 @@ dotnet test
 - **Outbox:** event'in entity ile aynı transaction'da yazıldığı (iki yönlü rollback) ve bir mesajın her handler'a bir
   kez teslim edildiği test edilir. Dispatcher testleri sahte saatle (`FakeTimeProvider`) çalışır: yeniden deneme,
   10 denemede bırakma ve retrying execution strategy altında çalışma da bu testlerde.
+- **Stok rezervasyonu:** Catalog ve Payments handler'ları doğrudan çağrılarak test edilir: rezervasyon, üç ret
+  nedeni, tekrar teslimde değişiklik olmaması, ödemenin bir kez sonuçlanması. Bir test de akışın tamamını Api host'unda
+  gerçek dispatcher'la sahte saati ilerleterek dener (POST'tan Completed'a).
 - **Kimlik sağlayıcı:** eklenti, yalnızca çekirdek + eklentiden kurulan bir host'ta (`IdentityServer/`) uçtan uca test
   edilir: Authorization Code + PKCE, refresh **rotation** ve **reuse** (zincir iptali), client credentials, sertleştirmeler,
   2FA, oturum uçları, admin API'si. `IdentityServerWiringTests` aynı akışı Api host'unun kendisinde dener.
-- **Architecture:** modül sınırlarını zorlar (Payments yalnızca Catalog.Contracts'a bağlı), çekirdek paketlerin
+- **Architecture:** modül sınırlarını zorlar (modüller birbirine yalnızca `*.Contracts` üzerinden bağlı), çekirdek paketlerin
   yalnızca Microsoft paketlerine bağlı olduğunu ve paketler arası bağımlılık yönünü doğrular (`NovaCore.Abstractions`
   ASP.NET/EF içermez), building block'larda assembly taraması olmadığını kontrol eder. Modül sırası ve endpoint listesi
   de testle sabitlenmiştir.

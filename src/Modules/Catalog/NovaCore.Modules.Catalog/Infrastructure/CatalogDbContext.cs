@@ -14,6 +14,8 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
 
     public DbSet<Product> Products => Set<Product>();
 
+    public DbSet<StockReservation> StockReservations => Set<StockReservation>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);

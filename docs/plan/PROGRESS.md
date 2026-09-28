@@ -705,14 +705,22 @@ Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-0
 - [x] F4b.1 (cf51371): Stok kararı.
   - Kullanıcı event akışını seçti (Q-30 → D-034). Diğer iki seçenek: senkron contract, senkron rezervasyon + event'le ödeme kaydı.
   - Uygulama kararları D-035'te, kaynaklar R-075'te. Kod değişmedi.
-- [x] F4b.2a (commit: bir sonraki satırda): Payments tarafı.
+- [x] F4b.2a (f3602d8): Payments tarafı.
   - Yeni `NovaCore.Modules.Payments.Contracts` projesi (`PaymentCreated`), yalnızca `NovaCore.Abstractions`'a bağlı; slnx'e eklendi. `Catalog.Contracts`'a `StockReserved` ve `StockReservationFailed` eklendi, o da artık `NovaCore.Abstractions`'a bağlı.
   - `Payment` kurucusu `PaymentCreated`'ı raise ediyor. `Complete()`/`Fail()` yalnızca Pending'den çalışıyor, aynı sonuç tekrar gelirse değişiklik yok, diğer geçişler `InvalidOperationException`. `Refund()` ve `PaymentStatus.Refunded` silindi (şema değişmedi, durum string kolon).
   - `SettlePayment` (internal) iki handler taşıyor; `PaymentsModule` onları açıkça kaydediyor. Bilinmeyen ödeme `InvalidOperationException`.
   - Bu adımdan sonra `PaymentCreated`'ın handler'ı yok: dispatcher onu işlenmiş sayıyor, ödeme Pending kalıyor (F4b.2b'ye kadar bugünkü davranış).
   - Testler 190 → 200: `PaymentTests` (5) ve `PaymentSettlementTests` (5). Önce kırmızı: tipler olmadığı için derleme hatası.
-- [ ] F4b.2b Catalog tarafı: stoğu ayırır ve cevap verir (sıradaki)
-- [ ] F4b.2c Stok eşzamanlılık belirteci
+- [x] F4b.2b (commit: bir sonraki satırda): Catalog tarafı; akış uçtan uca çalışıyor.
+  - `Product.RemoveStock(int)` `Result` dönüyor: aktif olmayan ürün `product.inactive`, yetersiz stok `product.insufficient_stock` ile reddediliyor ve stok değişmiyor. `quantity <= 0` `ArgumentOutOfRangeException`.
+  - `StockReservation`: anahtarı PaymentId, durumu Reserved ya da Refused, `Reason` ret kodu. `Reserve`/`Refuse` cevap event'ini raise ediyor. Tablo `stock_reservations`, `products`'a FK yok. Migration `StockReservations`.
+  - `ReserveStockForPayment` (internal handler): rezervasyon zaten varsa çıkıyor, ürün yoksa `product.not_found`, her şey tek `SaveChanges`'te. `CatalogModule` handler'ı açıkça kaydediyor; Catalog artık Payments.Contracts'ı referans alıyor.
+  - Testler 200 → 212: `ProductStockTests` (6) ve `StockReservationTests` (6: rezervasyon, üç ret nedeni, tekrar teslim, dispatcher'la POST'tan Completed'a). Önce kırmızı: tipler olmadığı için derleme hatası. Yeni test altyapısı: `OutboxDelivery.RunUntilAsync`.
+  - **Sapma (plan):** uçtan uca test ödemenin sonucunu `GET /payments` yerine veritabanından okuyor. Liste `CreatedAtUtc`'ye (DateTimeOffset) göre sıralıyor ve SQLite bunu çeviremiyor. Hata kısa bir denemeyle doğrulandı: "SQLite does not support expressions of type 'DateTimeOffset' in ORDER BY clauses" (R-068). SQL Server'da sorun yok; madde "Sonraya bırakılanlar"da.
+  - Test tekniği: handler'ı doğrudan çağıran testler ödemeyi outbox'a koymuyor (`ClearDomainEvents`). Aksi hâlde dispatcher'ın ilk turu aynı talebi aynı anda teslim edebilirdi.
+  - `has-pending-model-changes` üç context'te de temiz.
+  - Güncellenenler: README (proje ağacı, uç nokta tablosu, Modüller Arası İletişim, Domain event'ler, Test), `src/Modules/CLAUDE.md`, `tests/CLAUDE.md`, CHANGELOG.
+- [ ] F4b.2c Stok eşzamanlılık belirteci (sıradaki)
 - [ ] F4b.3 Eşzamanlılık testi
 - [ ] F5.3 Test borcu (Faz 5'ten taşındı, D-033)
 
@@ -886,6 +894,12 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4a, code review #9) Modül outbox'ları bir turda sırayla işleniyor. Erişilemeyen bir modül veritabanı (`EnableRetryOnFailure` geri çekilmesiyle) diğer modüllerin teslimini dakikalarca bekletebilir. Modüller aynı SQL Server'ı kullandığı sürece etkisi yok.
 - (Faz 4a → **Faz 5 sonu, unutulmamalı**) D-032: `docs/plan/DECISIONS.md` `.claude/hooks/package-policy.json` `protectedPaths` listesinden kullanıcı tarafından geçici olarak çıkarıldı. Bütün fazlar bitince satır geri eklenir (hook dosyası olduğu için kullanıcı ekler ya da onaylar); DECISIONS başlığındaki "hook onay ister" notu o zaman yeniden geçerli olur.
 - (Faz 4a, code review #12) `outbox_consumers`'ın clustered anahtarı (uniqueidentifier, nvarchar(256)) geniş ve SQL Server sırasında rastgele. Outbox tablosu için R-068'de kullanılan gerekçenin aynısı geçerli. Mesaj satırının `bigint Id`'si + Handler (FK ve cascade delete ile, temizlik için de uygun) daha iyi olur. D-031 (5)'i değiştirir; tablo boşken, ilk kullanımdan önce yapmak ucuz.
+
+- (Faz 4b, F4b.2b) `GET /api/v1/payments` SQLite test veritabanında 500 dönüyor: liste `CreatedAtUtc`'ye (DateTimeOffset) göre sıralıyor, SQLite bunu çeviremiyor (R-068). SQL Server'da sorun yok, ama listenin başarı yolu testlenmiyor. Çözüm yolları: test context'lerinde DateTimeOffset'i sıralanabilir bir türe çeviren bir dönüştürücü ya da gerçek SQL Server'la test (Testcontainers, paket onayı gerekir).
+- (Faz 4b, D-035 (6)) Failed bir ödemenin nedeni istemciye dönmüyor; neden yalnızca Catalog'daki rezervasyon satırında (`Reason`) duruyor. *Koşul:* bir istemci nedeni göstermek ister.
+- (Faz 4b) İade ve iadede stoğun geri verilmesi yok (`Refund` kullanılmadığı için silindi). *Koşul:* iade bir ürün gereksinimi olur. Rezervasyonu serbest bırakan bir event ve rezervasyona yeni bir durum gerekir.
+- (Faz 4b) Pending'de kalan bir ödeme için zaman aşımı ya da telafi yok. Catalog'un handler'ı 10 denemede başarısız olursa mesaj incelemeye bırakılır ve ödeme Pending kalır. *Koşul:* üretimde görülür. Pending ödemelerin yaşını izlemek ya da bir telafi adımı gerekir.
+- (Faz 4b) `Product.Deactivate`/`Reactivate`'i çağıran bir uç yok; akıştaki `product.inactive` reddi bugün yalnızca testte oluşuyor. Genel `Product` kuralları D-033 ile kapsam dışında.
 
 ## Son devir notu
 
