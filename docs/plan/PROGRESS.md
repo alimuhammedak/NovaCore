@@ -15,7 +15,7 @@
 | 3a | ✅ tamam | `faz/3a-kimlik-dogrulama` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-27) |
 | 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
-| 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | |
+| 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4c | ⏳ başlamadı | | | | |
 | 4d | ⏳ başlamadı (koşullu, F4d.1) | | | | |
 | 5 | ⏳ başlamadı | | | | |
@@ -947,7 +947,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-28, Faz 4b: Referans modüller (tamam, merge bekliyor).** Branch `faz/4b-referans-moduller`, 8 commit. Oturum `/novacore-phase 4c` ile başladı; 4b başlamadığı için bağımlılık kontrolünde durduruldu, kullanıcı 4b'yi başlattı.
+**2026-09-28, Faz 4b: Referans modüller (tamam, `main`'e merge edildi).** Branch `faz/4b-referans-moduller`, 8 commit. Oturum `/novacore-phase 4c` ile başladı; 4b başlamadığı için bağımlılık kontrolünde durduruldu, kullanıcı 4b'yi başlattı.
 
 - **Yapılanlar:**
   - F4b.1: kullanıcı event akışını seçti (Q-30, D-034). Uygulama kararları D-035'te, kaynaklar R-075'te.
@@ -966,7 +966,8 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - Hiçbir alanı değiştirmeyen bir PUT UPDATE göndermiyor, dolayısıyla çakışmıyor (doğru davranış).
   - Concurrency token `has-pending-model-changes`'te görünmüyor ama model snapshot'ını değiştiriyor; boş bir migration gerekti (review #6).
   - Api host'unda önceki testten kalan bir dispatcher turu, aynı anda gönderilen HTTP istekleriyle yarışabiliyor (review #1). Çözüm `ModuleTestData`'daki yardımcılar.
-- **Bekleyen (kullanıcı):** 4b'nin `main`'e merge'ü. Yerel `main`, `origin/main`'den 1 commit ileride (D-033 plan commit'i push edilmedi). F4d.1 (IdP modeli) ve F5.4 kendi fazlarının başında sorulacak.
+- **Merge:** kullanıcı onayıyla `main`'e `--no-ff` merge edildi (2026-09-28), push edilmedi. Yerel `main`, `origin/main`'den ileride: D-033 plan commit'i ve Faz 4b. Push kullanıcının kararı.
+- **Bekleyen (kullanıcı):** F4d.1 (IdP modeli) ve F5.4 kendi fazlarının başında sorulacak.
 - **Sonraki fazın (4c) bilmesi gerekenler:**
   - F4c.5 (tipli sonuçlar): `UpdateProduct`/`DeleteProduct`'ın yeni 409 yolunu da kapsamalı. `CreatePayment` 201 ve `Pending` dönmeye devam ediyor.
   - F4c.1 (FallbackPolicy): modül uçlarının hepsi `RequirePermission` taşıyor. Event handler'ları HTTP dışında çalıştığı için etkilenmez.
