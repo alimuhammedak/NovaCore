@@ -287,8 +287,8 @@ context'ler ortak bir transaction paylaşmaz. Bu yüzden ödeme ile stok, outbox
    sonuçlanır; aynı cevap tekrar gelirse değişiklik olmaz.
 
 Stoğu kesinleştiren kontrol rezervasyondur; `CreatePayment`'taki kontrol yalnızca yaygın durumlara hızlı cevap verir.
-Son birim için gelen iki istek ikisi de 201 alabilir, ama biri sonra Failed olur. Sonuç en fazla iki dispatcher turu
-sonra (yaklaşık 10 sn) `GET /api/v1/payments`'ta görünür.
+Son birim için gelen iki istek ikisi de 201 alabilir, ama biri sonra Failed olur. Teslimler başarılıysa sonuç iki
+dispatcher turu içinde (yaklaşık 10 sn) `GET /api/v1/payments`'ta görünür; başarısız her teslim bir tur daha ekler.
 
 Stoğa aynı anda yazan iki işlem birbirinin üstüne yazamaz, çünkü `Product.Stock` bir concurrency token'dır. Ürün uç
 noktaları (`PUT`/`DELETE`) okuduktan sonra değişmiş bir stokta 409 `product.concurrency_conflict` döner; rezervasyonun

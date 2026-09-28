@@ -105,8 +105,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The Payments module's answer handler completes or fails the payment. A payment settles once; the same answer again
     changes nothing, and the other answer is refused.
   - `POST /api/v1/payments` still answers 201 with a pending payment and keeps its 404/400/409 checks. The outcome shows
-    up in `GET /api/v1/payments` within two dispatcher passes. Two requests for the last unit can both be accepted; one
-    of them then fails. Migration `StockReservations` adds `catalog.stock_reservations`.
+    up in `GET /api/v1/payments` within two dispatcher passes when the deliveries succeed; each failed delivery adds a
+    pass. Two requests for the last unit can both be accepted; one of them then fails. Migration `StockReservations`
+    adds `catalog.stock_reservations`.
 
 ### Changed
 
@@ -214,7 +215,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Code that derives from `Entity<TId>` or `AuditableEntity<TId>` compiles unchanged.
 - `PUT` and `DELETE /api/v1/products/{id}` (Catalog sample module) answer 409 with code `product.concurrency_conflict`
   when the product's stock changed after the request read it. `Stock` is now a concurrency token, so a write can't
-  undo a sale. The OpenAPI document lists the 409 response for both.
+  undo a sale. The OpenAPI document lists the 409 response for both. Migration `StockConcurrencyToken` only brings the
+  model snapshot up to date; the schema doesn't change.
 - **Breaking (API and behaviour):** `IDomainEventDispatcher` is registered scoped and resolves the handlers from the
   caller's scope; as a singleton it resolved them from the root provider, which failed for scoped handlers. Each event
   type's handlers are invoked through a cached, strongly typed wrapper instead of `MethodInfo.Invoke` per call.

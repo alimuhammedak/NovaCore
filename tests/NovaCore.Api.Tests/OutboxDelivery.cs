@@ -13,14 +13,23 @@ internal static class OutboxDelivery
     // OutboxDispatcher.PollingInterval, which is internal to NovaCore.EntityFrameworkCore.
     private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(5);
 
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+
     public static async Task RunUntilAsync(FakeTimeProvider clock, Func<Task<bool>> delivered)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
-        while (!await delivered())
+        timeout.CancelAfter(Timeout);
+        try
         {
-            clock.Advance(PollingInterval);
-            await Task.Delay(TimeSpan.FromMilliseconds(50), timeout.Token);
+            while (!await delivered())
+            {
+                clock.Advance(PollingInterval);
+                await Task.Delay(TimeSpan.FromMilliseconds(50), timeout.Token);
+            }
+        }
+        catch (OperationCanceledException) when (!TestContext.Current.CancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"The outbox didn't deliver the expected effect within {Timeout.TotalSeconds} seconds.");
         }
     }
 }

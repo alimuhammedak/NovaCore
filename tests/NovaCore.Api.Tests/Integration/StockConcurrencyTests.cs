@@ -2,10 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Modules.Catalog.Authorization;
-using NovaCore.Modules.Catalog.Domain;
-using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Payments.Authorization;
 using NovaCore.Modules.Payments.Contracts;
 using NovaCore.Modules.Payments.Domain;
@@ -26,7 +23,7 @@ public sealed class StockConcurrencyTests(StockRaceApiFactory factory) : IClassF
     [Fact]
     public async Task Updating_a_product_whose_stock_changed_after_it_was_read_is_a_conflict()
     {
-        var productId = await AddProductAsync(stock: 5);
+        var productId = await factory.AddProductAsync(stock: 5);
         using var client = factory.CreateClientWithPermissions(CatalogPermissions.ProductsUpdate);
         factory.ChangeStockBeforeNextSave(productId, stock: 4);
 
@@ -35,61 +32,61 @@ public sealed class StockConcurrencyTests(StockRaceApiFactory factory) : IClassF
             $"/api/v1/products/{productId}", new { name = "Widget", price = 10m, stock = 8 });
 
         await AssertConflictAsync(response);
-        Assert.Equal(4, await StockAsync(productId));
+        Assert.Equal(4, await factory.StockAsync(productId));
     }
 
     [Fact]
     public async Task Deleting_a_product_whose_stock_changed_after_it_was_read_is_a_conflict()
     {
-        var productId = await AddProductAsync(stock: 5);
+        var productId = await factory.AddProductAsync(stock: 5);
         using var client = factory.CreateClientWithPermissions(CatalogPermissions.ProductsDelete);
         factory.ChangeStockBeforeNextSave(productId, stock: 4);
 
         var response = await client.DeleteAsync($"/api/v1/products/{productId}");
 
         await AssertConflictAsync(response);
-        Assert.Equal(4, await StockAsync(productId));
+        Assert.Equal(4, await factory.StockAsync(productId));
     }
 
     [Fact]
     public async Task Two_payments_for_the_last_unit_sell_it_once()
     {
-        var productId = await AddProductAsync(stock: 1);
-        using var client = factory.CreateClientWithPermissions(PaymentsPermissions.Create);
+        var productId = await factory.AddProductAsync(stock: 1);
 
-        // Both pass CreatePayment's check; the reservation decides.
-        var responses = await Task.WhenAll(
-            client.PostAsJsonAsync("/api/v1/payments", new { productId, quantity = 1 }),
-            client.PostAsJsonAsync("/api/v1/payments", new { productId, quantity = 1 }));
-        Assert.All(responses, response => Assert.Equal(HttpStatusCode.Created, response.StatusCode));
-        var paymentIds = await Task.WhenAll(responses.Select(PaymentIdAsync));
+        // Both passed CreatePayment's check, as two requests for the last unit arriving together do; the reservation
+        // decides. Saved directly, so a pass already running can't turn the second request away before it is saved.
+        Guid[] paymentIds =
+        [
+            await factory.AddPaymentAsync(productId, quantity: 1),
+            await factory.AddPaymentAsync(productId, quantity: 1),
+        ];
 
         await OutboxDelivery.RunUntilAsync(factory.Clock, async () =>
-            (await Task.WhenAll(paymentIds.Select(PaymentStatusAsync))).All(status => status != PaymentStatus.Pending));
+            (await Task.WhenAll(paymentIds.Select(factory.PaymentStatusAsync))).All(status => status != PaymentStatus.Pending));
 
-        var statuses = await Task.WhenAll(paymentIds.Select(PaymentStatusAsync));
+        var statuses = await Task.WhenAll(paymentIds.Select(factory.PaymentStatusAsync));
         Assert.Equal([PaymentStatus.Completed, PaymentStatus.Failed], statuses.Order());
-        Assert.Equal(0, await StockAsync(productId));
+        Assert.Equal(0, await factory.StockAsync(productId));
     }
 
     [Fact]
     public async Task A_reservation_over_stock_sold_after_it_was_read_is_retried_on_the_new_stock()
     {
-        var productId = await AddProductAsync(stock: 1);
+        var productId = await factory.AddProductAsync(stock: 1);
         using var client = factory.CreateClientWithPermissions(PaymentsPermissions.Create);
         // Another sale takes the last unit while the reservation holds the stock it read.
         factory.ChangeStockBeforeNextSave(productId, stock: 0);
 
         var response = await client.PostAsJsonAsync("/api/v1/payments", new { productId, quantity = 1 });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var paymentId = await PaymentIdAsync(response);
+        var paymentId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("paymentId").GetGuid();
 
         await OutboxDelivery.RunUntilAsync(factory.Clock,
-            async () => await PaymentStatusAsync(paymentId) != PaymentStatus.Pending);
+            async () => await factory.PaymentStatusAsync(paymentId) != PaymentStatus.Pending);
 
-        Assert.Equal(PaymentStatus.Failed, await PaymentStatusAsync(paymentId));
-        Assert.Equal(0, await StockAsync(productId));
-        var request = await PaymentCreatedMessageAsync(paymentId);
+        Assert.Equal(PaymentStatus.Failed, await factory.PaymentStatusAsync(paymentId));
+        Assert.Equal(0, await factory.StockAsync(productId));
+        var request = Assert.Single(await factory.OutboxMessagesAsync<PaymentsDbContext, PaymentCreated>(paymentId));
         Assert.Equal(1, request.Attempts);
         Assert.Contains(nameof(DbUpdateConcurrencyException), request.Error, StringComparison.Ordinal);
     }
@@ -100,48 +97,4 @@ public sealed class StockConcurrencyTests(StockRaceApiFactory factory) : IClassF
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("product.concurrency_conflict", problem.GetProperty("code").GetString());
     }
-
-    private static async Task<Guid> PaymentIdAsync(HttpResponseMessage response) =>
-        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("paymentId").GetGuid();
-
-    private async Task<Guid> AddProductAsync(int stock)
-    {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var catalog = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
-        var product = new Product("Widget", null, 10m, stock);
-        catalog.Products.Add(product);
-        await catalog.SaveChangesAsync();
-        return product.Id;
-    }
-
-    private async Task<int> StockAsync(Guid productId)
-    {
-        await using var scope = factory.Services.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<CatalogDbContext>().Products
-            .Where(product => product.Id == productId)
-            .Select(product => product.Stock)
-            .SingleAsync();
-    }
-
-    private async Task<PaymentStatus> PaymentStatusAsync(Guid paymentId)
-    {
-        await using var scope = factory.Services.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<PaymentsDbContext>().Payments
-            .Where(payment => payment.Id == paymentId)
-            .Select(payment => payment.Status)
-            .SingleAsync();
-    }
-
-    private async Task<OutboxRow> PaymentCreatedMessageAsync(Guid paymentId)
-    {
-        var type = typeof(PaymentCreated);
-        await using var scope = factory.Services.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<PaymentsDbContext>().Database
-            .SqlQueryRaw<OutboxRow>(
-                "SELECT Attempts, Error FROM outbox_messages WHERE Type = {0} AND Content LIKE {1}",
-                $"{type.FullName}, {type.Assembly.GetName().Name}", $"%{paymentId}%")
-            .SingleAsync();
-    }
-
-    private sealed record OutboxRow(int Attempts, string? Error);
 }

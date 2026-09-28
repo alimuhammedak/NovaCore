@@ -70,10 +70,17 @@ call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsT
 On the Api host the dispatcher runs too. With `FakeClockApiFactory` its timer follows the fake clock:
 `OutboxDelivery.RunUntilAsync(factory.Clock, condition)` advances it by the polling interval until the effect shows up
 (`StockReservationTests` runs a payment from POST to Completed this way). A module's handler can also be called
-directly: resolve `IDomainEventHandler<T>` from a scope, as the dispatcher does. When the test hands a request to a
-handler itself, keep that request out of the outbox (`ClearDomainEvents` before saving). Otherwise the dispatcher's
-first pass may deliver it at the same time. `GET /api/v1/payments` orders by a `DateTimeOffset`, which SQLite can't
-translate (R-068), so tests read payments from the database.
+directly with `factory.HandleAsync(event)` (`ModuleTestData`), the way the dispatcher calls it.
+
+A pass may be running whenever a test acts: the first pass at startup, or one queued by an earlier test's clock
+advances in the same class fixture. So:
+- a test that hands a request to a handler itself saves it with `AddPaymentForDirectHandlingAsync`, which keeps the
+  request out of the outbox;
+- a test that needs several requests past `CreatePayment`'s check saves them with `AddPaymentAsync` instead of racing
+  POSTs against that pass.
+
+`GET /api/v1/payments` orders by a `DateTimeOffset`, which SQLite can't translate (R-068), so tests read payments from
+the database (`PaymentStatusAsync`).
 
 `StockRaceApiFactory` (a `FakeClockApiFactory`) plays a concurrent writer for `StockConcurrencyTests`.
 `ChangeStockBeforeNextSave(productId, stock)` makes the next Catalog save that modifies or deletes the product first

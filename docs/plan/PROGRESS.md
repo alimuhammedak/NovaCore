@@ -734,12 +734,29 @@ Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-0
   - Testler 214 → 216. Adımın kapsamı yalnızca test olduğu ve davranış F4b.2b/F4b.2c'de geldiği için testler yazıldıkları anda yeşildi.
   - Kasıtlı bozma (commit'lenmedi): stok kontrolü kapatılınca ilk test (iki ödeme de Completed), belirteç kapatılınca ikinci test (bayat stokla Completed) kırmızıya döndü.
   - README Test bölümü güncellendi.
-- [x] F5.3 (commit: bir sonraki satırda): Test borcu (Faz 5'ten taşındı, D-033).
+- [x] F5.3 (4bf9706): Test borcu (Faz 5'ten taşındı, D-033).
   - `CatalogEndpointsTests` (3): geçerli gövdeyle oluşturma (201 + Location), okuma, aramayla listeleme; güncelleme (204, yeni değerlerle okunuyor); silme (204, ardından 404 `product.not_found`).
   - "Ödeme yap" maddesini F4b.2b'deki `StockReservationTests` karşılıyor (POST'tan Completed'a, dispatcher'la).
   - Testcontainers eklenmedi (D-035 (7)).
   - Testler 216 → 219. Mevcut davranışı sabitledikleri için kırmızı aşamaları yok.
   - "Sonraya bırakılanlar"daki Faz 2c maddesi ve D-033 listesindeki satır kapandı.
+- Faz doğrulaması (2026-09-28, code review'dan önce):
+  - `restore --force`: NU uyarısı yok.
+  - Release `--no-incremental`: 0 uyarı, 0 hata.
+  - Test: 219/219 (Release ve Debug).
+  - `list package --vulnerable`: 13 projede açık yok.
+  - `has-pending-model-changes`: üç context'te temiz.
+- [x] Code review düzeltmeleri (commit: bir sonraki satırda): `code-review` (xhigh, `main...faz/4b-referans-moduller`) 13 bulgu verdi.
+  - Düzeltilenler:
+    - (#1) `Two_payments_for_the_last_unit_sell_it_once` kararsızdı. Açılıştaki tur ya da sınıfın önceki bir testinin saat ilerletmesinden kalan tur, ilk ödemenin stoğunu ikinci POST'un kontrolünden önce ayırabiliyordu; ikinci POST 409 alırdı. Ödemeler artık doğrudan, outbox'a yazılarak kaydediliyor. Kasıtlı bozma: stok kontrolü kapatılınca test yine kırmızı.
+    - (#6) Stok belirteci modeli değiştirmişti ama snapshot güncellenmemişti; `has-pending-model-changes` belirteci görmüyor. Boş `StockConcurrencyToken` migration'ı snapshot'ı modelle eşitliyor, şema değişmiyor. Kural: `src/Modules/CLAUDE.md`, "After adding/altering an entity, generate a migration".
+    - (#7) `ProductConfiguration` yorumu, yalnızca adı değiştiren bir güncellemenin çakışmayacağını ima ediyordu. Düzeltildi.
+    - (#8) README ve CHANGELOG'daki "iki tur içinde" üst sınırı, başarısız teslimlerin eklediği turları söylemiyordu. Düzeltildi.
+    - (#10, #11) Test verisi yardımcıları (`AddProductAsync`, `StockAsync`, `PaymentStatusAsync`, outbox sorgusu) üç sınıfta ayrı ayrı yazılmıştı; `ModuleTestData`'da toplandı. `PaymentSettlementTests`'in ödemeleri de artık outbox'a konmuyor.
+    - (#12) `OutboxDelivery.RunUntilAsync` zaman aşımında yalın bir `TaskCanceledException` veriyordu; artık açıklayıcı bir `TimeoutException` veriyor.
+  - Değişiklik gerekmedi: (#4) `PaymentStatus.Refunded`'ın silinmesi. `Refund()` hiç çağrılmadığı için bu değerle yazılmış satır olamaz.
+  - Kapsam dışı ya da kabul edildi, "Sonraya bırakılanlar"da: #2 (zaten listedeydi), #3, #5, #9, #13.
+  - `tests/CLAUDE.md` yeni yardımcılara ve "arka planda süren tur" tuzağına göre güncellendi. Testler 219/219.
 
 ### Faz 4c
 - [ ] F4c.1 Güvenli varsayılanlar (FallbackPolicy, CORS)
@@ -903,7 +920,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4a, plan kapsamı dışı) Yeniden deneme her turda (5 sn) yapılıyor, geri çekilme (backoff) yok. 10 deneme yaklaşık 50 saniye sürüyor; bundan uzun süren bir bağımlılık kesintisi mesajı incelemeye düşürür. Aralık, parça boyu ve deneme sayısı sabit (Y-19). Bir tüketici ihtiyaç duyarsa options'a taşınabilir.
 - (Faz 4a → 4b; **4b'de yapılmadı**) Teslim gecikmesi en fazla bir tur (5 sn); event zincirinde her halka bir tur ekliyor. 4b event akışını seçti (D-034), bu yüzden ödemenin sonucu en fazla iki tur (yaklaşık 10 sn) sonra görünüyor. Kayıttan sonra dispatcher'a sinyal veren anında teslim bir çekirdek değişikliği; 4b'nin kapsamı dışında. *Koşul:* bir tüketici bu gecikmeyi sorun eder.
 - (Faz 4a) `IDomainEventDispatcher`'ın `src`'de çağıranı yok. PLAN F4a.3 gereği düzeltildi ve korunuyor, ama entity event'leri outbox'tan dağıtılıyor. Faz 5'te (ya da kullanıcı kararıyla) kaldırılması değerlendirilebilir.
-- (Faz 4a, R-068) `src/Modules/CLAUDE.md` Guid v7 anahtarları için "friendly to SQL Server clustering" diyor. SQL Server `uniqueidentifier`'ı son 6 bayta göre sıralıyor, v7'nin zaman damgası ise baştaki baytlarda; yani anahtarlar SQL Server sırasında artan değil ve Catalog/Payments'ın clustered PK'ları rastgele sırayla dolar. Çözüm için belge düzeltmesi ya da anahtar stratejisi kararı gerekir (örneğin `SequentialGuidValueGenerator`). Kapsam dışı.
+- (Faz 4a, R-068) `src/Modules/CLAUDE.md` Guid v7 anahtarları için "friendly to SQL Server clustering" diyor. SQL Server `uniqueidentifier`'ı son 6 bayta göre sıralıyor, v7'nin zaman damgası ise baştaki baytlarda; yani anahtarlar SQL Server sırasında artan değil ve Catalog/Payments'ın clustered PK'ları rastgele sırayla dolar. Çözüm için belge düzeltmesi ya da anahtar stratejisi kararı gerekir (örneğin `SequentialGuidValueGenerator`). Kapsam dışı. Faz 4b'de eklenen `stock_reservations` da aynı durumda: anahtarı ödemenin Guid v7'si (code review #13).
 - (Faz 4a) Outbox interceptor'ını `AddModuleDbContext` ekliyor, audit interceptor'ını ise hâlâ her modül kendisi ekliyor. İkisini aynı yere toplamak modül kaydını kısaltır; modül ve CLAUDE.md değişikliği gerektiği için yapılmadı.
 - (Faz 4a, code review #3) Interceptor event tamponunu event'ler kayda katılırken temizliyor. Kayıt başarısız olur ve aynı entity örneği *yeni* bir context'e eklenirse event'leri kalmamış olur. Örnek: execution strategy'yle elle yazılmış, entity'yi blok dışında oluşturan bir yeniden deneme bloğu. Belgelendi (aynı context'te `SaveChanges`'i yeniden dene). Kalıcı çözüm için tamponu `SavedChanges`'te temizlemek ve zaten izlenen `EventId`'leri atlamak gerekir; açık transaction'da commit hatası yine kapsanmaz.
 - (Faz 4a, code review #5) Başarısız bir tur her tick'te (5 sn) modül başına Error logluyor ve geri çekilmiyor. Örnek: migration uygulanmamış bir geliştirme veritabanında dakikada 24 hata logu. Context başına artan bekleme ya da seri başına tek log düşünülebilir.
@@ -915,8 +932,11 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4b, F4b.2b) `GET /api/v1/payments` SQLite test veritabanında 500 dönüyor: liste `CreatedAtUtc`'ye (DateTimeOffset) göre sıralıyor, SQLite bunu çeviremiyor (R-068). SQL Server'da sorun yok, ama listenin başarı yolu testlenmiyor. Çözüm yolları: test context'lerinde DateTimeOffset'i sıralanabilir bir türe çeviren bir dönüştürücü ya da gerçek SQL Server'la test (Testcontainers, paket onayı gerekir).
 - (Faz 4b, D-035 (6)) Failed bir ödemenin nedeni istemciye dönmüyor; neden yalnızca Catalog'daki rezervasyon satırında (`Reason`) duruyor. *Koşul:* bir istemci nedeni göstermek ister.
 - (Faz 4b) İade ve iadede stoğun geri verilmesi yok (`Refund` kullanılmadığı için silindi). *Koşul:* iade bir ürün gereksinimi olur. Rezervasyonu serbest bırakan bir event ve rezervasyona yeni bir durum gerekir.
-- (Faz 4b) Pending'de kalan bir ödeme için zaman aşımı ya da telafi yok. Catalog'un handler'ı 10 denemede başarısız olursa mesaj incelemeye bırakılır ve ödeme Pending kalır. *Koşul:* üretimde görülür. Pending ödemelerin yaşını izlemek ya da bir telafi adımı gerekir.
+- (Faz 4b, code review #2) Pending'de kalan bir ödeme için zaman aşımı ya da telafi yok. Catalog'un handler'ı 10 denemede başarısız olursa mesaj incelemeye bırakılır ve ödeme Pending kalır. *Koşul:* üretimde görülür. Pending ödemelerin yaşını izlemek ya da bir telafi adımı gerekir.
 - (Faz 4b) `Product.Deactivate`/`Reactivate`'i çağıran bir uç yok; akıştaki `product.inactive` reddi bugün yalnızca testte oluşuyor. Genel `Product` kuralları D-033 ile kapsam dışında.
+- (Faz 4b, code review #3) `EnableRetryOnFailure`, commit'in sonucu belirsiz kalınca `SaveChanges`'i yeniden oynatıyor. Stok belirteci yüzünden yeniden oynatılan UPDATE/DELETE 0 satır buluyor ve `UpdateProduct`/`DeleteProduct`, yazım aslında uygulanmış olsa bile 409 dönüyor. Bu MS connection-resiliency rehberindeki "Option 1: do (almost) nothing" ile kabul edildi: nadir bir durum ve istemci yeniden okuyunca kendi yazımını görüyor. *Koşul:* gözlenirse `ExecuteInTransaction` + `verifySucceeded`.
+- (Faz 4b, code review #5) Satır eşzamanlı olarak silinmişse de 409 `product.concurrency_conflict` dönüyor; 404 daha doğru olurdu. Çakışmada `exception.Entries[0].GetDatabaseValuesAsync()` null dönüyorsa 404 verilebilir. İstemci yeniden okuyunca zaten 404 alıyor.
+- (Faz 4b, code review #9) `DbUpdateConcurrencyException`'ın 409'a çevrilmesi, `Product`'ı yazan her uçta ayrı ayrı yapılıyor. Bunu unutan yeni bir uç 500 döner. *Koşul:* `Product`'ı yazan üçüncü bir uç gelir, ya da F4c.4'ün hata eşlemesi modüllere bir kanca verir; o zaman çeviri tek bir yere taşınır.
 
 ## Son devir notu
 

@@ -15,9 +15,9 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.Description).HasMaxLength(2000);
         builder.Property(p => p.Price).HasPrecision(18, 2);
 
-        // Stock is the concurrency token: a write over a stock that changed after it was read fails
-        // (DbUpdateConcurrencyException) instead of undoing a sale or selling the same unit twice. A change to any other
-        // column doesn't make it conflict. Application-managed, so it works on SQLite too (docs/plan/RESEARCH.md R-075).
+        // Stock is the concurrency token: any update or delete of a product whose stock changed after it was read fails
+        // (DbUpdateConcurrencyException) instead of undoing a sale or selling the same unit twice. Concurrent changes to
+        // other columns alone don't conflict. Application-managed, so it works on SQLite too (docs/plan/RESEARCH.md R-075).
         builder.Property(p => p.Stock).IsConcurrencyToken();
         builder.Property(p => p.CreatedBy).HasMaxLength(256);
         builder.Property(p => p.ModifiedBy).HasMaxLength(256);
