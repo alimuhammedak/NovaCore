@@ -11,10 +11,10 @@
 | 1 | ✅ tamam | `faz/1-kutuphane-altyapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2a | ✅ tamam | `faz/2a-paket-yapisi` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
 | 2b | ✅ tamam | `faz/2b-konfigurasyon` | 2026-09-25 | 2026-09-25 | 2026-09-25 (kullanıcı onayı, `--no-ff`) |
-| 2c | ✅ tamam | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | 2026-09-26 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
-| 3a | ✅ tamam | `faz/3a-kimlik-dogrulama` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
-| 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`, push yok) |
-| 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`, push yok) |
+| 2c | ✅ tamam | `faz/2c-yerlesik-karsiliklar` | 2026-09-26 | 2026-09-26 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-27) |
+| 3a | ✅ tamam | `faz/3a-kimlik-dogrulama` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-27) |
+| 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
+| 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4b | ⏳ başlamadı | | | | |
 | 5 | ⏳ başlamadı | | | | |
 
@@ -839,7 +839,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-28, Faz 4a bitti** (`faz/4a-outbox`, 5 commit) ve kullanıcı onayıyla main'e merge edildi (`--no-ff`). `main` push'lanmadı (2c'den beri yerelde).
+**2026-09-28, Faz 4a bitti** (`faz/4a-outbox`, 5 commit) ve kullanıcı onayıyla main'e merge edildi (`--no-ff`). `main`, kullanıcı isteğiyle GitHub'a push'landı (3b ve 4a'nın 27 commit'i, yalnızca `main`; 2c ve 3a 2026-09-27'de push'lanmıştı; faz branch'leri yerelde, hepsi merge edilmiş). Push'ta CI koşusu 36385969576 başladı, sonucu bu oturumda izlenmedi.
 
 - **Yapılanlar (D-031, R-068…R-070):**
   - Yazma tarafı (F4a.1): event tamponu jenerik olmayan `Entity` tabanında. `OutboxInterceptor` event'leri entity ile aynı SaveChanges içinde `outbox_messages`'a yazıyor. `AddModuleDbContext` interceptor'ı her modül context'ine kendisi ekliyor, modüller `modelBuilder.AddOutbox()` çağırıyor.
@@ -860,7 +860,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - Hook dosyasını (`.claude/hooks/package-policy.json`) düzenlemeyi auto-mode sınıflandırıcısı engelledi (aşağıda).
 - **Bekleyen (kullanıcı):**
   - DECISIONS düzenlemesi artık onay istemiyor. Kullanıcı `docs/plan/DECISIONS.md`'yi hook'un `protectedPaths` listesinden kendisi çıkardı; model hook dosyasını değiştiremiyor. Karar D-032'de, Faz 5 sonunda geri eklenecek ("Sonraya bırakılanlar").
-  - `main` push'u ve önizleme yayını ayrı kullanıcı kararları.
+  - Önizleme yayını (tag, paket) ayrı bir kullanıcı kararı. CI koşusu 36385969576'nın sonucu 4b başında kontrol edilmeli.
 - **Sonraki fazın (4b) bilmesi gerekenler:**
   - F4b.1'deki karar (senkron `ReserveStockAsync` ya da event) için altyapı hazır. Event seçilirse:
     - modüller arası event yayımlayanın `*.Contracts` projesinde durur (Payments'ın Contracts projesi henüz yok);
