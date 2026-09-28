@@ -15,7 +15,7 @@
 | 3a | ✅ tamam | `faz/3a-kimlik-dogrulama` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-27) |
 | 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
-| 4b | ⏳ başlamadı | | | | |
+| 4b | 🔄 devam ediyor | `faz/4b-referans-moduller` | 2026-09-28 | | |
 | 4c | ⏳ başlamadı | | | | |
 | 4d | ⏳ başlamadı (koşullu, F4d.1) | | | | |
 | 5 | ⏳ başlamadı | | | | |
@@ -700,8 +700,14 @@ Plan onayı 2026-09-28. Uygulama sırası F4a.1 → F4a.3 → F4a.2 (ID'ler sabi
   - Outbox testleri art arda 3 koşuda yeşil.
 
 ### Faz 4b
-- [ ] F4b.1 Stok kararı
-- [ ] F4b.2 Uygulama
+Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-034). F4b.2 üç alt adıma bölündü (D-035 (8)).
+
+- [x] F4b.1 (commit: bir sonraki satırda): Stok kararı.
+  - Kullanıcı event akışını seçti (Q-30 → D-034). Diğer iki seçenek: senkron contract, senkron rezervasyon + event'le ödeme kaydı.
+  - Uygulama kararları D-035'te, kaynaklar R-075'te. Kod değişmedi.
+- [ ] F4b.2a Payments tarafı: ödeme `PaymentCreated` yayımlar, cevapla sonuçlanır (sıradaki)
+- [ ] F4b.2b Catalog tarafı: stoğu ayırır ve cevap verir
+- [ ] F4b.2c Stok eşzamanlılık belirteci
 - [ ] F4b.3 Eşzamanlılık testi
 - [ ] F5.3 Test borcu (Faz 5'ten taşındı, D-033)
 
@@ -763,6 +769,7 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-27 | Faz 3b'nin IdP'si: OpenIddict eklentisi (PLAN F3b.1–3, Keycloak yalnızca F3b.4'te opsiyonel), yalnızca Keycloak ya da ikisi birden? (PLAN: 3a sonunda sorulur) | F3b.1'den önce | **OpenIddict eklentisi, Keycloak opsiyonel** (2026-09-27, kullanıcı; önce farkların açıklanmasını istedi, açıklama faz raporunda). PLAN F3b.1–F3b.5 olduğu gibi geçerli → D-025 |
 | Q-28 | Eski Identity modülünün PLAN F3b.2 listesinde olmayan özellikleri (2FA, parola değiştirme, logout-all, `/me`) yeni eklentiye taşınsın mı? | F3b.2 | **Tam parite** (2026-09-27, kullanıcı) → D-027 |
 | Q-29 | F3b.3'te Development'taki simetrik JWT doğrulaması (D-024 (1)) ne olsun? | F3b.3 | **Kaldır**: `Jwt:SigningKey`/`Issuer`/geliştirme anahtarı silinir, `Jwt:Authority` her ortamda zorunlu (2026-09-27, kullanıcı) → D-028 |
+| Q-30 | F4b.1: Stok rezervasyonu senkron bir contract (`ReserveStockAsync`) ile mi, event ile mi yapılsın? | F4b.1 | **Event akışı** (2026-09-28, kullanıcı). Sunulan seçenekler: senkron contract (iki commit arasında stok kaybı, outbox kullanılmaz), senkron rezervasyon + event'le ödeme kaydı (POST 202'ye döner), event akışı (önerilen). R-075 → D-034 |
 
 ## Sonraya bırakılanlar
 

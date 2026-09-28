@@ -622,3 +622,22 @@ Biçim:
   - GitHub Packages'ın NuGet registry'si, paket herkese açık olsa bile indirmek için `read:packages` yetkili bir token ya da `GITHUB_TOKEN` istiyor.
 - Kaynak: https://learn.microsoft.com/dotnet/core/tools/templates#template-packages · https://learn.microsoft.com/dotnet/core/tutorials/cli-templates-create-template-package · https://docs.github.com/en/enterprise-cloud@latest/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry
 - Sonuç: [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md) E1, F1, K1. Karar kullanıcının.
+
+## Faz 4b araştırması (2026-09-28)
+
+### R-075: Modüller arası stok düşümü: tek transaction mı, event mi? Eşzamanlı iki satış stoğu nasıl aşmaz? (2026-09-28, faz 4b; kaynak)
+- Soru: Payments stoğu kontrol ediyor ama düşmüyor (P1-5). Stok Catalog'un, ödeme Payments'ın DbContext'inde. İki yazım nasıl tutarlı tutulur? Aynı ürünü aynı anda alan iki istek stoğu nasıl aşmaz?
+- Bulgu:
+  - MS "Domain events": aggregate'ler arası tutarlılık için iki yol var, tek transaction ve nihai tutarlılık. *"both approaches (single atomic transaction and eventual consistency) can be right"*. İkincisi *"requires more complex code in order to detect possible inconsistencies across aggregates and the need to implement compensatory actions"*. Event'leri orijinal transaction'ın parçası olan ek tablolarda saklamak bu telafiyi mümkün kılıyor (outbox).
+  - EF Core "Transactions": context'ler arası transaction yalnızca ilişkisel sağlayıcıda kurulabiliyor ve context'lerin aynı `DbConnection` ve `DbTransaction`'ı paylaşmasını gerektiriyor. Retrying execution strategy'de kullanıcının açtığı transaction `CreateExecutionStrategy().ExecuteAsync` içine alınmalı.
+  - Azure "Compensating Transaction": telafinin kendisi de başarısız olabilir. Adımlar idempotent olmalı, ilerleme güvenilir biçimde kaydedilmeli.
+  - EF Core "Handling Concurrency Conflicts":
+    - Optimistic concurrency: belirteç `UPDATE`/`DELETE`'in `WHERE` koşuluna girer, çakışmada `DbUpdateConcurrencyException` atılır.
+    - `rowversion` SQL Server'a özgü; bazı veritabanları bunu *"don't support these at all (e.g. SQLite)"*. Uygulama yönetimli belirteç her sağlayıcıda çalışıyor.
+    - Otomatik bir güncelleme çakışmada *"can simply loop and retry immediately, after re-querying the data"*. Kullanıcıya dönen yolda seçenek: *"inform the user that the update failed due to conflicting changes"*.
+  - Microsoft'un eShop örneğinde Catalog, siparişin stok doğrulama isteğine `OrderStockConfirmedIntegrationEvent` ya da `OrderStockRejectedIntegrationEvent` ile cevap veriyor.
+- Kaynak: https://learn.microsoft.com/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/domain-events-design-implementation · https://learn.microsoft.com/ef/core/saving/transactions#cross-context-transaction · https://learn.microsoft.com/ef/core/miscellaneous/connection-resiliency#execution-strategies-and-transactions · https://learn.microsoft.com/azure/architecture/patterns/compensating-transaction · https://learn.microsoft.com/ef/core/saving/concurrency · https://github.com/dotnet/eShop/blob/main/src/Catalog.API/IntegrationEvents/EventHandling/OrderStatusChangedToAwaitingValidationIntegrationEventHandler.cs
+- Sonuç: Q-30'da kullanıcı event akışını seçti (D-034).
+  - Ortak bağlantı ve transaction seçenek yapılmadı: modülleri tek veritabanına bağlar ve Catalog.Contracts'a EF sızdırır (`IProductCatalog.cs:4-5`).
+  - Senkron contract iki commit arasında stok kaybı bırakırdı ve outbox'ı yine hiçbir modül kullanmazdı.
+  - Uygulama kararları D-035'te: `Stock` uygulama yönetimli concurrency token, handler'daki çakışma dispatcher'ın yeniden denemesine bırakılıyor, uç noktalarda 409.
