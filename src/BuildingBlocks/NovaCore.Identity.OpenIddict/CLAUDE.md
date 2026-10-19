@@ -63,7 +63,10 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 
 ## Adding an account endpoint
 
-- JSON API: map it in `AccountEndpoints` under `/api/v1/auth` (the `strict` rate limit). `.AllowAnonymous()` only for
+- JSON API: map it in `AccountEndpoints` under `/api/v1/auth` (the `strict` rate limit). The handler returns typed
+  results (`Results<Ok<T>, ValidationProblem, UnauthorizedHttpResult>`, ...), with named internal records for bodies
+  (`MessageResponse`), not anonymous objects: the union is the OpenAPI contract. `/connect/*` and `/account/*` stay
+  `IResult` (protocol and HTML, excluded from the document). `.AllowAnonymous()` only for
   pre-sign-in endpoints (register, confirm-email); everything else `.RequireAuthorization()` or
   `.RequirePermission(IdentityPermissions.X)`. Put the validated body in `AccountRequests.cs` and list it in
   `PublicAPI.Unshipped.txt`.

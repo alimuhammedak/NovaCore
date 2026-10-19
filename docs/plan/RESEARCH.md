@@ -706,3 +706,19 @@ Biçim:
   - `OperationCanceledException` özel bir durum almaz.
   - 500'leri framework loglar. İstemci hataları loglanmaz. Projenin handler'larının işlediği exception'lar, framework varsayılanı gibi bastırılır.
 
+### R-080: Tipli yanıtlar ve OpenAPI meta verisi (2026-10-20, faz 4c; kaynak + ölçüm)
+- Soru: `Result`'tan HTTP'ye dönüşüm başarı tipini handler imzasında nasıl taşır? Hata yanıtları için meta veri nereden gelir? OpenAPI belgesi değişir mi?
+- Bulgu:
+  - MS:
+    - Yalnızca `IEndpointMetadataProvider` uygulayan dönüş tipleri belgede bir `responses` girişi üretir.
+    - `Results<T1,…>` union'ı, tip argümanlarından meta veri sağlayanların meta verisini ekler. Implicit dönüşümleri sayesinde bildirilmeyen bir sonuç derleme hatası verir.
+    - `Produces` yalnızca meta veridir, davranışı kısıtlamaz.
+  - Kaynak (`ProblemHttpResult`, release/10.0): `PopulateMetadata` yalnızca `DisableCookieRedirectMetadata` ekler, yanıt tipi eklemez. `ExecuteAsync` yanıtı `IProblemDetailsService` üzerinden yazar. Yani `.ProducesProblem(...)` gerekir ve `traceId`/`instance` özelleştirmesi aynen uygulanır.
+  - `TypedResults.ValidationProblem`, `Ok<T>`, `NoContent`, `Created<T>`, `NotFound<T>`, `Conflict<T>`, `BadRequest<T>`, `UnauthorizedHttpResult` meta veri sağlar. `Results.X` aynı tipleri `IResult` olarak döndürür, bu yüzden gövdeler değişmez.
+  - Ölçüm: belge adımdan önce ve sonra alındı.
+    - 7 modül ucunun `responses` girişleri bayt bayt aynı. Silinen `.Produces<T>()` satırlarının yerini union tuttu.
+    - 13 kimlik ucu şemasız `200`'den tipli yanıtlara geçti; örneğin `logout-all` artık gerçekteki `204`'ü bildiriyor.
+    - Hiçbir şema silinmedi; 9 şema eklendi. Belgenin `responses` dışındaki kısımları aynı.
+- Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/openapi/include-metadata?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis/responses?view=aspnetcore-10.0 · https://raw.githubusercontent.com/dotnet/aspnetcore/release/10.0/src/Http/Http.Results/src/ProblemHttpResult.cs
+- Sonuç (D-036 (5)): `ToHttpResult` union döner, `(Result, int)` overload'u silinir. Eklentinin JSON uçları tipli sonuç döner; protokol ve HTML uçları `IResult` kalır. `EndpointContractTests` belgede görünen handler'ların düz `IResult` dönmediğini doğrular.
+

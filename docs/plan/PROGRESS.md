@@ -785,8 +785,13 @@ Plan onayı 2026-10-20. Yeni test altyapısı `CoreWebTestHost` (yalnızca çeki
   - **Sürpriz:** `IPAddress.TryParse("10.0.0")` başarılı ve `10.0.0.0` dönüyor; IPv4 için dört bölüm şartı eklendi (R-078).
   - Api `appsettings.json`'a boş `ForwardedHeaders` bölümü eklendi. "Sonraya bırakılanlar"da 3 madde kapandı, 1'i kısmen.
   - Kararlar D-036 (3), R-078. Güncellenenler: README (Konfigürasyon, Ek sertleştirme), BuildingBlocks CLAUDE.md, CHANGELOG.
-- [ ] F4c.4 Projenin hata eşlemesi — devam ediyor
-- [ ] F4c.5 Tipli yanıt sözleşmesi
+- [x] F4c.4 (f28d973): Projenin hata eşlemesi.
+  - `GlobalExceptionHandler` silindi (public API). Yerine internal `ExceptionMapping`: `ExceptionHandlerOptions.StatusCodeSelector`, `CustomizeProblemDetails` içinde başlık/`type`/`detail` ve `SuppressDiagnosticsCallback`. `ErrorType` → durum/başlık eşlemesi artık `ResultHttpExtensions` ile ortak (`internal`).
+  - Davranış: `AppException` durumu ve mesajı aynı; `BadHttpRequestException` kendi durumu (bozuk JSON 400); diğer her şey, sunucunun kendi `OperationCanceledException`'ı dahil, mesajsız 500. 500'leri framework'ün `UnhandledException` logu yazıyor; istemci hataları ve projenin handler'larının işledikleri loglanmıyor.
+  - Testler 238 → 244: `ExceptionMappingTests` (13) geldi, `GlobalExceptionHandlerTests` (7) sınıfla birlikte gitti (plan onayı, Y-44). Önce kırmızı: 7 test (sonradan kaydedilen handler çalışmıyordu, framework exception'ları 4xx/499, bozuk JSON 500). Kasıtlı bozma: bastırma kapatılınca log testi kırmızı (commit'lenmedi).
+  - Kararlar D-036 (4), R-079. "Sonraya bırakılanlar"da `BadHttpRequestException` maddeleri kapandı; review #9'un koşul notu güncellendi (kanca artık var, kod değişmedi).
+  - Güncellenenler: README (Cross-cutting tablosu), BuildingBlocks CLAUDE.md, CHANGELOG.
+- [ ] F4c.5 Tipli yanıt sözleşmesi — devam ediyor
 - [ ] F4c.6 Data Protection anahtar deposu koruması
 - [ ] F4c.7 Outbox şeması ve bakımı
 
@@ -847,7 +852,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 **D-033 ile plana alınanlar (2026-09-28).** Aşağıdaki maddeler artık bir adıma bağlı. O adım bitince madde üstü çizilir.
 - ~~Forwarded headers yok (Faz 0) ve proxy arkasında cookie'lerin `Secure` bayrağı (Faz 3b) → F4c.3.~~ → F4c.3'te yapıldı.
-- Y-31 testinin `IResult` kör noktası (Faz 0, F0.7) → F4c.5.
+- ~~Y-31 testinin `IResult` kör noktası (Faz 0, F0.7) → F4c.5.~~ → F4c.5'te yapıldı.
 - ~~`BadHttpRequestException`'ın 500 dönmesi (Faz 2b) → F4c.4.~~ → F4c.4'te yapıldı.
 - ~~Super-admin bypass'ının token rolüne dayanması (Faz 3a) → F4c.2.~~ → F4c.2'de yapıldı.
 - `outbox_consumers` anahtarı (Faz 4a, #12) ve işlenmiş mesajların hiç silinmemesi (Faz 4a) → F4c.7.
@@ -871,7 +876,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - ~~(Faz 0) Global ve "strict" rate limiter partition anahtarı olarak `RemoteIpAddress` kullanıyor. Bir reverse proxy arkasında bu proxy'nin IP'si olur. `ForwardedHeaders` yapılandırılmamış.~~ → F4c.3'te çözüldü: güvenilen proxy'nin `X-Forwarded-For`'u `RemoteIpAddress`'i istemcinin adresi yapıyor.
 - (Faz 0, F0.2) Bu makinede kurulu shared framework 10.0.8, paketler artık 10.0.12. Runtime'ı 10.0.12'ye güncellemek ortam işi, repo işi değil.
 - (Faz 0, F0.8) GitHub Actions uyarısı (ilk CI koşusu, 2026-09-25): `ubuntu-latest` etiketi 19 Ekim 2026'dan itibaren Ubuntu 26'ya geçecek (actions/runner-images#14748). Etki beklenmiyor. İlk koşularda kırmızı olursa runner'ı `ubuntu-24.04`'e sabitlemek bir seçenek.
-- (Faz 0, F0.7) Y-31 testi ApiExplorer'a dayanıyor. `Task<IResult>` dönen ve `Produces<T>` bildirmeyen handler'ların yanıt payload'ını göremez (Identity uç noktalarının çoğu böyle). ApiExplorer dışı endpoint'ler de kapsam dışı (health, `ExcludeFromDescription`). Handler'lar typed result'a (`Results<Ok<T>, …>`) geçerse kapsam kendiliğinden genişler.
+- ~~(Faz 0, F0.7) Y-31 testi ApiExplorer'a dayanıyor. `Task<IResult>` dönen ve `Produces<T>` bildirmeyen handler'ların yanıt payload'ını göremez (Identity uç noktalarının çoğu böyle).~~ → F4c.5'te çözüldü: belgede görünen bütün handler'lar tipli sonuç dönüyor ve `EndpointContractTests` bunu doğruluyor. ApiExplorer dışı uçlar (health, `ExcludeFromDescription`) hâlâ kapsam dışı.
 - (Faz 0, F0.6) Kök `CLAUDE.md` Standards bölümünde "If a mediator is ever truly needed, use MIT `martinothamar/Mediator`" yazıyor. Bu, DECISIONS Y-01 ile çelişiyor ("herhangi bir mediator veya request-dispatch soyutlaması" yasak). Öncelik DECISIONS'ta, ama not gelecekteki oturumları yanıltabilir. Cümle kaldırılmalı veya Y-01'e yönlendirilmeli.
 - ~~(Faz 0) "strict" policy'nin tek tüketicisi Identity'nin `/api/v1/auth` grubu.~~ → Faz 3b'de değerlendirildi: policy'yi artık eklentinin `/connect/token`, `/account/*` ve `/api/v1/auth/*` uçları kullanıyor, `StrictRateLimitTests` `/connect/token`'ı sınıyor (D-009'un anlamı korundu).
 - (Faz 1) ~~F2b.6'da yapılacak: `.editorconfig`'teki geçici CA1848/CA1873 satırları silinecek.~~ → F2b.6 Faz 2a'nın ilk adımı oldu (D-017), Faz 2a adım listesinde.

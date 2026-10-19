@@ -246,6 +246,13 @@ public sealed class OrdersModule : IModule
 Her özellik tek dosya: request (validation attribute'larıyla) + response + route + handler bir arada. Mediator yok;
 handler bağımlılıklarını doğrudan minimal-API DI'dan alır. Örnek: [`CreateProduct.cs`](src/Modules/Catalog/NovaCore.Modules.Catalog/Features/CreateProduct.cs).
 
+Handler'ın dönüş tipi yanıt sözleşmesidir: `Task<Results<Ok<ProductDto>, ProblemHttpResult>>` gibi bir union.
+`result.ToHttpResult()` bu union'ı üretir (`Result` → `NoContent`, `Result<T>` → `Ok<T>`, özel başarı için
+`ToHttpResult(value => TypedResults.Created(...))`). Başarı yanıtını OpenAPI belgesine union'ın kendisi yazar, bu yüzden
+`.Produces<T>()` yazılmaz; derleyici de bildirilmeyen bir yanıtı reddeder. Hata durum kodları `.ProducesProblem(404)`
+ile bildirilir, çünkü ProblemDetails'in durumu çalışma anında belli olur. `EndpointContractTests` OpenAPI'de görünen hiçbir
+handler'ın düz `IResult` dönmediğini doğrular.
+
 Validation, .NET 10'un yerleşik Minimal API validation'ıdır. Kurallar request record'unun parametrelerindeki
 DataAnnotations'tır (`[Required, MaxLength(200)] string Name`). Hazır bir attribute'un ifade edemediği kural, tek bir
 değer için özel bir `ValidationAttribute`'tur (ör. `CreatePayment`'taki `NotEmpty`), birden çok özellik için
@@ -337,7 +344,7 @@ handler, tekrar teslime karşı iş anahtarıyla bir kayıt tutar ve onu değiş
 | **Health** | Yerleşik Health Checks + `AddDbContextCheck` | `/health` (her modül DB'si, "ready" etiketi) + `/alive`, yalnızca Development |
 | **API docs** | `Microsoft.AspNetCore.OpenApi` + Scalar | Bearer security scheme transformer ile; Scalar UI `NovaCore.Scalar` eklentisinde (`MapCoreScalar`) |
 | **Modül kaydı** | Açık kayıt | `builder.AddModule<TModule>()` (assembly taraması yok) |
-| **Result** | Result pattern | Sıfır-bağımlılık `Result<T>` + `ToHttpResult()` |
+| **Result** | Result pattern | Sıfır-bağımlılık `Result<T>` + `ToHttpResult()`, tipli union döner (`Results<Ok<T>, ProblemHttpResult>`) |
 
 `Result<T>` **beklenen** hatalar (NotFound/Validation/Conflict) için; gerçek istisnai durumlar için
 exception. Exception'ı akış kontrolü için kullanmaktan kaçınılır.

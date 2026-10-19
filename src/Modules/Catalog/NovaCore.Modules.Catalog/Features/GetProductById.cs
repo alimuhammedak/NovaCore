@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using NovaCore.Abstractions.Results;
@@ -19,10 +20,9 @@ public static class GetProductById
             .WithName("GetProductById")
             .WithSummary("Get a product by id")
             .RequirePermission(CatalogPermissions.ProductsRead)
-            .Produces<ProductDto>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
-    private static async Task<IResult> Handle(
+    private static async Task<Results<Ok<ProductDto>, ProblemHttpResult>> Handle(
         Guid id,
         CatalogDbContext dbContext,
         CancellationToken cancellationToken)

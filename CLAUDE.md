@@ -158,7 +158,9 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   (in-process interface, e.g. `IProductCatalog`) or a domain event — never another module's DbContext.
 
 - **Expected failures → `Result`/`Result<T>` + `.ToHttpResult()`** (`NovaCore.AspNetCore`). Reserve
-  exceptions for the genuinely exceptional. Domain exceptions live in `NovaCore.AspNetCore/Exceptions`.
+  exceptions for the genuinely exceptional. Handlers return typed results (`Task<Results<Ok<T>, ProblemHttpResult>>`,
+  never a bare `IResult`): the return type is the response contract in the OpenAPI document, so don't add
+  `.Produces<T>()` for the success response; declare the problem statuses with `.ProducesProblem(...)` (F4c.5). Domain exceptions live in `NovaCore.AspNetCore/Exceptions`.
 
 - **Endpoints are guarded by permissions, not ad-hoc role checks:**
   `endpoint.RequirePermission("module:resource:action")`. Authorization is closed by default: an endpoint without

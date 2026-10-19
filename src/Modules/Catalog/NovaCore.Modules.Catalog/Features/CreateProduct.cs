@@ -30,7 +30,6 @@ public static class CreateProduct
             .WithName("CreateProduct")
             .WithSummary("Create a new product")
             .RequirePermission(CatalogPermissions.ProductsCreate)
-            .Produces<Response>(StatusCodes.Status201Created)
             .ProducesValidationProblem();
 
     private static async Task<Created<Response>> Handle(

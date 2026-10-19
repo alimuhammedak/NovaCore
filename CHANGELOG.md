@@ -116,6 +116,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `ToHttpResult` returns typed unions instead of `IResult`: `Result` → `Results<NoContent, ProblemHttpResult>`,
+  `Result<T>` → `Results<Ok<T>, ProblemHttpResult>`, and `ToHttpResult(value => TypedResults.Created(...))` →
+  `Results<TSuccess, ProblemHttpResult>`; `Problem(Error)` returns `ProblemHttpResult`. The `(Result, int)` overload is
+  removed. Module handlers return these unions and drop their success `.Produces<T>()`; the OpenAPI document is
+  unchanged for them. The identity provider's `/api/v1/auth/*` and `/api/v1/admin/*` endpoints return typed results
+  too, so their responses (bodies, 204s, 400/404/409) now appear in the OpenAPI document instead of an untyped 200.
+  Response bodies are unchanged.
+
 - `ArgumentException`, `FormatException`, `KeyNotFoundException`, `UnauthorizedAccessException` and an
   `OperationCanceledException` the server raised itself are answered with 500 instead of 400/404/403/499: they are bugs,
   not client errors. A client's abort is still the framework's 499. The framework's exception handler middleware logs
