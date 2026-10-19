@@ -6,6 +6,7 @@ using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using NovaCore.AspNetCore.Identity;
+using NovaCore.Modules.Catalog.Authorization;
 using NovaCore.Modules.Catalog.Infrastructure;
 using Xunit;
 
@@ -14,8 +15,8 @@ namespace NovaCore.Api.Tests.Integration;
 /// <summary>
 /// JWT bearer validation against an OpenID Connect authority (PLAN F3a.1, D-002): the signing keys come from the
 /// authority's discovery document and JWKS, and a token must carry that issuer, the configured audience, a valid
-/// signature and an unexpired lifetime. A super-admin token reaches a permission-guarded endpoint (200); every broken
-/// token is turned away as unauthenticated (401).
+/// signature and an unexpired lifetime. A valid token of a caller holding the permission reaches a permission-guarded
+/// endpoint (200); every broken token is turned away as unauthenticated (401).
 /// </summary>
 public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>, IAsyncLifetime
 {
@@ -30,7 +31,7 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
     [Fact]
     public async Task A_token_signed_by_the_authority_is_accepted()
     {
-        var token = _factory.IdentityProvider.CreateToken(SuperAdmin());
+        var token = _factory.IdentityProvider.CreateToken(Reader(_factory));
 
         var response = await GetWithTokenAsync(_factory, token);
 
@@ -48,13 +49,13 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
         var signingKey = _factory.IdentityProvider.SigningKey;
         var token = defect switch
         {
-            "wrong issuer" => TestIdentityProvider.CreateToken(SuperAdmin(), signingKey, issuer: "https://attacker.example"),
-            "wrong audience" => TestIdentityProvider.CreateToken(SuperAdmin(), signingKey, audience: "another.api"),
+            "wrong issuer" => TestIdentityProvider.CreateToken(Reader(_factory), signingKey, issuer: "https://attacker.example"),
+            "wrong audience" => TestIdentityProvider.CreateToken(Reader(_factory), signingKey, audience: "another.api"),
             // Same key id, different key: the signature cannot be verified with the published key.
             "foreign signing key" => TestIdentityProvider.CreateToken(
-                SuperAdmin(), new RsaSecurityKey(foreignRsa) { KeyId = signingKey.KeyId }),
+                Reader(_factory), new RsaSecurityKey(foreignRsa) { KeyId = signingKey.KeyId }),
             "expired" => TestIdentityProvider.CreateToken(
-                SuperAdmin(), signingKey, expires: TimeProvider.System.GetUtcNow().AddMinutes(-10)),
+                Reader(_factory), signingKey, expires: TimeProvider.System.GetUtcNow().AddMinutes(-10)),
             _ => throw new ArgumentOutOfRangeException(nameof(defect), defect, null)
         };
 
@@ -69,7 +70,7 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
         await using var factory = new ProductionApiFactory();
         await EnsureCatalogCreatedAsync(factory);
 
-        var accepted = await GetWithTokenAsync(factory, factory.IdentityProvider.CreateToken(SuperAdmin()));
+        var accepted = await GetWithTokenAsync(factory, factory.IdentityProvider.CreateToken(Reader(factory)));
 
         Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
     }
@@ -87,16 +88,18 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
         var symmetricKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("a-symmetric-key-that-is-long-enough-0123456789"));
 
         var response = await GetWithTokenAsync(factory,
-            TestIdentityProvider.CreateToken(SuperAdmin(), symmetricKey, SecurityAlgorithms.HmacSha256));
+            TestIdentityProvider.CreateToken(Reader(factory), symmetricKey, SecurityAlgorithms.HmacSha256));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    private static Claim[] SuperAdmin() =>
-    [
-        new(NovaClaims.Subject, Guid.NewGuid().ToString()),
-        new(NovaClaims.Role, HttpContextCurrentUser.SuperAdminRole)
-    ];
+    // A fresh subject that may read the protected endpoint, granted on the server of the given host.
+    private static Claim[] Reader(NovaCoreApiFactory factory)
+    {
+        var subject = Guid.NewGuid().ToString();
+        factory.GrantPermissions(subject, CatalogPermissions.ProductsRead);
+        return [new(NovaClaims.Subject, subject)];
+    }
 
     private static async Task<HttpResponseMessage> GetWithTokenAsync<TEntryPoint>(
         Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<TEntryPoint> factory, string token)

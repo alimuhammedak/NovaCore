@@ -766,8 +766,14 @@ Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-0
 ### Faz 4c
 Plan onayı 2026-10-20. Yeni test altyapısı `CoreWebTestHost` (yalnızca çekirdek web paketiyle kurulan tüketici host'u) F4c.1'de gelir, F4c.3 ve F4c.4 de kullanır. Plan onayı şu test değişikliklerini de kapsıyor (Y-44): `GlobalExceptionHandlerTests` ve `DomainEventDispatcherTests` silinen sınıflarla birlikte gider; super-admin testi ve framework exception durum kodları tasarım gereği değişir; health'in Production testi, `JwtValidationTests` ve `ValidationTests` aynı amaçla kurulum değiştirir.
 
-- [ ] F4c.1 Güvenli varsayılanlar (FallbackPolicy, CORS) — devam ediyor
-- [ ] F4c.2 Super-admin sunucu tarafında
+- [x] F4c.1 (7a060b8): Güvenli varsayılanlar.
+  - `AddCoreAuthorization` `FallbackPolicy = RequireAuthenticatedUser` kuruyor. `AllowAnonymous` alanlar: `/connect/authorize|token|endsession`, `/account` grubu, health, OpenAPI belgesi, Scalar. OpenIddict'in discovery/JWKS/revoke istekleri authentication middleware'inde yanıtlandığı için etkilenmiyor (R-076).
+  - CORS: `Cors:AllowedOrigins` boşken Development her origin'e izin veriyor, diğer ortamlar hiçbirine.
+  - Yeni test altyapısı `CoreWebTestHost`. Testler 219 → 227: `SecureDefaultsTests` (meta verisiz uç 401/200, beş açık uç anonim 200, Production'da CORS kapalı, Development'ta açık). Önce kırmızı: meta verisiz uç 200, Production CORS `*` döndü.
+  - Kasıtlı bozma (commit'lenmedi): eklentideki `AllowAnonymous` işaretleri kaldırılınca kimlik akış testlerinden 11'i kırmızı.
+  - Değişen test: health'in Production testi kimlikli client'la 404'ü doğruluyor; anonim istek artık 401 alıyor (tanımsız yola fallback, MS'in belgelediği davranış).
+  - Kararlar D-036 (1)'de. Güncellenenler: README (Konfigürasyon, Yetkilendirme), kök/BuildingBlocks/eklenti/tests CLAUDE.md, CHANGELOG, memory `novacore-security`.
+- [ ] F4c.2 Super-admin sunucu tarafında — devam ediyor
 - [ ] F4c.3 Forwarded headers
 - [ ] F4c.4 Projenin hata eşlemesi
 - [ ] F4c.5 Tipli yanıt sözleşmesi

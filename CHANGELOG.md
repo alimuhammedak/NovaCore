@@ -239,6 +239,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- The `Administrator` role no longer bypasses permission checks through the token's `role` claim, which a removed
+  administrator kept until the token expired. Permissions, an administrator's included, are resolved on the server:
+  the identity provider's resolver gives an `Administrator` member every permission the modules declare, so a removed
+  administrator loses them within `Cache:PermissionExpiration`. `HttpContextCurrentUser.SuperAdminRole` is removed and
+  `ICurrentUser.HasPermission` checks the resolved permissions only.
+
 - Authorization is closed by default: `AddCoreAuthorization` sets a fallback policy that requires an authenticated
   caller, so an endpoint without authorization metadata (a forgotten `RequirePermission`) is no longer public, and a
   request that matches no endpoint gets 401 instead of 404 when anonymous. The endpoints meant to be public declare

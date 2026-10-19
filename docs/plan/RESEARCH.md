@@ -657,3 +657,16 @@ Biçim:
   - `AllowAnonymous` alan uçlar: `/connect/*` passthrough uçları, `/account` grubu, health, OpenAPI belgesi, Scalar.
   - Tanımsız bir yola anonim istek artık 404 yerine 401 alır. Health'in Production testi bu yüzden kimlikli bir client'la 404'ü doğruluyor.
 
+### R-077: Super-admin'i sunucu tarafına taşımanın yolu (2026-10-20, faz 4c; kod + kırmızı test)
+- Soru: `PermissionAuthorizationHandler` `Administrator` rolünü token'daki `role` claim'inden okuyor; rolünden çıkarılan bir admin token'ın ömrü boyunca her kontrolü geçiyor. Bypass sunucuda çözülen bilgiye nasıl dayanır, `IPermissionResolver` değişmeli mi?
+- Bulgu:
+  - Kod: seed (`IdentityServerSeeder.SeedRolesAsync`) `Administrator` rolüne o anda tanımlı bütün izinleri claim olarak yazıyor ve yalnızca `SeedOnStartup` açıkken çalışıyor. Resolver rolün claim'lerini zaten okuyor, yani seed'den sonra admin izinlerini token rolü olmadan da alıyor. Bypass yalnızca seed'den sonra tanımlanan izinler ve token rolü için fark yaratıyor.
+  - MS policy rehberi bir handler'ın birden çok koşulla `Succeed` edebileceğini gösteriyor, ama super-admin için bir kalıp önermiyor. Konu bir tasarım seçimi.
+  - Seçenekler:
+    - (a) Bypass'ı silip yalnızca seed'e güvenmek: en basit yol, ama seed kapalıyken yeni bir modülün izinleri admin'e ulaşmaz.
+    - (b) Resolver'ın `Administrator` üyeliğini tanımlı bütün izinlere (`IPermissionDefinitionProvider`) çözmesi: çekirdekte rol kavramı kalmaz, `IPermissionResolver` aynı kalır.
+    - (c) Çekirdekte `"*"` gibi bir işaret izni: tanımsız izinleri de kapsar, ama `ICurrentUser.Permissions`'a ve `/me` yanıtına sihirli bir değer sokar ve public API'ye sabit ekler.
+  - Kırmızı testler: token'da `role: Administrator` olan ama sunucuda izni olmayan çağrı 200 aldı; seed'in role yazmadığı bir izin admin'e çözülmedi; rolden çıkarılan admin önbellek süresinden sonra da 200 aldı.
+- Kaynak: https://learn.microsoft.com/aspnet/core/security/authorization/policies?view=aspnetcore-10.0 · kod: `IdentityServerSeeder.cs`, `PermissionAuthorization.cs`
+- Sonuç (D-036 (2)): (b). Çekirdekte super-admin yok, `HttpContextCurrentUser.SuperAdminRole` kalkar. Tanımlanmamış bir izin admin'e de verilmez.
+

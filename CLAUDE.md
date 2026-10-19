@@ -164,7 +164,8 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   `endpoint.RequirePermission("module:resource:action")`. Authorization is closed by default: an endpoint without
   authorization metadata requires an authenticated caller (fallback policy, F4c.1), and a public one says
   `.AllowAnonymous()`. Declare a module's permissions via
-  `IPermissionDefinitionProvider` + `AddPermissionDefinitions<T>()`. The `Administrator` role is super-admin.
+  `IPermissionDefinitionProvider` + `AddPermissionDefinitions<T>()`. No token role bypasses a permission check: the
+  identity provider's resolver gives an `Administrator` member every declared permission, on the server (F4c.2).
 
 - **Central Package Management:** versions live ONLY in `Directory.Packages.props`. `*.csproj` use
   versionless `<PackageReference>`. Common build props are in `Directory.Build.props` (net10.0, nullable,

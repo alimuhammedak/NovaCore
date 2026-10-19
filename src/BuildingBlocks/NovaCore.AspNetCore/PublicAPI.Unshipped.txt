@@ -71,7 +71,6 @@ NovaCore.AspNetCore.Security.SecurityHeadersMiddleware.InvokeAsync(Microsoft.Asp
 NovaCore.AspNetCore.Security.SecurityHeadersMiddleware.SecurityHeadersMiddleware(Microsoft.AspNetCore.Http.RequestDelegate! next) -> void
 NovaCore.AspNetCore.Web.CoreWebExtensions
 const NovaCore.AspNetCore.Auth.JwtOptions.SectionName = "Jwt" -> string!
-const NovaCore.AspNetCore.Identity.HttpContextCurrentUser.SuperAdminRole = "Administrator" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Email = "email" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Name = "name" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Permission = "permission" -> string!

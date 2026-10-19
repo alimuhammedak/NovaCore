@@ -409,7 +409,9 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   rollerinden ve doğrudan izinlerinden, servis client'ları için `Identity:Clients`'tan okur. Sonuç HybridCache'te `sub` + security stamp anahtarıyla
   `Cache:PermissionExpiration` (varsayılan 5 dk) boyunca tutulur: bir rol değişikliği oturum açmış kullanıcıya en geç bu
   sürede yansır, yeni bir security stamp'li token cache'i atlar. Host'ta bir `IPermissionResolver` kayıtlı değilse
-  uygulama açılmaz. `Administrator` rolü (token'daki rol claim'i) super-admin'dir, tüm kontrolleri geçer.
+  uygulama açılmaz. Token'daki hiçbir rol izin kontrolünü atlatmaz. Kimlik eklentisinde `Administrator` rolünün üyesi,
+modüllerin tanımladığı bütün izinleri sunucuda alır (seed o izni role yazmamış olsa da). Rolünden çıkarılan bir admin
+de izinlerini önbellek süresi dolunca kaybeder.
 - **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder hepsini toplayıp
   rollere bağlar (`User` rolü = iş modüllerinin yalnızca `:read` izinleri — least privilege).
 

@@ -11,9 +11,6 @@ namespace NovaCore.AspNetCore.Identity;
 /// </summary>
 public sealed class HttpContextCurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
 {
-    /// <summary>Roles whose holders implicitly satisfy every permission check.</summary>
-    public const string SuperAdminRole = "Administrator";
-
     private ClaimsPrincipal? Principal => httpContextAccessor.HttpContext?.User;
 
     /// <inheritdoc />
@@ -53,7 +50,5 @@ public sealed class HttpContextCurrentUser(IHttpContextAccessor httpContextAcces
         Roles.Contains(role) || (Principal?.IsInRole(role) ?? false);
 
     /// <inheritdoc />
-    /// <remarks>Holders of <see cref="SuperAdminRole"/> have every permission.</remarks>
-    public bool HasPermission(string permission) =>
-        IsInRole(SuperAdminRole) || Permissions.Contains(permission);
+    public bool HasPermission(string permission) => Permissions.Contains(permission);
 }

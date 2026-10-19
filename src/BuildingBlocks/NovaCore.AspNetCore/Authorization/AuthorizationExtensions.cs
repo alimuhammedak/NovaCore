@@ -41,7 +41,7 @@ public static class AuthorizationExtensions
 
     /// <summary>
     /// Guards an endpoint (or group) with a fine-grained permission: <c>.RequirePermission("catalog:products:create")</c>.
-    /// Anonymous callers get 401; authenticated callers without the permission (or the super-admin role) get 403.
+    /// Anonymous callers get 401; authenticated callers without the permission get 403.
     /// </summary>
     public static TBuilder RequirePermission<TBuilder>(this TBuilder builder, string permission)
         where TBuilder : IEndpointConventionBuilder =>

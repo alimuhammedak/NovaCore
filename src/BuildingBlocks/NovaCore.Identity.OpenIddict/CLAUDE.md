@@ -40,7 +40,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   after `/2fa/disable`, which takes a code (D-030 (3)).
 - **Claims contract:** access tokens carry `sub`, `name`, `email`, `role` (the names in `NovaClaims`). **Never
   permissions, never the security stamp:** the core resolves permissions per request (`IdentityPermissionResolver`: role
-  + direct `permission` claims for a Guid `sub`, `Identity:Clients:n:Permissions` for a service client's id). The core's
+  + direct `permission` claims for a Guid `sub`, every declared permission for an `Administrator` member,
+  `Identity:Clients:n:Permissions` for a service client's id). The core has no super-admin role: the token's `role`
+  claim is informational and never passes a permission check (D-036 (2)). The core's
   claims transformation runs on OpenIddict's scheme too, so a principal copied into a token drops `permission` claims
   (D-029 (3)).
 - **Anonymous by declaration:** the core's fallback policy closes every endpoint without authorization metadata, so the
