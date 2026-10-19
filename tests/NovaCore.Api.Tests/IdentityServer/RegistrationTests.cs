@@ -129,8 +129,12 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         return WebUtility.HtmlDecode(Href().Match(body).Groups["url"].Value);
     }
 
-    private static void AddKeys(WebApplicationBuilder builder) =>
+    // The keys a production host brings: signing and encryption, and a Data Protection key store.
+    private static void AddKeys(WebApplicationBuilder builder)
+    {
         builder.Services.AddOpenIddict().AddServer(server => server.AddEphemeralSigningKey().AddEphemeralEncryptionKey());
+        InMemoryKeyStore.AddTo(builder.Services);
+    }
 
     [GeneratedRegex("href=\"(?<url>[^\"]+)\"")]
     private static partial Regex Href();

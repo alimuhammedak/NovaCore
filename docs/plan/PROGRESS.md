@@ -791,8 +791,17 @@ Plan onayı 2026-10-20. Yeni test altyapısı `CoreWebTestHost` (yalnızca çeki
   - Testler 238 → 244: `ExceptionMappingTests` (13) geldi, `GlobalExceptionHandlerTests` (7) sınıfla birlikte gitti (plan onayı, Y-44). Önce kırmızı: 7 test (sonradan kaydedilen handler çalışmıyordu, framework exception'ları 4xx/499, bozuk JSON 500). Kasıtlı bozma: bastırma kapatılınca log testi kırmızı (commit'lenmedi).
   - Kararlar D-036 (4), R-079. "Sonraya bırakılanlar"da `BadHttpRequestException` maddeleri kapandı; review #9'un koşul notu güncellendi (kanca artık var, kod değişmedi).
   - Güncellenenler: README (Cross-cutting tablosu), BuildingBlocks CLAUDE.md, CHANGELOG.
-- [ ] F4c.5 Tipli yanıt sözleşmesi — devam ediyor
-- [ ] F4c.6 Data Protection anahtar deposu koruması
+- [x] F4c.5 (2cc1743): Tipli yanıt sözleşmesi.
+  - `ToHttpResult` union dönüyor: `Results<NoContent, ProblemHttpResult>`, `Results<Ok<T>, ProblemHttpResult>`, `Results<TSuccess, ProblemHttpResult>`. `Problem(Error)` → `ProblemHttpResult`. `(Result, int)` overload'u silindi (çağıranı yoktu). Public API değişikliği (0.x).
+  - Modül handler'ları `Task<Results<…>>` dönüyor; başarı için yazılan `.Produces<T>()`/`.Produces(204)` satırları kalktı, `.ProducesProblem(...)` kaldı (`ProblemHttpResult` meta veri üretmiyor, R-080).
+  - Kimlik eklentisinin `/api/v1/auth/*` ve `/api/v1/admin/*` uçları tipli sonuçlara geçti. Anonim gövdeler aynı JSON'u üreten internal record'lar oldu: `MessageResponse`, `RecoveryCodesResponse`, `RoleSummary`, `PermissionGroup`. `/connect/*` ve `/account/*` `IResult` kaldı.
+  - OpenAPI farkı (adım öncesi ve sonrası, geçici bir snapshot testiyle; commit'lenmedi):
+    - 7 modül ucunun yanıtları bayt bayt aynı.
+    - 13 kimlik ucu şemasız `200`'den tipli yanıtlara geçti: gövde şemaları, `204`'ler, 400 validation, 404/409 mesajları. `logout-all`, `change-password`, `2fa/disable` ve admin rol uçları artık gerçekteki `204`'ü bildiriyor.
+    - Hiçbir şema silinmedi, 9 şema eklendi, `responses` dışındaki kısım aynı.
+  - Testler 244 → 245: `EndpointContractTests.Described_endpoints_return_typed_results`. Önce kırmızı: kimlik ve modül uçlarındaki düz `IResult` handler'lar. Yanıt gövdelerini mevcut uç testleri koruyor.
+  - Kararlar D-036 (5), R-080. "Sonraya bırakılanlar"da Y-31 kör noktası kapandı. Güncellenenler: README (Result, slice anatomisi), kök/Modules/BuildingBlocks/eklenti CLAUDE.md, CHANGELOG.
+- [ ] F4c.6 Data Protection anahtar deposu koruması — devam ediyor
 - [ ] F4c.7 Outbox şeması ve bakımı
 
 ### Faz 4d (koşullu)

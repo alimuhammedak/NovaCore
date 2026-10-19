@@ -722,3 +722,18 @@ Biçim:
 - Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/openapi/include-metadata?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis/responses?view=aspnetcore-10.0 · https://raw.githubusercontent.com/dotnet/aspnetcore/release/10.0/src/Http/Http.Results/src/ProblemHttpResult.cs
 - Sonuç (D-036 (5)): `ToHttpResult` union döner, `(Result, int)` overload'u silinir. Eklentinin JSON uçları tipli sonuç döner; protokol ve HTML uçları `IResult` kalır. `EndpointContractTests` belgede görünen handler'ların düz `IResult` dönmediğini doğrular.
 
+### R-081: Data Protection anahtar deposu açıkça seçilmiş mi, nasıl anlaşılır? (2026-10-20, faz 4c; kaynak + kırmızı test)
+- Soru: Kimlik eklentisi, host'un bir anahtar deposu seçip seçmediğini nasıl anlar? Kontrol hangi mekanizmayla yapılmalı?
+- Bulgu:
+  - MS:
+    - Uygulama ortamını tanımaya çalışır: Azure App Service'te `%HOME%\ASP.NET\DataProtection-Keys`, kullanıcı profili varsa `%LOCALAPPDATA%` ya da `$HOME/.aspnet`, IIS'te registry kullanılır. Hiçbiri yoksa anahtarlar süreç bitince kaybolur.
+    - Docker'da anahtarlar kalıcı bir volume'a ya da harici bir sağlayıcıya yazılmalıdır. Web farm'da varsayılan yapılandırma uygun değildir.
+  - MS (extensibility): uygulama genelindeki depo `KeyManagementOptions.XmlRepository` ile değiştirilir. `PersistKeysToFileSystem`, `PersistKeysToDbContext`, Azure Blob ve Redis bu özelliği ayarlar. Varsayılan sezgisel seçim ise options'a yazılmaz, `XmlKeyManager` onu kendi içinde yapar. Yani `XmlRepository == null` "host bir depo seçmedi" demektir.
+  - Kırmızı test: Production'da anahtarlar ve e-posta göndericisi varken, depo olmadan host açılıyordu.
+  - Yan etki: imza anahtarı eksikliğini bekleyen mevcut test artık önce depo hatasını görüyordu. Teste depo eklendi; amacı aynı kaldı.
+- Kaynak: https://learn.microsoft.com/aspnet/core/security/data-protection/configuration/default-settings?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/security/data-protection/extensibility/key-management?view=aspnetcore-10.0#ixmlrepository · https://learn.microsoft.com/aspnet/core/security/data-protection/implementation/key-storage-providers?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/host-and-deploy/web-farm?view=aspnetcore-10.0
+- Sonuç (D-036 (6)):
+  - Eklenti `KeyManagementOptions`'ı `Validate<IHostEnvironment>` + `ValidateOnStart` ile doğrular: Development ya da `XmlRepository != null`.
+  - Azure App Service'in otomatik `%HOME%` deposu da açık sayılmaz; host onu tek satırla (`PersistKeysToFileSystem`) belirtir.
+  - Depo paketi eklenmez (`Microsoft.AspNetCore.DataProtection.EntityFrameworkCore`); depoyu host seçer.
+

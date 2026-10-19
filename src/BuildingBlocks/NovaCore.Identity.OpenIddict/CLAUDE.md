@@ -77,5 +77,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - `Jwt:Authority` is the host's public https URL; the signing and encryption certificates are added by the host.
 - A real `IEmailSender` is registered (`LoggingEmailSender` writes confirmation links to the log: Development only;
   `EmailSenderStartupCheck` stops the host otherwise).
+- A Data Protection key store the host chose (`PersistKeysTo*`, which sets `KeyManagementOptions.XmlRepository`): the
+  cookies, antiforgery tokens and confirmation links depend on it. Outside Development `ValidateOnStart` stops the host
+  without one (D-036 (6)); the framework's fallback (user profile or memory) doesn't survive a replaced container.
 - Client secrets and the seed administrator's password come from user secrets or the environment, never appsettings.
 - TLS at the edge; OpenIddict refuses plain HTTP.

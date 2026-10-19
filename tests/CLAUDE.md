@@ -52,7 +52,9 @@ dispatcher reads the module databases in the background while requests use them,
 thread-safe (docs/plan/RESEARCH.md R-069). The Catalog and Payments schemas are created in the factory ctor, as after the
 migrations, so the dispatcher's passes find their outboxes. A test that needs another schema (the identity store's)
 creates it (`EnsureCreated`). Outside Development the factory also brings what a production host must: ephemeral
-signing/encryption keys for the identity provider (standing in for certificates) and an email sender. A subclass can
+signing/encryption keys for the identity provider (standing in for certificates), an email sender and a Data
+Protection key store (`InMemoryKeyStore.AddTo(services)`). A test that expects another startup failure outside
+Development adds the key store too, or the missing store is what stops the host. A subclass can
 call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsTests` points one at a missing file with
 `Mode=ReadWrite`: the dispatcher opens it too, and the default mode would create the file.
 

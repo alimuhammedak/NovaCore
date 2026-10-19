@@ -453,8 +453,11 @@ de izinlerini önbellek süresi dolunca kaybeder.
 
 > **Üretimde mutlaka:** `Jwt:Authority`'yi host'un public https adresine (ya da harici sağlayıcıya) ayarla, imza ve
 > şifreleme sertifikalarını host'ta ekle, TLS/HTTPS'i edge'de zorla, gerçek bir `IEmailSender` (SMTP/SendGrid) tak,
-> admin parolasını ve client secret'larını user-secrets/ortam değişkeniyle ver. `LoggingEmailSender` yalnızca
-> Development'ta kayıtlıdır; diğer ortamlarda `IEmailSender` ya da anahtarlar eksikse uygulama açılışta durur.
+> admin parolasını ve client secret'larını user-secrets/ortam değişkeniyle ver, bir **Data Protection anahtar deposu**
+> seç (kalıcı volume'da `PersistKeysToFileSystem`, `PersistKeysToDbContext` ya da blob/Redis). Giriş cookie'leri,
+> antiforgery token'ları ve onay linkleri bu anahtarlarla korunur; framework'ün varsayılan deposu container
+> yenilenince kaybolur ve her örnekte farklıdır. `LoggingEmailSender` yalnızca Development'ta kayıtlıdır; diğer
+> ortamlarda `IEmailSender`, imza anahtarları ya da anahtar deposu eksikse uygulama açılışta durur.
 
 **Kaynaklar:** [OWASP Authentication CS](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) ·
 [OWASP Password Storage CS](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) ·

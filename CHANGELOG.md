@@ -263,6 +263,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- `NovaCore.Identity.OpenIddict` stops the host outside Development unless the host configured a Data Protection key
+  store (`PersistKeysToFileSystem`, `PersistKeysToDbContext`, a blob or Redis store). The sign-in cookies, antiforgery
+  tokens and email confirmation links are protected with these keys; the framework's fallback store is lost when a
+  container is replaced and differs between instances, which signed users out and broke links without an error.
+
 - The `Administrator` role no longer bypasses permission checks through the token's `role` claim, which a removed
   administrator kept until the token expired. Permissions, an administrator's included, are resolved on the server:
   the identity provider's resolver gives an `Administrator` member every permission the modules declare, so a removed
