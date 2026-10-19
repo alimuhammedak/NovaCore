@@ -116,6 +116,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `ArgumentException`, `FormatException`, `KeyNotFoundException`, `UnauthorizedAccessException` and an
+  `OperationCanceledException` the server raised itself are answered with 500 instead of 400/404/403/499: they are bugs,
+  not client errors. A client's abort is still the framework's 499. The framework's exception handler middleware logs
+  the 500s (`UnhandledException`, Error) instead of the core; `AppException`s and bad requests are no longer logged, like
+  a failed `Result`. Response titles and types are unchanged.
+
 - Every project builds with the `latest-recommended` analyzers, `EnforceCodeStyleInBuild` and `TreatWarningsAsErrors`.
   Low and moderate NuGet advisories (NU1901/NU1902) stay warnings.
 - **Breaking:** `Result<T>.Success(T)` and `Result<T>.Failure(Error)` are no longer public. Use `Result.Success<T>(value)`,
@@ -229,6 +235,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- `GlobalExceptionHandler`. Its mapping is now the exception handler middleware's own fallback
+  (`ExceptionHandlerOptions.StatusCodeSelector` and the ProblemDetails customization), so an `IExceptionHandler` a project
+  registers runs first, whether it was added before or after `AddCoreWeb`; before, the catch-all handler registered by
+  `AddCoreWeb` answered first and later handlers never ran.
+
 - Unused dependencies and wiring: `Scrutor` (never called), `Asp.Versioning.Http` + `AddApiVersioning` (no endpoint used a
   version set), `AddOutputCache`/`UseOutputCache` (no policy or endpoint used it).
 - **Breaking:** `PagedList<T>.Empty(int)` (it had no callers).
@@ -277,6 +288,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   code, but their message (which can carry connection strings, paths or other internals) is only logged.
 
 ### Fixed
+
+- A request body Minimal APIs can't read (malformed JSON in Development, where they throw `BadHttpRequestException`)
+  answers with the exception's status (400) instead of 500.
 
 - The ProblemDetails `instance` member is a URI reference, the request path (e.g. `/api/v1/products/42`), instead of
   `"GET /api/v1/products/42"`. The query string is left out.

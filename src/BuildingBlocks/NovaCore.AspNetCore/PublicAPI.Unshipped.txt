@@ -39,9 +39,6 @@ NovaCore.AspNetCore.Exceptions.ConflictException
 NovaCore.AspNetCore.Exceptions.ConflictException.ConflictException(string! message) -> void
 NovaCore.AspNetCore.Exceptions.ForbiddenException
 NovaCore.AspNetCore.Exceptions.ForbiddenException.ForbiddenException(string! message = "You are not allowed to perform this action.") -> void
-NovaCore.AspNetCore.Exceptions.GlobalExceptionHandler
-NovaCore.AspNetCore.Exceptions.GlobalExceptionHandler.GlobalExceptionHandler(Microsoft.AspNetCore.Http.IProblemDetailsService! problemDetailsService, Microsoft.Extensions.Logging.ILogger<NovaCore.AspNetCore.Exceptions.GlobalExceptionHandler!>! logger) -> void
-NovaCore.AspNetCore.Exceptions.GlobalExceptionHandler.TryHandleAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext, System.Exception! exception, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
 NovaCore.AspNetCore.Exceptions.NotFoundException
 NovaCore.AspNetCore.Exceptions.NotFoundException.NotFoundException(string! message) -> void
 NovaCore.AspNetCore.Hosting.HostingExtensions

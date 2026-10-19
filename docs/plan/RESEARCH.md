@@ -688,3 +688,21 @@ Biçim:
   - Yalnızca For ve Proto uygulanır. Liste doluysa framework'ün loopback varsayılanları temizlenir; boşsa options'a dokunulmaz.
   - IPv4 adresi dört bölümüyle yazılmalıdır.
 
+### R-079: Exception handler middleware'in sırası, yedek yolu ve diagnostics'i (2026-10-20, faz 4c; kaynak + kırmızı test)
+- Soru: Çekirdeğin eşlemesi `IExceptionHandler` olmadan nasıl çalışır? Projenin handler'ı nasıl her zaman önce çalışır? Log ve iptal davranışı ne olur?
+- Bulgu:
+  - Kaynak (`ExceptionHandlerMiddlewareImpl.HandleException`, release/10.0), işlem sırası:
+    1. `OperationCanceledException` ya da `IOException` gelmişse ve `RequestAborted` iptal edilmişse, middleware `RequestAbortedException` logu yazar, durumu 499 yapar ve **handler'lar çalışmadan döner**. Yani eski `GlobalExceptionHandler`'ın 499 eşlemesine yalnızca sunucunun kendi iptalleri ulaşıyordu.
+    2. `Response.StatusCode = StatusCodeSelector?.Invoke(exception) ?? 500`.
+    3. Kayıtlı `IExceptionHandler`'lar sırayla denenir; `true` dönen ilk handler zinciri keser.
+    4. Hiçbiri işlemezse `IProblemDetailsService.TryWriteAsync` çağrılır. Context'te `Exception` ve `ProblemDetails.Status = Response.StatusCode` bulunur, yani `CustomizeProblemDetails` exception'ı görür.
+  - Diagnostics: `SuppressDiagnosticsCallback` null ise yalnızca `ExceptionHandledBy == ExceptionHandlerService` bastırılır. Callback yalnızca middleware'in işlediği exception'larda çağrılır. Bastırılanlar: `UnhandledException` Error logu, `HandledException` EventSource olayı, `error.type` metrik etiketi.
+  - `BadHttpRequestException` bir `IOException`'dır, ama istek iptal edilmediyse 1. adıma takılmaz.
+  - `ProblemHttpResult` da yanıtını `IProblemDetailsService` üzerinden yazar; o yolda `Exception` null'dır.
+  - Kırmızı testler (`ExceptionMappingTests`): `AddCoreWeb`'den sonra kaydedilen handler çalışmıyordu, dört framework exception'ı ve sunucu iptali 4xx/499 alıyordu, bozuk JSON gövdesi 500 dönüyordu. Kasıtlı bozma: bastırma kapatılınca log testi kırmızı (commit'lenmedi).
+- Kaynak: https://raw.githubusercontent.com/dotnet/aspnetcore/release/10.0/src/Middleware/Diagnostics/src/ExceptionHandler/ExceptionHandlerMiddlewareImpl.cs · https://learn.microsoft.com/aspnet/core/fundamentals/error-handling?view=aspnetcore-10.0#iexceptionhandler · https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.builder.exceptionhandleroptions.suppressdiagnosticscallback?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/breaking-changes/10/exception-handler-diagnostics-suppressed?view=aspnetcore-10.0
+- Sonuç (D-036 (4)):
+  - Eşleme `StatusCodeSelector`, `CustomizeProblemDetails` ve `SuppressDiagnosticsCallback` ile yapılır. `GlobalExceptionHandler` silinir.
+  - `OperationCanceledException` özel bir durum almaz.
+  - 500'leri framework loglar. İstemci hataları loglanmaz. Projenin handler'larının işlediği exception'lar, framework varsayılanı gibi bastırılır.
+

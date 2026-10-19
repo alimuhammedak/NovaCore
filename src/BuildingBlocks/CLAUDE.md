@@ -16,8 +16,8 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   creation), `ICurrentUser`. If a new type needs a framework, it does **not** belong here.
 
 - **`NovaCore.AspNetCore`** — the web host: `IModule` + `AddModule<TModule>()`/`MapModules`, `AddCoreDefaults`
-  (health + HttpClient resilience), `AddCoreWeb`/`UseCoreWeb`, `GlobalExceptionHandler` (RFC 9457) and the
-  `AppException` types, `ResultHttpExtensions.ToHttpResult`, JWT auth (`AddCoreAuthentication`: `Jwt:Authority` +
+  (health + HttpClient resilience), `AddCoreWeb`/`UseCoreWeb`, the exception mapping (`ExceptionMapping`, RFC 9457) and
+  the `AppException` types, `ResultHttpExtensions.ToHttpResult`, JWT auth (`AddCoreAuthentication`: `Jwt:Authority` +
   JWKS, asymmetric keys only, D-028), permission authz (`IPermissionResolver` + a claims transformation that
   resolves permissions on the server and caches them in HybridCache)
   (`Authorization/`), the OpenAPI document, `SecurityHeadersMiddleware`, HybridCache (`AddCoreCaching`). Depends on
@@ -64,8 +64,12 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
 - **Time comes from `TimeProvider`**: register `TimeProvider.System` with `TryAddSingleton` where its consumer is
   registered, so the package works whichever `AddCore*` the host calls first.
 - **Health endpoints are Development-only** (`MapDefaultEndpoints`, D-022); `/health` includes every module database.
-- **`IExceptionHandler` order matters** — they run in registration order (R-046). `GlobalExceptionHandler` is the
-  catch-all, so a more specific handler must be registered ahead of it.
+- **The core's exception mapping is no `IExceptionHandler`.** Those run in registration order and the first `true` wins
+  (R-046), so a catch-all one would shadow a project's handler registered after it. The mapping is the exception
+  handler middleware's fallback instead: `ExceptionHandlerOptions.StatusCodeSelector` (`AppException` → its type's
+  status, `BadHttpRequestException` → its status, else 500), `ProblemDetailsOptions.CustomizeProblemDetails` (title,
+  `type`, and `detail` for an `AppException` only) and `SuppressDiagnosticsCallback` (the framework logs 500s; client
+  errors and handler-handled exceptions aren't logged). Don't add a core `IExceptionHandler` (R-079).
 - Caching: inject `HybridCache` directly. It is already an abstract class with a default implementation (R-008), so
   don't wrap it (Y-15). `AddCoreCaching` registers it with the default entry lifetime from `Cache:DefaultExpiration`.
 - **Forwarded headers are opt-in by proxy:** `UseCoreWeb` runs `UseForwardedHeaders` first; `ForwardedHeaders:KnownProxies`

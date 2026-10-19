@@ -778,8 +778,14 @@ Plan onayı 2026-10-20. Yeni test altyapısı `CoreWebTestHost` (yalnızca çeki
   - Eklentinin resolver'ı store'daki `Administrator` üyeliğini modüllerin tanımladığı bütün izinlere çözüyor, seed'in o izni role yazıp yazmadığından bağımsız. `IPermissionResolver` değişmedi.
   - Testler 227 → 229. Önce kırmızı: token rolüyle 200, seed'in yazmadığı izin çözülmedi, rolden çıkarılan admin önbellek süresinden sonra da 200 aldı. Yeni: `AdministratorRemovalTests` (sahte saat; admin ucu ve `/probe` 403), resolver testi. Değişenler: super-admin testi 403 bekliyor; `JwtValidationTests` sunucuda izin verilmiş bir okuyucu, `ValidationTests` tanımlı bütün izinler kullanıyor.
   - Kararlar D-036 (2), R-077. Güncellenenler: README (Yetkilendirme), kök ve eklenti CLAUDE.md, CHANGELOG, memory `novacore-security`.
-- [ ] F4c.3 Forwarded headers — devam ediyor
-- [ ] F4c.4 Projenin hata eşlemesi
+- [x] F4c.3 (1c6751c): Forwarded headers.
+  - `UseCoreWeb` `UseForwardedHeaders()`'ı en başta çalıştırıyor. `ForwardedHeaders:KnownProxies` (IP) ve `KnownIPNetworks` (CIDR) yeni internal `TrustedProxiesOptions`'a bağlanıyor ve açılışta doğrulanıyor; dolu listede yalnızca For + Proto uygulanıyor, framework'ün loopback varsayılanlarının yerine bu liste geçiyor. Boş listede options'a dokunulmuyor.
+  - Plan "ForwardedHeadersSettings" adını anıyordu; diğer options tipleriyle aynı biçimde `TrustedProxiesOptions` oldu.
+  - Testler 229 → 238: `ForwardedHeadersTests` (`CoreWebTestHost`: güvenilen proxy ve ağ istemciyi ve şemayı belirler, başka kaynak ve dolu listede loopback yok sayılır, liste yokken hiçbir şey uygulanmaz, "strict" limiter forwarded istemciye göre bölünür, dört geçersiz giriş açılışı durdurur). Önce kırmızı: 6 test.
+  - **Sürpriz:** `IPAddress.TryParse("10.0.0")` başarılı ve `10.0.0.0` dönüyor; IPv4 için dört bölüm şartı eklendi (R-078).
+  - Api `appsettings.json`'a boş `ForwardedHeaders` bölümü eklendi. "Sonraya bırakılanlar"da 3 madde kapandı, 1'i kısmen.
+  - Kararlar D-036 (3), R-078. Güncellenenler: README (Konfigürasyon, Ek sertleştirme), BuildingBlocks CLAUDE.md, CHANGELOG.
+- [ ] F4c.4 Projenin hata eşlemesi — devam ediyor
 - [ ] F4c.5 Tipli yanıt sözleşmesi
 - [ ] F4c.6 Data Protection anahtar deposu koruması
 - [ ] F4c.7 Outbox şeması ve bakımı
@@ -842,7 +848,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 **D-033 ile plana alınanlar (2026-09-28).** Aşağıdaki maddeler artık bir adıma bağlı. O adım bitince madde üstü çizilir.
 - ~~Forwarded headers yok (Faz 0) ve proxy arkasında cookie'lerin `Secure` bayrağı (Faz 3b) → F4c.3.~~ → F4c.3'te yapıldı.
 - Y-31 testinin `IResult` kör noktası (Faz 0, F0.7) → F4c.5.
-- `BadHttpRequestException`'ın 500 dönmesi (Faz 2b) → F4c.4.
+- ~~`BadHttpRequestException`'ın 500 dönmesi (Faz 2b) → F4c.4.~~ → F4c.4'te yapıldı.
 - ~~Super-admin bypass'ının token rolüne dayanması (Faz 3a) → F4c.2.~~ → F4c.2'de yapıldı.
 - `outbox_consumers` anahtarı (Faz 4a, #12) ve işlenmiş mesajların hiç silinmemesi (Faz 4a) → F4c.7.
 - Parola sıfırlama, onay e-postasını yeniden gönderme, `User` rolü yokken kayıtta 500 (Faz 3b) → F4d.2.
@@ -889,7 +895,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - ~~(Faz 2a, F2a.4 → F2c.1) **Y-20'nin modül kısmı henüz testli değil.**~~ → F2c.1e'de çözüldü: `ExplicitRegistrationTests` artık tüm `src`'yi tarıyor ve `*FromAssembly*` kayıt yardımcılarını da yakalıyor. EF'in `ApplyConfigurationsFromAssembly`'si model yapılandırması olduğu için hariç (D-023 (5)). Eski not: Modüller validator'ları `AddValidatorsFromAssembly` ile (assembly taraması) kaydediyor. Bu FluentValidation ile birlikte F2c.1'de gidiyor; o zaman `ExplicitRegistrationTests`'in taraması `src/Modules`'ü de kapsamalı. `ApplyConfigurationsFromAssembly` (EF model yapılandırması, DI kaydı değil) Y-20 kapsamında mı, o gün karar verilmeli.
 - (Faz 2a, F2a.2c) `SecurityHeadersMiddleware` hâlâ `/scalar` yolunu CSP'den muaf tutuyor. Scalar artık bir eklenti; çekirdeğin eklentinin yolunu bilmesi küçük bir bağlılık. Davranış değişikliği olacağı için 2a'da dokunulmadı.
 - (Faz 2a, F2a.2b) OpenTelemetry `service.version` olarak uygulamanın değil NovaCore eklentisinin assembly sürümünü (0.1.0.0) raporluyor. Davranış 2a'da korundu. Doğrusu muhtemelen giriş assembly'sinin sürümü.
-- (Faz 2b, code review) `GlobalExceptionHandler.Map`'te `BadHttpRequestException` için bir durum yok. Development'ta minimal API'ler bozuk gövdede bu exception'ı fırlatıyor (`ThrowOnBadRequest`), yanıt 400 yerine 500 oluyor ve Error seviyesinde log düşüyor. Bu 2b'den önce de böyleydi; status eşlemesini değiştirmek F2b.4'ün kapsamı dışında. Çözüm: `BadHttpRequestException.StatusCode`'u kullanmak.
+- ~~(Faz 2b, code review) `GlobalExceptionHandler.Map`'te `BadHttpRequestException` için bir durum yok.~~ → F4c.4'te çözüldü: kendi durum kodunu dönüyor. Development'ta minimal API'ler bozuk gövdede bu exception'ı fırlatıyor (`ThrowOnBadRequest`), yanıt 400 yerine 500 oluyor ve Error seviyesinde log düşüyor. Bu 2b'den önce de böyleydi; status eşlemesini değiştirmek F2b.4'ün kapsamı dışında. Çözüm: `BadHttpRequestException.StatusCode`'u kullanmak.
 - (Faz 2b, code review) DbContext health check'lerinde timeout yok. SQL Server'a erişilemezse `/health` bağlantı timeout'u kadar bekleyebilir. Uçlar yalnızca Development'ta olduğu için şimdi etkisi düşük. Production'da probe gerekince (D-022) `HealthCheckRegistration.Timeout` ile birlikte ele alınmalı.
 - (Faz 2b, code review) Test yardımcıları tekrar ediyor: `NoOpEmailSender` iki dosyada (`EmailSenderRegistrationTests`, `ConfigurationValidationTests`), kullanıcı seed'i iki dosyada (`AuthFlowTests`, `RefreshTokenExpiryTests`). Paylaşılan bir test yardımcısına taşınabilir; mevcut testleri değiştirmek gerektiği için yapılmadı.
 - (Faz 2b) `NovaCore.OpenTelemetry`, `OTEL_EXPORTER_OTLP_ENDPOINT`'i kayıt anında okuyor (`OpenTelemetryHostingExtensions.cs:35`). F2b.1'in kapsamı iki çekirdek paketti. Bu okuma `ConfigureAppConfiguration` ile ezilemiyor, ama MS ServiceDefaults da aynı kalıbı kullanıyor.
@@ -953,7 +959,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4b) `Product.Deactivate`/`Reactivate`'i çağıran bir uç yok; akıştaki `product.inactive` reddi bugün yalnızca testte oluşuyor. Genel `Product` kuralları D-033 ile kapsam dışında.
 - (Faz 4b, code review #3) `EnableRetryOnFailure`, commit'in sonucu belirsiz kalınca `SaveChanges`'i yeniden oynatıyor. Stok belirteci yüzünden yeniden oynatılan UPDATE/DELETE 0 satır buluyor ve `UpdateProduct`/`DeleteProduct`, yazım aslında uygulanmış olsa bile 409 dönüyor. Bu MS connection-resiliency rehberindeki "Option 1: do (almost) nothing" ile kabul edildi: nadir bir durum ve istemci yeniden okuyunca kendi yazımını görüyor. *Koşul:* gözlenirse `ExecuteInTransaction` + `verifySucceeded`.
 - (Faz 4b, code review #5) Satır eşzamanlı olarak silinmişse de 409 `product.concurrency_conflict` dönüyor; 404 daha doğru olurdu. Çakışmada `exception.Entries[0].GetDatabaseValuesAsync()` null dönüyorsa 404 verilebilir. İstemci yeniden okuyunca zaten 404 alıyor.
-- (Faz 4b, code review #9) `DbUpdateConcurrencyException`'ın 409'a çevrilmesi, `Product`'ı yazan her uçta ayrı ayrı yapılıyor. Bunu unutan yeni bir uç 500 döner. *Koşul:* `Product`'ı yazan üçüncü bir uç gelir, ya da F4c.4'ün hata eşlemesi modüllere bir kanca verir; o zaman çeviri tek bir yere taşınır.
+- (Faz 4b, code review #9) `DbUpdateConcurrencyException`'ın 409'a çevrilmesi, `Product`'ı yazan her uçta ayrı ayrı yapılıyor. Bunu unutan yeni bir uç 500 döner. *Koşul:* `Product`'ı yazan üçüncü bir uç gelir. F4c.4'ten beri kanca var: modül kendi `IExceptionHandler`'ını kaydedebilir ve o handler çekirdeğin eşlemesinden önce çalışır. Çeviri o gün oraya taşınır.
 
 ## Son devir notu
 

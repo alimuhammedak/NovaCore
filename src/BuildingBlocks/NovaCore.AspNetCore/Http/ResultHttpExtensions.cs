@@ -54,7 +54,8 @@ public static class ResultHttpExtensions
             extensions: new Dictionary<string, object?> { ["code"] = error.Code });
     }
 
-    private static int StatusFor(ErrorType type) => type switch
+    // Shared with the exception mapping, so an AppException and a failed Result of the same type answer alike.
+    internal static int StatusFor(ErrorType type) => type switch
     {
         ErrorType.Validation => StatusCodes.Status400BadRequest,
         ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
@@ -64,7 +65,7 @@ public static class ResultHttpExtensions
         _ => StatusCodes.Status500InternalServerError
     };
 
-    private static string TitleFor(ErrorType type) => type switch
+    internal static string TitleFor(ErrorType type) => type switch
     {
         ErrorType.Validation => "Validation failed",
         ErrorType.Unauthorized => "Unauthorized",

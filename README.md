@@ -324,7 +324,7 @@ handler, tekrar teslime karşı iş anahtarıyla bir kayıt tutar ve onu değiş
 
 | Concern | Yaklaşım (.NET 10) | NovaCore'da |
 |---|---|---|
-| **Exception handling** | `IExceptionHandler` + `AddProblemDetails` (RFC 9457) | `GlobalExceptionHandler` |
+| **Exception handling** | `UseExceptionHandler` + `AddProblemDetails` (RFC 9457), `StatusCodeSelector` | Eşleme middleware'in kendi yedek yolunda: projenin `IExceptionHandler`'ları her zaman önce çalışır. `AppException` → durumu + mesajı, `BadHttpRequestException` → kendi durumu, diğer her şey → 500, mesajsız; yalnızca 500'ler loglanır |
 | **Logging** | Serilog (structured) + OTel korelasyon | `AddCoreLogging` (`NovaCore.Serilog` eklentisi) — Console + opsiyonel Seq |
 | **Tracing/Metrics** | OpenTelemetry | `AddCoreObservability` (`NovaCore.OpenTelemetry` eklentisi) — OTLP yalnızca endpoint konfigüre ise |
 | **Caching** | HybridCache (L1 + opsiyonel L2) | `HybridCache` doğrudan enjekte edilir (zaten soyut bir sınıf, sarmalayıcı yok). `AddCoreCaching` varsayılan süreyi `Cache:DefaultExpiration`'dan alır |

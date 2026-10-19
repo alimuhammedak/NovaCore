@@ -45,7 +45,7 @@ public static class CoreWebExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 
-        services.AddCoreInfrastructure(); // adds ProblemDetails + GlobalExceptionHandler + caching
+        services.AddCoreInfrastructure(); // adds ProblemDetails, the exception mapping and caching
 
         services.AddCoreAuthentication();
         services.AddCoreAuthorization(); // the handler behind RequirePermission(...)
