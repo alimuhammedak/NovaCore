@@ -395,6 +395,11 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
 
 ### Yetkilendirme (authorization) — permission-based
 - Roller (Identity) **+ ince taneli izinler**. İzinler `module:resource:action` (ör. `catalog:products:create`).
+- **Varsayılan kapalı:** yetki meta verisi olmayan bir uç ve hiçbir uca eşleşmeyen istek kimlik doğrulama ister
+  (`FallbackPolicy = RequireAuthenticatedUser`, MS'in "tercih edilen yol" dediği yöntem). `RequirePermission`'ı unutulan
+  bir uç böylece herkese açılmaz (OWASP API5). Anonim olması gereken uç bunu `AllowAnonymous()` ile söyler: kimlik
+  sağlayıcının `/connect/*` uçları ve giriş sayfası, kayıt ve e-posta onayı, health uçları, OpenAPI belgesi ve Scalar.
+  Bir sonucu: tanımsız bir yola anonim istek 404 yerine 401 alır.
 - `RequirePermissionAttribute` (`AuthorizeAttribute` + `IAuthorizationRequirementData`) kendi `PermissionRequirement`'ını
   taşır, `PermissionAuthorizationHandler` onu denetler. Özel policy provider ya da izin başına bir named policy yok.
   Kullanım: `endpoint.RequirePermission("catalog:products:create")` veya handler'da `[RequirePermission(...)]`.
@@ -460,7 +465,7 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
                      "Clients": [] },                // { ClientId, DisplayName, ClientSecret, RedirectUris, PostLogoutRedirectUris, Permissions }
   "Cache":         { "DefaultExpiration": "00:05:00", "PermissionExpiration": "00:05:00" },
   "RateLimiting":  { "PermitLimit": 100, "WindowSeconds": 60 },   // giriş ve hesap uçları 1/10'unu kullanır ("strict")
-  "Cors":          { "AllowedOrigins": [] },        // boş = her ortamda her origin'e izin (credentials olmadan)
+  "Cors":          { "AllowedOrigins": [] },        // boş = Development'ta her origin (credentials olmadan), diğer ortamlarda hiçbiri
   "Seq":           { "ServerUrl": "" }              // dolu = Seq'e log gönder
 }
 ```

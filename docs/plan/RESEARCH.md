@@ -641,3 +641,19 @@ Biçim:
   - Ortak bağlantı ve transaction seçenek yapılmadı: modülleri tek veritabanına bağlar ve Catalog.Contracts'a EF sızdırır (`IProductCatalog.cs:4-5`).
   - Senkron contract iki commit arasında stok kaybı bırakırdı ve outbox'ı yine hiçbir modül kullanmazdı.
   - Uygulama kararları D-035'te: `Stock` uygulama yönetimli concurrency token, handler'daki çakışma dispatcher'ın yeniden denemesine bırakılıyor, uç noktalarda 409.
+
+## Faz 4c araştırması (2026-10-20)
+
+### R-076: Fallback policy hangi istekleri kapsar? Anonim kalması gereken uçlar hangileri? (2026-10-20, faz 4c; kaynak + kırmızı test)
+- Soru: `FallbackPolicy = RequireAuthenticatedUser` hangi isteklere uygulanır? Kimlik eklentisinin OpenIddict uçları ve Development uçları (health, OpenAPI, Scalar) nasıl etkilenir? Boş bir CORS policy'si geçerli mi?
+- Bulgu:
+  - MS: fallback policy, yetki meta verisi olmayan ve yetkilendirme middleware'inden geçen isteklere uygulanır; *"A request that doesn't match an endpoint uses the fallback policy if the authorization middleware runs for the request."* Açık uçlar `AllowAnonymous` alır; MS bunu varsayılan olarak kimlik doğrulama istemenin tercih edilen yolu sayıyor.
+  - OpenIddict'in ASP.NET Core sunucusu bir `IAuthenticationRequestHandler`. Discovery, JWKS ve revocation isteklerini authentication middleware'inde kendisi yanıtlar, yetkilendirmeye hiç ulaşmazlar. Passthrough uçları (`/connect/authorize`, `/token`, `/endsession`) ise isteği doğruladıktan sonra endpoint'e bırakır. Bu yüzden onlar `AllowAnonymous` ister.
+  - Kırmızı test: `AllowAnonymous` kaldırılınca kimlik akış testlerinden 11'i kırmızıya döndü (commit'lenmedi).
+  - `CorsPolicyBuilder.Build()` origin'siz bir policy'yi kabul eder; o policy hiçbir origin'e `Access-Control-Allow-Origin` vermez (test: Production'da basit istek ve preflight).
+- Kaynak: https://learn.microsoft.com/aspnet/core/security/authorization/policies?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/security/authorization/secure-data?view=aspnetcore-10.0#secure-user-data · https://learn.microsoft.com/aspnet/core/fundamentals/static-files?view=aspnetcore-10.0#static-file-authorization
+- Sonuç (D-036 (1)):
+  - Fallback policy `AddCoreAuthorization`'da kurulur.
+  - `AllowAnonymous` alan uçlar: `/connect/*` passthrough uçları, `/account` grubu, health, OpenAPI belgesi, Scalar.
+  - Tanımsız bir yola anonim istek artık 404 yerine 401 alır. Health'in Production testi bu yüzden kimlikli bir client'la 404'ü doğruluyor.
+

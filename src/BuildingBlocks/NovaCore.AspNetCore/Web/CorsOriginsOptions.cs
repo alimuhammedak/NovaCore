@@ -1,8 +1,9 @@
 namespace NovaCore.AspNetCore.Web;
 
 /// <summary>
-/// Bound from the <c>Cors</c> section. Empty allows any origin without credentials; otherwise only these origins, with
-/// credentials. Named apart from ASP.NET Core's own <c>CorsOptions</c>, which it configures.
+/// Bound from the <c>Cors</c> section: these origins are allowed, with credentials. Empty allows any origin without
+/// credentials in Development and no origin anywhere else. Named apart from ASP.NET Core's own <c>CorsOptions</c>, which
+/// it configures.
 /// </summary>
 internal sealed class CorsOriginsOptions
 {

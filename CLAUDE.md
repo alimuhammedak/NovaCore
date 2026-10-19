@@ -161,7 +161,9 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   exceptions for the genuinely exceptional. Domain exceptions live in `NovaCore.AspNetCore/Exceptions`.
 
 - **Endpoints are guarded by permissions, not ad-hoc role checks:**
-  `endpoint.RequirePermission("module:resource:action")`. Declare a module's permissions via
+  `endpoint.RequirePermission("module:resource:action")`. Authorization is closed by default: an endpoint without
+  authorization metadata requires an authenticated caller (fallback policy, F4c.1), and a public one says
+  `.AllowAnonymous()`. Declare a module's permissions via
   `IPermissionDefinitionProvider` + `AddPermissionDefinitions<T>()`. The `Administrator` role is super-admin.
 
 - **Central Package Management:** versions live ONLY in `Directory.Packages.props`. `*.csproj` use

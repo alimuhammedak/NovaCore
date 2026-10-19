@@ -121,6 +121,13 @@ redirects) and the public client: authorize → sign-in form (antiforgery token)
 collection, apart from the parallel tests: their CPU load made the `WebApplicationFactory` startup race (R-055) hit
 most full runs.
 
+## The core alone: `CoreWebTestHost`
+
+`CoreWebTestHost` is a host composed only of the core web package (`AddCoreWeb`, a resolver that grants nothing,
+`UseCoreWeb`) whose endpoints each test maps itself: an endpoint without authorization metadata, one that echoes the
+request, one that throws. Tokens come from its own `TestIdentityProvider` (`CreateClientWithClaims`). Use it for
+pipeline behaviour the Api host can't show because its endpoints are fixed (`SecureDefaultsTests`).
+
 ## Test configuration — in-memory config is enough
 
 The building blocks bind configuration through the options pattern and read it when the options are first built,

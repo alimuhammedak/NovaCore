@@ -68,6 +68,11 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
   catch-all, so a more specific handler must be registered ahead of it.
 - Caching: inject `HybridCache` directly. It is already an abstract class with a default implementation (R-008), so
   don't wrap it (Y-15). `AddCoreCaching` registers it with the default entry lifetime from `Cache:DefaultExpiration`.
+- **Authorization is closed by default:** `AddCoreAuthorization` sets `FallbackPolicy = RequireAuthenticatedUser`, so an
+  endpoint without authorization metadata, and a request that matches none, needs a signed-in caller (R-073). An
+  endpoint a building block maps for anonymous callers (health, the OpenAPI document, Scalar, the identity provider's
+  `/connect/*` and `/account/*`) says `.AllowAnonymous()`; `SecureDefaultsTests` pins them. CORS with an empty
+  `Cors:AllowedOrigins` allows any origin in Development only.
 - Permission authorization: `RequirePermissionAttribute` carries a `PermissionRequirement`
   (`IAuthorizationRequirementData`, R-053), which `PermissionAuthorizationHandler` checks. There is no custom policy
   provider and no named policy per permission. Use `RequirePermission(...)` / `[RequirePermission]` rather than

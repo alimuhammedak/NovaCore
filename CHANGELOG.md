@@ -239,6 +239,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Authorization is closed by default: `AddCoreAuthorization` sets a fallback policy that requires an authenticated
+  caller, so an endpoint without authorization metadata (a forgotten `RequirePermission`) is no longer public, and a
+  request that matches no endpoint gets 401 instead of 404 when anonymous. The endpoints meant to be public declare
+  `AllowAnonymous`: health, the OpenAPI document, Scalar, the identity provider's `/connect/*` endpoints and sign-in
+  pages, registration and email confirmation.
+- With an empty `Cors:AllowedOrigins`, only Development allows any origin; other environments allow none (previously
+  every origin, in every environment).
+
 - `docker-compose.yml` reads the SQL Server SA password from a git-ignored `.env` file instead of a hard-coded value.
 - Carried-over account flaws closed in `NovaCore.Identity.OpenIddict`: the sign-in page says "confirm your email" only
   after the right password, and a wrong one counts toward lockout (the old login answered "email not confirmed" for any

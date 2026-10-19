@@ -43,6 +43,10 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   + direct `permission` claims for a Guid `sub`, `Identity:Clients:n:Permissions` for a service client's id). The core's
   claims transformation runs on OpenIddict's scheme too, so a principal copied into a token drops `permission` claims
   (D-029 (3)).
+- **Anonymous by declaration:** the core's fallback policy closes every endpoint without authorization metadata, so the
+  protocol endpoints (`ConnectEndpoints`) and the sign-in pages (`/account` group) carry `.AllowAnonymous()`; the
+  handlers read the sign-in session themselves. OpenIddict's own endpoints (discovery, JWKS, revocation) answer in the
+  authentication middleware, before authorization.
 - **Pages and forms:** plain HTML (the core's CSP forbids scripts and styles), antiforgery checked in the handler with
   `IAntiforgery.IsRequestValidAsync` (the pipeline has no antiforgery middleware, R-061), redirects to local URLs only.
 - **Links from configuration, never from the request:** the email confirmation link starts from `Jwt:Authority`, not the

@@ -16,7 +16,7 @@
 | 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push edilmedi) |
-| 4c | ⏳ başlamadı | | | | |
+| 4c | 🔄 devam ediyor | `faz/4c-tuketici-hazirligi` | 2026-10-20 | | |
 | 4d | ⏳ başlamadı (koşullu, F4d.1) | | | | |
 | 5 | ⏳ başlamadı | | | | |
 
@@ -764,7 +764,9 @@ Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-0
   - Akış ve eşzamanlılık testleri art arda 3 koşuda yeşil (27/27).
 
 ### Faz 4c
-- [ ] F4c.1 Güvenli varsayılanlar (FallbackPolicy, CORS)
+Plan onayı 2026-10-20. Yeni test altyapısı `CoreWebTestHost` (yalnızca çekirdek web paketiyle kurulan tüketici host'u) F4c.1'de gelir, F4c.3 ve F4c.4 de kullanır. Plan onayı şu test değişikliklerini de kapsıyor (Y-44): `GlobalExceptionHandlerTests` ve `DomainEventDispatcherTests` silinen sınıflarla birlikte gider; super-admin testi ve framework exception durum kodları tasarım gereği değişir; health'in Production testi, `JwtValidationTests` ve `ValidationTests` aynı amaçla kurulum değiştirir.
+
+- [ ] F4c.1 Güvenli varsayılanlar (FallbackPolicy, CORS) — devam ediyor
 - [ ] F4c.2 Super-admin sunucu tarafında
 - [ ] F4c.3 Forwarded headers
 - [ ] F4c.4 Projenin hata eşlemesi

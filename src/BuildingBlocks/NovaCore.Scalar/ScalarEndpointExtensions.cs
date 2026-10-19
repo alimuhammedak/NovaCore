@@ -33,7 +33,7 @@ public static class ScalarEndpointExtensions
             {
                 options.WithTitle("NovaCore API").WithTheme(ScalarTheme.Mars);
                 configure(options);
-            });
+            }).AllowAnonymous();
         }
 
         return app;

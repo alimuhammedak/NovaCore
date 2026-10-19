@@ -68,7 +68,7 @@ public static class CoreWebExtensions
 
         // The OpenAPI document, in Development only. The Scalar UI over it is the NovaCore.Scalar add-on (MapCoreScalar).
         if (app.Environment.IsDevelopment())
-            app.MapOpenApi();
+            app.MapOpenApi().AllowAnonymous();
 
         app.UseCors(CorsPolicyName);
         app.UseRateLimiter();
@@ -133,14 +133,16 @@ public static class CoreWebExtensions
 
         services.AddCors();
 
-        services.AddOptions<CorsOptions>().Configure<IOptions<CorsOriginsOptions>>((options, cors) =>
+        services.AddOptions<CorsOptions>().Configure<IOptions<CorsOriginsOptions>, IHostEnvironment>((options, cors, environment) =>
             options.AddPolicy(CorsPolicyName, policy =>
             {
                 var origins = cors.Value.AllowedOrigins;
                 if (origins.Length > 0)
                     policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
-                else
+                else if (environment.IsDevelopment())
                     policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+
+                // Otherwise the policy allows no origin: a deployment names its origins or gets no cross-origin access.
             }));
     }
 }
