@@ -670,3 +670,21 @@ Biçim:
 - Kaynak: https://learn.microsoft.com/aspnet/core/security/authorization/policies?view=aspnetcore-10.0 · kod: `IdentityServerSeeder.cs`, `PermissionAuthorization.cs`
 - Sonuç (D-036 (2)): (b). Çekirdekte super-admin yok, `HttpContextCurrentUser.SuperAdminRole` kalkar. Tanımlanmamış bir izin admin'e de verilmez.
 
+### R-078: .NET 10'da forwarded headers'ın varsayılanları ve config'ten yapılandırılması (2026-10-20, faz 4c; kaynak + kırmızı test)
+- Soru: `UseForwardedHeaders` neyi varsayılan olarak işler, hangi proxy'lere güvenir? Güvenilen liste config'ten nasıl verilir, boş liste ne yapmalı?
+- Bulgu:
+  - MS:
+    - `ForwardedHeaders` varsayılanı `None`'dır; işlenecek başlıklar açıkça seçilmelidir.
+    - Middleware başlıkları yalnızca `KnownProxies` ve `KnownIPNetworks`'teki kaynaklardan kabul eder. Varsayılan liste loopback'tir.
+    - `ForwardLimit` 1 kalmalıdır.
+    - Middleware, şemaya, host'a ya da istemci IP'sine bakan her şeyden önce çalışmalıdır. Edge'de açılırsa istemci kimliğini taklit edebilir.
+  - .NET 10: `KnownNetworks` ve `Microsoft.AspNetCore.HttpOverrides.IPNetwork` obsolete (ASPDEPR005); yerine `KnownIPNetworks` ve `System.Net.IPNetwork`.
+  - `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` middleware'i kendisi ekler ve listeleri temizler (her kaynağa güvenir). Boş config'te options'a dokunmamak bu yolu bozmaz.
+  - `IPAddress.TryParse("10.0.0")` başarılı olur ve `10.0.0.0` döner (eski kısaltma biçimi). `System.Net.IPNetwork.TryParse` önek olmadan ya da host bitleri set edilmiş bir tabanla başarısız olur.
+  - Kırmızı testler: güvenilen proxy'nin başlıkları ve limiter bölümü uygulanmıyordu; geçersiz girişler açılışı durdurmuyordu. Dolu listede loopback'ın güvenilmediği de testte.
+- Kaynak: https://learn.microsoft.com/aspnet/core/host-and-deploy/proxy-load-balancer?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/fundamentals/servers/kestrel/security-considerations?view=aspnetcore-10.0#security-middleware · https://learn.microsoft.com/aspnet/core/breaking-changes/10/ipnetwork-knownnetworks-obsolete?view=aspnetcore-10.0 · https://learn.microsoft.com/dotnet/api/system.net.ipaddress.tryparse
+- Sonuç (D-036 (3)):
+  - Bölüm `ForwardedHeaders`, anahtarlar `KnownProxies` ve `KnownIPNetworks`.
+  - Yalnızca For ve Proto uygulanır. Liste doluysa framework'ün loopback varsayılanları temizlenir; boşsa options'a dokunulmaz.
+  - IPv4 adresi dört bölümüyle yazılmalıdır.
+

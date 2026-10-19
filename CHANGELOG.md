@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Reverse proxy support: `UseCoreWeb` applies `X-Forwarded-For` and `X-Forwarded-Proto` first, from the proxies and
+  networks listed under `ForwardedHeaders:KnownProxies` and `ForwardedHeaders:KnownIPNetworks` only (validated on
+  start). Behind a trusted proxy the rate limiter partitions by the real client and the request scheme is the client's,
+  so cookies get their `Secure` flag. With no list, no caller's headers apply (the framework default).
+
 - MIT `LICENSE` and this changelog.
 - Architecture tests for the testable bans in `docs/plan/DECISIONS.md` (banned packages, module boundaries, repository
   and helper types, DI scope validation, domain types in endpoint signatures, TODO/FIXME in `src/`).

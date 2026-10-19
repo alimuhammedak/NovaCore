@@ -773,8 +773,12 @@ Plan onayı 2026-10-20. Yeni test altyapısı `CoreWebTestHost` (yalnızca çeki
   - Kasıtlı bozma (commit'lenmedi): eklentideki `AllowAnonymous` işaretleri kaldırılınca kimlik akış testlerinden 11'i kırmızı.
   - Değişen test: health'in Production testi kimlikli client'la 404'ü doğruluyor; anonim istek artık 401 alıyor (tanımsız yola fallback, MS'in belgelediği davranış).
   - Kararlar D-036 (1)'de. Güncellenenler: README (Konfigürasyon, Yetkilendirme), kök/BuildingBlocks/eklenti/tests CLAUDE.md, CHANGELOG, memory `novacore-security`.
-- [ ] F4c.2 Super-admin sunucu tarafında — devam ediyor
-- [ ] F4c.3 Forwarded headers
+- [x] F4c.2 (c1f0075): Super-admin sunucu tarafında.
+  - Çekirdekte super-admin kalmadı: `PermissionAuthorizationHandler` ve `HttpContextCurrentUser.HasPermission` yalnızca çözülen izinlere bakıyor, `SuperAdminRole` silindi (public API, 0.x).
+  - Eklentinin resolver'ı store'daki `Administrator` üyeliğini modüllerin tanımladığı bütün izinlere çözüyor, seed'in o izni role yazıp yazmadığından bağımsız. `IPermissionResolver` değişmedi.
+  - Testler 227 → 229. Önce kırmızı: token rolüyle 200, seed'in yazmadığı izin çözülmedi, rolden çıkarılan admin önbellek süresinden sonra da 200 aldı. Yeni: `AdministratorRemovalTests` (sahte saat; admin ucu ve `/probe` 403), resolver testi. Değişenler: super-admin testi 403 bekliyor; `JwtValidationTests` sunucuda izin verilmiş bir okuyucu, `ValidationTests` tanımlı bütün izinler kullanıyor.
+  - Kararlar D-036 (2), R-077. Güncellenenler: README (Yetkilendirme), kök ve eklenti CLAUDE.md, CHANGELOG, memory `novacore-security`.
+- [ ] F4c.3 Forwarded headers — devam ediyor
 - [ ] F4c.4 Projenin hata eşlemesi
 - [ ] F4c.5 Tipli yanıt sözleşmesi
 - [ ] F4c.6 Data Protection anahtar deposu koruması
@@ -836,10 +840,10 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konular. Her faz sonunda kullanıcı bunları gözden geçirir.
 
 **D-033 ile plana alınanlar (2026-09-28).** Aşağıdaki maddeler artık bir adıma bağlı. O adım bitince madde üstü çizilir.
-- Forwarded headers yok (Faz 0) ve proxy arkasında cookie'lerin `Secure` bayrağı (Faz 3b) → F4c.3.
+- ~~Forwarded headers yok (Faz 0) ve proxy arkasında cookie'lerin `Secure` bayrağı (Faz 3b) → F4c.3.~~ → F4c.3'te yapıldı.
 - Y-31 testinin `IResult` kör noktası (Faz 0, F0.7) → F4c.5.
 - `BadHttpRequestException`'ın 500 dönmesi (Faz 2b) → F4c.4.
-- Super-admin bypass'ının token rolüne dayanması (Faz 3a) → F4c.2.
+- ~~Super-admin bypass'ının token rolüne dayanması (Faz 3a) → F4c.2.~~ → F4c.2'de yapıldı.
 - `outbox_consumers` anahtarı (Faz 4a, #12) ve işlenmiş mesajların hiç silinmemesi (Faz 4a) → F4c.7.
 - Parola sıfırlama, onay e-postasını yeniden gönderme, `User` rolü yokken kayıtta 500 (Faz 3b) → F4d.2.
 - Kurtarma kodları (Faz 3b) → F4d.3.
@@ -858,7 +862,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 - xUnit v3 → 4.x ve xunit.runner.visualstudio 4.x major güncellemesi (F0.2 kapsamı dışında). Kaynak: `dotnet list package --outdated`, 2026-09-24.
 - (Faz 0, Q-09) `Microsoft.Extensions.Caching.Hybrid` ve `Microsoft.Extensions.Http.Resilience` 10.0.0 → 10.10.0, `Microsoft.NET.Test.Sdk` 18.6.0 → 18.10.1. Açıkları yok. Hybrid için F2c.3, Resilience için F2a.2 (eklenti paketi) uygun yer olabilir.
-- (Faz 0) Global ve "strict" rate limiter partition anahtarı olarak `RemoteIpAddress` kullanıyor. Bir reverse proxy arkasında bu proxy'nin IP'si olur. `ForwardedHeaders` yapılandırılmamış.
+- ~~(Faz 0) Global ve "strict" rate limiter partition anahtarı olarak `RemoteIpAddress` kullanıyor. Bir reverse proxy arkasında bu proxy'nin IP'si olur. `ForwardedHeaders` yapılandırılmamış.~~ → F4c.3'te çözüldü: güvenilen proxy'nin `X-Forwarded-For`'u `RemoteIpAddress`'i istemcinin adresi yapıyor.
 - (Faz 0, F0.2) Bu makinede kurulu shared framework 10.0.8, paketler artık 10.0.12. Runtime'ı 10.0.12'ye güncellemek ortam işi, repo işi değil.
 - (Faz 0, F0.8) GitHub Actions uyarısı (ilk CI koşusu, 2026-09-25): `ubuntu-latest` etiketi 19 Ekim 2026'dan itibaren Ubuntu 26'ya geçecek (actions/runner-images#14748). Etki beklenmiyor. İlk koşularda kırmızı olursa runner'ı `ubuntu-24.04`'e sabitlemek bir seçenek.
 - (Faz 0, F0.7) Y-31 testi ApiExplorer'a dayanıyor. `Task<IResult>` dönen ve `Produces<T>` bildirmeyen handler'ların yanıt payload'ını göremez (Identity uç noktalarının çoğu böyle). ApiExplorer dışı endpoint'ler de kapsam dışı (health, `ExcludeFromDescription`). Handler'lar typed result'a (`Results<Ok<T>, …>`) geçerse kapsam kendiliğinden genişler.
@@ -902,7 +906,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 2b → Faz 3a; **F3a.1'de değerlendirildi, yapılmadı**, R-058: `TokenValidationParameters`'ta `TimeProvider` yok, tek yol varsayılan doğrulamanın yerini alan bir `LifetimeValidator` delegesi.) Token üretimi `TimeProvider`'dan okuyor, JwtBearer'ın lifetime doğrulaması (IdentityModel) ise gerçek saatten. Sahte saatli testler bu yüzden gerçek "şimdi"den başlıyor (R-050). F3a.1'de doğrulama yeniden yazılırken `TimeProvider` ile hizalanabilir.
 
 - ~~(Faz 3a → F3b.3)~~ → F3b.3b'de çözüldü (D-028): üretim kodu ve Development simetrik modu kaldırıldı. Eski not: Çekirdekteki `ITokenService`/`JwtTokenService`/`AccessToken` ve `JwtOptions`'ın issuance alanlarının (`AccessTokenMinutes`, `RefreshTokenDays`) tek tüketicisi Identity modülü (D-024 (3)). Modülle birlikte kaldırılmalı. O gün HS256 üreten bir issuer kalmayacak; Development'taki simetrik doğrulamanın (`Jwt:SigningKey`) kalıp kalmayacağına karar verilmeli (ör. `dotnet user-jwts` için).
-- (Faz 3a, code review → 3b; **3b'de yapılmadı**, plan kapsamı dışında bırakıldı) **Super-admin bypass'ı token'daki rol claim'ine dayanıyor.** `Administrator` rolünden çıkarılan bir kullanıcı, token'ın ömrü boyunca (Identity'de 15 dk) her izni geçmeye devam ediyor. İzinler ise cache TTL'iyle yansıyor. IdP 3b'de gelirken super-admin de sunucu tarafında çözülmeli (resolver'dan dönen bir işaret ya da rol).
+- ~~(Faz 3a, code review → 3b; **3b'de yapılmadı**, plan kapsamı dışında bırakıldı) **Super-admin bypass'ı token'daki rol claim'ine dayanıyor.**~~ → F4c.2'de çözüldü (D-036 (2)). `Administrator` rolünden çıkarılan bir kullanıcı, token'ın ömrü boyunca (Identity'de 15 dk) her izni geçmeye devam ediyor. İzinler ise cache TTL'iyle yansıyor. IdP 3b'de gelirken super-admin de sunucu tarafında çözülmeli (resolver'dan dönen bir işaret ya da rol).
 - ~~(Faz 3a, code review)~~ → F3b.3b'de çözüldü: `Jwt:SigningKey` yok (D-028). Eski not: Development'ta hem `Jwt:Authority` hem `Jwt:SigningKey` varsa JwtBearer issuer'ları ve anahtarları bağsız birleştiriyor (R-056): Authority'nin issuer'ını taşıyan ama HS256 geliştirme anahtarıyla imzalanmış bir token kabul ediliyor. Yalnızca Development. Simetrik mod 3b'de yeniden değerlendirilince (yukarıdaki madde) birlikte ele alınmalı.
 - (Faz 3a → 3b; **3b'de yapılmadı**: Api host'u tek Authority'ye, kendi sağlayıcısına güveniyor, Keycloak ise yerine geçen bir seçenek) İzin önbelleğinin anahtarında `iss` yok (PLAN: `sub` + stamp). OIDC'de `sub` yalnızca issuer içinde tekil. Tek Authority ile sorun yok, ama Development/test'te iki issuer (test IdP + Identity) ve 3b'de OpenIddict + Keycloak birlikte güvenilirse `sub` çakışabilir. İkinci bir issuer desteklenirken anahtara `iss` eklenmeli.
 - (Faz 3a, code review) İzin önbelleğinin değeri `string[]`. HybridCache bunu değişmez saymadığı için her L1 okumasında JSON'dan yeniden üretiyor, yani her kimlikli istekte küçük bir deserialize maliyeti var. `[ImmutableObject(true)]` işaretli bir tip bunu önler, ama L2 (Redis) eklenince serileştirilebilir kalması doğrulanmalı.
@@ -925,7 +929,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 3b, code review, altitude) Eklenti token'a kopyaladığı principal'dan `permission` claim'lerini ayıklıyor, çünkü çekirdeğin `IClaimsTransformation`'ı her şemada (cookie, OpenIddict) çalışıyor ve her `/connect/token`'da resolver'a gidiyor. Kök çözüm izinleri yalnızca bearer principal'ı için çözmek (ör. `JwtBearerEvents.OnTokenValidated`). Bu R-057 ve D-029 (3)'ü yeniden açar; çekirdek değişikliği.
 - (Faz 3b, code review) Seed her açılışta gizli client'ların secret'ını yeniden hash'leyip yazıyor (`UpdateAsync(app, descriptor)` düz secret'ı hash'le karşılaştırıyor).
 - (Faz 3b, code review) `IdentityPermissionResolver` rol başına iki sorgu atıyor (N+1). Cache'li; eski modülden geldi.
-- (Faz 3b, code review) `SecurePolicy = Always` yalnızca uygulama cookie'sinde. 2FA kullanıcı cookie'si ve antiforgery cookie'si varsayılanda. Forwarded headers'sız bir TLS proxy'si arkasında `Secure` bayrağı olmadan çıkıyorlar (yukarıdaki Faz 0 `ForwardedHeaders` maddesiyle ilgili).
+- (Faz 3b, code review; **F4c.3'te kısmen çözüldü**: güvenilen proxy yapılandırılınca istek şeması https olur ve `SameAsRequest` cookie'ler `Secure` alır) `SecurePolicy = Always` yalnızca uygulama cookie'sinde. 2FA kullanıcı cookie'si ve antiforgery cookie'si varsayılanda. Forwarded headers'sız bir TLS proxy'si arkasında `Secure` bayrağı olmadan çıkıyorlar (yukarıdaki Faz 0 `ForwardedHeaders` maddesiyle ilgili).
 - (Faz 3b, F3b.5b, R-066) Scalar'da OAuth2 şeması seçili ama token'sız kalınca elle eklenen `Authorization` başlığı işe yaramıyor (401). Normal kullanımda Scalar popup'la token alıyor; built-in browser popup'ı aynı sekmede açtığı için bu tarayıcıda denenemedi. Gerçek bir tarayıcıda Scalar'ın popup akışı bir kez elle denenmeli.
 
 - (Faz 4a, plan kapsamı dışı) **Birden çok uygulama örneği:** dispatcher veritabanı başına tek örnek varsayıyor. İki host aynı outbox'u okursa aynı mesajı ikisi de teslim edebilir. Çözüm bir claim/lease olabilir (örneğin koşullu `ExecuteUpdate` ile kilit süresi). SQLite `DateTimeOffset` karşılaştırmasını çeviremediği için süre alanının tipi test tarafını da etkiler (R-068).

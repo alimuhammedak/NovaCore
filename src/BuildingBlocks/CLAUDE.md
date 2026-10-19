@@ -68,6 +68,10 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
   catch-all, so a more specific handler must be registered ahead of it.
 - Caching: inject `HybridCache` directly. It is already an abstract class with a default implementation (R-008), so
   don't wrap it (Y-15). `AddCoreCaching` registers it with the default entry lifetime from `Cache:DefaultExpiration`.
+- **Forwarded headers are opt-in by proxy:** `UseCoreWeb` runs `UseForwardedHeaders` first; `ForwardedHeaders:KnownProxies`
+  and `KnownIPNetworks` (validated on start) replace the framework's loopback defaults, and only `X-Forwarded-For` and
+  `X-Forwarded-Proto` apply. Empty leaves `ForwardedHeadersOptions` untouched (nothing applied). Anything that reads the
+  client IP or the scheme reads `HttpContext.Connection.RemoteIpAddress`/`Request.Scheme` after this middleware.
 - **Authorization is closed by default:** `AddCoreAuthorization` sets `FallbackPolicy = RequireAuthenticatedUser`, so an
   endpoint without authorization metadata, and a request that matches none, needs a signed-in caller (R-073). An
   endpoint a building block maps for anonymous callers (health, the OpenAPI document, Scalar, the identity provider's

@@ -431,6 +431,11 @@ de izinlerini önbellek süresi dolunca kaybeder.
 | `POST·DELETE /api/v1/admin/users/{id}/roles` | Rol ata/kaldır (`identity:users:manage`) |
 
 ### Ek sertleştirme
+- **Reverse proxy arkasında:** `UseCoreWeb` pipeline'ın başında `UseForwardedHeaders`'ı çalıştırır. Yalnızca
+  `ForwardedHeaders:KnownProxies`/`KnownIPNetworks`'te listelenen kaynakların `X-Forwarded-For` ve `X-Forwarded-Proto`
+  başlıkları uygulanır; böylece rate limiter gerçek istemciyi ayırır, istek şeması (ve `Secure` cookie'ler) https olur.
+  Liste boşsa hiç kimsenin başlığı uygulanmaz (framework varsayılanı, loopback dahil). `X-Forwarded-Host` işlenmez:
+  public adres `Jwt:Authority`'den gelir.
 - **Security headers** (her yanıtta): `X-Content-Type-Options`, `X-Frame-Options: DENY`,
   `Referrer-Policy`, `Content-Security-Policy: default-src 'none'`, `Server` başlığı kaldırılır; prod'da **HSTS**.
 - **Audit logging:** giriş (başarılı/başarısız), lockout, 2FA, refresh, çıkış, parola değişimi, oturum iptali, rol
@@ -468,6 +473,7 @@ de izinlerini önbellek süresi dolunca kaybeder.
   "Cache":         { "DefaultExpiration": "00:05:00", "PermissionExpiration": "00:05:00" },
   "RateLimiting":  { "PermitLimit": 100, "WindowSeconds": 60 },   // giriş ve hesap uçları 1/10'unu kullanır ("strict")
   "Cors":          { "AllowedOrigins": [] },        // boş = Development'ta her origin (credentials olmadan), diğer ortamlarda hiçbiri
+  "ForwardedHeaders": { "KnownProxies": [], "KnownIPNetworks": [] },  // reverse proxy'nin IP'leri / CIDR ağları; boş = başlıklar işlenmez
   "Seq":           { "ServerUrl": "" }              // dolu = Seq'e log gönder
 }
 ```
@@ -485,6 +491,8 @@ host'u, ayarın adını veren bir hatayla durdurur:
 - `RateLimiting`: `PermitLimit` ve `WindowSeconds` ≥ 1. `Cache:DefaultExpiration` ve `Cache:PermissionExpiration`
   pozitif birer süre.
 - `Cors:AllowedOrigins`: her giriş çıplak bir origin olmalı (`https://app.example.com`): yol, sondaki `/` ve `*` yok.
+- `ForwardedHeaders:KnownProxies`: IP adresleri (IPv4 dört bölümüyle, `10.0.0` gibi kısaltma yok);
+  `ForwardedHeaders:KnownIPNetworks`: CIDR ağları (`10.0.0.0/8`, host bitleri sıfır).
 - `Database:ApplyMigrations`: `true`/`false`.
 
 Değerler kayıt anında değil, ilk kullanımda okunur. Bu yüzden `CreateBuilder`'dan sonra eklenen config (ör. testlerde
