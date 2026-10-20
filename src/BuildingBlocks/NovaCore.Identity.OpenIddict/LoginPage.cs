@@ -10,9 +10,10 @@ using Microsoft.AspNetCore.WebUtilities;
 namespace NovaCore.Identity.OpenIddict;
 
 /// <summary>
-/// The sign-in pages the authorization endpoint sends an anonymous browser to: the password step, then the
-/// authenticator-code step for an account with two-factor authentication. Plain HTML without scripts or styles (the
-/// core's Content-Security-Policy allows neither), an antiforgery token, and a redirect back to a local URL only.
+/// The sign-in pages the authorization endpoint sends an anonymous browser to: the password step, then, for an account
+/// with two-factor authentication, the code step, which takes an authenticator code or one of the recovery codes. Plain
+/// HTML without scripts or styles (the core's Content-Security-Policy allows neither), an antiforgery token, and a
+/// redirect back to a local URL only.
 /// </summary>
 internal static class LoginPage
 {
@@ -27,11 +28,10 @@ internal static class LoginPage
 
     private const string InvalidCode = "Invalid authenticator code.";
 
-    public static void Map(IEndpointRouteBuilder endpoints)
-    {
-        // The pages a signed-out browser signs in on.
-        var account = endpoints.MapGroup("/account").ExcludeFromDescription().AllowAnonymous().RequireRateLimiting("strict");
+    private const string InvalidRecoveryCode = "Invalid recovery code.";
 
+    public static void Map(RouteGroupBuilder account)
+    {
         account.MapGet("/login", (string? returnUrl, HttpContext context, IAntiforgery antiforgery) =>
             PasswordForm(context, antiforgery, returnUrl, email: null, error: null));
         account.MapPost("/login", SignIn);
@@ -40,13 +40,14 @@ internal static class LoginPage
         account.MapPost("/login/2fa", SignInWithCode);
     }
 
-    // The forms are read and their antiforgery token checked here, not by [FromForm] binding: that needs the antiforgery
-    // middleware, which the host pipeline doesn't have (docs/plan/RESEARCH.md R-061).
+    // The forms are read and their antiforgery token checked here, not by [FromForm] binding (see HtmlPage).
     private static async Task<IResult> SignIn(
         HttpContext context,
         IAntiforgery antiforgery,
         UserManager<ApplicationUser> users,
         SignInManager<ApplicationUser> signIn,
+        IPasswordHasher<ApplicationUser> hasher,
+        DummyPasswordHash dummyHash,
         SecurityAuditLogger audit)
     {
         if (!context.Request.HasFormContentType || !await antiforgery.IsRequestValidAsync(context))
@@ -59,6 +60,10 @@ internal static class LoginPage
         var user = string.IsNullOrWhiteSpace(email) ? null : await users.FindByEmailAsync(email);
         if (user is null || string.IsNullOrEmpty(password))
         {
+            // An unknown address costs a password hash too, so the answer doesn't come sooner than for a known one.
+            if (user is null && !string.IsNullOrEmpty(password))
+                dummyHash.Check(hasher, password);
+
             audit.LoginFailed(email, ip, "unknown-user");
             return PasswordForm(context, antiforgery, returnUrl, email, InvalidCredentials);
         }
@@ -113,6 +118,7 @@ internal static class LoginPage
     private static async Task<IResult> SignInWithCode(
         HttpContext context,
         IAntiforgery antiforgery,
+        UserManager<ApplicationUser> users,
         SignInManager<ApplicationUser> signIn,
         SecurityAuditLogger audit)
     {
@@ -128,12 +134,19 @@ internal static class LoginPage
         if (user is null)
             return Results.LocalRedirect(QueryHelpers.AddQueryString(context.Request.PathBase + Path, "ReturnUrl", returnUrl ?? string.Empty));
 
-        // A wrong code counts as a failed access, so it leads to lockout like a wrong password.
-        var result = await signIn.TwoFactorAuthenticatorSignInAsync(
-            (code ?? string.Empty).Replace(" ", string.Empty, StringComparison.Ordinal), isPersistent: false, rememberClient: false);
+        // An authenticator code is digits, even mistyped; Identity's recovery codes (XXXXX-XXXXX) always have a dash.
+        var entered = (code ?? string.Empty).Replace(" ", string.Empty, StringComparison.Ordinal);
+        var isRecoveryCode = entered.Length == 0 || !entered.All(char.IsAsciiDigit);
+
+        // A wrong code of either kind counts as a failed access, so it leads to lockout like a wrong password.
+        var result = isRecoveryCode
+            ? await RecoveryCodeSignInAsync(users, signIn, user, entered)
+            : await signIn.TwoFactorAuthenticatorSignInAsync(entered, isPersistent: false, rememberClient: false);
 
         if (result.Succeeded)
         {
+            if (isRecoveryCode)
+                audit.RecoveryCodeUsed(user.Id);
             audit.LoginSucceeded(user.Id, ip);
             return Continue(returnUrl);
         }
@@ -141,54 +154,44 @@ internal static class LoginPage
         if (result.IsLockedOut)
             audit.AccountLockedOut(user.Id, ip);
         else
-            audit.LoginFailed(user.Email, ip, "bad-2fa-code");
+            audit.LoginFailed(user.Email, ip, isRecoveryCode ? "bad-recovery-code" : "bad-2fa-code");
 
-        return CodeForm(context, antiforgery, returnUrl, InvalidCode);
+        return CodeForm(context, antiforgery, returnUrl, isRecoveryCode ? InvalidRecoveryCode : InvalidCode);
+    }
+
+    // SignInManager redeems a recovery code without looking at lockout and doesn't count a wrong one: "codes are expected
+    // to be random" (docs/plan/RESEARCH.md R-085). Both happen here, so a locked account can't get in with a code and a
+    // wrong code counts like a wrong authenticator code. A redeemed code is gone (single use).
+    private static async Task<SignInResult> RecoveryCodeSignInAsync(
+        UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signIn, ApplicationUser user, string code)
+    {
+        if (await users.IsLockedOutAsync(user))
+            return SignInResult.LockedOut;
+
+        // The codes are upper case letters and digits.
+        var result = await signIn.TwoFactorRecoveryCodeSignInAsync(code.ToUpperInvariant());
+        if (result.Succeeded)
+            return result;
+
+        await users.AccessFailedAsync(user);
+        return await users.IsLockedOutAsync(user) ? SignInResult.LockedOut : SignInResult.Failed;
     }
 
     // Only back into this application (the authorization endpoint): never an open redirect.
     private static IResult Continue(string? returnUrl) =>
         RedirectHttpResult.IsLocalUrl(returnUrl)
             ? Results.LocalRedirect(returnUrl!)
-            : Page("Signed in", "<h1>Signed in</h1><p>You are signed in. Return to the application to continue.</p>");
+            : HtmlPage.Message("Signed in", "You are signed in. Return to the application to continue.");
 
     private static IResult PasswordForm(HttpContext context, IAntiforgery antiforgery, string? returnUrl, string? email, string? error) =>
-        Form(context, antiforgery, "Sign in", Path, returnUrl, error, $"""
+        HtmlPage.Form(context, antiforgery, "Sign in", Path, [new("ReturnUrl", returnUrl)], error, $"""
             <p><label for="email">Email</label><br><input id="email" name="Email" type="email" autocomplete="username" required value="{HtmlEncoder.Default.Encode(email ?? "")}"></p>
             <p><label for="password">Password</label><br><input id="password" name="Password" type="password" autocomplete="current-password" required></p>
-            """);
+            """,
+            after: HtmlPage.Link(context, PasswordResetPage.ForgotPath, "Forgot your password?"));
 
     private static IResult CodeForm(HttpContext context, IAntiforgery antiforgery, string? returnUrl, string? error) =>
-        Form(context, antiforgery, "Two-factor authentication", TwoFactorPath, returnUrl, error, """
-            <p><label for="code">Authenticator code</label><br><input id="code" name="Code" inputmode="numeric" autocomplete="one-time-code" required></p>
+        HtmlPage.Form(context, antiforgery, "Two-factor authentication", TwoFactorPath, [new("ReturnUrl", returnUrl)], error, """
+            <p><label for="code">Authenticator code or recovery code</label><br><input id="code" name="Code" autocomplete="one-time-code" required></p>
             """);
-
-    private static IResult Form(
-        HttpContext context, IAntiforgery antiforgery, string title, string action, string? returnUrl, string? error, string fields)
-    {
-        var html = HtmlEncoder.Default;
-        var tokens = antiforgery.GetAndStoreTokens(context);
-
-        return Page(title, $"""
-            <h1>{html.Encode(title)}</h1>
-            {(error is null ? "" : $"<p role=\"alert\">{html.Encode(error)}</p>")}
-            <form method="post" action="{html.Encode(context.Request.PathBase + action)}">
-              <input type="hidden" name="{html.Encode(tokens.FormFieldName)}" value="{html.Encode(tokens.RequestToken ?? "")}">
-              <input type="hidden" name="ReturnUrl" value="{html.Encode(returnUrl ?? "")}">
-            {fields}  <p><button type="submit">Continue</button></p>
-            </form>
-            """);
-    }
-
-    private static IResult Page(string title, string body) => Results.Content(
-        $"""
-         <!doctype html>
-         <html lang="en">
-         <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{HtmlEncoder.Default.Encode(title)}</title></head>
-         <body><main>
-         {body}
-         </main></body>
-         </html>
-         """,
-        "text/html; charset=utf-8");
 }

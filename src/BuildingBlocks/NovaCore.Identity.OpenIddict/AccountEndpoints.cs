@@ -1,11 +1,8 @@
-using System.Buffers.Text;
-using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NovaCore.Abstractions.Identity;
@@ -15,9 +12,10 @@ using OpenIddict.Abstractions;
 namespace NovaCore.Identity.OpenIddict;
 
 /// <summary>
-/// The account API under <c>/api/v1/auth</c> (the Identity module's paths): self-service registration and email
-/// confirmation (anonymous; registering an existing address looks like registering a new one), and for the signed-in
-/// caller: who am I, change password, sign out everywhere, and authenticator-app two-factor authentication.
+/// The account API under <c>/api/v1/auth</c> (the Identity module's paths): self-service registration, email
+/// confirmation and sending the confirmation again (anonymous; none of them reveals whether an address has an account),
+/// and for the signed-in caller: who am I, change password, sign out everywhere, and authenticator-app two-factor
+/// authentication.
 /// </summary>
 internal static class AccountEndpoints
 {
@@ -25,6 +23,9 @@ internal static class AccountEndpoints
 
     private static readonly MessageResponse GenericAccepted =
         new("If the email address is new, a confirmation link has been sent.");
+
+    private static readonly MessageResponse ConfirmationResent =
+        new("If the address belongs to an account that isn't confirmed yet, a new confirmation link has been sent.");
 
     /// <summary>A message for the caller, e.g. after registration or when a resource is missing.</summary>
     internal sealed record MessageResponse(string Message);
@@ -41,6 +42,12 @@ internal static class AccountEndpoints
         auth.MapGet("/confirm-email", ConfirmEmail)
             .WithName("ConfirmEmail")
             .WithSummary("Confirm an email address using the token from the confirmation link")
+            .AllowAnonymous();
+
+        auth.MapPost("/resend-confirmation-email", ResendConfirmationEmail)
+            .WithName("ResendConfirmationEmail")
+            .WithSummary("Send the email confirmation link again (only to an account that isn't confirmed yet)")
+            .ProducesValidationProblem()
             .AllowAnonymous();
 
         auth.MapGet("/me", Me)
@@ -73,6 +80,7 @@ internal static class AccountEndpoints
     private static async Task<Results<Ok<MessageResponse>, ValidationProblem>> Register(
         RegisterRequest request,
         UserManager<ApplicationUser> users,
+        RoleManager<ApplicationRole> roles,
         IEmailSender emailSender,
         SecurityAuditLogger audit,
         IOptions<JwtOptions> jwt,
@@ -94,26 +102,43 @@ internal static class AccountEndpoints
             if (result.Errors.All(error => error.Code.Contains("Duplicate", StringComparison.OrdinalIgnoreCase)))
                 return TypedResults.Ok(GenericAccepted);
 
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["password"] = result.Errors.Select(error => error.Description).ToArray()
-            });
+            return PasswordProblem(result.Errors.Select(error => error.Description).ToArray());
         }
 
-        await users.AddToRoleAsync(user, IdentityRoles.User);
+        // The seed creates the User role. Without it (seeding off) there are no roles yet, and the account starts without
+        // one; the admin API grants roles later.
+        if (await roles.RoleExistsAsync(IdentityRoles.User))
+            await users.AddToRoleAsync(user, IdentityRoles.User);
 
-        var token = Base64Url.EncodeToString(Encoding.UTF8.GetBytes(await users.GenerateEmailConfirmationTokenAsync(user)));
-
-        // The link starts from the configured public URL, never from the request's Host header (host header poisoning).
-        var link = QueryHelpers.AddQueryString(
-            new Uri(new Uri(jwt.Value.Authority.TrimEnd('/') + "/"), ConfirmEmailPath).AbsoluteUri,
-            new Dictionary<string, string?> { ["userId"] = user.Id.ToString(), ["token"] = token });
-
-        await emailSender.SendAsync(request.Email, "Confirm your account",
-            $"Welcome! Confirm your email address: <a href=\"{link}\">Confirm</a>", cancellationToken);
+        await SendConfirmationAsync(users, emailSender, jwt.Value, user, cancellationToken);
 
         audit.UserRegistered(user.Id, request.Email);
         return TypedResults.Ok(GenericAccepted);
+    }
+
+    // Identity's /resendConfirmationEmail sends to a confirmed account too; here only an unconfirmed one gets a link, so
+    // nobody can have emails sent to a confirmed address. The answer is the same either way (RESEARCH R-084).
+    private static async Task<Ok<MessageResponse>> ResendConfirmationEmail(
+        ResendConfirmationEmailRequest request,
+        UserManager<ApplicationUser> users,
+        IEmailSender emailSender,
+        IOptions<JwtOptions> jwt,
+        CancellationToken cancellationToken)
+    {
+        var user = await users.FindByEmailAsync(request.Email);
+        if (user is not null && !await users.IsEmailConfirmedAsync(user))
+            await SendConfirmationAsync(users, emailSender, jwt.Value, user, cancellationToken);
+
+        return TypedResults.Ok(ConfirmationResent);
+    }
+
+    private static async Task SendConfirmationAsync(
+        UserManager<ApplicationUser> users, IEmailSender emailSender, JwtOptions jwt, ApplicationUser user, CancellationToken cancellationToken)
+    {
+        var link = EmailLinks.Create(jwt, ConfirmEmailPath, user.Id, await users.GenerateEmailConfirmationTokenAsync(user));
+
+        await emailSender.SendAsync(user.Email!, "Confirm your account",
+            $"Welcome! Confirm your email address: <a href=\"{link}\">Confirm</a>", cancellationToken);
     }
 
     internal sealed record MeResponse(
@@ -151,21 +176,34 @@ internal static class AccountEndpoints
         IOpenIddictTokenManager tokens,
         IOpenIddictAuthorizationManager authorizations,
         SecurityAuditLogger audit,
+        HttpContext context,
         CancellationToken cancellationToken)
     {
         var user = await FindAsync(users, currentUser);
         if (user is null)
             return TypedResults.Unauthorized();
 
+        // Like the sign-in page: a locked account changes nothing and a wrong current password counts toward lockout, so a
+        // stolen access token can't guess the password more often than the sign-in page allows. ChangePasswordAsync checks
+        // the password itself, so it is hashed once.
+        if (await users.IsLockedOutAsync(user))
+            return PasswordProblem(["The account is locked. Try again later."]);
+
         // ChangePasswordAsync also renews the security stamp, which ends the provider's sign-in cookie.
         var result = await users.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
         if (!result.Succeeded)
         {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            if (result.Errors.Any(error => error.Code == nameof(IdentityErrorDescriber.PasswordMismatch)))
             {
-                ["password"] = result.Errors.Select(error => error.Description).ToArray()
-            });
+                await users.AccessFailedAsync(user);
+                if (await users.IsLockedOutAsync(user))
+                    audit.AccountLockedOut(user.Id, context.Connection.RemoteIpAddress?.ToString());
+            }
+
+            return PasswordProblem(result.Errors.Select(error => error.Description).ToArray());
         }
+
+        await users.ResetAccessFailedCountAsync(user);
 
         // Defence in depth: a password change ends every session.
         await RevokeSessionsAsync(user, tokens, authorizations, cancellationToken);
@@ -175,7 +213,7 @@ internal static class AccountEndpoints
     }
 
     // Refresh tokens and authorizations can be revoked; issued access tokens stay valid until they expire (15 minutes).
-    private static async Task RevokeSessionsAsync(
+    internal static async Task RevokeSessionsAsync(
         ApplicationUser user,
         IOpenIddictTokenManager tokens,
         IOpenIddictAuthorizationManager authorizations,
@@ -259,6 +297,9 @@ internal static class AccountEndpoints
         ["code"] = ["The verification code is invalid."]
     });
 
+    private static ValidationProblem PasswordProblem(string[] errors) =>
+        TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["password"] = errors });
+
     private static async Task<Results<Ok<MessageResponse>, BadRequest<MessageResponse>>> ConfirmEmail(
         Guid userId,
         string token,
@@ -268,18 +309,8 @@ internal static class AccountEndpoints
         var invalid = TypedResults.BadRequest(new MessageResponse("Invalid or expired confirmation token."));
 
         var user = await users.FindByIdAsync(userId.ToString());
-        if (user is null)
+        if (user is null || EmailLinks.DecodeToken(token) is not { } decoded)
             return invalid;
-
-        string decoded;
-        try
-        {
-            decoded = Encoding.UTF8.GetString(Base64Url.DecodeFromChars(token));
-        }
-        catch (FormatException)
-        {
-            return invalid;
-        }
 
         if (!(await users.ConfirmEmailAsync(user, decoded)).Succeeded)
             return invalid;

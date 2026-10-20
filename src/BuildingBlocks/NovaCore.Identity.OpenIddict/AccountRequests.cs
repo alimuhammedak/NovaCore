@@ -14,6 +14,10 @@ public sealed record RegisterRequest(
     [Required, Length(12, 128)] string Password,
     [MaxLength(128)] string? DisplayName);
 
+/// <summary>The body of <c>POST /api/v1/auth/resend-confirmation-email</c>.</summary>
+/// <param name="Email">The address the account registered with.</param>
+public sealed record ResendConfirmationEmailRequest([Required, EmailAddress, MaxLength(256)] string Email);
+
 /// <summary>The body of <c>POST /api/v1/auth/2fa/enable</c> and <c>/2fa/disable</c>.</summary>
 /// <param name="Code">The current code from the authenticator app.</param>
 public sealed record TwoFactorCodeRequest([Required, Length(6, 8)] string Code);

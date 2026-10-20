@@ -198,18 +198,72 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         using var flow = new OidcFlow(_host);
         await flow.SignInAsync("leave@novacore.test", Password);
 
-        var endSession = await flow.Browser.GetAsync(QueryHelpers.AddQueryString("/connect/endsession", new Dictionary<string, string?>
-        {
-            ["client_id"] = IdentityServerTestHost.ClientId,
-            ["post_logout_redirect_uri"] = IdentityServerTestHost.PostLogoutRedirectUri
-        }));
+        // The provider asks first; the confirmation posts the request back with its antiforgery token.
+        var confirmation = await flow.Browser.GetAsync(EndSessionUri);
+        var endSession = await flow.SubmitFormAsync(confirmation, "/connect/endsession", []);
         Assert.Equal(HttpStatusCode.Redirect, endSession.StatusCode);
         Assert.StartsWith(IdentityServerTestHost.PostLogoutRedirectUri, endSession.Headers.Location!.ToString(), StringComparison.Ordinal);
 
         // The next authorization request needs a new sign-in.
-        var again = await flow.Browser.GetAsync(OidcFlow.AuthorizeUri(OidcFlow.NewPkce().Challenge));
-        Assert.Equal(HttpStatusCode.Redirect, again.StatusCode);
-        Assert.StartsWith(IdentityServerTestHost.Authority + "/account/login", again.Headers.Location!.ToString(), StringComparison.Ordinal);
+        Assert.StartsWith(IdentityServerTestHost.Authority + "/account/login", (await AuthorizeAsync(flow)).ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task End_session_asks_before_signing_out()
+    {
+        await _host.CreateUserAsync("ask@novacore.test", Password);
+        using var flow = new OidcFlow(_host);
+        await flow.SignInAsync("ask@novacore.test", Password);
+
+        // A link on another site leads here too (logout CSRF): it gets the question, not the sign-out.
+        var response = await flow.Browser.GetAsync(EndSessionUri);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Sign out", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.StartsWith(IdentityServerTestHost.RedirectUri, (await AuthorizeAsync(flow)).ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_sign_out_post_without_the_confirmation_token_keeps_the_session()
+    {
+        await _host.CreateUserAsync("cross-site@novacore.test", Password);
+        using var flow = new OidcFlow(_host);
+        await flow.SignInAsync("cross-site@novacore.test", Password);
+
+        // What a form on another site can post: the parameters, but no antiforgery token.
+        var response = await flow.Browser.PostAsync("/connect/endsession", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["client_id"] = IdentityServerTestHost.ClientId,
+            ["post_logout_redirect_uri"] = IdentityServerTestHost.PostLogoutRedirectUri
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.StartsWith(IdentityServerTestHost.RedirectUri, (await AuthorizeAsync(flow)).ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_signed_out_browser_is_sent_on_without_the_question()
+    {
+        using var flow = new OidcFlow(_host);
+
+        var response = await flow.Browser.GetAsync(EndSessionUri);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.StartsWith(IdentityServerTestHost.PostLogoutRedirectUri, response.Headers.Location!.ToString(), StringComparison.Ordinal);
+    }
+
+    private static string EndSessionUri => QueryHelpers.AddQueryString("/connect/endsession", new Dictionary<string, string?>
+    {
+        ["client_id"] = IdentityServerTestHost.ClientId,
+        ["post_logout_redirect_uri"] = IdentityServerTestHost.PostLogoutRedirectUri
+    });
+
+    // Where a new authorization request leads: the client's callback while the provider session lasts, else the sign-in page.
+    private static async Task<Uri> AuthorizeAsync(OidcFlow flow)
+    {
+        var response = await flow.Browser.GetAsync(OidcFlow.AuthorizeUri(OidcFlow.NewPkce().Challenge));
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        return response.Headers.Location!;
     }
 }
 

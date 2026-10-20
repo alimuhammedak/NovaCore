@@ -60,7 +60,11 @@ public sealed class IdentityServerTestHost : IAsyncDisposable
     public static async Task<IdentityServerTestHost> StartAsync(
         string environment = "Development", Action<WebApplicationBuilder>? configure = null)
     {
-        var connection = new SqliteConnection("DataSource=:memory:");
+        // A named in-memory database that lives while this connection is open. Each context instance opens its own
+        // connection to it: the token pruner uses the store in the background while requests do, and a SqliteConnection
+        // isn't thread-safe (docs/plan/RESEARCH.md R-069). No pooling, so the database goes when the host does.
+        var connection = new SqliteConnection(
+            $"Data Source=identity-tests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared;Pooling=False");
         connection.Open();
         WebApplication? app = null;
 
@@ -90,7 +94,7 @@ public sealed class IdentityServerTestHost : IAsyncDisposable
             builder.AddCorePersistence();
             builder.AddCoreIdentityServer();
             builder.Services.AddModuleDbContext<IdentityServerDbContext>((provider, db) => db
-                .UseSqlite(connection)
+                .UseSqlite(connection.ConnectionString)
                 .AddInterceptors(provider.GetRequiredService<AuditableEntityInterceptor>()));
 
             // JwtBearer reads the authority's metadata and keys from this very server (docs/plan/RESEARCH.md R-056).

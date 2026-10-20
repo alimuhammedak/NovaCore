@@ -24,7 +24,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   and `/account/*` read them.
 - **Hardening (keep these values or stronger):** PBKDF2 `IterationCount = 600_000`; password length-first
   (`RequiredLength = 12`, no composition rules); lockout 5 attempts / 15 min, new accounts included; a wrong 2FA code
-  counts as a failed access; `RequireConfirmedEmail = true`; `RequireUniqueEmail = true`.
+  counts as a failed access, a recovery code included (`SignInManager` neither checks lockout nor counts a wrong
+  recovery code, so `LoginPage` does both before and after redeeming it, R-085); `RequireConfirmedEmail = true`;
+  `RequireUniqueEmail = true`.
 - **Protocol:** Authorization Code with PKCE **S256 only** (`plain` removed, D-029 (1)); refresh tokens rotate, and a
   redeemed one reused after OpenIddict's 30 s leeway revokes every token of its authorization; access tokens 15 minutes,
   refresh tokens 7 days. The token endpoint re-checks the account on every refresh (exists, can sign in, not locked out)
@@ -32,7 +34,14 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **Anti-enumeration:** the sign-in page shows one message for an unknown account, a wrong password and a locked
   account; the "confirm your email" message comes only after the right password. `SignInManager` answers `NotAllowed`
   before it looks at the password, so `LoginPage` checks the password itself and counts a wrong one (D-030 (1)).
-  Registration answers an existing address like a new one.
+  An unknown email costs a password hash like a known one (`DummyPasswordHash`, made once by the host's hasher), so the
+  answer's timing doesn't reveal accounts either (R-087). Registration answers an existing address like a new one. Resending the confirmation answers every address alike and
+  emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
+  account; the reset page answers an unknown or unconfirmed account like a bad token (R-084).
+- **Password reset:** the link carries an Identity token that `ResetPasswordAsync` uses up (it renews the security
+  stamp), the new password is typed twice, and a reset revokes every token and authorization of the user like a
+  password change. It never signs the user in. A missing `User` role (seeding off) leaves a new account without a role
+  instead of failing the registration.
 - **Sign-in age:** `auth_time` and `max_age` read the sign-in time the cookie's `OnSigningIn` records in its
   properties, never the cookie's `IssuedUtc`, which moves on every renewal (sliding expiration, the zero-interval stamp
   check; D-030 (2), R-067).
@@ -45,21 +54,32 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   claim is informational and never passes a permission check (D-036 (2)). The core's
   claims transformation runs on OpenIddict's scheme too, so a principal copied into a token drops `permission` claims
   (D-029 (3)).
+- **The store is pruned:** `ExpiredTokenPruner` (a `BackgroundService`, a pass at startup, then hourly) calls
+  OpenIddict's `PruneAsync` for tokens, then authorizations, with a 14-day minimum lifespan (OpenIddict.Quartz's defaults,
+  R-088). Keep the lifespan longer than the refresh token lifetime, so a reused refresh token is still found and revokes
+  its chain. A failed step is logged (a failed token step doesn't skip the authorizations) and the next pass tries
+  again; it never stops the host.
+- **Sign-out asks first:** `/connect/endsession` shows a signed-in browser a question whose form posts the request's
+  parameters back with an antiforgery token; only that POST signs out (logout CSRF, RP-Initiated Logout §2, R-086). A
+  signed-out browser goes straight on to the post-logout redirect.
 - **Anonymous by declaration:** the core's fallback policy closes every endpoint without authorization metadata, so the
   protocol endpoints (`ConnectEndpoints`) and the sign-in pages (`/account` group) carry `.AllowAnonymous()`; the
   handlers read the sign-in session themselves. OpenIddict's own endpoints (discovery, JWKS, revocation) answer in the
   authentication middleware, before authorization.
-- **Pages and forms:** plain HTML (the core's CSP forbids scripts and styles), antiforgery checked in the handler with
-  `IAntiforgery.IsRequestValidAsync` (the pipeline has no antiforgery middleware, R-061), redirects to local URLs only.
-- **Links from configuration, never from the request:** the email confirmation link starts from `Jwt:Authority`, not the
-  Host header.
+- **Pages and forms:** plain HTML (the core's CSP forbids scripts and styles), rendered by `HtmlPage`; antiforgery
+  checked in the handler with `IAntiforgery.IsRequestValidAsync` (the pipeline has no antiforgery middleware, R-061),
+  redirects to local URLs only. The `/account` group (anonymous, out of the OpenAPI document, `strict` rate limit) is
+  created once in `MapCoreIdentityServer`.
+- **Links from configuration, never from the request:** the emailed links (confirmation, password reset) come from
+  `EmailLinks`, which starts them from `Jwt:Authority`, not the Host header.
 - **Validated request bodies are public records** (`AccountRequests.cs`): .NET 10's validation generator skips internal
   types (R-062). Endpoint classes stay internal.
 - **Audit, don't print secrets.** Security events go through `SecurityAuditLogger` (masked emails, `SECURITY` prefix).
   Never log passwords, codes, raw tokens or full JWTs.
 - **Password change and "sign out everywhere"** revoke every token and authorization of the user and renew the security
   stamp; the cookie's stamp is checked on every use (`ValidationInterval = 0`), so the provider session ends at once.
-  Issued access tokens stay valid until they expire.
+  Issued access tokens stay valid until they expire. A wrong current password counts toward lockout and a locked
+  account's password doesn't change, as on the sign-in page: a stolen access token mustn't guess more often (R-087).
 
 ## Adding an account endpoint
 
@@ -67,7 +87,7 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   results (`Results<Ok<T>, ValidationProblem, UnauthorizedHttpResult>`, ...), with named internal records for bodies
   (`MessageResponse`), not anonymous objects: the union is the OpenAPI contract. `/connect/*` and `/account/*` stay
   `IResult` (protocol and HTML, excluded from the document). `.AllowAnonymous()` only for
-  pre-sign-in endpoints (register, confirm-email); everything else `.RequireAuthorization()` or
+  pre-sign-in endpoints (register, confirm-email, resend-confirmation-email); everything else `.RequireAuthorization()` or
   `.RequirePermission(IdentityPermissions.X)`. Put the validated body in `AccountRequests.cs` and list it in
   `PublicAPI.Unshipped.txt`.
 - Add the endpoint to the Api host's `ModuleRegistrationTests` and, when it validates, `ValidationTests`.

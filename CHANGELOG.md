@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `NovaCore.Identity.OpenIddict` prunes its store: at startup and every hour, OpenIddict's `PruneAsync` deletes the tokens
+  that are expired, revoked or redeemed and the authorizations that are no longer valid and have no token left, once
+  they are 14 days old (OpenIddict.Quartz's defaults; no new package). A failed pass is logged as an error and retried on
+  the next one.
+- Password reset in `NovaCore.Identity.OpenIddict`: the sign-in page links to `/account/forgot-password`, which emails a
+  confirmed account a link to `/account/reset-password` (from `Jwt:Authority`, never the Host header). The new password
+  is typed twice; the link works once and expires with the other Identity tokens (6 hours). A reset revokes every refresh
+  token and authorization of the user and doesn't sign them in. Unknown and unconfirmed addresses get the same page and
+  no email. Audited as `SECURITY password_reset_requested` and `password_reset`.
+- The sign-in page's two-factor step also takes one of the recovery codes `/api/v1/auth/2fa/enable` returns, once each
+  (until now they couldn't be used). A locked account can't sign in with one, and a wrong one counts toward lockout like
+  a wrong authenticator code. A used code is audited as `SECURITY recovery_code_used` (Warning).
+- `POST /api/v1/auth/resend-confirmation-email` (anonymous, `strict` rate limit) sends the confirmation link again to an
+  account that isn't confirmed yet; every address gets the same answer.
+
 - Reverse proxy support: `UseCoreWeb` applies `X-Forwarded-For` and `X-Forwarded-Proto` first, from the proxies and
   networks listed under `ForwardedHeaders:KnownProxies` and `ForwardedHeaders:KnownIPNetworks` only (validated on
   start). Behind a trusted proxy the rate limiter partitions by the real client and the request scheme is the client's,
@@ -271,6 +286,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- `/connect/endsession` no longer signs a browser out on any GET: a signed-in browser gets a question, and only its form's
+  POST, with an antiforgery token, ends the session (logout CSRF). A signed-out browser goes on to the post-logout
+  redirect as before.
+- The sign-in page checks a password hash for an unknown email too, so its response time no longer reveals which
+  addresses have accounts.
+- A wrong current password at `/api/v1/auth/change-password` counts toward lockout (audited as `SECURITY
+  account_locked_out` when it locks the account), and a locked account's password doesn't change; before, a stolen access token allowed unlimited guesses within the rate limit.
+
 - `System.Security.Cryptography.Pkcs` 9.0.11, which Microsoft.Data.SqlClient brings under EF Core's SQL Server
   provider, had two high-severity denial-of-service advisories (CVE-2026-84008, CVE-2026-70162; GHSA-846f-f764-76mx,
   GHSA-2fmv-rv2c-59x7) and failed the restore. Every project that references the SQL Server provider (the Catalog and
@@ -314,6 +337,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   code, but their message (which can carry connection strings, paths or other internals) is only logged.
 
 ### Fixed
+
+- Registering through `NovaCore.Identity.OpenIddict` without a seeded `User` role (seeding off, the Development
+  default) answered 500 after creating the account, and sent no confirmation email. The account now starts without a
+  role and gets its confirmation link.
 
 - A request body Minimal APIs can't read (malformed JSON in Development, where they throw `BadHttpRequestException`)
   answers with the exception's status (400) instead of 500.

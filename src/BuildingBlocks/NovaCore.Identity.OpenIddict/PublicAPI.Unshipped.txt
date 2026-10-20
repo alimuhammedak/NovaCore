@@ -73,3 +73,15 @@ override NovaCore.Identity.OpenIddict.AssignRoleRequest.ToString() -> string!
 static NovaCore.Identity.OpenIddict.AssignRoleRequest.operator !=(NovaCore.Identity.OpenIddict.AssignRoleRequest? left, NovaCore.Identity.OpenIddict.AssignRoleRequest? right) -> bool
 static NovaCore.Identity.OpenIddict.AssignRoleRequest.operator ==(NovaCore.Identity.OpenIddict.AssignRoleRequest? left, NovaCore.Identity.OpenIddict.AssignRoleRequest? right) -> bool
 const NovaCore.Identity.OpenIddict.IdentityServerHostingExtensions.OpenApiSecuritySchemeId = "OAuth2" -> string!
+NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest
+NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest!
+NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.Email.get -> string!
+NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.Email.init -> void
+NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.Deconstruct(out string! Email) -> void
+NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.Equals(NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest? other) -> bool
+NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.ResendConfirmationEmailRequest(string! Email) -> void
+override NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.Equals(object? obj) -> bool
+override NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.GetHashCode() -> int
+override NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.ToString() -> string!
+static NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.operator !=(NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest? left, NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.operator ==(NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest? left, NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest? right) -> bool

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NovaCore.Identity.OpenIddict;
 using Xunit;
 
@@ -12,7 +13,8 @@ namespace NovaCore.Api.Tests.IdentityServer;
 /// <summary>
 /// The account hardening carried over from the Identity module (PLAN F3b.2): PBKDF2 with 600,000 iterations, a
 /// length-first password policy, unique emails, lockout after five failures, confirmed email before sign-in, a sign-in
-/// page that doesn't reveal which accounts exist, and an audit log that masks emails and never holds a password.
+/// page that doesn't reveal which accounts exist, by its answer or by its time (PLAN F4d.4), and an audit log that masks
+/// emails and never holds a password.
 /// </summary>
 [Collection(IdentityServerTestGroup.Name)]
 public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) : IClassFixture<SignInHardeningTests.Fixture>
@@ -26,7 +28,14 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
     {
         public LogCapture Log { get; } = new();
 
-        protected override void Configure(WebApplicationBuilder builder) => builder.Logging.AddProvider(Log);
+        public CountingPasswordHasher.Counter PasswordChecks { get; } = new();
+
+        protected override void Configure(WebApplicationBuilder builder)
+        {
+            builder.Logging.AddProvider(Log);
+            builder.Services.AddSingleton(PasswordChecks);
+            builder.Services.AddScoped<IPasswordHasher<ApplicationUser>, CountingPasswordHasher>();
+        }
     }
 
     [Fact]
@@ -141,6 +150,40 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
     }
 
     [Fact]
+    public async Task An_unknown_account_costs_a_password_check_like_a_known_one()
+    {
+        await _host.CreateUserAsync("timing@novacore.test", Password);
+        using var flow = new OidcFlow(_host);
+
+        var before = fixture.PasswordChecks.Count;
+        await SignInPageAsync(flow, "timing@novacore.test", "not the password");
+        var known = fixture.PasswordChecks.Count - before;
+
+        before = fixture.PasswordChecks.Count;
+        await SignInPageAsync(flow, "nobody-timing@novacore.test", "not the password");
+        var unknown = fixture.PasswordChecks.Count - before;
+
+        // The hash is what takes the time (600,000 iterations), so the answer doesn't come sooner for an unknown address.
+        Assert.Equal(1, known);
+        Assert.Equal(known, unknown);
+    }
+
+    [Fact]
+    public async Task A_lockout_from_wrong_current_passwords_is_audited()
+    {
+        var user = await _host.CreateUserAsync("change-audit@novacore.test", Password);
+        using var flow = new OidcFlow(_host);
+        var tokens = await flow.SignInAsync("change-audit@novacore.test", Password);
+
+        for (var attempt = 0; attempt < 5; attempt++)
+            await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/change-password", tokens.AccessToken,
+                new { currentPassword = $"wrong guess number {attempt}", newPassword = "another long passphrase" });
+
+        Assert.Contains(fixture.Log.Messages, message =>
+            message.StartsWith($"SECURITY account_locked_out User={user.Id}", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_failed_sign_in_is_audited_with_a_masked_email_and_no_password()
     {
         await _host.CreateUserAsync("audit@novacore.test", Password);
@@ -161,4 +204,24 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
 
     private static ApplicationUser NewUser(string email) =>
         new() { UserName = email, Email = email, CreatedAtUtc = TimeProvider.System.GetUtcNow() };
+}
+
+/// <summary>Identity's password hasher, counting its checks.</summary>
+public sealed class CountingPasswordHasher(IOptions<PasswordHasherOptions> options, CountingPasswordHasher.Counter counter)
+    : PasswordHasher<ApplicationUser>(options)
+{
+    public override PasswordVerificationResult VerifyHashedPassword(ApplicationUser user, string hashedPassword, string providedPassword)
+    {
+        counter.Increment();
+        return base.VerifyHashedPassword(user, hashedPassword, providedPassword);
+    }
+
+    public sealed class Counter
+    {
+        private int _count;
+
+        public int Count => Volatile.Read(ref _count);
+
+        public void Increment() => Interlocked.Increment(ref _count);
+    }
 }

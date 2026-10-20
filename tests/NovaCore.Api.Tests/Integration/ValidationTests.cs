@@ -26,6 +26,7 @@ public class ValidationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCor
         { "POST", "/api/v1/payments", Json(new { productId = Guid.Empty, quantity = 1 }), ["ProductId"] },
         { "POST", "/api/v1/payments", Json(new { productId = SomeId, quantity = 0 }), ["Quantity"] },
         { "POST", "/api/v1/auth/register", Json(new { email = "not-an-email", password = "too-short", displayName = new string('x', 129) }), ["DisplayName", "Email", "Password"] },
+        { "POST", "/api/v1/auth/resend-confirmation-email", Json(new { email = "not-an-email" }), ["Email"] },
         { "POST", "/api/v1/auth/change-password", Json(new { currentPassword = "", newPassword = "too-short" }), ["CurrentPassword", "NewPassword"] },
         { "POST", "/api/v1/auth/2fa/enable", Json(new { code = "12345" }), ["Code"] },
         { "POST", "/api/v1/auth/2fa/disable", Json(new { code = "123456789" }), ["Code"] },

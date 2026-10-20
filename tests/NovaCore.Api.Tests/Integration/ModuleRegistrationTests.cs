@@ -32,6 +32,7 @@ public class ModuleRegistrationTests(NovaCoreApiFactory factory) : IClassFixture
         [
             "POST /api/v1/auth/register",
             "GET /api/v1/auth/confirm-email",
+            "POST /api/v1/auth/resend-confirmation-email",
             "GET /api/v1/auth/me",
             "POST /api/v1/auth/logout-all",
             "POST /api/v1/auth/change-password",

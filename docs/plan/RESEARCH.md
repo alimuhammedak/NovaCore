@@ -767,3 +767,112 @@ Biçim:
 - Kaynak: https://github.com/advisories/GHSA-846f-f764-76mx · https://github.com/advisories/GHSA-2fmv-rv2c-59x7 · https://learn.microsoft.com/nuget/concepts/auditing-packages · https://learn.microsoft.com/nuget/consume-packages/central-package-management#transitive-pinning
 - Sonuç (D-036 (8)): Catalog ve Payments, Pkcs 10.0.13'e doğrudan referans verir (CPM'de sürüm). Api ve testler onu proje referansından en yakın sürüm olarak alır. `list package --vulnerable` 13 projede temiz.
 
+### R-084: Parola sıfırlama ve onay e-postasını yeniden gönderme: hesabın varlığını ele vermeden (2026-10-20, faz 4d; kaynak + kırmızı test)
+- Soru: Sıfırlama ve yeniden gönderme uçları nasıl çalışmalı ki yanıt hesabın varlığını ele vermesin? Sıfırlamadan sonra ne olmalı? Link mi, kod mu?
+- Bulgu:
+  - ASP.NET Core `MapIdentityApi` (release/10.0, `IdentityApiEndpointRouteBuilderExtensions.cs`):
+    - `/forgotPassword` yalnızca kullanıcı var ve e-postası onaylıysa token üretip gönderir, her durumda `Ok` döner. Kod yorumu: "Don't reveal that the user does not exist or is not confirmed".
+    - `/resetPassword` bilinmeyen ya da onaysız kullanıcıya bozuk token'la aynı `InvalidToken` hatasını verir. Token Base64Url'dir. Lockout'a dokunmaz.
+    - `/resendConfirmationEmail` bilinmeyen adrese `Ok` döner, bulunan her kullanıcıya (onaylı olsa da) link gönderir.
+  - `UserManager.ResetPasswordAsync` token'ı (stamp dahil) doğrular, sonra parola politikasını uygular ve security stamp'i yeniler. Aynı token ikinci kez doğrulanmaz.
+  - MS Learn (Account confirmation and password recovery): ForgotPassword "fails silently if the user email has not been confirmed"; parola sıfırlama e-postadaki linkle açılan bir sayfada yapılır. Blazor WASM rehberinde onay e-postasını yeniden gönderme linki istemcinin kayıt ekranında.
+  - OWASP Forgot Password Cheat Sheet:
+    - Var olan ve olmayan hesap için aynı mesaj ve tutarlı yanıt süresi.
+    - Token rastgele, tek kullanımlık ve süreli.
+    - Başarılı sıfırlamadan sonra otomatik giriş yok; oturumlar iptal edilebilir.
+    - Yeni parola iki kez girilir.
+    - Sayfada `Referrer-Policy: no-referrer` (çekirdek zaten her yanıtta gönderiyor).
+    - Token gösterilmeden hesapta değişiklik yapılmaz (ör. kilitleme).
+  - Kırmızı test: seed kapalıyken (`User` rolü yok) `register` hesabı oluşturup `AddToRoleAsync`'te 500 veriyordu, onay e-postası da gitmiyordu.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Core/src/IdentityApiEndpointRouteBuilderExtensions.cs · https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Extensions.Core/src/UserManager.cs · https://learn.microsoft.com/aspnet/core/security/authentication/accconfirm · https://learn.microsoft.com/aspnet/core/blazor/security/webassembly/standalone-with-identity/account-confirmation-and-password-recovery · https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
+- Sonuç (D-038 (1)–(4)):
+  - Sıfırlama sağlayıcının HTML sayfalarıyla yapılır: kullanıcı parolasını giriş sayfasında unutur ve link bir sayfa açmalıdır.
+  - Yeniden gönderme kayıt gibi bir JSON uçtur ve yalnızca onaysız hesaba e-posta yollar.
+  - Sıfırlama oturumları iptal eder, otomatik giriş yapmaz.
+  - Kalan fark: bilinen hesapta e-posta gönderimi yanıtı uzatabilir (PROGRESS → Sonraya bırakılanlar).
+
+### R-085: Kurtarma koduyla giriş ve lockout (2026-10-20, faz 4d; kaynak + kırmızı test)
+- Soru: Giriş sayfasının 2FA adımı kurtarma kodunu nasıl kabul eder? Kod tek kullanımlık mı? Hatalı kod ve kilitli hesap nasıl ele alınır?
+- Bulgu:
+  - `SignInManager.TwoFactorRecoveryCodeSignInAsync` (release/10.0) iki adım yapıyor: bekleyen 2FA kullanıcısını cookie'den alıyor ve `RedeemTwoFactorRecoveryCodeAsync`'i çağırıyor.
+    - `PreSignInCheck` ya da `IsLockedOut` kontrolü yok.
+    - Hatalı kodda `AccessFailedAsync` çağrılmıyor. Kaynaktaki yorum: "We don't protect against brute force attacks since codes are expected to be random."
+    - Başarıda lockout sayacı sıfırlanıyor.
+  - `TwoFactorAuthenticatorSignInAsync` ise önce `PreSignInCheck` yapıyor (lockout), hatalı kodda `AccessFailedAsync` çağırıyor.
+  - `UserStoreBase.RedeemCodeAsync` (MS API dokümanı): "recovery codes are only valid once, and will be invalid after use."
+  - `UserManager.CreateTwoFactorRecoveryCode`: `XXXXX-XXXXX`, alfabe `23456789BCDFGHJKMNPQRTVWXY` (yalnızca büyük harf ve rakam, ~47 bit). Altı haneli bir authenticator koduyla karışmaz. `RedeemTwoFactorRecoveryCodeAsync` büyük/küçük harfi normalize etmiyor.
+  - Sonuç olarak, olduğu gibi kullanılırsa kilitli bir hesap kurtarma koduyla girebilirdi ve eklentinin "hatalı 2FA kodu sayılır" kuralı kurtarma kodunda geçerli olmazdı.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Core/src/SignInManager.cs · https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Extensions.Core/src/UserManager.cs · https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.identity.userstorebase-5.redeemcodeasync · https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.identity.signinmanager-1.twofactorrecoverycodesigninasync
+- Sonuç (D-038 (5)): 2FA adımı tek alan. Yalnızca rakam authenticator koduna gider (code review'dan sonra; önce "tam altı hane" idi ve yanlış uzunluktaki kod "kurtarma kodu geçersiz" mesajı alıyordu), gerisi kurtarma koduna. Kurtarma kodundan önce `IsLockedOutAsync`, hatalı kodda `AccessFailedAsync` eklenti tarafında yapılır. Kod büyük harfe çevrilir. Kullanılan kod `recovery_code_used` (Warning) olarak loglanır.
+
+### R-086: Sağlayıcıdan çıkışta onay (logout CSRF) (2026-10-20, faz 4d; kaynak + kırmızı test)
+- Soru: `/connect/endsession` herhangi bir GET'le oturumu kapatıyordu. Spec ne istiyor, OpenIddict nasıl öneriyor?
+- Bulgu:
+  - OpenID Connect RP-Initiated Logout 1.0 §2:
+    - OP kullanıcıya OP'den de çıkmak isteyip istemediğini "SHOULD" sormalı.
+    - `id_token_hint` yoksa (ya da OP oturumuna ait değilse) bu soru "MUST".
+    - OP logout ucunda GET ve POST'u desteklemeli.
+  - §4: Oturum açık değilken çıkış istemek hata değildir.
+  - §6: `id_token_hint`'siz istekler bir hizmet reddi yoludur.
+  - OpenIddict'in Velusia örneği:
+    - GET bir onay sayfası gösterir.
+    - Sayfanın formu isteğin bütün parametrelerini (form ya da query) hidden input olarak aynı uca POST eder.
+    - POST `[ValidateAntiForgeryToken]` ile korunur, `SignInManager.SignOutAsync` ve OpenIddict şemasıyla `SignOut` yapar.
+    - OpenIddict, client'ın kayıtlı `post_logout_redirect_uri`'sine yönlendirir.
+  - `IAntiforgery.IsRequestValidAsync` güvenli metotlarda (GET dahil) true döner; POST ayrıca kontrol edilmelidir.
+  - Kırmızı test: oturumlu tarayıcının GET'i ve antiforgery'siz POST'u oturumu kapatıyordu.
+- Kaynak: https://openid.net/specs/openid-connect-rpinitiated-1_0.html · https://github.com/openiddict/openiddict-samples/blob/dev/samples/Velusia/Velusia.Server/Controllers/AuthorizationController.cs · https://github.com/openiddict/openiddict-samples/blob/dev/samples/Velusia/Velusia.Server/Views/Authorization/Logout.cshtml · https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.antiforgery.iantiforgery.isrequestvalidasync
+- Sonuç (D-038 (6)):
+  - Oturumlu tarayıcıya her durumda soru sorulur. `id_token_hint` doğrulanmaz; spec'e uyuyor ve daha az kod.
+  - Yalnızca geçerli antiforgery token'lı POST çıkış yapar.
+  - Oturumsuz tarayıcı doğrudan yönlendirilir.
+
+### R-087: Giriş sayfasında yanıt süresi ve `change-password`'da lockout (2026-10-20, faz 4d; kaynak + kırmızı test)
+- Soru:
+  - Bilinmeyen e-posta neden daha hızlı dönüyor ve nasıl eşitlenir?
+  - `change-password` lockout'a neden bakmıyor, nasıl bağlanır?
+- Bulgu:
+  - Zamanlama:
+    - `SignInManager.PasswordSignInAsync(string, ...)` bilinmeyen kullanıcıda hemen `Failed` döner, hash hesaplamaz. `UserManager.CheckPasswordAsync` de null kullanıcıda hash'lemez.
+    - Bilinen kullanıcıda PBKDF2 600.000 iterasyon harcanır.
+    - OWASP Authentication Cheat Sheet "quick exit" örneğini yanlış gösteriyor ve kullanıcı ne olursa olsun aynı işlemin yapılmasını öneriyor.
+  - Hasher kaydı: `IPasswordHasher<TUser>` `AddIdentityCore`'da `TryAddScoped`'tır. Host kendi hasher'ını önce kaydederse o kullanılır, bu yüzden sahte hash de onunla üretilmeli. Singleton tutucu hasher'ı her çağrıda alır (Y-26). Static alan kullanılmaz (Y-24).
+  - Lockout:
+    - `UserManager.ChangePasswordAsync` eşleşmeyen parolada `PasswordMismatch` döner, `AccessFailedAsync` çağırmaz.
+    - `SignInManager.CheckPasswordSignInAsync` lockout'u kontrol edip sayardı ama parola iki kez hash'lenirdi: bir kez kontrolde, bir kez `ChangePasswordAsync`'te.
+    - OWASP: parola değişimi mevcut parolayı doğrular; brute-force koruması bütün kimlik doğrulama yollarında geçerli.
+  - Kırmızı test:
+    - Bilinmeyen e-posta hasher'ı hiç çağırmıyordu.
+    - 5 yanlış mevcut parola hesabı kilitlemiyordu, ardından doğru parola parolayı değiştiriyordu.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Core/src/SignInManager.cs · https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Extensions.Core/src/UserManager.cs · https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Extensions.Core/src/IdentityServiceCollectionExtensions.cs · https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+- Sonuç (D-038 (7), (8)):
+  - `DummyPasswordHash` singleton'ı, host'un hasher'ıyla bir kez üretilen hash'i tutar. Bilinmeyen e-postada parola ona karşı doğrulanır.
+  - `change-password`, giriş sayfasının `CheckUnconfirmedAsync` kalıbını izler:
+    - kilitliyse reddeder;
+    - `PasswordMismatch`'te `AccessFailedAsync` çağırır;
+    - başarıda sayacı sıfırlar.
+    Hash tek kez hesaplanır.
+
+### R-088: OpenIddict kayıtlarının temizlenmesi: `PruneAsync`'in anlamı ve OpenIddict.Quartz'ın varsayılanları (2026-10-20, faz 4d; kaynak + kırmızı test)
+- Soru: Token ve authorization tabloları neyle, ne sıklıkla ve hangi eşikle temizlenir? Yeni paket olmadan nasıl çalışır?
+- Bulgu:
+  - `IOpenIddictTokenManager.PruneAsync(threshold)`, EF Core store'unda (7.7.1) şunları siler: `CreationDate < threshold` olan ve durumu `Valid`/`Inactive` dışında olan ya da authorization'ı artık geçerli olmayan ya da süresi dolmuş (`ExpirationDate < DateTime.UtcNow`) token'lar.
+    - Süre karşılaştırması sorgunun içinde, yani veritabanının saatiyle yapılıyor. Eşik çağıranın saatinden geliyor.
+    - 1.000'lik parçalar halinde `ExecuteDeleteAsync` ile siliyor. Hataları toplayıp sonunda `AggregateException` atıyor.
+  - `IOpenIddictAuthorizationManager.PruneAsync(threshold)`: `CreationDate < threshold`, durumu `Valid` değil ya da tipi ad hoc, ve token'ı kalmamış authorization'lar.
+    - Geçerli kalıcı authorization hiç silinmiyor. Eklenti kullanıcı ve client başına bir tane yeniden kullanıyor, sayı sınırlı.
+    - Dokümanı token'ların önce temizlenmesini söylüyor.
+  - OpenIddict.Quartz (7.7.1):
+    - `MinimumTokenLifespan` ve `MinimumAuthorizationLifespan` = 14 gün. Eşik `TimeProvider.GetUtcNow() − lifespan`.
+    - Önce token'lar, sonra authorization'lar.
+    - Saatte bir tetikleniyor, ilk çalışma açılıştan 1–9 dk sonra. Yorumdaki gerekçe: uygulama bir saat dolmadan yeniden başlarsa da bir kez çalışsın.
+  - OpenIddict `TimeProvider`'ı DI'dan alıyor (`OpenIddictCoreOptions.TimeProvider`).
+  - Kırmızı test: süresi dolmuş token ve iptal edilmiş authorization bir saat sonra da duruyordu.
+  - Test altyapısı: `IdentityServerTestHost` bütün context'lere tek bir `SqliteConnection` veriyordu. Arka plandaki tur istekle aynı anda o bağlantıyı kullanacağı için host, Api factory'si gibi paylaşımlı adlı in-memory veritabanına ve context başına bağlantıya geçti (R-069).
+- Kaynak: https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.EntityFrameworkCore/Stores/OpenIddictEntityFrameworkCoreTokenStore.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.EntityFrameworkCore/Stores/OpenIddictEntityFrameworkCoreAuthorizationStore.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Quartz/OpenIddictQuartzJob.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Quartz/OpenIddictQuartzOptions.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Quartz/OpenIddictQuartzExtensions.cs
+- Sonuç (D-038 (9)):
+  - Eklentide `ExpiredTokenPruner` (`BackgroundService`). Zamanlayıcı `PeriodicTimer(1 saat, TimeProvider)`, eşik 14 gün, önce token'lar.
+  - İlk tur açılışta, `OutboxDispatcher` gibi. Quartz'ın 1–9 dakikalık rastgele gecikmesi birden çok örneği yaymak içindir; burada veritabanı başına tek örnek varsayılıyor (D-031) ve aynı satırları iki kez silmek zararsız.
+  - Tur hatası loglanır, host durmaz.
+  - Yeni paket yok.
+
