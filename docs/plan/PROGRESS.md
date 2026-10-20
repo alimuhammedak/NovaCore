@@ -17,7 +17,7 @@
 | 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push edilmedi) |
-| 4d | 🔄 devam ediyor | `faz/4d-kimlik-uretim` | 2026-10-20 | | |
+| 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | merge onayı bekleniyor |
 | 5 | ⏳ başlamadı | | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
@@ -881,7 +881,7 @@ Plan onayı 2026-10-20. Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents
   - Test: 274/274, Debug ve Release.
   - `list package --vulnerable`: 13 projede açık yok.
   - `has-pending-model-changes`: üç context'te temiz.
-- [x] Code review düzeltmeleri (HASH): `code-review` (high, `main...faz/4d-kimlik-uretim`) 7 bulgu verdi.
+- [x] Code review düzeltmeleri (2e81b2e): `code-review` (high, `main...faz/4d-kimlik-uretim`) 7 bulgu verdi.
   - Düzeltilenler:
     - (#2) `change-password`'daki yanlış parolalar hesabı kilitleyince audit olayı yazılmıyordu (giriş sayfası `account_locked_out` yazıyor). Artık yazılıyor. Kırmızı test: `A_lockout_from_wrong_current_passwords_is_audited`.
     - (#4) Altı hane olmayan her giriş kurtarma kodu sayılıyordu; yanlış uzunlukta bir authenticator kodu "Invalid recovery code." alıyordu. Artık yalnızca rakam olan giriş authenticator kodu (kurtarma kodları her zaman tire içeriyor). Kırmızı test: `A_code_of_digits_only_is_an_authenticator_code_whatever_its_length`.
@@ -889,7 +889,12 @@ Plan onayı 2026-10-20. Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents
     - (#6) `Register` aynı `ValidationProblem` biçimini elle kuruyordu; `PasswordProblem`'i kullanıyor.
   - "Sonraya bırakılanlar"a yazılanlar: #1 (yeniden gönderme ucunda zamanlama farkı, forgot-password maddesine eklendi), #5 (çıkış sorusunda vazgeçme yolu yok), #7 (128 karakter sınırı iki yerde).
   - Testler 274 → 276.
-- Faz doğrulaması, düzeltmelerden sonra (2026-10-20): aşağıdaki devir notunda.
+- Faz doğrulaması, düzeltmelerden sonra (2026-10-20):
+  - `restore --force`: NU uyarısı yok.
+  - Release `--no-incremental`: 0 uyarı, 0 hata.
+  - Test: 276/276, Debug ve Release.
+  - `list package --vulnerable`: 13 projede açık yok.
+  - `has-pending-model-changes`: üç context'te temiz.
 
 ### Faz 5
 - [ ] F5.1 Template package
@@ -1068,32 +1073,38 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-20, Faz 4c: Tüketici hazırlığı (tamam, `main`'e merge edildi).** Branch `faz/4c-tuketici-hazirligi`, 10 commit.
+**2026-10-20, Faz 4d: Kimlik eklentisi üretim eksikleri (tamam, merge onayı bekleniyor).** Branch `faz/4d-kimlik-uretim`, 7 commit.
 
 - **Yapılanlar:**
-  - F4c.1: fallback policy her uçta kimlik istiyor, açık uçlar `AllowAnonymous`; Development dışında boş CORS listesi hiçbir origin'e izin vermiyor.
-  - F4c.2: çekirdekte super-admin yok; eklentinin resolver'ı `Administrator` üyeliğini tanımlı bütün izinlere çözüyor.
-  - F4c.3: `UseCoreWeb` `UseForwardedHeaders`'ı en başta çalıştırıyor; yalnızca `ForwardedHeaders:KnownProxies`/`KnownIPNetworks`.
-  - F4c.4: `GlobalExceptionHandler` yerine middleware'in yedek yolu (`StatusCodeSelector` + `ExceptionHandler` delegate + `SuppressDiagnosticsCallback`). Framework exception'ları 500, `BadHttpRequestException` kendi durumu.
-  - F4c.5: `ToHttpResult` tipli union dönüyor; modül ve eklenti JSON uçları tipli; Y-31 kör noktası kapandı.
-  - F4c.6: kimlik eklentisi Development dışında Data Protection anahtar deposu istiyor.
-  - F4c.7: `outbox_consumers` mesajın `Id`'sine bağlı (FK, cascade); işlenmiş mesajlar 7 gün sonra siliniyor; `IDomainEventDispatcher` silindi; migration'lar mevcut kayıtları dönüştürüyor.
-  - Pkcs güvenlik açığı (dış kaynaklı) ve code review düzeltmeleri.
-  - Testler 219 → 248. Kararlar D-036 (1)–(8), R-076…R-083.
+  - F4d.1: IdP modeli (a) kendi host'unda eklenti (Q-31, D-037).
+  - F4d.2:
+    - Parola sıfırlama HTML sayfalarıyla (`/account/forgot-password`, `/account/reset-password`). Yanıt her adres için aynı, link tek kullanımlık, sıfırlama oturumları iptal ediyor.
+    - `POST /api/v1/auth/resend-confirmation-email`, yalnızca onaysız hesaba e-posta gönderiyor.
+    - `User` rolü yokken kayıt artık 500 vermiyor.
+  - F4d.3: 2FA adımı kurtarma kodunu da kabul ediyor. Kod tek kullanımlık; kilitli hesap kodla giremiyor, hatalı kod sayılıyor.
+  - F4d.4:
+    - `/connect/endsession` önce soruyor (logout CSRF).
+    - Bilinmeyen e-posta da hash harcıyor (zamanlama).
+    - `change-password` lockout'a bağlandı.
+  - F4d.5: `ExpiredTokenPruner` açılışta ve saatte bir OpenIddict kayıtlarını temizliyor (14 gün, yeni paket yok).
+  - Code review düzeltmeleri.
+  - Testler 248 → 276. Kararlar D-037, D-038 (1)–(9), R-084…R-088.
 - **Sürprizler:**
-  - Fallback policy tanımsız yola anonim istekte 404 yerine 401 döndürüyor (MS'in belgelediği davranış).
-  - `IPAddress.TryParse("10.0.0")` kısaltmayı kabul ediyor.
-  - Framework istemci iptalini handler'lardan önce 499 yapıyor.
-  - `CustomizeProblemDetails` her yazıma uygulanıyor (review #1).
-  - `migrations script` tek batch üretiyor (`EXEC` gerekti).
-  - `FakeTimeProvider` günlerce ilerletilince periyodik zamanlayıcıyı her periyot için tetikliyor.
-  - 13 Ekim .NET güvenlik yamasıyla Pkcs açığı geldi.
+  - `SignInManager.TwoFactorRecoveryCodeSignInAsync` lockout'a bakmıyor ve hatalı kodu saymıyor (R-085).
+  - `SignInManager` bilinmeyen kullanıcıda hiç hash'lemiyor (R-087).
+  - OpenIddict'in store'u token süresini veritabanının saatiyle karşılaştırıyor (R-088).
+  - `IdentityServerTestHost`'un tek `SqliteConnection`'ı arka plan işine uygun değildi; context başına bağlantıya geçildi.
 - **Kullanıcıya:**
-  - Pkcs sorusu reddedildi, "devam et" ile önerilen seçenek uygulandı. Farklı bir yol isterseniz D-036 (8) yeniden açılır.
-  - Merge: kullanıcı onayıyla ("her şeyi maine al") `main`'e `--no-ff` merge edildi (2026-10-20), push edilmedi. Push kullanıcının kararı.
-- **Sonraki fazın (4d) bilmesi gerekenler:**
-  - F4d.1 kullanıcı kararı (IdP modeli).
-  - Eklentinin JSON uçları artık tipli sonuç dönüyor; yeni uçlar da öyle yazılmalı. Gövdeler için `AccountEndpoints.MessageResponse` var.
-  - Production host'larında Data Protection deposu zorunlu (testlerde `InMemoryKeyStore.AddTo`).
-  - Fallback policy yüzünden yeni anonim uçlar (parola sıfırlama vb.) `AllowAnonymous` almalı.
-- **Sıradaki:** yeni bir oturumda `/novacore-phase 4d`.
+  - Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmadı (kullanıcı kararı).
+  - Merge (`faz/4d-kimlik-uretim` → `main`) kullanıcı onayı bekliyor. Push kullanıcının kararı.
+- **Sonraki fazın (5) bilmesi gerekenler:**
+  - Şablonun yerleşik IdP seçeneği (F5.1) artık parola sıfırlama sayfalarını ve temizlik servisini de getiriyor.
+  - Üretim kontrol listesi değişmedi: gerçek `IEmailSender` sıfırlama linkleri için de gerekli.
+  - "Sonraya bırakılanlar"da 4d'den 5 madde var:
+    - e-posta gönderen uçlarda zamanlama farkı;
+    - parola bildirim e-postası;
+    - kurtarma kodu uyarısı ve yenileme ucu;
+    - çıkış sorusunda vazgeçme yolu;
+    - 128 karakter sınırının tekrarı.
+  - D-032: DECISIONS.md'nin hook korumasına geri eklenmesi Faz 5 sonunda.
+- **Sıradaki:** merge onayından sonra yeni bir oturumda `/novacore-phase 5`.

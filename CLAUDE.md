@@ -135,8 +135,9 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
   `NovaCore.AspNetCore` too: permissions are resolved on the server through `IPermissionResolver` (never read from the
   token) and cached per `sub` + security stamp for `Cache:PermissionExpiration`. The tokens come from the
   `NovaCore.Identity.OpenIddict` add-on (ASP.NET Core Identity + OpenIddict: Authorization Code + PKCE, refresh
-  rotation, client credentials, 2FA, admin), which the Api host runs as its own authority. See
-  `src/BuildingBlocks/NovaCore.Identity.OpenIddict/CLAUDE.md` before touching auth.
+  rotation, client credentials, 2FA with recovery codes, password reset, token pruning, admin), which the Api host
+  runs as its own authority (DECISIONS D-037). See `src/BuildingBlocks/NovaCore.Identity.OpenIddict/CLAUDE.md` before
+  touching auth.
 
 ---
 
