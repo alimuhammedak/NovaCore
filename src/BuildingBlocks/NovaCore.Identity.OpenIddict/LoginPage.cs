@@ -10,9 +10,10 @@ using Microsoft.AspNetCore.WebUtilities;
 namespace NovaCore.Identity.OpenIddict;
 
 /// <summary>
-/// The sign-in pages the authorization endpoint sends an anonymous browser to: the password step, then the
-/// authenticator-code step for an account with two-factor authentication. Plain HTML without scripts or styles (the
-/// core's Content-Security-Policy allows neither), an antiforgery token, and a redirect back to a local URL only.
+/// The sign-in pages the authorization endpoint sends an anonymous browser to: the password step, then, for an account
+/// with two-factor authentication, the code step, which takes an authenticator code or one of the recovery codes. Plain
+/// HTML without scripts or styles (the core's Content-Security-Policy allows neither), an antiforgery token, and a
+/// redirect back to a local URL only.
 /// </summary>
 internal static class LoginPage
 {
@@ -26,6 +27,8 @@ internal static class LoginPage
     private const string EmailNotConfirmed = "Confirm your email address before signing in.";
 
     private const string InvalidCode = "Invalid authenticator code.";
+
+    private const string InvalidRecoveryCode = "Invalid recovery code.";
 
     public static void Map(RouteGroupBuilder account)
     {
@@ -109,6 +112,7 @@ internal static class LoginPage
     private static async Task<IResult> SignInWithCode(
         HttpContext context,
         IAntiforgery antiforgery,
+        UserManager<ApplicationUser> users,
         SignInManager<ApplicationUser> signIn,
         SecurityAuditLogger audit)
     {
@@ -124,12 +128,19 @@ internal static class LoginPage
         if (user is null)
             return Results.LocalRedirect(QueryHelpers.AddQueryString(context.Request.PathBase + Path, "ReturnUrl", returnUrl ?? string.Empty));
 
-        // A wrong code counts as a failed access, so it leads to lockout like a wrong password.
-        var result = await signIn.TwoFactorAuthenticatorSignInAsync(
-            (code ?? string.Empty).Replace(" ", string.Empty, StringComparison.Ordinal), isPersistent: false, rememberClient: false);
+        // An authenticator code has six digits; Identity's recovery codes (XXXXX-XXXXX) have letters and a dash.
+        var entered = (code ?? string.Empty).Replace(" ", string.Empty, StringComparison.Ordinal);
+        var isRecoveryCode = entered.Length != 6 || !entered.All(char.IsAsciiDigit);
+
+        // A wrong code of either kind counts as a failed access, so it leads to lockout like a wrong password.
+        var result = isRecoveryCode
+            ? await RecoveryCodeSignInAsync(users, signIn, user, entered)
+            : await signIn.TwoFactorAuthenticatorSignInAsync(entered, isPersistent: false, rememberClient: false);
 
         if (result.Succeeded)
         {
+            if (isRecoveryCode)
+                audit.RecoveryCodeUsed(user.Id);
             audit.LoginSucceeded(user.Id, ip);
             return Continue(returnUrl);
         }
@@ -137,9 +148,27 @@ internal static class LoginPage
         if (result.IsLockedOut)
             audit.AccountLockedOut(user.Id, ip);
         else
-            audit.LoginFailed(user.Email, ip, "bad-2fa-code");
+            audit.LoginFailed(user.Email, ip, isRecoveryCode ? "bad-recovery-code" : "bad-2fa-code");
 
-        return CodeForm(context, antiforgery, returnUrl, InvalidCode);
+        return CodeForm(context, antiforgery, returnUrl, isRecoveryCode ? InvalidRecoveryCode : InvalidCode);
+    }
+
+    // SignInManager redeems a recovery code without looking at lockout and doesn't count a wrong one: "codes are expected
+    // to be random" (docs/plan/RESEARCH.md R-085). Both happen here, so a locked account can't get in with a code and a
+    // wrong code counts like a wrong authenticator code. A redeemed code is gone (single use).
+    private static async Task<SignInResult> RecoveryCodeSignInAsync(
+        UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signIn, ApplicationUser user, string code)
+    {
+        if (await users.IsLockedOutAsync(user))
+            return SignInResult.LockedOut;
+
+        // The codes are upper case letters and digits.
+        var result = await signIn.TwoFactorRecoveryCodeSignInAsync(code.ToUpperInvariant());
+        if (result.Succeeded)
+            return result;
+
+        await users.AccessFailedAsync(user);
+        return await users.IsLockedOutAsync(user) ? SignInResult.LockedOut : SignInResult.Failed;
     }
 
     // Only back into this application (the authorization endpoint): never an open redirect.
@@ -157,6 +186,6 @@ internal static class LoginPage
 
     private static IResult CodeForm(HttpContext context, IAntiforgery antiforgery, string? returnUrl, string? error) =>
         HtmlPage.Form(context, antiforgery, "Two-factor authentication", TwoFactorPath, [new("ReturnUrl", returnUrl)], error, """
-            <p><label for="code">Authenticator code</label><br><input id="code" name="Code" inputmode="numeric" autocomplete="one-time-code" required></p>
+            <p><label for="code">Authenticator code or recovery code</label><br><input id="code" name="Code" autocomplete="one-time-code" required></p>
             """);
 }

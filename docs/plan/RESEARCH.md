@@ -791,3 +791,17 @@ Biçim:
   - Sıfırlama oturumları iptal eder, otomatik giriş yapmaz.
   - Kalan fark: bilinen hesapta e-posta gönderimi yanıtı uzatabilir (PROGRESS → Sonraya bırakılanlar).
 
+### R-085: Kurtarma koduyla giriş ve lockout (2026-10-20, faz 4d; kaynak + kırmızı test)
+- Soru: Giriş sayfasının 2FA adımı kurtarma kodunu nasıl kabul eder? Kod tek kullanımlık mı? Hatalı kod ve kilitli hesap nasıl ele alınır?
+- Bulgu:
+  - `SignInManager.TwoFactorRecoveryCodeSignInAsync` (release/10.0) iki adım yapıyor: bekleyen 2FA kullanıcısını cookie'den alıyor ve `RedeemTwoFactorRecoveryCodeAsync`'i çağırıyor.
+    - `PreSignInCheck` ya da `IsLockedOut` kontrolü yok.
+    - Hatalı kodda `AccessFailedAsync` çağrılmıyor. Kaynaktaki yorum: "We don't protect against brute force attacks since codes are expected to be random."
+    - Başarıda lockout sayacı sıfırlanıyor.
+  - `TwoFactorAuthenticatorSignInAsync` ise önce `PreSignInCheck` yapıyor (lockout), hatalı kodda `AccessFailedAsync` çağırıyor.
+  - `UserStoreBase.RedeemCodeAsync` (MS API dokümanı): "recovery codes are only valid once, and will be invalid after use."
+  - `UserManager.CreateTwoFactorRecoveryCode`: `XXXXX-XXXXX`, alfabe `23456789BCDFGHJKMNPQRTVWXY` (yalnızca büyük harf ve rakam, ~47 bit). Altı haneli bir authenticator koduyla karışmaz. `RedeemTwoFactorRecoveryCodeAsync` büyük/küçük harfi normalize etmiyor.
+  - Sonuç olarak, olduğu gibi kullanılırsa kilitli bir hesap kurtarma koduyla girebilirdi ve eklentinin "hatalı 2FA kodu sayılır" kuralı kurtarma kodunda geçerli olmazdı.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Core/src/SignInManager.cs · https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Extensions.Core/src/UserManager.cs · https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.identity.userstorebase-5.redeemcodeasync · https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.identity.signinmanager-1.twofactorrecoverycodesigninasync
+- Sonuç (D-038 (5)): 2FA adımı tek alan. Altı hane authenticator koduna gider, gerisi kurtarma koduna. Kurtarma kodundan önce `IsLockedOutAsync`, hatalı kodda `AccessFailedAsync` eklenti tarafında yapılır. Kod büyük harfe çevrilir. Kullanılan kod `recovery_code_used` (Warning) olarak loglanır.
+

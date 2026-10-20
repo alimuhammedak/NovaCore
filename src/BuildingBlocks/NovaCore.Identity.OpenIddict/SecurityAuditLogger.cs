@@ -33,6 +33,8 @@ internal sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
 
     public void TwoFactorDisabled(Guid userId) => logger.LogTwoFactorDisabled(userId);
 
+    public void RecoveryCodeUsed(Guid userId) => logger.LogRecoveryCodeUsed(userId);
+
     public void TokenRefreshed(Guid userId, string? ip) => logger.LogTokenRefreshed(userId, ip);
 
     public void SignedOut(Guid userId) => logger.LogSignedOut(userId);
@@ -84,6 +86,10 @@ internal static partial class SecurityAuditLog
 
     [LoggerMessage(EventId = 20, Level = LogLevel.Warning, Message = "SECURITY two_factor_disabled User={UserId}")]
     public static partial void LogTwoFactorDisabled(this ILogger logger, Guid userId);
+
+    // Warning: a used recovery code can mean a lost authenticator, or a stolen code.
+    [LoggerMessage(EventId = 27, Level = LogLevel.Warning, Message = "SECURITY recovery_code_used User={UserId}")]
+    public static partial void LogRecoveryCodeUsed(this ILogger logger, Guid userId);
 
     [LoggerMessage(EventId = 14, Level = LogLevel.Information, Message = "SECURITY token_refreshed User={UserId} Ip={Ip}")]
     public static partial void LogTokenRefreshed(this ILogger logger, Guid userId, string? ip);

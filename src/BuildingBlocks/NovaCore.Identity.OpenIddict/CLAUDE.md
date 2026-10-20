@@ -24,7 +24,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   and `/account/*` read them.
 - **Hardening (keep these values or stronger):** PBKDF2 `IterationCount = 600_000`; password length-first
   (`RequiredLength = 12`, no composition rules); lockout 5 attempts / 15 min, new accounts included; a wrong 2FA code
-  counts as a failed access; `RequireConfirmedEmail = true`; `RequireUniqueEmail = true`.
+  counts as a failed access, a recovery code included (`SignInManager` neither checks lockout nor counts a wrong
+  recovery code, so `LoginPage` does both before and after redeeming it, R-085); `RequireConfirmedEmail = true`;
+  `RequireUniqueEmail = true`.
 - **Protocol:** Authorization Code with PKCE **S256 only** (`plain` removed, D-029 (1)); refresh tokens rotate, and a
   redeemed one reused after OpenIddict's 30 s leeway revokes every token of its authorization; access tokens 15 minutes,
   refresh tokens 7 days. The token endpoint re-checks the account on every refresh (exists, can sign in, not locked out)

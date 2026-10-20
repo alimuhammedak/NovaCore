@@ -844,14 +844,19 @@ Plan onayı 2026-10-20. Yeni test altyapısı `CoreWebTestHost` (yalnızca çeki
 Plan onayı 2026-10-20. Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmuyor (kullanıcı kararı); commit'ler dosya dosya stage'leniyor. Plan onayı şu test değişikliğini de kapsıyor (Y-44): `End_session_signs_the_browser_out_of_the_provider` endsession'ın yeni onay adımını geçiyor.
 
 - [x] F4d.1 (88ed38d): IdP modeli (a) kendi host'unda eklenti (Q-31, D-037). Faz yürüyor.
-- [x] F4d.2 (HASH): Parola sıfırlama, onay e-postasını yeniden gönderme, `User` rolü yokken kayıt.
+- [x] F4d.2 (02f8ccf): Parola sıfırlama, onay e-postasını yeniden gönderme, `User` rolü yokken kayıt.
   - Sıfırlama sağlayıcının HTML sayfalarıyla: giriş sayfasında "Forgot your password?" → `/account/forgot-password` → e-postadaki link → `/account/reset-password`. Yanıt her adres için aynı, link yalnızca onaylı hesaba gidiyor. Yeni parola iki kez giriliyor. Sıfırlama bütün oturumları iptal ediyor, otomatik giriş yapmıyor.
   - Yeniden gönderme JSON uç: `POST /api/v1/auth/resend-confirmation-email`, yalnızca onaysız hesaba e-posta, yanıt aynı. Yeni public gövde `ResendConfirmationEmailRequest`.
   - Kayıtta `User` rolü yoksa hesap rolsüz oluşuyor (bugün 500).
   - Ortak parçalar: `HtmlPage` (LoginPage'in sayfa/form kodu taşındı), `EmailLinks` (kayıt ve sıfırlama linkleri, token Base64Url). `/account` grubu `MapCoreIdentityServer`'da tek yerde kuruluyor. Audit: `password_reset_requested`, `password_reset`.
   - Testler 248 → 264: yeni `PasswordResetTests` (11: uçtan uca sıfırlama ve oturumların bitmesi, tek kullanım, bilinmeyen/onaysız adres aynı yanıt ve e-posta yok, iki parola, politika, bozuk token ile bilinmeyen kullanıcı aynı yanıt, Host başlığı, giriş sayfasındaki link, üç uçta "strict"); `RegistrationTests` +3 (yeniden gönderme yalnızca onaysız hesaba, yeniden gönderilen link onaylıyor, seed'siz kayıt); `ValidationTests`, `SecureDefaultsTests` ve `ModuleRegistrationTests` listelerine yeni uçlar. Önce kırmızı: 16 test (biri yanlışlıkla yeşildi, kayıt e-postasını okuyordu; ikinci e-postayı şart koşacak şekilde düzeltildi).
   - Kararlar D-038 (1)–(4), R-084. Güncellenenler: README (uçlar, kimlik sağlayıcı, hesaplar, yetkilendirme, audit), eklenti CLAUDE.md, CHANGELOG.
-- [ ] F4d.3 Kurtarma koduyla giriş
+- [x] F4d.3 (HASH): Kurtarma koduyla giriş.
+  - 2FA adımı tek alan: altı haneli giriş authenticator koduna, gerisi kurtarma koduna gidiyor (`XXXXX-XXXXX`, büyük harfe çevriliyor). Kod tek kullanımlık (`RedeemTwoFactorRecoveryCodeAsync`).
+  - **Sürpriz (R-085):** `SignInManager.TwoFactorRecoveryCodeSignInAsync` lockout'a bakmıyor ve hatalı kodu saymıyor. Eklenti ikisini kendisi yapıyor: kilitli hesap kodla giremiyor, hatalı kod başarısız deneme sayılıyor.
+  - Audit: `recovery_code_used` (Warning, EventId 27); hatalı kodun nedeni `bad-recovery-code`.
+  - Testler 264 → 267: `TwoFactorTests` +3 (kod bir kez giriş yapar ve küçük harfle de kabul edilir, hatalı kod sayılır, kilitli hesap kodla giremez). `EnableAsync` yardımcısı kurtarma kodlarını da döndürüyor. Önce kırmızı: 3 test.
+  - Kararlar D-038 (5), R-085. Güncellenenler: README (Hesaplar), eklenti CLAUDE.md (Hardening), CHANGELOG.
 - [ ] F4d.4 Güvenlik düzeltmeleri
 - [ ] F4d.5 Token temizliği
 
@@ -911,7 +916,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - ~~Super-admin bypass'ının token rolüne dayanması (Faz 3a) → F4c.2.~~ → F4c.2'de yapıldı.
 - ~~`outbox_consumers` anahtarı (Faz 4a, #12) ve işlenmiş mesajların hiç silinmemesi (Faz 4a) → F4c.7.~~ → F4c.7'de yapıldı.
 - ~~Parola sıfırlama, onay e-postasını yeniden gönderme, `User` rolü yokken kayıtta 500 (Faz 3b) → F4d.2.~~ → F4d.2'de yapıldı.
-- Kurtarma kodları (Faz 3b) → F4d.3.
+- ~~Kurtarma kodları (Faz 3b) → F4d.3.~~ → F4d.3'te yapıldı.
 - Logout CSRF, giriş zamanlama farkı, `change-password` lockout'u (Faz 3b) → F4d.4.
 - OpenIddict kayıtlarının temizlenmemesi (Faz 3b) → F4d.5.
 - Template'in paket kimliğini taşıması (Faz 1, F5.1) → F5.1.
@@ -986,7 +991,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 3b, plan kapsamı dışı) userinfo ucu, Razor/Identity UI, OpenIddict.Validation ve reference token yok (D-026).
 - (Faz 3b) Test süresi: eklenti testleri `DisableParallelization` koleksiyonunda ve PBKDF2 600k ile yaklaşık 1 dk 20 sn. Tüm paket yaklaşık 2 dk. Testlerde iterasyon sayısını düşürmek hızlandırır, ama sertleştirme testini ayrı tutmak gerekir.
 - (Faz 3b, code review) Giriş sayfasında zamanlama farkı: bilinmeyen e-posta PBKDF2'siz hemen dönüyor, bilinen e-posta 600k iterasyon harcıyor. Aynı mesaja rağmen yanıt süresi hesabın varlığını ele veriyor (eski modülde de vardı). Çözüm: bilinmeyen kullanıcıda sahte bir hash doğrulamak. Kayıt ucunda da benzer bir fark var (yeni hesapta hash + e-posta).
-- (Faz 3b, code review) Kurtarma kodları kullanılamıyor: `/2fa/enable` 10 kod veriyor ama giriş sayfasının kod adımı yalnızca authenticator kodunu kabul ediyor (`TwoFactorRecoveryCodeSignInAsync` çağrılmıyor). Eski modülde de böyleydi.
+- ~~(Faz 3b, code review) Kurtarma kodları kullanılamıyor: `/2fa/enable` 10 kod veriyor ama giriş sayfasının kod adımı yalnızca authenticator kodunu kabul ediyor (`TwoFactorRecoveryCodeSignInAsync` çağrılmıyor). Eski modülde de böyleydi.~~ → F4d.3'te çözüldü.
 - (Faz 3b, code review) `change-password`'da yanlış mevcut parola lockout sayacını artırmıyor. Çalınmış bir access token'la yalnızca IP rate limit'iyle sınırlı bir parola denemesi yapılabiliyor (eski modülde de vardı).
 - ~~(Faz 3b, code review) `register`, `User` rolü yoksa (seed kapalıyken, Development varsayılanı) kullanıcıyı oluşturduktan sonra 500 veriyor. Onay e-postası gitmiyor, tekrar kayıt genel 200'le dönüyor; adres takılı kalıyor (eski modülde de vardı).~~ → F4d.2'de çözüldü: rol yoksa hesap rolsüz oluşuyor; takılan adres için yeniden gönderme ucu var.
 - (Faz 3b, code review) Refresh'te lockout kontrolü: e-postayı bilen biri 5 yanlış parolayla kurbanın bütün refresh oturumlarını düşürebiliyor. OpenIddict örneği yalnızca `CanSignIn`'e bakıyor. Bu bir tasarım ödünleşimi; kaldırmak D-029'a eklenecek bir karar ister.
@@ -1016,6 +1021,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4c, code review #4) Outbox'ın saklama taraması her turda (5 sn) her modül context'inde bir sorgu atıyor; silinecek mesajlar 7 günlük ölçekte birikiyor. *Koşul:* veritabanı yükü ölçülür ve sorun olursa tarama seyrekleştirilir (ör. saatte bir, `TimeProvider`'la).
 - (Faz 4c, code review #5) `AdminEndpoints`, `AccountEndpoints.MessageResponse`'u kullanıyor (iç içe record). Ortak bir yanıt tipi olarak üst düzeye taşınabilir; yalnızca okunabilirlik.
 - (Faz 4d, F4d.2, R-084) Parola sıfırlama formunda zamanlama farkı: bilinen ve onaylı hesapta token üretilip e-posta gönderiliyor, diğerlerinde hemen dönülüyor. Yanıt aynı, süre gerçek bir SMTP ile farklı olabilir (OWASP "consistent amount of time"). Kayıt ucundaki farkla aynı tür. *Koşul:* gerçek göndericiyle ölçülebilir bir fark ya da bir sızma testi bulgusu. Çözüm e-postayı kuyruğa ya da outbox'a almak.
+- (Faz 4d, F4d.3) Kurtarma kodları azaldığında uyarı yok ve kodları yenilemenin ayrı bir ucu yok; bugün yenilemek için 2FA kapatılıp yeniden açılıyor. *Koşul:* kullanıcılar kodları tüketmeye başlar ya da ürün ister.
 - (Faz 4d, F4d.2) Parola değişti/sıfırlandı bildirim e-postası yok (OWASP Forgot Password önerisi). *Koşul:* ürün ister ya da bir güvenlik incelemesi bulgusu.
 - (Faz 4b, D-035 (6)) Failed bir ödemenin nedeni istemciye dönmüyor; neden yalnızca Catalog'daki rezervasyon satırında (`Reason`) duruyor. *Koşul:* bir istemci nedeni göstermek ister.
 - (Faz 4b) İade ve iadede stoğun geri verilmesi yok (`Refund` kullanılmadığı için silindi). *Koşul:* iade bir ürün gereksinimi olur. Rezervasyonu serbest bırakan bir event ve rezervasyona yeni bir durum gerekir.

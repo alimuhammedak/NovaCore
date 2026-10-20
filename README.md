@@ -398,10 +398,12 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
 - **Parola saklama:** Identity PBKDF2-HMAC-SHA256, **600.000 iterasyon** (OWASP Password Storage).
 - **Parola politikası:** uzunluk öncelikli — **min 12**, max 128, zorunlu kompozisyon kuralı yok
   (OWASP Authentication: "no composition rules").
-- **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**, hatalı 2FA kodu da sayılır), giriş sayfası, token ucu ve
+- **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**, hatalı 2FA ya da kurtarma kodu da sayılır), giriş sayfası, token ucu ve
   hesap API'sinde rate limiting (`strict`), bilinmeyen hesap / yanlış parola / kilitli hesap için **tek hata mesajı**.
 - **E-posta onayı** zorunlu (dev'de link loglanır; link `Jwt:Authority`'den üretilir, Host başlığından değil),
-  **TOTP 2FA** (authenticator app). Onay linki `resend-confirmation-email` ile yeniden istenir; yalnızca onaylanmamış
+  **TOTP 2FA** (authenticator app). 2FA adımı `/2fa/enable`'ın verdiği 10 kurtarma kodundan birini de kabul eder: her
+  kod bir kez kullanılır, kilitli hesap kodla da giremez, kullanılan kod `SECURITY recovery_code_used` (Warning) olarak
+  loglanır. Onay linki `resend-confirmation-email` ile yeniden istenir; yalnızca onaylanmamış
   hesaba gider, yanıt her adres için aynıdır.
 - **Parola sıfırlama:** giriş sayfasındaki "Forgot your password?" linki bir e-posta formu açar. Onaylı hesaba
   `/account/reset-password` linki gider (Identity token'ı, 6 saat, tek kullanımlık: sıfırlama security stamp'i

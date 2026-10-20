@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is typed twice; the link works once and expires with the other Identity tokens (6 hours). A reset revokes every refresh
   token and authorization of the user and doesn't sign them in. Unknown and unconfirmed addresses get the same page and
   no email. Audited as `SECURITY password_reset_requested` and `password_reset`.
+- The sign-in page's two-factor step also takes one of the recovery codes `/api/v1/auth/2fa/enable` returns, once each
+  (until now they couldn't be used). A locked account can't sign in with one, and a wrong one counts toward lockout like
+  a wrong authenticator code. A used code is audited as `SECURITY recovery_code_used` (Warning).
 - `POST /api/v1/auth/resend-confirmation-email` (anonymous, `strict` rate limit) sends the confirmation link again to an
   account that isn't confirmed yet; every address gets the same answer.
 
