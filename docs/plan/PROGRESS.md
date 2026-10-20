@@ -868,12 +868,28 @@ Plan onayı 2026-10-20. Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents
     - Değişen test (plan onayı, Y-44): `End_session_signs_the_browser_out_of_the_provider` onay adımını geçiyor.
     - Önce kırmızı: 6 test.
   - Kararlar D-038 (6)–(8), R-086, R-087. Güncellenenler: README (Hesaplar, Endpoint'ler), eklenti CLAUDE.md, CHANGELOG (Security).
-- [x] F4d.5 (HASH): Token temizliği.
+- [x] F4d.5 (6d42236): Token temizliği.
   - Yeni `ExpiredTokenPruner` (`BackgroundService`): ilk tur açılışta, sonra saatte bir. Her tur önce token'lar, sonra authorization'lar için OpenIddict'in `PruneAsync`'ini 14 günlük eşikle çağırıyor; değerler OpenIddict.Quartz'ın varsayılanları (R-088). Yeni paket yok. Tur hatası loglanıyor, host durmuyor.
   - **Sürpriz:** OpenIddict'in store'u süreyi veritabanının saatiyle (`DateTime.UtcNow` sorgunun içinde) karşılaştırıyor, eşik ise `TimeProvider`'dan geliyor. Test süre tarihlerini gerçek saate göre veriyor.
   - Test altyapısı: `IdentityServerTestHost` tek bir `SqliteConnection` paylaşıyordu. Arka plandaki tur istekle aynı anda o bağlantıyı kullanacağı için host, Api factory'si gibi adlı paylaşımlı in-memory veritabanına ve context başına bağlantıya geçti (R-069). Değişiklikten sonra eklentinin 95 testi temizlik servisi eklenmeden yeşildi.
   - Testler 273 → 274: `TokenPruningTests` (sahte saat bir saat ilerliyor; süresi dolmuş token ve iptal edilmiş authorization siliniyor, geçerli kalıcı authorization ve yeni token kalıyor). Önce kırmızı. Kasıtlı bozma (commit'lenmedi): saat ilerletilmeyince test kırmızı, yani silmeyi saatlik tur yapıyor. Api host'unun testlerinde kimlik şeması çoğunlukla yok; açılış turu hata loglayıp devam ediyor, host durmuyor.
   - Kararlar D-038 (9), R-088. Güncellenenler: README (Kimlik sağlayıcı), eklenti ve tests CLAUDE.md, CHANGELOG.
+
+- Faz doğrulaması (2026-10-20, code review'dan önce):
+  - `restore --force`: NU uyarısı yok.
+  - Release `--no-incremental`: 0 uyarı, 0 hata.
+  - Test: 274/274, Debug ve Release.
+  - `list package --vulnerable`: 13 projede açık yok.
+  - `has-pending-model-changes`: üç context'te temiz.
+- [x] Code review düzeltmeleri (HASH): `code-review` (high, `main...faz/4d-kimlik-uretim`) 7 bulgu verdi.
+  - Düzeltilenler:
+    - (#2) `change-password`'daki yanlış parolalar hesabı kilitleyince audit olayı yazılmıyordu (giriş sayfası `account_locked_out` yazıyor). Artık yazılıyor. Kırmızı test: `A_lockout_from_wrong_current_passwords_is_audited`.
+    - (#4) Altı hane olmayan her giriş kurtarma kodu sayılıyordu; yanlış uzunlukta bir authenticator kodu "Invalid recovery code." alıyordu. Artık yalnızca rakam olan giriş authenticator kodu (kurtarma kodları her zaman tire içeriyor). Kırmızı test: `A_code_of_digits_only_is_an_authenticator_code_whatever_its_length`.
+    - (#3) Temizlik turunda token adımı hata verince authorization adımı atlanıyordu. Artık iki adımın hata sınırı ayrı (OpenIddict.Quartz da devam ediyor). Hata üretmek zor olduğu için testi yok.
+    - (#6) `Register` aynı `ValidationProblem` biçimini elle kuruyordu; `PasswordProblem`'i kullanıyor.
+  - "Sonraya bırakılanlar"a yazılanlar: #1 (yeniden gönderme ucunda zamanlama farkı, forgot-password maddesine eklendi), #5 (çıkış sorusunda vazgeçme yolu yok), #7 (128 karakter sınırı iki yerde).
+  - Testler 274 → 276.
+- Faz doğrulaması, düzeltmelerden sonra (2026-10-20): aşağıdaki devir notunda.
 
 ### Faz 5
 - [ ] F5.1 Template package
@@ -1035,7 +1051,9 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4c, D-036 (8)) Catalog, Payments ve Api'de `System.Security.Cryptography.Pkcs` 10.0.13'e doğrudan referans var: Microsoft.Data.SqlClient açıklı 9.0.11'e bağlı (R-083). *Koşul:* EF Core SqlServer'ın getirdiği SqlClient düzeltilmiş bir Pkcs'e (≥ 9.0.21 / 10.0.13) bağlanınca referans ve CPM satırı kalkar; `dotnet nuget why <modül> System.Security.Cryptography.Pkcs` ile kontrol edilir.
 - (Faz 4c, code review #4) Outbox'ın saklama taraması her turda (5 sn) her modül context'inde bir sorgu atıyor; silinecek mesajlar 7 günlük ölçekte birikiyor. *Koşul:* veritabanı yükü ölçülür ve sorun olursa tarama seyrekleştirilir (ör. saatte bir, `TimeProvider`'la).
 - (Faz 4c, code review #5) `AdminEndpoints`, `AccountEndpoints.MessageResponse`'u kullanıyor (iç içe record). Ortak bir yanıt tipi olarak üst düzeye taşınabilir; yalnızca okunabilirlik.
-- (Faz 4d, F4d.2, R-084) Parola sıfırlama formunda zamanlama farkı: bilinen ve onaylı hesapta token üretilip e-posta gönderiliyor, diğerlerinde hemen dönülüyor. Yanıt aynı, süre gerçek bir SMTP ile farklı olabilir (OWASP "consistent amount of time"). Kayıt ucundaki farkla aynı tür. *Koşul:* gerçek göndericiyle ölçülebilir bir fark ya da bir sızma testi bulgusu. Çözüm e-postayı kuyruğa ya da outbox'a almak.
+- (Faz 4d, F4d.2, R-084; code review #1) Parola sıfırlama formunda ve `resend-confirmation-email`'de zamanlama farkı: e-posta alan hesapta (onaylı / onaysız) token üretilip e-posta gönderiliyor, diğerlerinde hemen dönülüyor. Yanıt aynı, süre gerçek bir SMTP ile farklı olabilir (OWASP "consistent amount of time"). Kayıt ucundaki farkla aynı tür. *Koşul:* gerçek göndericiyle ölçülebilir bir fark ya da bir sızma testi bulgusu. Çözüm e-postayı kuyruğa ya da outbox'a almak.
+- (Faz 4d, code review #5) `/connect/endsession`'ın sorusunda yalnızca "Sign out" düğmesi var; vazgeçen kullanıcıyı uygulamaya geri götüren bir yol yok (OpenIddict'in Velusia örneğinde de yok). *Koşul:* kullanıcı geri bildirimi. Client'ın kayıtlı adresine dönen bir link `post_logout_redirect_uri`'yi oturum kapanmadan kullanırdı; bu bir tasarım kararı ister.
+- (Faz 4d, code review #7) Parolanın en fazla 128 karakter sınırı iki yerde: `AccountRequests`'teki `[Length(12, 128)]` ve `PasswordResetPage.MaxPasswordLength`. *Koşul:* sınır değişirse ikisi birlikte değişmeli; ortak bir sabit attribute'larda da kullanılabilir.
 - (Faz 4d, F4d.3) Kurtarma kodları azaldığında uyarı yok ve kodları yenilemenin ayrı bir ucu yok; bugün yenilemek için 2FA kapatılıp yeniden açılıyor. *Koşul:* kullanıcılar kodları tüketmeye başlar ya da ürün ister.
 - (Faz 4d, F4d.2) Parola değişti/sıfırlandı bildirim e-postası yok (OWASP Forgot Password önerisi). *Koşul:* ürün ister ya da bir güvenlik incelemesi bulgusu.
 - (Faz 4b, D-035 (6)) Failed bir ödemenin nedeni istemciye dönmüyor; neden yalnızca Catalog'daki rezervasyon satırında (`Reason`) duruyor. *Koşul:* bir istemci nedeni göstermek ister.

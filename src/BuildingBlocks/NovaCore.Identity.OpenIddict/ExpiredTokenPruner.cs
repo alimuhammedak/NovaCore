@@ -45,33 +45,42 @@ internal sealed partial class ExpiredTokenPruner(
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
+    // Tokens first: an authorization with a token left is never pruned. A failed token step doesn't skip the
+    // authorizations, whose own rows may still be prunable (OpenIddict.Quartz goes on the same way).
     private async Task PruneAsync(CancellationToken cancellationToken)
+    {
+        var threshold = timeProvider.GetUtcNow() - MinimumLifespan;
+
+        var tokens = await PruneAsync<IOpenIddictTokenManager>(
+            "tokens", (manager, token) => manager.PruneAsync(threshold, token), cancellationToken);
+        var authorizations = await PruneAsync<IOpenIddictAuthorizationManager>(
+            "authorizations", (manager, token) => manager.PruneAsync(threshold, token), cancellationToken);
+
+        if (tokens + authorizations > 0)
+            LogPruned(tokens, authorizations);
+    }
+
+    private async Task<long> PruneAsync<TManager>(
+        string records, Func<TManager, CancellationToken, ValueTask<long>> prune, CancellationToken cancellationToken)
+        where TManager : notnull
     {
         try
         {
             await using var scope = scopeFactory.CreateAsyncScope();
-            var threshold = timeProvider.GetUtcNow() - MinimumLifespan;
-
-            // Tokens first: an authorization with a token left is never pruned.
-            var tokens = await scope.ServiceProvider.GetRequiredService<IOpenIddictTokenManager>()
-                .PruneAsync(threshold, cancellationToken);
-            var authorizations = await scope.ServiceProvider.GetRequiredService<IOpenIddictAuthorizationManager>()
-                .PruneAsync(threshold, cancellationToken);
-
-            if (tokens + authorizations > 0)
-                LogPruned(tokens, authorizations);
+            return await prune(scope.ServiceProvider.GetRequiredService<TManager>(), cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             // The loop's boundary: an unreachable database or a missing table must not stop the host. Only the host's own
             // stop gets through.
-            LogPassFailed(exception);
+            LogPassFailed(records, exception);
+            return 0;
         }
     }
 
     [LoggerMessage(EventId = 41, Level = LogLevel.Information, Message = "Pruned {Tokens} tokens and {Authorizations} authorizations of the identity provider.")]
     private partial void LogPruned(long tokens, long authorizations);
 
-    [LoggerMessage(EventId = 42, Level = LogLevel.Error, Message = "Pruning the identity provider's tokens and authorizations failed. The next pass tries again.")]
-    private partial void LogPassFailed(Exception exception);
+    [LoggerMessage(EventId = 42, Level = LogLevel.Error, Message = "Pruning the identity provider's {Records} failed. The next pass tries again.")]
+    private partial void LogPassFailed(string records, Exception exception);
 }

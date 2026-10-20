@@ -134,9 +134,9 @@ internal static class LoginPage
         if (user is null)
             return Results.LocalRedirect(QueryHelpers.AddQueryString(context.Request.PathBase + Path, "ReturnUrl", returnUrl ?? string.Empty));
 
-        // An authenticator code has six digits; Identity's recovery codes (XXXXX-XXXXX) have letters and a dash.
+        // An authenticator code is digits, even mistyped; Identity's recovery codes (XXXXX-XXXXX) always have a dash.
         var entered = (code ?? string.Empty).Replace(" ", string.Empty, StringComparison.Ordinal);
-        var isRecoveryCode = entered.Length != 6 || !entered.All(char.IsAsciiDigit);
+        var isRecoveryCode = entered.Length == 0 || !entered.All(char.IsAsciiDigit);
 
         // A wrong code of either kind counts as a failed access, so it leads to lockout like a wrong password.
         var result = isRecoveryCode

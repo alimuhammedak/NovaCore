@@ -57,7 +57,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **The store is pruned:** `ExpiredTokenPruner` (a `BackgroundService`, a pass at startup, then hourly) calls
   OpenIddict's `PruneAsync` for tokens, then authorizations, with a 14-day minimum lifespan (OpenIddict.Quartz's defaults,
   R-088). Keep the lifespan longer than the refresh token lifetime, so a reused refresh token is still found and revokes
-  its chain. A failed pass is logged and the next one tries again; it never stops the host.
+  its chain. A failed step is logged (a failed token step doesn't skip the authorizations) and the next pass tries
+  again; it never stops the host.
 - **Sign-out asks first:** `/connect/endsession` shows a signed-in browser a question whose form posts the request's
   parameters back with an antiforgery token; only that POST signs out (logout CSRF, RP-Initiated Logout §2, R-086). A
   signed-out browser goes straight on to the post-logout redirect.

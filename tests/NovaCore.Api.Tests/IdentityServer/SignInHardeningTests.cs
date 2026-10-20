@@ -169,6 +169,21 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
     }
 
     [Fact]
+    public async Task A_lockout_from_wrong_current_passwords_is_audited()
+    {
+        var user = await _host.CreateUserAsync("change-audit@novacore.test", Password);
+        using var flow = new OidcFlow(_host);
+        var tokens = await flow.SignInAsync("change-audit@novacore.test", Password);
+
+        for (var attempt = 0; attempt < 5; attempt++)
+            await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/change-password", tokens.AccessToken,
+                new { currentPassword = $"wrong guess number {attempt}", newPassword = "another long passphrase" });
+
+        Assert.Contains(fixture.Log.Messages, message =>
+            message.StartsWith($"SECURITY account_locked_out User={user.Id}", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_failed_sign_in_is_audited_with_a_masked_email_and_no_password()
     {
         await _host.CreateUserAsync("audit@novacore.test", Password);

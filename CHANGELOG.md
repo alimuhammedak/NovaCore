@@ -291,8 +291,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   redirect as before.
 - The sign-in page checks a password hash for an unknown email too, so its response time no longer reveals which
   addresses have accounts.
-- A wrong current password at `/api/v1/auth/change-password` counts toward lockout, and a locked account's password
-  doesn't change; before, a stolen access token allowed unlimited guesses within the rate limit.
+- A wrong current password at `/api/v1/auth/change-password` counts toward lockout (audited as `SECURITY
+  account_locked_out` when it locks the account), and a locked account's password doesn't change; before, a stolen access token allowed unlimited guesses within the rate limit.
 
 - `System.Security.Cryptography.Pkcs` 9.0.11, which Microsoft.Data.SqlClient brings under EF Core's SQL Server
   provider, had two high-severity denial-of-service advisories (CVE-2026-84008, CVE-2026-70162; GHSA-846f-f764-76mx,

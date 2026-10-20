@@ -102,10 +102,7 @@ internal static class AccountEndpoints
             if (result.Errors.All(error => error.Code.Contains("Duplicate", StringComparison.OrdinalIgnoreCase)))
                 return TypedResults.Ok(GenericAccepted);
 
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["password"] = result.Errors.Select(error => error.Description).ToArray()
-            });
+            return PasswordProblem(result.Errors.Select(error => error.Description).ToArray());
         }
 
         // The seed creates the User role. Without it (seeding off) there are no roles yet, and the account starts without
@@ -179,6 +176,7 @@ internal static class AccountEndpoints
         IOpenIddictTokenManager tokens,
         IOpenIddictAuthorizationManager authorizations,
         SecurityAuditLogger audit,
+        HttpContext context,
         CancellationToken cancellationToken)
     {
         var user = await FindAsync(users, currentUser);
@@ -196,7 +194,11 @@ internal static class AccountEndpoints
         if (!result.Succeeded)
         {
             if (result.Errors.Any(error => error.Code == nameof(IdentityErrorDescriber.PasswordMismatch)))
+            {
                 await users.AccessFailedAsync(user);
+                if (await users.IsLockedOutAsync(user))
+                    audit.AccountLockedOut(user.Id, context.Connection.RemoteIpAddress?.ToString());
+            }
 
             return PasswordProblem(result.Errors.Select(error => error.Description).ToArray());
         }

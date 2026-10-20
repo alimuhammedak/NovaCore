@@ -158,6 +158,19 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
     }
 
     [Fact]
+    public async Task A_code_of_digits_only_is_an_authenticator_code_whatever_its_length()
+    {
+        await _host.CreateUserAsync("mfa-digits@novacore.test", Password);
+        await EnableAsync("mfa-digits@novacore.test");
+
+        using var flow = new OidcFlow(_host);
+        var (_, codePage) = await CodeStepAsync(flow, "mfa-digits@novacore.test");
+        var response = await flow.SubmitCodeAsync(codePage, "12345");
+
+        Assert.Contains("Invalid authenticator code.", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_locked_account_cannot_sign_in_with_a_recovery_code()
     {
         var user = await _host.CreateUserAsync("recovery-locked@novacore.test", Password);
