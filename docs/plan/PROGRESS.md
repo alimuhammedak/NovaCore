@@ -16,7 +16,7 @@
 | 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push edilmedi) |
-| 4c | 🔄 devam ediyor | `faz/4c-tuketici-hazirligi` | 2026-10-20 | | |
+| 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | merge onayı bekleniyor |
 | 4d | ⏳ başlamadı (koşullu, F4d.1) | | | | |
 | 5 | ⏳ başlamadı | | | | |
 
@@ -819,6 +819,27 @@ Plan onayı 2026-10-20. Yeni test altyapısı `CoreWebTestHost` (yalnızca çeki
   - Kararlar D-036 (7) (D-031 (5) ve (7) revizyon kuralıyla işaretlendi, D-033 (7)), R-082. "Sonraya bırakılanlar"da 4 madde kapandı.
   - Güncellenenler: README (outbox, proje ağacı), kök/BuildingBlocks/tests CLAUDE.md, CHANGELOG.
 
+- [x] Pkcs açığı (df35563): faz doğrulamasında `restore --force` NU1903 verdi. 13 Ekim'de yayımlanan `System.Security.Cryptography.Pkcs` açıkları (CVE-2026-84008, CVE-2026-70162) Microsoft.Data.SqlClient üzerinden geliyordu ve en yeni EF/SqlClient da açıklı sürüme bağlı (R-083). Kullanıcıya seçenekler soruldu; soruyu reddedip "devam et" dedi, önerilen seçenek uygulandı: SQL Server sağlayıcısını kullanan projelere doğrudan Pkcs 10.0.13 (D-036 (8)).
+- Faz doğrulaması (2026-10-20, code review'dan önce):
+  - `restore --force`: Pkcs düzeltmesinden sonra NU uyarısı yok (önce NU1903).
+  - Release `--no-incremental`: 0 uyarı, 0 hata.
+  - Test: 246/246 Debug. Release'te bir koşuda `ConfigurationValidationTests`'in Production/`http` Authority satırı kırmızı oldu; mesajı yakalanamadı, sonraki 3 sınıf koşusu ve 2 tam Release koşusu yeşil. R-055'in (açılış hatası bekleyen testlerde aralıklı `ObjectDisposedException`) etkilediği test ailesinden; kanıtsız olduğu için kesin neden yazılmadı.
+  - `list package --vulnerable`: 13 projede açık yok.
+  - `has-pending-model-changes`: üç context'te temiz.
+- [x] Code review düzeltmeleri (fed25c4): `code-review` (high, `main...faz/4c-tuketici-hazirligi`) 5 bulgu verdi.
+  - Düzeltilenler:
+    - (#1) Exception eşlemesi `CustomizeProblemDetails` içindeydi ve exception taşıyan her ProblemDetails yazımını eziyordu; projenin handler'ının yazdığı başlık ve detay da gidiyordu. Eşleme `ExceptionHandlerOptions.ExceptionHandler` delegate'ine taşındı; middleware onu yalnızca hiçbir handler işlemediğinde çağırıyor. Kırmızı test: `The_problem_details_a_project_handler_writes_are_its_own`.
+    - (#2) Saklama taraması, hâlâ saklanan bir mesaj içeren ilk parçada duruyordu; geç işlenmiş düşük Id'li bir mesaj turu 49 silmeyle sınırlıyordu. Artık süresi dolmuş mesaj içermeyen ilk parçada duruyor. Kırmızı test: `A_message_processed_late_does_not_hold_back_the_expired_ones_after_it` (eski kuralla zaman aşımı).
+    - (#3) Api host'u SQL Server sağlayıcısını kendisi referans alıyor; Pkcs düzeltmesini yalnızca modüller üzerinden alıyordu. Api'ye de doğrudan referans eklendi.
+  - "Sonraya bırakılanlar"a yazılanlar: #4 (her turda tarama sorgusu), #5 (iç içe `MessageResponse`).
+  - Testler 246 → 248.
+- Faz doğrulaması, düzeltmelerden sonra (2026-10-20):
+  - `restore --force`: NU uyarısı yok.
+  - `list package --vulnerable`: 13 projede açık yok.
+  - Release `--no-incremental`: 0 uyarı, 0 hata.
+  - Test: 248/248, Release ve Debug.
+  - `has-pending-model-changes`: üç context'te temiz.
+
 ### Faz 4d (koşullu)
 - [ ] F4d.1 IdP modeli kararı
 - [ ] F4d.2 Parola sıfırlama ve onay e-postasını yeniden gönderme
@@ -997,31 +1018,32 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-28, Faz 4b: Referans modüller (tamam, `main`'e merge edildi).** Branch `faz/4b-referans-moduller`, 8 commit. Oturum `/novacore-phase 4c` ile başladı; 4b başlamadığı için bağımlılık kontrolünde durduruldu, kullanıcı 4b'yi başlattı.
+**2026-10-20, Faz 4c: Tüketici hazırlığı (tamam, merge onayı bekleniyor).** Branch `faz/4c-tuketici-hazirligi`, 11 commit.
 
 - **Yapılanlar:**
-  - F4b.1: kullanıcı event akışını seçti (Q-30, D-034). Uygulama kararları D-035'te, kaynaklar R-075'te.
-  - F4b.2a–c:
-    - Payments ödemeyi Pending kaydediyor ve `PaymentCreated`'ı yayımlıyor (yeni `Payments.Contracts` projesi).
-    - Catalog stoğu ayırıyor ya da reddediyor. Cevap, anahtarı PaymentId olan bir `StockReservation`; `StockReserved` ya da `StockReservationFailed` event'iyle birlikte yazılıyor.
-    - Payments ödemeyi Completed ya da Failed yapıyor.
-    - `Product.Stock` bir concurrency token; PUT/DELETE çakışmada 409 dönüyor.
-    - Migration'lar: `StockReservations` ve `StockConcurrencyToken` (yalnızca snapshot).
-  - F4b.3: eşzamanlılık testleri: son birim için iki ödeme, okunduktan sonra başka bir satışın aldığı stok.
-  - F5.3: Catalog CRUD uçtan uca testleri. Ödemenin uçtan uca testi `StockReservationTests`'te.
-  - Code review'daki 13 bulgunun 7'si düzeltildi, 1'i gereksizdi, 5'i "Sonraya bırakılanlar"a yazıldı.
-  - Testler 190 → 219.
+  - F4c.1: fallback policy her uçta kimlik istiyor, açık uçlar `AllowAnonymous`; Development dışında boş CORS listesi hiçbir origin'e izin vermiyor.
+  - F4c.2: çekirdekte super-admin yok; eklentinin resolver'ı `Administrator` üyeliğini tanımlı bütün izinlere çözüyor.
+  - F4c.3: `UseCoreWeb` `UseForwardedHeaders`'ı en başta çalıştırıyor; yalnızca `ForwardedHeaders:KnownProxies`/`KnownIPNetworks`.
+  - F4c.4: `GlobalExceptionHandler` yerine middleware'in yedek yolu (`StatusCodeSelector` + `ExceptionHandler` delegate + `SuppressDiagnosticsCallback`). Framework exception'ları 500, `BadHttpRequestException` kendi durumu.
+  - F4c.5: `ToHttpResult` tipli union dönüyor; modül ve eklenti JSON uçları tipli; Y-31 kör noktası kapandı.
+  - F4c.6: kimlik eklentisi Development dışında Data Protection anahtar deposu istiyor.
+  - F4c.7: `outbox_consumers` mesajın `Id`'sine bağlı (FK, cascade); işlenmiş mesajlar 7 gün sonra siliniyor; `IDomainEventDispatcher` silindi; migration'lar mevcut kayıtları dönüştürüyor.
+  - Pkcs güvenlik açığı (dış kaynaklı) ve code review düzeltmeleri.
+  - Testler 219 → 248. Kararlar D-036 (1)–(8), R-076…R-083.
 - **Sürprizler:**
-  - SQLite `DateTimeOffset`'e göre ORDER BY çeviremiyor, bu yüzden `GET /payments` test veritabanında 500 dönüyor. Testler ödemenin durumunu veritabanından okuyor.
-  - Hiçbir alanı değiştirmeyen bir PUT UPDATE göndermiyor, dolayısıyla çakışmıyor (doğru davranış).
-  - Concurrency token `has-pending-model-changes`'te görünmüyor ama model snapshot'ını değiştiriyor; boş bir migration gerekti (review #6).
-  - Api host'unda önceki testten kalan bir dispatcher turu, aynı anda gönderilen HTTP istekleriyle yarışabiliyor (review #1). Çözüm `ModuleTestData`'daki yardımcılar.
-- **Merge:** kullanıcı onayıyla `main`'e `--no-ff` merge edildi (2026-09-28), push edilmedi. Yerel `main`, `origin/main`'den ileride: D-033 plan commit'i ve Faz 4b. Push kullanıcının kararı.
-- **Bekleyen (kullanıcı):** F4d.1 (IdP modeli) ve F5.4 kendi fazlarının başında sorulacak.
-- **Sonraki fazın (4c) bilmesi gerekenler:**
-  - F4c.5 (tipli sonuçlar): `UpdateProduct`/`DeleteProduct`'ın yeni 409 yolunu da kapsamalı. `CreatePayment` 201 ve `Pending` dönmeye devam ediyor.
-  - F4c.1 (FallbackPolicy): modül uçlarının hepsi `RequirePermission` taşıyor. Event handler'ları HTTP dışında çalıştığı için etkilenmez.
-  - F4c.4 (hata eşlemesi): `DbUpdateConcurrencyException` bugün modüllerde uç başına 409'a çevriliyor (review #9). Çekirdeğin eşlemesi modüllere bir kanca verirse bu çeviri oraya toplanabilir.
-  - F4c.7 (outbox şeması): `outbox_consumers`'a artık Catalog ve Payments handler'ları kayıt yazıyor. Anahtar değişikliği migration'ı mevcut satırları dönüştürmeli; henüz yayın yok, veri yalnızca geliştirme veritabanlarında. F4c.7'nin silmesi planlanan `IDomainEventDispatcher`'ı modüller kullanmıyor.
-  - Test altyapısı: `FakeClockApiFactory` artık sealed değil. Yeni yardımcılar `StockRaceApiFactory`, `ModuleTestData` ve `OutboxDelivery.RunUntilAsync` (tests/CLAUDE.md).
-- **Sıradaki:** merge onayından sonra yeni bir oturumda `/novacore-phase 4c`.
+  - Fallback policy tanımsız yola anonim istekte 404 yerine 401 döndürüyor (MS'in belgelediği davranış).
+  - `IPAddress.TryParse("10.0.0")` kısaltmayı kabul ediyor.
+  - Framework istemci iptalini handler'lardan önce 499 yapıyor.
+  - `CustomizeProblemDetails` her yazıma uygulanıyor (review #1).
+  - `migrations script` tek batch üretiyor (`EXEC` gerekti).
+  - `FakeTimeProvider` günlerce ilerletilince periyodik zamanlayıcıyı her periyot için tetikliyor.
+  - 13 Ekim .NET güvenlik yamasıyla Pkcs açığı geldi.
+- **Kullanıcıya:**
+  - Pkcs sorusu reddedildi, "devam et" ile önerilen seçenek uygulandı. Farklı bir yol isterseniz D-036 (8) yeniden açılır.
+  - Merge (`faz/4c-tuketici-hazirligi` → `main`) onayı bekleniyor.
+- **Sonraki fazın (4d) bilmesi gerekenler:**
+  - F4d.1 kullanıcı kararı (IdP modeli).
+  - Eklentinin JSON uçları artık tipli sonuç dönüyor; yeni uçlar da öyle yazılmalı. Gövdeler için `AccountEndpoints.MessageResponse` var.
+  - Production host'larında Data Protection deposu zorunlu (testlerde `InMemoryKeyStore.AddTo`).
+  - Fallback policy yüzünden yeni anonim uçlar (parola sıfırlama vb.) `AllowAnonymous` almalı.
+- **Sıradaki:** merge onayından sonra yeni bir oturumda `/novacore-phase 4d`.
