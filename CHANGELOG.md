@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-preview.1] - 2026-10-20
+
+The first published version (GitHub Packages, `BMD.NovaCore.*`). Everything below is relative to the code the
+repository started from.
+
 ### Added
 
 - `BMD.NovaCore.Templates`, a template package (`src/Templates/NovaCore.Templates`): `dotnet new novacore` creates a

@@ -10,7 +10,7 @@ contains `NovaCore.AspNetCore`).
 |---|---|
 | `NovaCore.Abstractions` | `Result`/`Error`, paging, base entities, domain-event and current-user abstractions (BCL only) |
 | `NovaCore.AspNetCore` | Modules (`AddModule<T>`), ProblemDetails exception handling, `Result` → HTTP, OpenAPI document, JWT authentication, permission authorization, rate limiting, security headers |
-| `NovaCore.EntityFrameworkCore` | Module-owned `DbContext`s, audit stamping, startup migrations, in-process domain events |
+| `NovaCore.EntityFrameworkCore` | Module-owned `DbContext`s, audit stamping, opt-in startup migrations, a transactional outbox and its dispatcher for domain events |
 | `NovaCore.Serilog` | Add-on: Serilog logging (console, Seq) |
 | `NovaCore.OpenTelemetry` | Add-on: OpenTelemetry logs, metrics and tracing, OTLP export |
 | `NovaCore.Scalar` | Add-on: Scalar API reference UI (Development) |

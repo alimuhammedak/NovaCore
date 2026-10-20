@@ -42,7 +42,9 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   The interval, batch size, 10 attempts and the retention are constants: no consumer needs them configurable yet (Y-19).
 
 **Add-ons** (optional, one third-party library each; they may reference AspNetCore/Abstractions only):
-`NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`), `NovaCore.Scalar`
+`NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`: `ILogger` logs with their
+message and scopes, metrics and traces, all over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; a Serilog host keeps
+its logs in Serilog, which doesn't write to other providers), `NovaCore.Scalar`
 (`MapCoreScalar`), `NovaCore.Identity.OpenIddict` (`AddCoreIdentityServer`: an OpenID Connect provider on ASP.NET Core
 Identity + OpenIddict, D-026). A new third-party integration becomes a new add-on, not a dependency of the core.
 
@@ -90,6 +92,8 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
   (`IAuthorizationRequirementData`, R-053), which `PermissionAuthorizationHandler` checks. There is no custom policy
   provider and no named policy per permission. Use `RequirePermission(...)` / `[RequirePermission]` rather than
   hand-rolled `[Authorize(Roles=)]`; `PermissionAuthorizationTests` pins 200/403.
+- Package IDs are `BMD.` + the project name (`Directory.Build.targets`, D-041); the project, assembly and namespace
+  names don't change. A dependency between two packages is a `ProjectReference`; pack turns it into the `BMD.` ID.
 - The packages are `IsPackable=true`; avoid leaking app-specific assumptions (connection strings,
   concrete modules) into them. A new package needs `GenerateDocumentationFile`, the PublicApiAnalyzers reference and
   the two `PublicAPI.*.txt` files; `Directory.Build.targets` fails the build without the first two.

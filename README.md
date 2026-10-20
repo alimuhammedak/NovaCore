@@ -12,7 +12,12 @@ ile organize edilmiş iş modülleri.
 ---
 
 ## İçindekiler
-- [Hızlı Başlangıç](#hızlı-başlangıç)
+- [Yeni Proje (Tüketici Rehberi)](#yeni-proje-tüketici-rehberi)
+  - [Kurulum](#kurulum) · [Şablon ne üretir](#şablon-ne-üretir) · [Sorumluluk modeli](#sorumluluk-modeli) ·
+    [Kontrol listesi](#yeni-proje-kontrol-listesi) · [Ayarları ezmek](#ayarları-ezmek) ·
+    [Nesne düzeyi yetki](#nesne-düzeyi-yetki) · [BFF](#tarayıcı-uygulamaları-bff) ·
+    [Migration dağıtımı](#migrationların-dağıtımı) · [Güncelleme](#güncelleme)
+- [Bu Repoda Çalışmak](#bu-repoda-çalışmak)
 - [Mimari](#mimari)
 - [Proje Ağacı](#proje-ağacı)
 - [Yeni Modül Ekleme](#yeni-modül-ekleme)
@@ -28,7 +33,194 @@ ile organize edilmiş iş modülleri.
 
 ---
 
-## Hızlı Başlangıç
+## Yeni Proje (Tüketici Rehberi)
+
+NovaCore bir projeye iki parça hâlinde gelir: **paketler** (`BMD.NovaCore.*`, GitHub Packages) ve onlara bağlı bir
+iskelet üreten **şablon** (`BMD.NovaCore.Templates`). Paketler NovaCore'un sorumluluğundadır ve sürümle güncellenir.
+Şablonun ürettiği kod ilk andan itibaren projenindir.
+
+### Kurulum
+
+```bash
+# 1) Bir kez: paketlerin feed'i. GitHub Packages, paket private olduğu için read:packages yetkili bir token ister.
+#    Kaynağın adı novacore olmalı: üretilen nuget.config aynı adla tanımlar, kimlik bilgisi buradan gelir.
+dotnet nuget add source https://nuget.pkg.github.com/alimuhammedak/index.json -n novacore -u <github-kullanıcısı> -p <token>
+
+# 2) Şablon paketi
+dotnet new install BMD.NovaCore.Templates::0.1.0-preview.1
+
+# 3) Proje
+dotnet new novacore -n SiparisServisi                    # kimlik sağlayıcı host'un içinde (varsayılan: --auth BuiltIn)
+dotnet new novacore -n SiparisServisi --auth External    # harici sağlayıcı (Entra ID, Keycloak): yalnızca token doğrulanır
+cd SiparisServisi && dotnet build && dotnet test         # SQL Server gerekmez: testler SQLite kullanır
+```
+
+- Linux ve macOS'ta token'ı saklamak için `--store-password-in-clear-text` gerekir; Windows'ta şifreli saklanır.
+- **Paket ID'leri `BMD.NovaCore.*`, içlerindeki assembly ve namespace'ler `NovaCore.*`'dır** (`BMD.NovaCore.AspNetCore` →
+  `using NovaCore.AspNetCore;`). nuget.org'da başka sahiplerin `NovaCore.*` paketleri var; üretilen `nuget.config`
+  `BMD.NovaCore.*`'ı yalnızca bu feed'e eşler (package source mapping), başka bir kaynak bu adlarla paket veremez.
+- Feed kaynağı kullanıcı düzeyinde eklendiği için, kendi `nuget.config`'i olmayan başka bir merkezi paket yönetimli
+  projede NU1507 uyarısı görülebilir. NovaCore projeleri kaynaklarını `<clear/>` ile kendileri tanımlar.
+- `--auth BuiltIn`: `NovaCore.Identity.OpenIddict` host'ta çalışır, Development'ta `Jwt:Authority` host'un kendisidir
+  (https profili). Scalar (`/scalar/v1`) Authorization Code + PKCE ile giriş yapar.
+- `--auth External`: kimlik sağlayıcı yoktur. `Jwt:Authority`'ye sağlayıcının issuer adresini yazın ve o sağlayıcının
+  kullanıcıları için bir `IPermissionResolver` kaydedin; izinler sunucuda çözüldüğü için host onsuz açılmaz.
+
+### Şablon ne üretir
+
+| Yol | İçerik |
+|---|---|
+| `src/Api/<Ad>.Api` | `Program.cs` (kompozisyon kökü), üretim kontrol listesini yorum olarak taşıyan `appsettings.json`, Development dışı health probe örneği; BuiltIn'de kimlik sağlayıcının migration'ları |
+| `src/Modules/Todos/<Ad>.Modules.Todos` | Örnek modül: dört slice (oluştur, oku, sayfalı listele, tamamla), izinler, validation, `Result` → ProblemDetails, `todos` şeması, migration, outbox. Kendi modülünüzü yanına ekleyin (bkz. [Yeni Modül Ekleme](#yeni-modül-ekleme)), örneği silin |
+| `tests/<Ad>.Api.Tests` | `WebApplicationFactory` + in-memory SQLite + bellek içi OpenID Connect issuer; izinler `CreateClientWithPermissions(...)` ile verilir |
+| `.github/workflows/ci.yml` | Restore (NuGet audit), build, test, context başına migration kontrolü, varsayılan dalda migration bundle'ları, açık paket kontrolü. Repo secret'ı `NOVACORE_PACKAGES_TOKEN` (read:packages) gerekir |
+| Kök | `nuget.config`, `Directory.Build.props` (uyarılar hata, analyzer'lar, NuGet audit), `Directory.Packages.props` (merkezi sürümler, `NovaCoreVersion`), `global.json`, `.editorconfig`, `dotnet-tools.json` (dotnet-ef) |
+
+Log hattı tektir: `AddCoreObservability` log, metrik ve trace'i OpenTelemetry'den geçirir, `OTEL_EXPORTER_OTLP_ENDPOINT`
+varsa OTLP'ye gönderir. Serilog eklentisi (`BMD.NovaCore.Serilog`) isteyen proje için ayrıca durur.
+
+### Sorumluluk modeli
+
+| Katman | İçerik | Sahibi | Nasıl değişir |
+|---|---|---|---|
+| **Paketler** | Doğru yapılması zor, güvenlik açısından kritik ve her projede aynı olması gereken mekanizmalar | NovaCore | SemVer sürümü, PublicAPI takibi, CHANGELOG |
+| **Şablon çıktısı** | `Program.cs`, `appsettings*.json`, test projesi, CI, örnek modül | Üretildiği andan itibaren proje | Projede düzenlenir; paket güncellemesi bu kodu değiştirmez |
+| **Proje** | İş modülleri, ortam kararları, işletim | Proje | — |
+
+Bir şeyin nereye gideceğine karar kuralı: güvenlik ya da tutarlılık için kritik, doğru yapılması zor ve en az iki
+projede gereken → paket. İskeleti ortak ama değeri projeye göre değişen → şablon. Ortama bağlı (proxy, anahtar deposu,
+secret deposu, veritabanı hesabı, IdP barındırma) → proje; paket yalnızca doğru yeri ve sırayı sağlar.
+
+| Konu | Paket | Şablon | Proje |
+|---|---|---|---|
+| HTTP pipeline | `UseCoreWeb` sırayı belirler (forwarded headers, security headers, exception handler, CORS, rate limiter, kimlik doğrulama, yetkilendirme) | `UseCoreWeb`'i çağırır | Kendi middleware'ini `UseCoreWeb`'den sonra ekler |
+| Token doğrulama | JwtBearer, yalnızca asimetrik, `Jwt:Authority` | `Jwt:Authority`/`Audience` değerleri | IdP'yi seçer ve işletir |
+| Yetkilendirme | `RequirePermission`, varsayılan kapalı (fallback policy), izin önbelleği, resolver sözleşmesi | Örnek modülün izinleri | İzin tanımları, harici IdP'de resolver, **nesne düzeyi yetki** |
+| Hata sözleşmesi | ProblemDetails, `Result` → HTTP, exception eşlemesi | — | Domain hataları, kendi `IExceptionHandler`'ları |
+| Veri | `AddModuleDbContext`, outbox, audit | Sağlayıcı (`UseSqlServer`), migration bundle'ları | Şema, migration üretimi ve **uygulanması**, yedekleme |
+| Gözlem | OpenTelemetry ve Serilog eklentileri | OpenTelemetry hattı | Backend (OTLP collector), alarmlar |
+| Proxy ve TLS | `UseForwardedHeaders` en başta, güvenilen proxy listesi doğrulanır | `ForwardedHeaders:*` | Reverse proxy, TLS sertifikası, HTTPS yönlendirmesi |
+| Data Protection | Kimlik eklentisi Development dışında anahtar deposu yoksa açılmaz | Kontrol listesinde | Anahtar deposu (volume, veritabanı, Key Vault) |
+| Health | Kontroller (her modül DB'si, liveness) | Yönetim portunda probe örneği | Orchestrator probe ayarı |
+| Frontend kimliği | — | — | BFF ya da server-rendered UI (aşağıda) |
+| Test | — | Test projesi, factory, test IdP | Testler |
+
+### Yeni proje kontrol listesi
+
+Üretilen `appsettings.json`'daki `PRODUCTION:` notları aynı listedir.
+
+- [ ] `Jwt:Authority` ve `Jwt:Audience`. BuiltIn: host'un public https adresi. External: sağlayıcının issuer adresi ve
+      bir `IPermissionResolver`.
+- [ ] `Cors:AllowedOrigins`: tarayıcıdan çağıracak origin'ler. Liste boşsa Development dışında hiçbir origin'e izin yok.
+- [ ] `AllowedHosts`: API'nin cevap verdiği alan adları (şablonda `*`).
+- [ ] Bağlantı dizesi. Şablondaki Windows kimlik doğrulaması yalnızca yereldir; uygulamanın hesabı DDL yetkisi taşımaz.
+- [ ] Migration'lar CI'ın bundle'larıyla, ayrı bir hesapla uygulanır; `Database:ApplyMigrations` Development dışında `false`.
+- [ ] Reverse proxy arkasındaysa `ForwardedHeaders:KnownProxies`/`KnownIPNetworks`. TLS ve HTTPS yönlendirmesi edge'de.
+- [ ] Probe'lar: `HealthChecks:ProbePort` ve host'un o portu da dinlemesi (`ASPNETCORE_HTTP_PORTS=8080;8081`).
+- [ ] `OTEL_EXPORTER_OTLP_ENDPOINT`: log, metrik ve trace'in gideceği collector.
+- [ ] Secret'lar Development'ta user-secrets'ta, diğer ortamlarda ortam değişkeninde ya da bir vault'ta; CI'da
+      `NOVACORE_PACKAGES_TOKEN`.
+- [ ] Yalnızca BuiltIn, eksikse host açılmaz: OpenIddict imza ve şifreleme sertifikaları
+      (`services.AddOpenIddict().AddServer(s => s.AddSigningCertificate(...).AddEncryptionCertificate(...))`), gerçek
+      bir `IEmailSender` (onay ve parola sıfırlama linkleri), bir Data Protection anahtar deposu
+      (`services.AddDataProtection().PersistKeysTo...(...)`). Seed yöneticisinin parolası ve client secret'ları secret
+      deposundan.
+
+### Ayarları ezmek
+
+Paketler ayarlarını options pattern'le kurar, kayıt anında hiçbir değer okunmaz. Bu yüzden proje her birini
+`Program.cs`'te, ilgili `AddCore*` çağrısından sonra değiştirebilir: `services.Configure<T>` paketin `Configure`'ından
+sonra, `services.PostConfigure<T>` bütün `Configure`'lardan sonra çalışır.
+
+| Options | Paketin kurduğu | Not |
+|---|---|---|
+| `JwtBearerOptions` (`JwtBearerDefaults.AuthenticationScheme`) | `Authority`, audience, yalnızca asimetrik algoritmalar, `ClockSkew` 30 sn, `MapInboundClaims = false` | **`Configure` kullanın, `PostConfigure` değil:** JwtBearer discovery'yi kendi `PostConfigure`'ında `Authority`'den kurar, sonra değişen `Authority` etkisiz kalır |
+| `AuthorizationOptions` | `FallbackPolicy` = kimliği doğrulanmış kullanıcı | Açık uç için policy'yi gevşetmek yerine o uca `.AllowAnonymous()` |
+| `RateLimiterOptions` | IP başına global fixed-window (`RateLimiting:*`), `"strict"` policy | Kendi policy'lerinizi `AddPolicy` ile ekleyin |
+| `CorsOptions` | `CoreWebExtensions.CorsPolicyName` policy'si, `Cors:AllowedOrigins`'ten | Aynı adla `AddPolicy` policy'yi değiştirir |
+| `ForwardedHeadersOptions` | `ForwardedHeaders:*` doluysa yalnızca `X-Forwarded-For` ve `X-Forwarded-Proto`, yalnızca listedekilerden | |
+| `ExceptionHandlerOptions`, `ProblemDetailsOptions` | Exception → durum kodu ve ProblemDetails (`traceId`, `instance`) | Bir exception'ı kendiniz eşlemek için `IExceptionHandler` kaydedin: paketin eşlemesi middleware'in yedek yolunda olduğu için sizinki her zaman önce çalışır |
+| `HybridCacheOptions` | Varsayılan süre `Cache:DefaultExpiration` | L2 için bir `IDistributedCache` (Redis) kaydetmek yeter |
+| `OpenApiOptions` (belge `v1`) | Bearer security scheme | Kendi transformer'larınızı ekleyin |
+| Kimlik eklentisi: `IdentityOptions`, `PasswordHasherOptions`, `DataProtectionTokenProviderOptions`, uygulama cookie'si, `OpenIddictServerOptions` | Parola en az 12, lockout 5 deneme / 15 dk, onaylı e-posta, PBKDF2 600.000, onay token'ı 6 saat, cookie 30 dk kayan, access token 15 dk, refresh 7 gün | Değerleri yükseltmek serbest; düşürmek eklentinin güvenlik varsayımlarını bozar (bkz. [Güvenlik](#güvenlik--yetkilendirme)) |
+
+```csharp
+// Program.cs: AddCoreWeb'den sonra
+builder.Services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
+    options => options.TokenValidationParameters.ClockSkew = TimeSpan.FromSeconds(10));
+builder.Services.PostConfigure<RateLimiterOptions>(options => options.AddPolicy("uploads", context =>
+    RateLimitPartition.GetConcurrencyLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+        _ => new ConcurrencyLimiterOptions { PermitLimit = 2, QueueLimit = 0 })));
+```
+
+Ezilemeyenler: `UseCoreWeb`'in middleware sırası (kimlik doğrulama ile yetkilendirme arasında bir yer yok), izin
+önbelleğinin anahtarı (`sub` + security stamp) ve outbox ile token temizliğinin sabitleri (5 sn tur, 10 deneme, 7 gün
+saklama; 14 gün). Bunlar bir proje ihtiyaç duyunca açılır (DECISIONS Y-14, Y-19).
+
+### Nesne düzeyi yetki
+
+`RequirePermission` işlev düzeyindedir: "bu kullanıcı todo tamamlayabilir mi". "Bu kullanıcı **bu** todo'yu
+tamamlayabilir mi" sorusu kaydın kendisine bakar ve projenindir. OWASP API Security Top 10'da birinci sıradaki risk
+budur (API1:2023 Broken Object Level Authorization). Microsoft'un yolu resource-based authorization'dır:
+
+```csharp
+// Kaydın sahibi: oluşturan handler ICurrentUser.UserId'yi (token'daki sub) yazar. CreatedBy kullanıcı adını tutar,
+// denetim içindir; sahiplik için değil.
+public sealed class TodoOwnerRequirement : IAuthorizationRequirement;
+
+internal sealed class TodoOwnerHandler : AuthorizationHandler<TodoOwnerRequirement, Todo>
+{
+    protected override Task HandleRequirementAsync(
+        AuthorizationHandlerContext context, TodoOwnerRequirement requirement, Todo todo)
+    {
+        if (todo.OwnerId == context.User.FindFirstValue(NovaClaims.Subject))
+            context.Succeed(requirement);
+        return Task.CompletedTask;
+    }
+}
+
+// Modülün AddModule'ünde: services.AddSingleton<IAuthorizationHandler, TodoOwnerHandler>();
+// Handler'da, kaydı okuduktan sonra (ClaimsPrincipal user ve IAuthorizationService authorization parametreleriyle):
+if (!(await authorization.AuthorizeAsync(user, todo, new TodoOwnerRequirement())).Succeeded)
+    return Result.Failure(Error.NotFound("todo.not_found", $"Todo '{id}' was not found.")).ToHttpResult();
+```
+
+Başkasının kaydına 404 dönmek kaydın varlığını da gizler. Listelerde aynı kural sorguya girer
+(`Where(t => t.OwnerId == currentUser.UserId)`): sayfalanmış bir listeyi bellekte süzmek sayfaları bozar.
+
+### Tarayıcı uygulamaları: BFF
+
+Microsoft, web uygulamaları için tarayıcıda çalışan public OIDC/OAuth client'larını artık önermiyor; önerilen mimari
+**Backend for Frontend**: token'lar sunucuda kalır, tarayıcıda yalnızca HttpOnly bir cookie olur. NovaCore'da bir BFF
+paketi yok (iki proje ihtiyaç duyana kadar, Y-14). Seçenekler:
+
+- **SPA + BFF host:** ayrı bir ASP.NET Core host'u confidential client olarak (`Identity:Clients`'ta `ClientSecret` ve
+  `RedirectUris`) OIDC ile oturum açar, cookie tutar ve API çağrılarını access token'ı ekleyerek API'ye iletir (YARP).
+- **Server-rendered UI** (Blazor Web App, Razor Pages): API'yi sunucu tarafından çağırır; tarayıcı token görmez.
+- **Yalnızca API:** mobil ya da masaüstü uygulamalar Authorization Code + PKCE ile public client olabilir.
+
+### Migration'ların dağıtımı
+
+- Üretilen CI varsayılan dala her push'ta context başına bir **migration bundle** üretir (`migration-bundles`
+  artifact'i, 7 gün). Dağıtımda, uygulama sürümünden önce tek seferlik bir iş olarak, şema yetkili ayrı bir hesapla
+  çalıştırılır: `ASPNETCORE_ENVIRONMENT=Production ./efbundle --connection "$DEPLOYMENT_CONNECTION_STRING"`. Bundle'lar
+  framework-dependent'tır (`linux-x64`); runtime'ı olmayan bir ortam için CI'da `--self-contained` ekleyin.
+- SQL'in gözden geçirilmesi gerekiyorsa script: `dotnet ef migrations script --idempotent --project <modül> --startup-project <modül> --context <Context> -o <ad>.sql`.
+- `Database:ApplyMigrations=true` (açılışta uygula) yalnızca Development ya da tek örnekli basit kurulumlar içindir: her
+  replika migration denemesine girer ve uygulamanın hesabı şema yetkisi ister.
+- Her context kendi şemasında kendi `__EFMigrationsHistory` tablosunu tutar; bundle'lar birbirinden bağımsızdır.
+
+### Güncelleme
+
+`Directory.Packages.props`'taki `NovaCoreVersion`'ı değiştirin: bütün `BMD.NovaCore.*` paketleri aynı sürümde kalır.
+Önce [CHANGELOG](CHANGELOG.md)'u okuyun; 0.x sürümlerinde minor sürüm kırıcı değişiklik içerebilir. Şablonun ürettiği
+kod güncellemeyle değişmez; yeni bir şablon özelliğini istiyorsanız yeni sürümle bir proje üretip farkı alın.
+
+---
+
+## Bu Repoda Çalışmak
+
+Bu bölüm NovaCore'un kendisini (paketler, referans Api host'u, Catalog ve Payments modülleri) geliştirmek içindir.
 
 Gereksinim: **.NET 10 SDK** (10.0.300+), **SQL Server** (yerel instance, Windows auth — bkz. `appsettings.json`).
 
@@ -72,16 +264,13 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 > **RFC 9457 ProblemDetails** ile yanıt verir.
 >
 > `/health` ve `/alive` yalnızca Development'ta map'lenir (DECISIONS D-022). Production'da probe gerekiyorsa host
-> kendi `MapHealthChecks` kaydını yapar. `RequireHost` Host header'ına güvendiği için sahtelenebilir; port kontrolü
-> `ConnectionInfo.LocalPort` ile yapılmalıdır.
+> kendi kaydını yapar. `RequireHost` Host header'ına güvendiği için sahtelenebilir; port kontrolü
+> `ConnectionInfo.LocalPort` ile yapılmalıdır. Şablonun `Program.cs`'i bunu `UseHealthChecks(path, port)` ile
+> `HealthChecks:ProbePort`'ta yapar.
 
-### 5 dakikada yeni proje (template)
-```bash
-# Bir kez: GitHub Packages feed'i, read:packages yetkili bir token'la (bkz. Çekirdeği Dağıtma)
-dotnet nuget add source https://nuget.pkg.github.com/alimuhammedak/index.json -n novacore -u <github-kullanıcısı> -p <token>
-dotnet new install BMD.NovaCore.Templates::0.1.0-preview.1
-dotnet new novacore -n SiparisServisi            # --auth BuiltIn (varsayılan) | External
-```
+Şablondan yeni proje açmak için bkz. [Yeni Proje (Tüketici Rehberi)](#yeni-proje-tüketici-rehberi). Şablonu bu
+repodan denemek: `bash eng/template-smoke.sh` (bütün paketleri yerel bir feed'e pack eder, iki kimlik seçeneğiyle proje
+üretip derler ve test eder).
 
 ---
 
@@ -214,10 +403,11 @@ app.Run();
 "Ödeme modülü ekleme" senaryosu tam olarak şöyle: **yeni proje + `IModule` + Api referansı + `Program.cs`'te bir
 satır.** Modüller assembly taranarak bulunmaz; host her modülü `builder.AddModule<TModule>()` ile açıkça ekler.
 
-1. `dotnet new classlib -o src/Modules/Orders/NovaCore.Modules.Orders` (isim `NovaCore.Modules.` ile başlamalı;
-   mimari testler modülleri bu önekle bulur)
-2. `NovaCore.AspNetCore` ve `NovaCore.EntityFrameworkCore`'a referans ver. Validation için paket gerekmez, ASP.NET Core
-   framework'ü getiriyor.
+1. `dotnet new classlib -o src/Modules/Orders/NovaCore.Modules.Orders`. Bu repoda isim `NovaCore.Modules.` ile
+   başlamalı (mimari testler modülleri bu önekle bulur); şablondan üretilen projede `<Ad>.Modules.Orders`.
+2. `NovaCore.AspNetCore` ve `NovaCore.EntityFrameworkCore`'a referans ver (üretilen projede paket referansı:
+   `BMD.NovaCore.AspNetCore`, `BMD.NovaCore.EntityFrameworkCore`; şablonun `Todos` modülünün csproj'u örnektir).
+   Validation için paket gerekmez, ASP.NET Core framework'ü getiriyor.
 3. `IModule` implement et:
 
 ```csharp
@@ -597,7 +787,8 @@ dotnet test
 
 1. **`dotnet new` template (birincil):** `BMD.NovaCore.Templates` şablon paketi (`src/Templates/NovaCore.Templates`)
    iskeleti paketlere bağlı olarak üretir: Api host, örnek `Todos` modülü, test projesi, CI. Repo'nun kendi dosyaları
-   (BuildingBlocks kaynağı, plan belgeleri, `.claude/`, `release.yml`, PublicAPI dosyaları) şablona girmez.
+   (BuildingBlocks kaynağı, plan belgeleri, `.claude/`, `release.yml`, PublicAPI dosyaları) şablona girmez. Kurulum ve
+   kullanım: [Yeni Proje (Tüketici Rehberi)](#yeni-proje-tüketici-rehberi).
    ```bash
    dotnet new install BMD.NovaCore.Templates::0.1.0-preview.1
    dotnet new novacore -n YeniProje --auth BuiltIn   # ya da External: yalnızca Jwt:Authority, kimlik sağlayıcı yok
@@ -632,20 +823,19 @@ dotnet test
 | Serilog.AspNetCore | Structured logging (`NovaCore.Serilog` eklentisi) | **Apache-2.0** |
 | OpenTelemetry.* | Observability (`NovaCore.OpenTelemetry` eklentisi) | **Apache-2.0** |
 | Microsoft.AspNetCore.OpenApi / Caching.Hybrid / JwtBearer / Http.Resilience | Microsoft-yerleşik (`NovaCore.AspNetCore`) | **MIT** |
-| Microsoft.EntityFrameworkCore / Extensions.Hosting.Abstractions / Configuration.Binder | Microsoft-yerleşik (`NovaCore.EntityFrameworkCore`) | **MIT** |
+| Microsoft.EntityFrameworkCore.Relational / Extensions.Hosting.Abstractions / Options.ConfigurationExtensions / Diagnostics.HealthChecks.EntityFrameworkCore | Microsoft-yerleşik (`NovaCore.EntityFrameworkCore`) | **MIT** |
 | Microsoft.AspNetCore.Identity.EntityFrameworkCore | Kullanıcı/rol deposu (`NovaCore.Identity.OpenIddict`) | **MIT** |
 | OpenIddict.Server.AspNetCore / OpenIddict.EntityFrameworkCore | OpenID Connect sağlayıcı (`NovaCore.Identity.OpenIddict` eklentisi) | **Apache-2.0** |
 | Microsoft.EntityFrameworkCore.SqlServer | EF Core sağlayıcı | **MIT** |
 | Microsoft.CodeAnalysis.PublicApiAnalyzers | Public API takibi (yalnızca build, pakete girmez) | **MIT** |
 
-> ⚠️ **MediatR (v13+) ve AutoMapper (v15+) artık ticari** (Lucky Penny). NovaCore bunları kullanmaz.
-> Pipeline behavior gerçekten gerekirse MIT lisanslı `martinothamar/Mediator` eklenebilir.
+> ⚠️ **MediatR (v13+) ve AutoMapper (v15+) artık ticari** (Lucky Penny). NovaCore bunları kullanmaz. Başka bir mediator
+> ya da request-dispatch soyutlaması da eklenmez (DECISIONS Y-01): handler'lar bağımlılıklarını minimal API DI'dan alır.
 
 ---
 
 ## Kararı Değiştirecek Eşikler
 
-- **Mediator kütüphanesi ekle** → yalnızca pipeline behavior ihtiyacı somutlaşırsa (`martinothamar/Mediator`, MIT).
 - **Tam Clean Architecture'a geç** → yalnızca bir modül gerçekten karmaşık DDD/invariant içeriyorsa, sadece o modül için.
 - **Redis L2 cache ekle** → bir `IDistributedCache` (Redis) kaydet; HybridCache otomatik benimser.
 - **Harici bir IdP'ye geç (Keycloak, Entra)** → `Jwt:Authority`'yi ona çevir ve o IdP'nin kullanıcıları için bir
