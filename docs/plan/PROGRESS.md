@@ -16,7 +16,7 @@
 | 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push edilmedi) |
-| 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | merge onayı bekleniyor |
+| 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4d | ⏳ başlamadı (koşullu, F4d.1) | | | | |
 | 5 | ⏳ başlamadı | | | | |
 
@@ -1018,7 +1018,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-20, Faz 4c: Tüketici hazırlığı (tamam, merge onayı bekleniyor).** Branch `faz/4c-tuketici-hazirligi`, 10 commit.
+**2026-10-20, Faz 4c: Tüketici hazırlığı (tamam, `main`'e merge edildi).** Branch `faz/4c-tuketici-hazirligi`, 10 commit.
 
 - **Yapılanlar:**
   - F4c.1: fallback policy her uçta kimlik istiyor, açık uçlar `AllowAnonymous`; Development dışında boş CORS listesi hiçbir origin'e izin vermiyor.
@@ -1040,10 +1040,10 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - 13 Ekim .NET güvenlik yamasıyla Pkcs açığı geldi.
 - **Kullanıcıya:**
   - Pkcs sorusu reddedildi, "devam et" ile önerilen seçenek uygulandı. Farklı bir yol isterseniz D-036 (8) yeniden açılır.
-  - Merge (`faz/4c-tuketici-hazirligi` → `main`) onayı bekleniyor.
+  - Merge: kullanıcı onayıyla ("her şeyi maine al") `main`'e `--no-ff` merge edildi (2026-10-20), push edilmedi. Push kullanıcının kararı.
 - **Sonraki fazın (4d) bilmesi gerekenler:**
   - F4d.1 kullanıcı kararı (IdP modeli).
   - Eklentinin JSON uçları artık tipli sonuç dönüyor; yeni uçlar da öyle yazılmalı. Gövdeler için `AccountEndpoints.MessageResponse` var.
   - Production host'larında Data Protection deposu zorunlu (testlerde `InMemoryKeyStore.AddTo`).
   - Fallback policy yüzünden yeni anonim uçlar (parola sıfırlama vb.) `AllowAnonymous` almalı.
-- **Sıradaki:** merge onayından sonra yeni bir oturumda `/novacore-phase 4d`.
+- **Sıradaki:** yeni bir oturumda `/novacore-phase 4d`.
