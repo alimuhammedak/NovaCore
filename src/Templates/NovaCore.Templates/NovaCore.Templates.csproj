@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NovaCore.Templates: the `dotnet new novacore` template package (docs/plan/PLAN.md F5.1, RESEARCH R-074). It compiles
+    nothing: content/novacore is packed as content, the way `dotnet new templatepack` lays a template package out. The
+    generated project references the NovaCore packages of this package's own version, stamped in when packing.
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageType>Template</PackageType>
+    <Description>NovaCore template: `dotnet new novacore` creates a .NET 10 modular-monolith Web API on the NovaCore packages, with a sample module, tests and CI.</Description>
+    <PackageTags>dotnet-new;templates;novacore;modular-monolith;webapi</PackageTags>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <!-- Dot files (.gitignore, .editorconfig, .github) are part of the template. -->
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <!-- No assemblies, so no dependencies: NU5128's documented fix for a package without lib/ref files. -->
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);NovaCoreStampPackageVersion</TargetsForTfmSpecificContentInPackage>
+    <!-- Forward slashes: the target reads the file with a property function, which doesn't convert separators on Linux. -->
+    <NovaCoreTemplatePackagesProps>content/novacore/Directory.Packages.props</NovaCoreTemplatePackagesProps>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="content\**\*" Exclude="content\**\bin\**;content\**\obj\**;$(NovaCoreTemplatePackagesProps)"
+             PackagePath="content\" />
+    <Compile Remove="**\*" />
+  </ItemGroup>
+
+  <!--
+    The generated project uses the NovaCore packages of this version, prerelease suffix included. The template's
+    Directory.Packages.props names it with a placeholder; this target packs a copy with the version written in.
+  -->
+  <Target Name="NovaCoreStampPackageVersion">
+    <PropertyGroup>
+      <_NovaCoreStampedPackagesProps>$(IntermediateOutputPath)template/Directory.Packages.props</_NovaCoreStampedPackagesProps>
+      <_NovaCoreStampedContent>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/$(NovaCoreTemplatePackagesProps)').Replace('NOVACORE_PACKAGE_VERSION', '$(PackageVersion)'))</_NovaCoreStampedContent>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_NovaCoreStampedPackagesProps)" Lines="$([MSBuild]::Escape($(_NovaCoreStampedContent)))"
+                      Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(_NovaCoreStampedPackagesProps)" PackagePath="content/novacore/Directory.Packages.props" />
+    </ItemGroup>
+  </Target>
+
+</Project>

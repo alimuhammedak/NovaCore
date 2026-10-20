@@ -54,3 +54,22 @@ jobs:
           dotnet list NovaCore.slnx package --vulnerable --include-transitive --format json > vulnerable.json
           jq -e '[.projects[].frameworks[]? | (.topLevelPackages // [])[], (.transitivePackages // [])[]] | length == 0' vulnerable.json \
             || { cat vulnerable.json; exit 1; }
+
+  # The template as a consumer gets it (docs/plan/PLAN.md F5.2): every package packed into a local feed, a project created
+  # with each --auth option, then built with warnings as errors, tested and checked against its migrations. The project
+  # restores the packages from that feed, never from this repository's projects.
+  template-smoke:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Template smoke test
+        run: bash eng/template-smoke.sh "$RUNNER_TEMP/template-smoke"

@@ -7,8 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-preview.1] - 2026-10-20
+
+The first published version (GitHub Packages, `BMD.NovaCore.*`). Everything below is relative to the code the
+repository started from.
+
 ### Added
 
+- `BMD.NovaCore.Templates`, a template package (`src/Templates/NovaCore.Templates`): `dotnet new novacore` creates a
+  solution that references the NovaCore packages of the template's own version instead of copying this repository. It
+  has an API host, a sample `Todos` module (CRUD-style slices, permissions, validation, `Result` → ProblemDetails, its
+  own schema, migrations and outbox), integration tests with an in-memory OpenID Connect issuer, a `nuget.config` that
+  maps the NovaCore packages to their feed, `appsettings.json` with a production checklist, and a CI workflow that checks
+  the migrations against the model and, on the default branch, builds a migration bundle per DbContext. `--auth BuiltIn`
+  (default) runs the identity provider in the host; `--auth External` only validates an external provider's tokens.
+  Outside Development the host can answer probes on a management port (`HealthChecks:ProbePort`).
+- `eng/template-smoke.sh` packs every package into a local feed, creates a project from the template with each identity
+  option, and builds, tests and checks its migrations the way a consumer would. CI runs it as the `template-smoke` job.
 - `NovaCore.Identity.OpenIddict` prunes its store: at startup and every hour, OpenIddict's `PruneAsync` deletes the tokens
   that are expired, revoked or redeemed and the authorizations that are no longer valid and have no token left, once
   they are 14 days old (OpenIddict.Quartz's defaults; no new package). A failed pass is logged as an error and retried on
@@ -130,6 +145,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     adds `catalog.stock_reservations`.
 
 ### Changed
+
+- Package IDs carry the `BMD.` prefix (`BMD.NovaCore.AspNetCore`, ...): other owners publish `NovaCore.*` packages on
+  nuget.org, `NovaCore.AspNetCore` and `NovaCore.Templates` among them. Assembly and namespace names don't change.
+- `dotnet new install .` no longer turns this repository into a template (the root `.template.config` is gone); the
+  template is the `BMD.NovaCore.Templates` package.
+
+- `AddCoreObservability` (`NovaCore.OpenTelemetry`) sets up the log signal itself: `ILogger` records go through
+  OpenTelemetry with their rendered message and scopes, and are exported over OTLP with the metrics and traces when
+  `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Before, OTLP export turned logs on implicitly without the message and scopes. A
+  host that uses Serilog (`AddCoreLogging`) is unaffected: Serilog doesn't write to other logging providers.
 
 - `outbox_consumers` is keyed by the message row (`MessageId`, the outbox's `bigint` key) and the handler, with a
   cascading foreign key, instead of the event id: narrow and ever-increasing like the outbox's own key. The

@@ -1,0 +1,22 @@
+<Project>
+
+  <!-- Build defaults for every project in the solution; the .csproj files stay small. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Zero warnings is enforced: fix a warning instead of suppressing it. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!--
+      NuGet audit: a high (NU1903) or critical (NU1904) vulnerability in any package, transitive included, fails
+      restore. Low (NU1901) and moderate (NU1902) ones stay warnings, so a new advisory doesn't block unrelated work.
+    -->
+    <WarningsAsErrors>$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902</WarningsNotAsErrors>
+  </PropertyGroup>
+
+</Project>

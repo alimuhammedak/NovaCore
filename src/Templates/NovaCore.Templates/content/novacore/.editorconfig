@@ -1,0 +1,32 @@
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.{cs,csx}]
+indent_size = 4
+csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_prefer_braces = when_multiline:silent
+dotnet_sort_system_directives_first = true
+
+[tests/**.cs]
+# Test names are sentences (Completing_a_todo_twice_is_a_conflict), as in Microsoft's unit-testing guidance.
+dotnet_diagnostic.CA1707.severity = none
+
+[src/**/Migrations/*.cs]
+# EF Core migrations pass constant column arrays. Up/Down run once per database and the builder keeps the arrays: the
+# two cases CA1861's documentation allows suppressing.
+dotnet_diagnostic.CA1861.severity = none
+
+[*.{csproj,props,targets,slnx,config}]
+indent_size = 2
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false

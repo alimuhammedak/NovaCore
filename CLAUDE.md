@@ -69,11 +69,13 @@ dotnet ef database update     --project src/Modules/<M>/NovaCore.Modules.<M> --s
 # The identity provider's context comes from the NovaCore.Identity.OpenIddict package; its migrations live in the Api (R-060):
 dotnet ef migrations add <Name> --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context IdentityServerDbContext --output-dir Identity/Migrations
 
-# Scaffold a fresh project from this repo (it is a `dotnet new` template)
-dotnet new install .
-dotnet new novacore -n MyProject
+# The template package (src/Templates/NovaCore.Templates, package BMD.NovaCore.Templates) and its smoke test: packs every
+# package into a local feed, creates a project with --auth BuiltIn and External, builds, tests and checks its migrations.
+bash eng/template-smoke.sh [work-dir]
+dotnet new install BMD.NovaCore.Templates::<version>    # from the GitHub Packages feed
+dotnet new novacore -n MyProject [--auth BuiltIn|External]
 
-# NuGet packages (the seven IsPackable building blocks) → artifacts/ (git-ignored). Version: VersionPrefix in Directory.Build.props.
+# NuGet packages (the seven building blocks + the template, IDs BMD.NovaCore.*) → artifacts/ (git-ignored). Version: VersionPrefix.
 dotnet pack NovaCore.slnx -c Release -o artifacts [--version-suffix preview.1]
 ```
 
@@ -90,8 +92,16 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
 
 - **Packages (`src/BuildingBlocks/`, ANALYSIS §4):** three **core** packages that depend on the BCL and Microsoft
   packages only (D-003) — `NovaCore.Abstractions` (BCL only), `NovaCore.AspNetCore` and `NovaCore.EntityFrameworkCore`
-  — plus optional **add-on** packages for third-party libraries: `NovaCore.Serilog`, `NovaCore.OpenTelemetry`,
-  `NovaCore.Scalar`, `NovaCore.Identity.OpenIddict` (the OpenID Connect provider).
+  — plus optional **add-on** packages for third-party libraries: `NovaCore.Serilog`, `NovaCore.OpenTelemetry` (logs,
+  metrics, traces), `NovaCore.Scalar`, `NovaCore.Identity.OpenIddict` (the OpenID Connect provider).
+  **Package IDs are `BMD.NovaCore.*`** (`Directory.Build.targets`: `BMD.$(MSBuildProjectName)`); assembly, project and
+  namespace names stay `NovaCore.*` (D-041: other owners publish `NovaCore.*` on nuget.org).
+
+- **The template (`src/Templates/NovaCore.Templates`, package `BMD.NovaCore.Templates`, D-040):** `dotnet new novacore`
+  creates a solution that references the packages of the template's own version (stamped into its
+  `Directory.Packages.props` when packing). It compiles nothing here; its `.cs` files are still scanned by the
+  architecture tests under `src/`. Change it, then prove it with `bash eng/template-smoke.sh` (see
+  `src/Templates/CLAUDE.md`).
 
 - **Dependency direction (one way):** `Api` → `Modules.*` → `NovaCore.AspNetCore` / `NovaCore.EntityFrameworkCore`
   → `NovaCore.Abstractions` → BCL. AspNetCore and EntityFrameworkCore never reference each other; add-ons reference
@@ -147,7 +157,7 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 
 - **Packages: MIT/Apache (or Microsoft built-in) ONLY.** **Never add MediatR, AutoMapper, or
   FluentAssertions** — they are now commercial. Use: Mapperly (mapping), .NET 10's built-in validation
-  (validation), Scalar (OpenAPI UI). If a mediator is ever truly needed, use MIT `martinothamar/Mediator`.
+  (validation), Scalar (OpenAPI UI). No other mediator or request-dispatch abstraction either (DECISIONS Y-01).
 
 - **No mediator / no CQRS dispatcher.** Handlers receive dependencies directly from minimal-API DI
   (`sade CQRS`). Don't introduce a request-dispatch abstraction.
@@ -178,7 +188,8 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   per-project csproj stay tiny.
 
 - **0 warnings is enforced** (`TreatWarningsAsErrors`). Fix a warning; don't suppress it. Suppressing (`NoWarn`,
-  `#pragma`, `.editorconfig` severity, `[SuppressMessage]`) needs user approval (DECISIONS Y-10). The approved ones are
+  `#pragma`, `.editorconfig` severity, `[SuppressMessage]`) needs user approval (DECISIONS Y-44), unless Microsoft's
+  "When to suppress" section for that rule allows it permanently. The approved ones are
   listed under Gotchas.
 
 - **Configuration goes through validated options, never read at registration.** Bind a section with

@@ -18,7 +18,7 @@
 | 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20, kullanıcı isteği) |
-| 5 | ⏳ başlamadı | | | | |
+| 5 | ✅ tamam | `faz/5-sablon-yayin` | 2026-10-20 | 2026-10-20 | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
 
@@ -897,11 +897,49 @@ Plan onayı 2026-10-20. Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents
   - `has-pending-model-changes`: üç context'te temiz.
 
 ### Faz 5
-- [ ] F5.1 Template package
-- [ ] F5.2 Tüketici smoke testi
+Plan onayı 2026-10-20. Uygulama sırası F5.4 → F5.1a → F5.1b → F5.1c → F5.2 → F5.5 (ID'ler sabit). Kanal ve ilk sürüm plan aşamasında soruldu (Q-32, Q-33). Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmuyor (4d'deki kullanıcı kararı); commit'ler dosya dosya stage'leniyor.
+
+- [x] F5.1a (d3c612b): Tek log hattı OpenTelemetry (R-089, D-040 (1)–(2)).
+  - **Sürpriz:** `UseOtlpExporter`, paketin kendi dokümanına göre log'ları zaten açıyordu ("automatically enables logging, metrics, and tracing"). Yani endpoint tanımlıyken log'lar OTLP'ye gidiyordu, ama biçimlenmiş mesaj ve scope'lar olmadan. Adım bu yüzden plandakinden dar: `AddCoreObservability` log sinyalini `WithLogging` ile açıkça kuruyor, `IncludeFormattedMessage` ve `IncludeScopes` açık (MS'in OTLP örneği ve Aspire ServiceDefaults gibi).
+  - Repo'nun Api host'u Serilog'da kalıyor; Serilog diğer provider'lara yazmadığı için davranış aynı.
+  - Testler 276 → 277: `ObservabilityTests` (OTel log provider'ı kayıtlı, iki seçenek açık). Önce kırmızı.
+  - Güncellenenler: CHANGELOG (Changed), `src/PACKAGE.md`, README (OTel satırları), eklentinin csproj açıklaması.
+- [x] F5.1b (216741f): Template package `BMD.NovaCore.Templates` (`src/Templates/NovaCore.Templates`), D-040 (3)–(7), D-041, R-090, R-091.
+  - MS templatepack düzeni; kökteki `.template.config` silindi. Derlenen kodu olmadığı için `Directory.Build.targets`'taki sembol, package validation, XML doc ve PublicAPI kuralları şablon paketine uygulanmıyor (`NovaCoreLibraryPackage`). NU5128 `SuppressDependenciesWhenPacking` ile.
+  - Üretilen projenin NovaCore sürümü pack anında yazılıyor (`TargetsForTfmSpecificContentInPackage`); `--version-suffix` da geçiyor.
+  - İçerik: Api host (`Program.cs`, kontrol listeli `appsettings`, Development dışı probe örneği, üretilen portlar), `Todos` örnek modülü (4 slice, izinler, validation, `Result`→ProblemDetails, `todos` şeması, `Initial` migration, outbox), test projesi (`ApiFactory`, `TestIdentityProvider`, 7 test + BuiltIn'de discovery testi), `nuget.config` (source mapping), CPM, TWAE. `--auth BuiltIn|External`.
+  - **Sürpriz 1 (R-090):** `ContentTargetFolders=content` içeriği `content/content/...` altına koydu; `PackagePath="content"` ile düzeldi.
+  - **Sürpriz 2 (R-091, Q-34):** nuget.org'da başka sahiplerin `NovaCore.Templates`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` paketleri var; `dotnet new`'in güncelleme kontrolü yabancı şablonu önerdi. Kullanıcı kararıyla bütün paket ID'leri `BMD.NovaCore.*` (D-041); assembly ve namespace'ler aynı.
+  - Doğrulama (`bash eng/template-smoke.sh`, yalıtılmış hive ve NuGet önbelleği): BuiltIn 8/8, External 7/7 test; TWAE altında 0 uyarı; `has-pending-model-changes` iki seçenekte temiz; repo'ya özgü dosya, yazar adı ya da çözülmemiş token yok.
+  - Hook: şablonun `Directory.Packages.props`'u ilk kez Bash'le yazılmıştı; paket denetiminden geçmesi için Write ile yeniden yazıldı.
+  - Şablon `src/` altında olduğu için mimari testler onun `.cs` dosyalarını da tarıyor: `SourceHygieneTests` şablonun test yardımcısındaki `TimeProvider.System.GetUtcNow()`'ı yakaladı. Test gevşetilmedi; `TestIdentityProvider` saati constructor'dan alıyor.
+  - Repo: 0 uyarı, 277/277.
+  - Güncellenenler: README (template satırları, proje ağacı, paket ID'leri), kök CLAUDE.md (komutlar), `src/PACKAGE.md`, CHANGELOG.
+- [x] F5.1c (a1bfe90): Üretilen projenin CI'ı (`content/novacore/.github/workflows/ci.yml`), D-040 (8), R-092.
+  - Adımlar: restore (NuGet audit), Release build, test, context başına `has-pending-model-changes` ve migration bundle (artifact), açık paket kontrolü. Feed token'ı `NOVACORE_PACKAGES_TOKEN` secret'ından, yalnızca restore, bundle ve açık kontrolü adımlarına.
+  - **Sürpriz:** self-contained bundle context başına ~180 MB, framework-dependent ~82 MB. Bundle'lar framework-dependent ve yalnızca varsayılan dala push'ta üretilip 7 gün saklanıyor; private repo'nun artifact kotası her push'ta dolmasın.
+  - Doğrulama: adımlar üretilen BuiltIn projede yerelde çalıştı (0 uyarı, 8/8, iki context temiz, iki bundle, açık yok; `jq` yerine Python eşdeğeri). YAML iki seçenekte de ayrıştırılıyor; External'da kimlik context'i yok.
+- [x] F5.2 (d1fb612): Tüketici smoke testi CI'da: `.github/workflows/ci.yml`'de `build-and-test`'e paralel `template-smoke` job'ı, `bash eng/template-smoke.sh "$RUNNER_TEMP/template-smoke"` (D-040 (9)).
+  - Script F5.1b'de kabul kriterinin aracı olarak commit'lenmişti; bu adım onu CI'a bağlıyor.
+  - Doğrulama: script yerelde yeşil (BuiltIn 8/8, External 7/7, migration'lar temiz, üretilen `ci.yml` iki seçenekte doğru). Workflow YAML olarak ayrıştırılıyor. Remote CI koşusu push'tan sonra görülecek (push kullanıcı onayıyla).
+  - Güncellenenler: README (Test), CHANGELOG.
 - [~] F5.3 → Faz 4b'ye taşındı (D-033)
-- [ ] F5.4 Yayın kararı
-- [ ] F5.5 Final dokümanlar
+- [x] F5.4 (a7f6bdf): Kanal GitHub Packages (D-013 kalır), ilk sürüm `0.1.0-preview.1` (Q-32, Q-33 → D-039). Kod değişmiyor; `release.yml` şablon paketini de aynı sürümle yayımlayacak (F5.1b'den sonra doğrulanır). Tag ve push faz sonunda ayrıca sorulacak.
+- [x] F5.5 (4cc3195): Final dokümanlar.
+  - README: yeni "Yeni Proje (Tüketici Rehberi)" bölümü: kurulum (feed, token, şablon, `--auth`), şablonun ürettikleri, sorumluluk modeli, yeni proje kontrol listesi, ezilebilir ayarlar tablosu (kod okunarak; `JwtBearerOptions` için `Configure` şart, R-056), nesne düzeyi yetki rehberi (resource-based authorization, OWASP API1), BFF önerisi, migration dağıtımı (bundle / idempotent script), güncelleme. Eski "Hızlı Başlangıç" artık "Bu Repoda Çalışmak". Paket/lisans tablosu ve mediator satırları (Y-01) düzeltildi.
+  - CHANGELOG: `[0.1.0-preview.1] - 2026-10-20` başlığı (tag onayı faz sonunda; onay gelmezse başlık `Unreleased`'a döner).
+  - CLAUDE.md'ler: kök (paket ID'leri, şablon, mediator → Y-01, Y-10 → Y-44), `tests/CLAUDE.md` ve `Directory.Build.props` yorumu (Y-44), `src/BuildingBlocks/CLAUDE.md` (OTel log'ları, paket ID'leri), yeni `src/Templates/CLAUDE.md`. `src/PACKAGE.md` (outbox). Memory: `novacore-project`, `novacore-stack`, index.
+  - "Sonraya bırakılanlar": bu fazda kapanan 7 madde işaretlendi, Faz 5'ten 7 yeni madde.
+  - D-032 kullanıcıya bırakıldı: `docs/plan/DECISIONS.md` `.claude/hooks/package-policy.json` `protectedPaths`'e geri eklenecek (hook dosyasını model düzenleyemiyor).
+
+- Faz doğrulaması (2026-10-20, code review'dan önce): `restore --force` NU uyarısı yok; Release `--no-incremental` 0 uyarı, 0 hata; test 277/277; `list package --vulnerable` 14 projede açık yok; `has-pending-model-changes` üç context'te temiz; `bash eng/template-smoke.sh` yeşil (BuiltIn 8/8, External 7/7).
+- [x] Code review düzeltmeleri (3423e71): `code-review` (high, `main...faz/5-sablon-yayin`) 7 bulgu verdi.
+  - Düzeltilenler:
+    - (#1) Sürüm damgalama hedefi dosyayı ters bölülü bir yolla `File.ReadAllText`'e veriyordu; Linux'taki pack (release.yml, `template-smoke`) dosyayı bulamayabilirdi. Yollar ileri bölü. Linux'ta ilk doğrulama push'tan sonra CI'da (Docker bu makinede kapalı).
+    - (#2) Port yer tutucuları çıplak sayılardı (`5443`, `5080`); template engine her geçişi değiştirdiği için ileride üretilecek bir migration'ın zaman damgası bozulabilirdi. Yer tutucular `NOVACORE_HTTPS_PORT` / `NOVACORE_HTTP_PORT`; smoke testi çözülmemiş yer tutucuyu da arıyor.
+    - (#3) Şablonun test factory'si izinleri issuer'a göre seçiyordu; BuiltIn'de sağlayıcının issuer'ı da test issuer'ı olduğu için sağlayıcının token'ları host'un resolver'ına hiç gitmiyordu. Artık subject'e göre: yalnızca `CreateClientWithPermissions`'ın yarattığı subject'ler verilen izinleri alır.
+    - (#7) Script, varsayılan `mktemp -d` çalışma klasörünü çıkışta siliyor.
+  - "Sonraya bırakılanlar"a yazılanlar: #4 (örnek `CompleteTodo`'da eşzamanlı iki tamamlama ikisi de 204), #5 (fork ve Dependabot PR'larında secret olmadığı için üretilen CI'ın restore'u 401), #6 (`template-smoke` job'ı çözümü bir kez daha derliyor).
 
 ## Açık sorular (Q)
 
@@ -940,6 +978,9 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-29 | F3b.3'te Development'taki simetrik JWT doğrulaması (D-024 (1)) ne olsun? | F3b.3 | **Kaldır**: `Jwt:SigningKey`/`Issuer`/geliştirme anahtarı silinir, `Jwt:Authority` her ortamda zorunlu (2026-09-27, kullanıcı) → D-028 |
 | Q-30 | F4b.1: Stok rezervasyonu senkron bir contract (`ReserveStockAsync`) ile mi, event ile mi yapılsın? | F4b.1 | **Event akışı** (2026-09-28, kullanıcı). Sunulan seçenekler: senkron contract (iki commit arasında stok kaybı, outbox kullanılmaz), senkron rezervasyon + event'le ödeme kaydı (POST 202'ye döner), event akışı (önerilen). R-075 → D-034 |
 | Q-31 | F4d.1: İlk proje hangi IdP modelini kullanacak? (a) kendi host'unda eklenti, (b) projeler arası merkezi IdP, (c) harici IdP (Entra, Keycloak) | F4d.1 | **(a) kendi host'unda eklenti** (2026-10-20, kullanıcı; önerilen seçenek). Faz 4d yürür → D-037 |
+| Q-32 | F5.4 (1): NovaCore paketleri ve şablon paketi hangi kanaldan tüketilsin? (GitHub Packages, nuget.org, yalnızca yerel klasör feed'i) | F5.4 (şablonun `nuget.config`'i ve CI'ı buna bağlı, bu yüzden plan aşamasında) | **GitHub Packages** (2026-10-20, kullanıcı; önerilen seçenek). D-013 olduğu gibi kalır → D-039 |
+| Q-33 | F5.4 (2): İlk sürüm `0.1.0-preview.1` mi, `0.1.0` mı? | F5.4 | **`0.1.0-preview.1`** (2026-10-20, kullanıcı; önerilen seçenek). Tag ve push faz sonunda ayrıca sorulur → D-039 |
+| Q-34 | F5.1b: nuget.org'da başka sahiplerin `NovaCore.Templates`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` paketleri var (R-091). Bizim paket ID'lerimiz ne olsun? (yalnızca şablonun ID'si değişsin / hiçbiri değişmesin / hepsine sahip öneki) | F5.1b | Kullanıcı: "hiçbir sorun yaşamayacak şekilde ilerleyelim, benim ismimi koyma"; önek sorusuna: **"BMD ile başlasın"** (2026-10-20). Bütün ID'ler `BMD.NovaCore.*`, assembly ve namespace'ler aynı → D-041 |
 
 ## Sonraya bırakılanlar
 
@@ -955,7 +996,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - ~~Kurtarma kodları (Faz 3b) → F4d.3.~~ → F4d.3'te yapıldı.
 - ~~Logout CSRF, giriş zamanlama farkı, `change-password` lockout'u (Faz 3b) → F4d.4.~~ → F4d.4'te yapıldı.
 - ~~OpenIddict kayıtlarının temizlenmemesi (Faz 3b) → F4d.5.~~ → F4d.5'te yapıldı.
-- Template'in paket kimliğini taşıması (Faz 1, F5.1) → F5.1.
+- ~~Template'in paket kimliğini taşıması (Faz 1, F5.1) → F5.1.~~ → F5.1b'de yapıldı: şablon ayrı bir template package, repo'ya özgü dosya taşımıyor.
 - ~~Catalog/Payments uçtan uca testleri (Faz 2c) → F5.3 (4b'de).~~ → F5.3'te yapıldı (Faz 4b).
 
 **D-033 ile bilerek plana alınmayanlar.** Bugün bir tüketicileri yok (Y-14). Madde, yanındaki koşul gerçekleşince plana alınır:
@@ -972,25 +1013,25 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 0, F0.2) Bu makinede kurulu shared framework 10.0.8, paketler artık 10.0.12. Runtime'ı 10.0.12'ye güncellemek ortam işi, repo işi değil.
 - (Faz 0, F0.8) GitHub Actions uyarısı (ilk CI koşusu, 2026-09-25): `ubuntu-latest` etiketi 19 Ekim 2026'dan itibaren Ubuntu 26'ya geçecek (actions/runner-images#14748). Etki beklenmiyor. İlk koşularda kırmızı olursa runner'ı `ubuntu-24.04`'e sabitlemek bir seçenek.
 - ~~(Faz 0, F0.7) Y-31 testi ApiExplorer'a dayanıyor. `Task<IResult>` dönen ve `Produces<T>` bildirmeyen handler'ların yanıt payload'ını göremez (Identity uç noktalarının çoğu böyle).~~ → F4c.5'te çözüldü: belgede görünen bütün handler'lar tipli sonuç dönüyor ve `EndpointContractTests` bunu doğruluyor. ApiExplorer dışı uçlar (health, `ExcludeFromDescription`) hâlâ kapsam dışı.
-- (Faz 0, F0.6) Kök `CLAUDE.md` Standards bölümünde "If a mediator is ever truly needed, use MIT `martinothamar/Mediator`" yazıyor. Bu, DECISIONS Y-01 ile çelişiyor ("herhangi bir mediator veya request-dispatch soyutlaması" yasak). Öncelik DECISIONS'ta, ama not gelecekteki oturumları yanıltabilir. Cümle kaldırılmalı veya Y-01'e yönlendirilmeli.
+- ~~(Faz 0, F0.6)~~ → F5.5'te düzeltildi (kök CLAUDE.md ve README Y-01'e yönlendiriyor). Kök `CLAUDE.md` Standards bölümünde "If a mediator is ever truly needed, use MIT `martinothamar/Mediator`" yazıyor. Bu, DECISIONS Y-01 ile çelişiyor ("herhangi bir mediator veya request-dispatch soyutlaması" yasak). Öncelik DECISIONS'ta, ama not gelecekteki oturumları yanıltabilir. Cümle kaldırılmalı veya Y-01'e yönlendirilmeli.
 - ~~(Faz 0) "strict" policy'nin tek tüketicisi Identity'nin `/api/v1/auth` grubu.~~ → Faz 3b'de değerlendirildi: policy'yi artık eklentinin `/connect/token`, `/account/*` ve `/api/v1/auth/*` uçları kullanıyor, `StrictRateLimitTests` `/connect/token`'ı sınıyor (D-009'un anlamı korundu).
 - (Faz 1) ~~F2b.6'da yapılacak: `.editorconfig`'teki geçici CA1848/CA1873 satırları silinecek.~~ → F2b.6 Faz 2a'nın ilk adımı oldu (D-017), Faz 2a adım listesinde.
 - (Faz 1, F2a) `NovaCore.Modules.Catalog.Contracts` packable. ANALYSIS §4'teki paket haritasında yok. Örnek modülün sözleşmesi paket olmalı mı? 2a'da karar verilmeli. Packable kalırsa XML doc ve PublicAPI dosyaları da onunla gider.
 - ~~(Faz 1, F2a.2) **Yeni packable projeler PublicAPI takibini sessizce atlayabilir.**~~ → F2a.2a'da çözüldü: `Directory.Build.targets`'taki `NovaCoreRequirePublicApiTracking` hedefi, packable bir projede referans yoksa build'i durduruyor (D-020 (7)). Eski not: `AdditionalFiles` ve doc koruması `Directory.Build.targets`'ta, ama `Microsoft.CodeAnalysis.PublicApiAnalyzers` referansı her csproj'da ayrı (PLAN F1.4 böyle istiyordu). F2a.2'deki 3 yeni pakete referans eklenmeli. Alternatif: referansı targets'a taşımak ya da bir koruma eklemek; bu PLAN'dan farklı bir yaklaşım olduğu için sorulmalı (code review bulgusu).
 - (Faz 1) **Stop hook değişiklik algılaması eksik:** `verify-on-stop.js` kök `Directory.Build.targets`'ı ve `*.txt` dosyalarını (PublicAPI) izlemiyor. Yalnızca bunlar değişirse build/test doğrulaması çalışmaz. Dosya korunan bir yolda, düzeltmek kullanıcı onayı ister (code review bulgusu).
-- (Faz 1, F5.1) **Template paket kimliğini taşıyor:** `dotnet new novacore`, `Directory.Build.targets`'ı (Authors = Muhammed Ali AK), `src/PACKAGE.md`'yi, `release.yml`'i ve PublicAPI dosyalarını kopyalıyor. `sourceName` değişimi yüzünden RepositoryUrl `github.com/alimuhammedak/<YeniAd>` oluyor (code review bulgusu).
+- ~~(Faz 1, F5.1)~~ → F5.1b'de çözüldü. **Template paket kimliğini taşıyor:** `dotnet new novacore`, `Directory.Build.targets`'ı (Authors = Muhammed Ali AK), `src/PACKAGE.md`'yi, `release.yml`'i ve PublicAPI dosyalarını kopyalıyor. `sourceName` değişimi yüzünden RepositoryUrl `github.com/alimuhammedak/<YeniAd>` oluyor (code review bulgusu).
 - (Faz 1, F2a) CA1711 (`IDomainEventHandler<T>`) ve CA1716 (`Error`) gerekçeli bastırıldı. 2a'da namespace'ler değişirken bu isimler de yeniden düşünülebilir.
 - ~~(Faz 1, F2a.2) Serilog log kültürü:~~ → F2a.2a'da karar verildi: `null` korunuyor, 2a'da davranış değişmiyor (D-020 (8)). Eski not: `formatProvider: null` Serilog'un varsayılanı. Logların culture-invariant olup olmayacağına NovaCore.Serilog'da karar verilmeli.
 - (Faz 1) Çözüm genelinde `dotnet pack`, `NovaCore.Api` için kodsuz bir uyarı veriyor: Web SDK `WarnOnPackingNonPackableProject=true` ayarlıyor. Pack başarısız olmuyor, uyarı bastırılmadı (Y-10). Kapatmak için Api csproj'da bu özellik `false` yapılabilir (kullanıcı onayıyla).
-- (Faz 2a, F2a.5) Kök CLAUDE.md Standards'taki "0 warnings" maddesi bastırma için hâlâ "DECISIONS Y-10" diyor. Y-10'un yerini Y-44 aldı (D-016), ifade de değişti: yalnızca MS'in "When to suppress" iznine dayanan kalıcı bastırma. Tek kelimelik ama bir kuralı değiştiriyor, 2a kapsamı dışı.
+- ~~(Faz 2a, F2a.5)~~ → F5.5'te düzeltildi. Kök CLAUDE.md Standards'taki "0 warnings" maddesi bastırma için hâlâ "DECISIONS Y-10" diyor. Y-10'un yerini Y-44 aldı (D-016), ifade de değişti: yalnızca MS'in "When to suppress" iznine dayanan kalıcı bastırma. Tek kelimelik ama bir kuralı değiştiriyor, 2a kapsamı dışı.
 - (Faz 2a, code review) `NovaCore.FluentValidation`, `NovaCore.Serilog`, `NovaCore.OpenTelemetry` ve `NovaCore.Scalar` namespace'leri, `NovaCore.*` altındaki kodda üçüncü taraf kök namespace'leri gölgeliyor. Örneğin bir modülde kısmen nitelenmiş `FluentValidation.Results.X` artık `NovaCore.FluentValidation`'a bağlanıp derlenmez, `global::` gerekir. Bugünkü kod dosya başındaki using'lerle çalışıyor. Namespace adları D-020 (4)'te seçildi; değiştirmek public API kararı.
 - (Faz 2a, code review) `PackageDependencyTests`'in csproj kontrolü `Directory.Build.*` ya da `GlobalPackageReference` ile eklenen paketleri görmüyor. `Include` yerine `Update` kullanan bir `PackageReference`'ta NRE veriyor. `bin/obj` altındaki csproj'ları da dışlamıyor. Assembly düzeyindeki test kısmen telafi ediyor.
 - (Faz 2a, code review) `ExplicitRegistrationTests` ile `SourceHygieneTests` aynı "src altındaki .cs dosyaları, bin/obj hariç" kodunu tekrar ediyor. `Solution`'a bir yardımcı taşınabilir. Bu mevcut bir testi değiştireceği için 2a'da yapılmadı.
 - ~~(Faz 2a, code review)~~ → Faz 3b'de çözüldü: eklentinin logger'ında `LoginFailed` da guard'lı. Eski not: `SecurityAuditLogger.LoginFailed` maskeyi guard'sız hesaplıyor, `UserRegistered` ise guard'lı. CA1873 varsayılan olarak yalnızca Information ve altına bakıyor (R-047). Davranış F2b.6'dan önceki gibi. Identity F3b.3'te emekliye ayrılacak.
 - (Faz 2a, code review) DECISIONS'ta D-018…D-020 satırları D-017'nin üstüne eklendi, tablo ID sırasında değil. Düzeltmek korunan dosyada yalnızca biçimsel bir düzenleme.
-- (Faz 2a) Kodsuz Api pack uyarısı, Y-10 → Y-44 notu ve mediator cümlesi hâlâ açık (yukarıdaki maddeler).
+- (Faz 2a) Kodsuz Api pack uyarısı hâlâ açık (Y-10 → Y-44 notu ve mediator cümlesi F5.5'te kapandı).
 - (Faz 1) `.snupkg` GitHub Packages'a gitmiyor (R-039), yalnızca workflow artifact'i. İleride nuget.org seçilirse sembol sunucusu kullanılabilir.
-- (Faz 1, F5.4) Package validation baseline'ı (`PackageValidationBaselineVersion`) `Microsoft.NET.ApiCompat.targets:18`'de değerlendirme anında okunuyor, import'u Directory.Build.targets'tan sonra geliyor. F5.4'te nereye yazılacağı doğrulanmalı (R-040).
+- (Faz 1, F5.4) Package validation baseline'ı (`PackageValidationBaselineVersion`) `Microsoft.NET.ApiCompat.targets:18`'de değerlendirme anında okunuyor, import'u Directory.Build.targets'tan sonra geliyor. F5.4'te nereye yazılacağı doğrulanmalı (R-040). **F5.4'te ertelendi (D-039):** ilk sürüm önizleme, baseline 1.0 kararıyla gelir; nereye yazılacağı o gün doğrulanır.
 - ~~(Faz 1) `NovaCore.Core.Web` paketinin nuspec bağımlılıklarında FluentValidation, Serilog, OpenTelemetry ve Scalar var (D-003 ihlali). F2a.2 ve F2c'nin işi.~~ → F2a.2'de çözüldü (Serilog/OTel/Scalar eklentilere, FluentValidation `NovaCore.FluentValidation`'a taşındı), F2a.4 testleri koruyor.
 - ~~(Faz 2a, F2a.4 → F2c.1) **Y-20'nin modül kısmı henüz testli değil.**~~ → F2c.1e'de çözüldü: `ExplicitRegistrationTests` artık tüm `src`'yi tarıyor ve `*FromAssembly*` kayıt yardımcılarını da yakalıyor. EF'in `ApplyConfigurationsFromAssembly`'si model yapılandırması olduğu için hariç (D-023 (5)). Eski not: Modüller validator'ları `AddValidatorsFromAssembly` ile (assembly taraması) kaydediyor. Bu FluentValidation ile birlikte F2c.1'de gidiyor; o zaman `ExplicitRegistrationTests`'in taraması `src/Modules`'ü de kapsamalı. `ApplyConfigurationsFromAssembly` (EF model yapılandırması, DI kaydı değil) Y-20 kapsamında mı, o gün karar verilmeli.
 - (Faz 2a, F2a.2c) `SecurityHeadersMiddleware` hâlâ `/scalar` yolunu CSP'den muaf tutuyor. Scalar artık bir eklenti; çekirdeğin eklentinin yolunu bilmesi küçük bir bağlılık. Davranış değişikliği olacağı için 2a'da dokunulmadı.
@@ -1004,11 +1045,11 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - Kök neden: `Mvc.Testing` `DeferredHost.StartAsync`, dispose edilmiş host'tan servis çözüyor.
   - F2c'den önce de vardı. CI'da da aralıklı kırmızıya yol açabilir.
   - Olası yollar: upstream'e bildirmek; açılış doğrulamasını `IStartupValidator` sarmalayıcısı ile yakalamak (hosted service hatalarını kapsamaz); bu testleri `WebApplicationFactory` dışında kurmak. Karar test altyapısını değiştireceği için kullanıcıya bırakıldı.
-- (Faz 2c) README "Paket / Lisans Tablosu"ndaki `Microsoft.EntityFrameworkCore / Extensions.Hosting.Abstractions / Configuration.Binder` satırı eskimiş. EF paketi F2b'den beri Binder yerine `Options.ConfigurationExtensions` ve `Diagnostics.HealthChecks.EntityFrameworkCore` kullanıyor. F2c.4 aynı tabloda yalnızca FluentValidation satırını sildi.
+- ~~(Faz 2c)~~ → F5.5'te düzeltildi. README "Paket / Lisans Tablosu"ndaki `Microsoft.EntityFrameworkCore / Extensions.Hosting.Abstractions / Configuration.Binder` satırı eskimiş. EF paketi F2b'den beri Binder yerine `Options.ConfigurationExtensions` ve `Diagnostics.HealthChecks.EntityFrameworkCore` kullanıyor. F2c.4 aynı tabloda yalnızca FluentValidation satırını sildi.
 - (Faz 2c, code review) **İki farklı validation 400 başlığı:** Yerleşik validation "One or more validation errors occurred." diyor (D-023 (4)). `Result` üzerinden dönen `ErrorType.Validation` (`ResultHttpExtensions.TitleFor`) ve `AppException` validation'ı (`GlobalExceptionHandler`) hâlâ "Validation failed" diyor. F2c'den önce ikisi de "Validation failed" idi. İki yanıtın `type`'ı zaten farklıydı (RFC 9110 / `httpstatuses.io`). Hizalamak public davranış değişikliği, F2c'nin kapsamı dışında.
 - ~~(Faz 2c, code review → F5.3)~~ → Faz 4b'de çözüldü: `CatalogEndpointsTests` (ürün oluştur, oku, listele, güncelle, sil) ve `StockReservationTests` (POST'tan Completed'a ödeme). Eski not: Catalog ve Payments için geçerli gövdeyle uçtan uca test yok. `ValidationTests` yalnızca reddedilen gövdeleri sabitliyor, `PermissionAuthorizationTests`'teki POST 403'te duruyor. Geçerli girdiyi yanlışlıkla reddeden bir attribute değişikliği yakalanmaz. F5.3'ün (Catalog/Payments entegrasyon testleri) kapsamına giriyor.
 - (Faz 2c, R-052) Record ctor parametrelerindeki DataAnnotations (`[MaxLength]`, `[Range]`, `[Length]`) OpenAPI şemasına yansımıyor. Faz sonunda belge main ile bayt bayt aynıydı. FluentValidation döneminde de şemada kısıt yoktu, yani bu bir gerileme değil. Kısıtları belgeye taşımanın yolu araştırılmadı.
-- (Faz 2c) Y-10'un yerini Y-44 aldı, ama iki yer hâlâ Y-10 diyor: `tests/CLAUDE.md` ("never weaken one to pass (Y-10)") ve `Directory.Build.props`'taki `TreatWarningsAsErrors` yorumu. Kök CLAUDE.md'deki aynı not yukarıda (Faz 2a, F2a.5).
+- ~~(Faz 2c)~~ → F5.5'te düzeltildi. Y-10'un yerini Y-44 aldı, ama iki yer hâlâ Y-10 diyor: `tests/CLAUDE.md` ("never weaken one to pass (Y-10)") ve `Directory.Build.props`'taki `TreatWarningsAsErrors` yorumu. Kök CLAUDE.md'deki aynı not yukarıda (Faz 2a, F2a.5).
 - (Faz 2b → Faz 3a; **F3a.1'de değerlendirildi, yapılmadı**, R-058: `TokenValidationParameters`'ta `TimeProvider` yok, tek yol varsayılan doğrulamanın yerini alan bir `LifetimeValidator` delegesi.) Token üretimi `TimeProvider`'dan okuyor, JwtBearer'ın lifetime doğrulaması (IdentityModel) ise gerçek saatten. Sahte saatli testler bu yüzden gerçek "şimdi"den başlıyor (R-050). F3a.1'de doğrulama yeniden yazılırken `TimeProvider` ile hizalanabilir.
 
 - ~~(Faz 3a → F3b.3)~~ → F3b.3b'de çözüldü (D-028): üretim kodu ve Development simetrik modu kaldırıldı. Eski not: Çekirdekteki `ITokenService`/`JwtTokenService`/`AccessToken` ve `JwtOptions`'ın issuance alanlarının (`AccessTokenMinutes`, `RefreshTokenDays`) tek tüketicisi Identity modülü (D-024 (3)). Modülle birlikte kaldırılmalı. O gün HS256 üreten bir issuer kalmayacak; Development'taki simetrik doğrulamanın (`Jwt:SigningKey`) kalıp kalmayacağına karar verilmeli (ör. `dotnet user-jwts` için).
@@ -1069,42 +1110,39 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4b, code review #5) Satır eşzamanlı olarak silinmişse de 409 `product.concurrency_conflict` dönüyor; 404 daha doğru olurdu. Çakışmada `exception.Entries[0].GetDatabaseValuesAsync()` null dönüyorsa 404 verilebilir. İstemci yeniden okuyunca zaten 404 alıyor.
 - (Faz 4b, code review #9) `DbUpdateConcurrencyException`'ın 409'a çevrilmesi, `Product`'ı yazan her uçta ayrı ayrı yapılıyor. Bunu unutan yeni bir uç 500 döner. *Koşul:* `Product`'ı yazan üçüncü bir uç gelir. F4c.4'ten beri kanca var: modül kendi `IExceptionHandler`'ını kaydedebilir ve o handler çekirdeğin eşlemesinden önce çalışır. Çeviri o gün oraya taşınır.
 
+- (Faz 5) `PermissionResolverStartupCheck`'in hata mesajı "register the identity integration's resolver (e.g. the Identity module's)" diyor; Identity modülü Faz 3b'de kalktı. Çekirdek kodu, Faz 5'in kapsamı dışında. *Koşul:* çekirdeğe bir sonraki dokunuş; mesaj eklentinin resolver'ını ya da projenin kendi resolver'ını söylemeli.
+- (Faz 5, D-040 (2)) Repo'nun Api host'u Serilog'u (log) ve OpenTelemetry'yi (metrik, trace) birlikte kullanıyor; şablon yalnızca OpenTelemetry. Api host'u Serilog eklentisinin tek tüketicisi. *Koşul:* referans host'un şablona benzemesi istenirse ya da Serilog eklentisinin bir tüketicisi kalmazsa.
+- (Faz 5, D-040 (4)) `--auth External`'da örnek bir `IPermissionResolver` yok; proje kendi resolver'ını yazar, yoksa host açılmaz. *Koşul:* iki proje aynı türde harici IdP resolver'ına (ör. token'daki rollerden izin eşlemesi) ihtiyaç duyar.
+- (Faz 5) Şablonun Development dışı probe örneği (`UseHealthChecks(path, port)`) testle korunmuyor: TestServer'da bağlantının yerel portu yok. *Koşul:* ilk container dağıtımında bir kez elle denenir.
+- (Faz 5, R-092) Üretilen projenin CI'ındaki bundle adımı yalnızca varsayılan dala push'ta çalışıyor ve repo'nun `template-smoke` job'ı onu koşturmuyor (yalnızca yerelde denendi). *Koşul:* `content/novacore/.github/workflows/ci.yml` değişirse adımlar üretilen bir projede yeniden denenir (src/Templates/CLAUDE.md).
+- (Faz 5) Üretilen projede `using`'ler kaynak adına göre sıralanmıyor (ör. `using Siparis.Modules.Todos;` `NovaCore.*`'dan önce kalıyor); şablon `MyService`'e göre sıralı. Analyzer bunu hata saymıyor. Kozmetik.
+- (Faz 5, code review #4) Şablonun örnek `CompleteTodo`'su okuyup `IsCompleted`'ı kontrol ediyor ve concurrency token olmadan kaydediyor; aynı anda gelen iki tamamlama ikisi de 204 alır (biri 409 almalıydı). Örnek basit tutuldu; token eklemek migration'ı ve örneği büyütür. *Koşul:* örnek modül bir eşzamanlılık kalıbı da öğretecekse (repo'da `Product.Stock` örneği var).
+- (Faz 5, code review #5) Üretilen projenin CI'ı restore için `NOVACORE_PACKAGES_TOKEN` secret'ını ister; fork'tan gelen ve Dependabot PR'larında secret olmadığı için restore 401 alır. *Koşul:* üretilen bir projede Dependabot ya da dış katkı açılır (Dependabot secret'ı ya da `pull_request_target` tasarımı gerekir).
+- (Faz 5, code review #6) Repo CI'ında `template-smoke` job'ı çözümü `build-and-test`'ten ayrı olarak bir kez daha derleyip pack ediyor. *Koşul:* CI süresi sorun olur; pack edilmiş paketler artifact olarak job'lar arasında taşınabilir.
+
 ## Son devir notu
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-20, Faz 4d: Kimlik eklentisi üretim eksikleri (tamam, `main`'e merge ve push edildi).** Branch `faz/4d-kimlik-uretim`, 7 commit.
+**2026-10-20, Faz 5: Şablon, dağıtım, yayın hazırlığı (tamam, merge onayı bekleniyor).** Branch `faz/5-sablon-yayin`, 8 commit.
 
 - **Yapılanlar:**
-  - F4d.1: IdP modeli (a) kendi host'unda eklenti (Q-31, D-037).
-  - F4d.2:
-    - Parola sıfırlama HTML sayfalarıyla (`/account/forgot-password`, `/account/reset-password`). Yanıt her adres için aynı, link tek kullanımlık, sıfırlama oturumları iptal ediyor.
-    - `POST /api/v1/auth/resend-confirmation-email`, yalnızca onaysız hesaba e-posta gönderiyor.
-    - `User` rolü yokken kayıt artık 500 vermiyor.
-  - F4d.3: 2FA adımı kurtarma kodunu da kabul ediyor. Kod tek kullanımlık; kilitli hesap kodla giremiyor, hatalı kod sayılıyor.
-  - F4d.4:
-    - `/connect/endsession` önce soruyor (logout CSRF).
-    - Bilinmeyen e-posta da hash harcıyor (zamanlama).
-    - `change-password` lockout'a bağlandı.
-  - F4d.5: `ExpiredTokenPruner` açılışta ve saatte bir OpenIddict kayıtlarını temizliyor (14 gün, yeni paket yok).
-  - Code review düzeltmeleri.
-  - Testler 248 → 276. Kararlar D-037, D-038 (1)–(9), R-084…R-088.
+  - F5.4: kanal GitHub Packages (D-013 kalır), ilk sürüm `0.1.0-preview.1` (Q-32, Q-33 → D-039).
+  - F5.1a: tek log hattı OpenTelemetry; `AddCoreObservability` log'ları biçimlenmiş mesaj ve scope'larla taşıyor (R-089).
+  - F5.1b: template package `BMD.NovaCore.Templates` (`src/Templates/NovaCore.Templates`): Api host, `Todos` örnek modülü, test projesi, `nuget.config` (source mapping), kontrol listeli `appsettings`, probe örneği, `--auth BuiltIn|External`. Kökteki `.template.config` silindi. Bütün paket ID'leri `BMD.NovaCore.*` (Q-34 → D-041).
+  - F5.1c: üretilen projenin CI'ı (migration kontrolü, varsayılan dalda bundle'lar).
+  - F5.2: `eng/template-smoke.sh` ve CI'da `template-smoke` job'ı.
+  - F5.5: README'de tüketici rehberi, CHANGELOG `[0.1.0-preview.1]`, CLAUDE.md'ler (yeni `src/Templates/CLAUDE.md`), memory.
+  - Code review düzeltmeleri. Testler 276 → 277 (repo); üretilen projelerde BuiltIn 8, External 7. Kararlar D-039, D-040 (1)–(9), D-041; R-089…R-092.
 - **Sürprizler:**
-  - `SignInManager.TwoFactorRecoveryCodeSignInAsync` lockout'a bakmıyor ve hatalı kodu saymıyor (R-085).
-  - `SignInManager` bilinmeyen kullanıcıda hiç hash'lemiyor (R-087).
-  - OpenIddict'in store'u token süresini veritabanının saatiyle karşılaştırıyor (R-088).
-  - `IdentityServerTestHost`'un tek `SqliteConnection`'ı arka plan işine uygun değildi; context başına bağlantıya geçildi.
+  - `UseOtlpExporter` log'ları zaten açıyordu; eksik olan mesaj ve scope'lardı (R-089).
+  - nuget.org'da başka sahiplerin `NovaCore.Templates`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` paketleri var; `dotnet new`'in güncelleme kontrolü yabancı şablonu önerdi. Paket ID'leri `BMD.NovaCore.*` oldu (R-091).
+  - `ContentTargetFolders=content` içeriği `content/content` altına koydu (R-090).
+  - Bundle'lar context başına 82 MB (framework-dependent) / 180 MB (self-contained); varsayılan dalla sınırlandı (R-092).
 - **Kullanıcıya:**
-  - Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmadı (kullanıcı kararı).
-  - Merge ve push: kullanıcı onayıyla ("Merge ve push") `main`'e `--no-ff` merge edildi ve origin'e push edildi (2026-10-20).
-- **Sonraki fazın (5) bilmesi gerekenler:**
-  - Şablonun yerleşik IdP seçeneği (F5.1) artık parola sıfırlama sayfalarını ve temizlik servisini de getiriyor.
-  - Üretim kontrol listesi değişmedi: gerçek `IEmailSender` sıfırlama linkleri için de gerekli.
-  - "Sonraya bırakılanlar"da 4d'den 5 madde var:
-    - e-posta gönderen uçlarda zamanlama farkı;
-    - parola bildirim e-postası;
-    - kurtarma kodu uyarısı ve yenileme ucu;
-    - çıkış sorusunda vazgeçme yolu;
-    - 128 karakter sınırının tekrarı.
-  - D-032: DECISIONS.md'nin hook korumasına geri eklenmesi Faz 5 sonunda.
-- **Sıradaki:** yeni bir oturumda `/novacore-phase 5`.
+  - **Merge, push ve tag onayı bekleniyor** (`faz/5-sablon-yayin` → `main`, `v0.1.0-preview.1`). Tag `release.yml`'i tetikler ve sekiz paketi GitHub Packages'a yükler; Linux'ta pack'in ilk doğrulaması da o zaman (ve push'taki `template-smoke` job'ında) olur.
+  - Tag atılmazsa CHANGELOG'daki `[0.1.0-preview.1]` başlığı `Unreleased`'a geri alınmalı.
+  - **D-032:** `docs/plan/DECISIONS.md`'yi `.claude/hooks/package-policy.json` `protectedPaths` listesine geri ekleyin (hook dosyasını model düzenleyemiyor). DECISIONS başlığındaki "hook onay ister" notu o zaman yeniden geçerli olur.
+  - Tüketen projeler için: GitHub'da `read:packages` yetkili bir token; yerelde `dotnet nuget add source ... -n novacore`, üretilen repoda `NOVACORE_PACKAGES_TOKEN` secret'ı.
+  - Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmadı.
+- **Sonrası:** plan bitti. İlk gerçek proje şablonla açılır; 1.0 kararı (PublicAPI.Shipped, package validation baseline) o proje bu sürümle çalıştıktan sonra ayrıca verilir (PLAN F5.4). "Sonraya bırakılanlar"da Faz 5'ten 9 madde var.
