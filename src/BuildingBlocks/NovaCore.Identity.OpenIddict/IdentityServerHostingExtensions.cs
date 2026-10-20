@@ -204,18 +204,24 @@ public static class IdentityServerHostingExtensions
 
     /// <summary>
     /// Maps the provider's endpoints: the authorization, token and end-session endpoints under <c>/connect</c> (OpenIddict
-    /// validates the requests first) and the sign-in page at <c>/account/login</c>, which stay out of the OpenAPI
-    /// document; and the account API under <c>/api/v1/auth</c> (registration, email confirmation, the current user,
-    /// password change, sign-out everywhere, two-factor authentication) and the user and role administration under
-    /// <c>/api/v1/admin</c>, guarded by the <c>identity:*</c> permissions. The token endpoint, the sign-in page and the
-    /// account API use the <c>strict</c> rate limit.
+    /// validates the requests first) and the browser pages under <c>/account</c> (sign-in at <c>/account/login</c>,
+    /// password reset at <c>/account/forgot-password</c>), which stay out of the OpenAPI document; and the account API
+    /// under <c>/api/v1/auth</c> (registration, email confirmation, the current user, password change, sign-out
+    /// everywhere, two-factor authentication) and the user and role administration under <c>/api/v1/admin</c>, guarded
+    /// by the <c>identity:*</c> permissions. The token endpoint, the pages and the account API use the <c>strict</c> rate
+    /// limit.
     /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
     /// <returns><paramref name="endpoints"/>, for chaining.</returns>
     public static IEndpointRouteBuilder MapCoreIdentityServer(this IEndpointRouteBuilder endpoints)
     {
         ConnectEndpoints.Map(endpoints);
-        LoginPage.Map(endpoints);
+
+        // The pages a signed-out browser uses; the handlers read the sign-in session themselves.
+        var account = endpoints.MapGroup("/account").ExcludeFromDescription().AllowAnonymous().RequireRateLimiting("strict");
+        LoginPage.Map(account);
+        PasswordResetPage.Map(account);
+
         AccountEndpoints.Map(endpoints);
         AdminEndpoints.Map(endpoints);
         return endpoints;

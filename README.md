@@ -60,8 +60,8 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 | `GET /openapi/v1.json` | OpenAPI 3.1 dokümanı |
 | `/scalar/v1` | Scalar API arayüzü (yalnızca Development) |
 | `/connect/authorize` · `token` · `revoke` · `endsession` | OpenID Connect sağlayıcı: Authorization Code + PKCE, refresh, client credentials (bkz. [Güvenlik](#güvenlik--yetkilendirme)) |
-| `/account/login` | Sağlayıcının giriş sayfası (gerekirse 2FA adımı) |
-| `/api/v1/auth/register` · `confirm-email` · `me` · `change-password` · `logout-all` | Hesap API'si |
+| `/account/login` · `forgot-password` | Sağlayıcının giriş sayfası (gerekirse 2FA adımı) ve parola sıfırlama |
+| `/api/v1/auth/register` · `confirm-email` · `resend-confirmation-email` · `me` · `change-password` · `logout-all` | Hesap API'si |
 | `/api/v1/auth/2fa/*` | TOTP iki-faktör (setup/enable/disable) |
 | `/api/v1/admin/*` | Kullanıcı/rol/izin yönetimi (permission korumalı) |
 | `/api/v1/products` | Catalog modülü (CRUD, permission korumalı) |
@@ -371,7 +371,8 @@ Tasarım OWASP cheat sheet'lerine, RFC 9700 (OAuth 2.0 Security BCP) ve Microsof
 
 ### Kimlik sağlayıcı (`NovaCore.Identity.OpenIddict`)
 - **Akışlar:** Authorization Code + **PKCE (yalnızca S256)**, refresh token, client credentials. Uçlar `/connect/*`;
-  tarayıcı girişi `/account/login` (sade HTML, antiforgery, yalnızca yerel ReturnUrl), gerekirse 2FA adımı.
+  tarayıcı girişi `/account/login` (sade HTML, antiforgery, yalnızca yerel ReturnUrl), gerekirse 2FA adımı, parola
+  sıfırlama `/account/forgot-password`.
 - **Token'lar:** imzalı JWT access token (RFC 9068; şifresiz, çünkü çekirdek her sağlayıcıyı standart bir resource
   server gibi doğrular), **15 dk**; `sub`, `name`, `email`, `role` claim'leri, **izinler token'a girmez**. Issuer =
   `Jwt:Authority`, `aud` = `Jwt:Audience`.
@@ -400,7 +401,13 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
 - **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**, hatalı 2FA kodu da sayılır), giriş sayfası, token ucu ve
   hesap API'sinde rate limiting (`strict`), bilinmeyen hesap / yanlış parola / kilitli hesap için **tek hata mesajı**.
 - **E-posta onayı** zorunlu (dev'de link loglanır; link `Jwt:Authority`'den üretilir, Host başlığından değil),
-  **TOTP 2FA** (authenticator app).
+  **TOTP 2FA** (authenticator app). Onay linki `resend-confirmation-email` ile yeniden istenir; yalnızca onaylanmamış
+  hesaba gider, yanıt her adres için aynıdır.
+- **Parola sıfırlama:** giriş sayfasındaki "Forgot your password?" linki bir e-posta formu açar. Onaylı hesaba
+  `/account/reset-password` linki gider (Identity token'ı, 6 saat, tek kullanımlık: sıfırlama security stamp'i
+  yeniler). Bilinmeyen ya da onaysız adres aynı sayfayı alır, e-posta gitmez. Yeni parola iki kez girilir; sıfırlama
+  bütün refresh token'ları ve authorization'ları iptal eder, otomatik giriş yapmaz (OWASP Forgot Password).
+- **Seed'siz kayıt:** `User` rolü yoksa (seed kapalı) hesap rolsüz oluşur; admin API'si rolü sonradan atar.
 - **Oturumlar:** parola değişikliği ve "her yerden çıkış" bütün refresh token'ları ve authorization'ları iptal eder ve
   sağlayıcıdaki giriş oturumunu hemen bitirir. Verilmiş access token'lar süreleri dolana kadar (15 dk) geçerlidir.
 
@@ -409,7 +416,8 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
 - **Varsayılan kapalı:** yetki meta verisi olmayan bir uç ve hiçbir uca eşleşmeyen istek kimlik doğrulama ister
   (`FallbackPolicy = RequireAuthenticatedUser`, MS'in "tercih edilen yol" dediği yöntem). `RequirePermission`'ı unutulan
   bir uç böylece herkese açılmaz (OWASP API5). Anonim olması gereken uç bunu `AllowAnonymous()` ile söyler: kimlik
-  sağlayıcının `/connect/*` uçları ve giriş sayfası, kayıt ve e-posta onayı, health uçları, OpenAPI belgesi ve Scalar.
+  sağlayıcının `/connect/*` uçları, giriş ve parola sıfırlama sayfaları, kayıt ve e-posta onayı, health uçları,
+  OpenAPI belgesi ve Scalar.
   Bir sonucu: tanımsız bir yola anonim istek 404 yerine 401 alır.
 - `RequirePermissionAttribute` (`AuthorizeAttribute` + `IAuthorizationRequirementData`) kendi `PermissionRequirement`'ını
   taşır, `PermissionAuthorizationHandler` onu denetler. Özel policy provider ya da izin başına bir named policy yok.
@@ -434,6 +442,8 @@ de izinlerini önbellek süresi dolunca kaybeder.
 | `POST /connect/revoke` · `GET·POST /connect/endsession` | Token iptali / sağlayıcıdan çıkış |
 | `POST /api/v1/auth/register` | Kayıt (anti-enumeration generic yanıt) + onay e-postası |
 | `GET /api/v1/auth/confirm-email` | E-posta onayı |
+| `POST /api/v1/auth/resend-confirmation-email` | Onay linkini yeniden gönder (yalnızca onaysız hesaba, generic yanıt) |
+| `GET·POST /account/forgot-password` · `reset-password` | Parola sıfırlama sayfaları (generic yanıt, link e-postayla) |
 | `POST /api/v1/auth/logout-all` | Tüm oturumları kapat |
 | `GET /api/v1/auth/me` | Mevcut principal (id, email, roller, izinler) |
 | `POST /api/v1/auth/change-password` | Parola değiştir (tüm oturumları iptal eder) |
@@ -449,8 +459,8 @@ de izinlerini önbellek süresi dolunca kaybeder.
   public adres `Jwt:Authority`'den gelir.
 - **Security headers** (her yanıtta): `X-Content-Type-Options`, `X-Frame-Options: DENY`,
   `Referrer-Policy`, `Content-Security-Policy: default-src 'none'`, `Server` başlığı kaldırılır; prod'da **HSTS**.
-- **Audit logging:** giriş (başarılı/başarısız), lockout, 2FA, refresh, çıkış, parola değişimi, oturum iptali, rol
-  atama; `SECURITY` önekli, e-posta maskeli, parola/kod/token loglanmaz. Refresh token tekrar kullanımını OpenIddict
+- **Audit logging:** giriş (başarılı/başarısız), lockout, 2FA, refresh, çıkış, parola değişimi ve sıfırlama, oturum
+  iptali, rol atama; `SECURITY` önekli, e-posta maskeli, parola/kod/token loglanmaz. Refresh token tekrar kullanımını OpenIddict
   kendisi loglar.
 - **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü iş modüllerinin
   `:read` izinlerini alır; opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.

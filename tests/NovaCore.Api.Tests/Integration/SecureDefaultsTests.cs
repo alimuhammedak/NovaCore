@@ -42,6 +42,7 @@ public sealed class SecureDefaultsTests(NovaCoreApiFactory factory, ProductionAp
     [InlineData("/health")]
     [InlineData("/alive")]
     [InlineData("/account/login")]
+    [InlineData("/account/forgot-password")]
     public async Task The_public_endpoints_of_the_host_stay_anonymous(string path)
     {
         var response = await factory.CreateClient().GetAsync(path);

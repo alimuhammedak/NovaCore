@@ -41,6 +41,10 @@ internal sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
 
     public void PasswordChanged(Guid userId) => logger.LogPasswordChanged(userId);
 
+    public void PasswordResetRequested(Guid userId) => logger.LogPasswordResetRequested(userId);
+
+    public void PasswordReset(Guid userId) => logger.LogPasswordReset(userId);
+
     public void RoleAssigned(Guid userId, string role, string? byUserId) => logger.LogRoleAssigned(userId, role, byUserId);
 
     public void RoleRemoved(Guid userId, string role, string? byUserId) => logger.LogRoleRemoved(userId, role, byUserId);
@@ -89,6 +93,12 @@ internal static partial class SecurityAuditLog
 
     [LoggerMessage(EventId = 21, Level = LogLevel.Information, Message = "SECURITY password_changed User={UserId}")]
     public static partial void LogPasswordChanged(this ILogger logger, Guid userId);
+
+    [LoggerMessage(EventId = 25, Level = LogLevel.Information, Message = "SECURITY password_reset_requested User={UserId}")]
+    public static partial void LogPasswordResetRequested(this ILogger logger, Guid userId);
+
+    [LoggerMessage(EventId = 26, Level = LogLevel.Information, Message = "SECURITY password_reset User={UserId}")]
+    public static partial void LogPasswordReset(this ILogger logger, Guid userId);
 
     [LoggerMessage(EventId = 22, Level = LogLevel.Information, Message = "SECURITY sessions_revoked User={UserId} Reason={Reason}")]
     public static partial void LogSessionsRevoked(this ILogger logger, Guid userId, string reason);

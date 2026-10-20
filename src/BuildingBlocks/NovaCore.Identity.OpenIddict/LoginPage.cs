@@ -27,11 +27,8 @@ internal static class LoginPage
 
     private const string InvalidCode = "Invalid authenticator code.";
 
-    public static void Map(IEndpointRouteBuilder endpoints)
+    public static void Map(RouteGroupBuilder account)
     {
-        // The pages a signed-out browser signs in on.
-        var account = endpoints.MapGroup("/account").ExcludeFromDescription().AllowAnonymous().RequireRateLimiting("strict");
-
         account.MapGet("/login", (string? returnUrl, HttpContext context, IAntiforgery antiforgery) =>
             PasswordForm(context, antiforgery, returnUrl, email: null, error: null));
         account.MapPost("/login", SignIn);
@@ -40,8 +37,7 @@ internal static class LoginPage
         account.MapPost("/login/2fa", SignInWithCode);
     }
 
-    // The forms are read and their antiforgery token checked here, not by [FromForm] binding: that needs the antiforgery
-    // middleware, which the host pipeline doesn't have (docs/plan/RESEARCH.md R-061).
+    // The forms are read and their antiforgery token checked here, not by [FromForm] binding (see HtmlPage).
     private static async Task<IResult> SignIn(
         HttpContext context,
         IAntiforgery antiforgery,
@@ -150,45 +146,17 @@ internal static class LoginPage
     private static IResult Continue(string? returnUrl) =>
         RedirectHttpResult.IsLocalUrl(returnUrl)
             ? Results.LocalRedirect(returnUrl!)
-            : Page("Signed in", "<h1>Signed in</h1><p>You are signed in. Return to the application to continue.</p>");
+            : HtmlPage.Message("Signed in", "You are signed in. Return to the application to continue.");
 
     private static IResult PasswordForm(HttpContext context, IAntiforgery antiforgery, string? returnUrl, string? email, string? error) =>
-        Form(context, antiforgery, "Sign in", Path, returnUrl, error, $"""
+        HtmlPage.Form(context, antiforgery, "Sign in", Path, [new("ReturnUrl", returnUrl)], error, $"""
             <p><label for="email">Email</label><br><input id="email" name="Email" type="email" autocomplete="username" required value="{HtmlEncoder.Default.Encode(email ?? "")}"></p>
             <p><label for="password">Password</label><br><input id="password" name="Password" type="password" autocomplete="current-password" required></p>
-            """);
+            """,
+            after: HtmlPage.Link(context, PasswordResetPage.ForgotPath, "Forgot your password?"));
 
     private static IResult CodeForm(HttpContext context, IAntiforgery antiforgery, string? returnUrl, string? error) =>
-        Form(context, antiforgery, "Two-factor authentication", TwoFactorPath, returnUrl, error, """
+        HtmlPage.Form(context, antiforgery, "Two-factor authentication", TwoFactorPath, [new("ReturnUrl", returnUrl)], error, """
             <p><label for="code">Authenticator code</label><br><input id="code" name="Code" inputmode="numeric" autocomplete="one-time-code" required></p>
             """);
-
-    private static IResult Form(
-        HttpContext context, IAntiforgery antiforgery, string title, string action, string? returnUrl, string? error, string fields)
-    {
-        var html = HtmlEncoder.Default;
-        var tokens = antiforgery.GetAndStoreTokens(context);
-
-        return Page(title, $"""
-            <h1>{html.Encode(title)}</h1>
-            {(error is null ? "" : $"<p role=\"alert\">{html.Encode(error)}</p>")}
-            <form method="post" action="{html.Encode(context.Request.PathBase + action)}">
-              <input type="hidden" name="{html.Encode(tokens.FormFieldName)}" value="{html.Encode(tokens.RequestToken ?? "")}">
-              <input type="hidden" name="ReturnUrl" value="{html.Encode(returnUrl ?? "")}">
-            {fields}  <p><button type="submit">Continue</button></p>
-            </form>
-            """);
-    }
-
-    private static IResult Page(string title, string body) => Results.Content(
-        $"""
-         <!doctype html>
-         <html lang="en">
-         <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{HtmlEncoder.Default.Encode(title)}</title></head>
-         <body><main>
-         {body}
-         </main></body>
-         </html>
-         """,
-        "text/html; charset=utf-8");
 }

@@ -77,6 +77,27 @@ internal sealed partial class OidcFlow : IDisposable
         }));
     }
 
+    /// <summary>
+    /// Posts the form of <paramref name="page"/> to <paramref name="action"/>, as a browser submits it: every hidden field
+    /// (the antiforgery token among them) plus <paramref name="fields"/>. <paramref name="configure"/> can change the
+    /// request before it is sent, e.g. its Host header.
+    /// </summary>
+    public async Task<HttpResponseMessage> SubmitFormAsync(
+        HttpResponseMessage page, string action, Dictionary<string, string> fields, Action<HttpRequestMessage>? configure = null)
+    {
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        var html = await page.Content.ReadAsStringAsync();
+
+        var values = HiddenInput().Matches(html)
+            .ToDictionary(match => match.Groups["name"].Value, match => WebUtility.HtmlDecode(match.Groups["value"].Value));
+        foreach (var (name, value) in fields)
+            values[name] = value;
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, action) { Content = new FormUrlEncodedContent(values) };
+        configure?.Invoke(request);
+        return await Browser.SendAsync(request);
+    }
+
     /// <summary>An authorization request for the test client; <paramref name="extra"/> adds or overrides parameters.</summary>
     public static string AuthorizeUri(string? codeChallenge, params (string Name, string? Value)[] extra)
     {

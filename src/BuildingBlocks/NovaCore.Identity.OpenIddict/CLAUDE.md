@@ -32,7 +32,13 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **Anti-enumeration:** the sign-in page shows one message for an unknown account, a wrong password and a locked
   account; the "confirm your email" message comes only after the right password. `SignInManager` answers `NotAllowed`
   before it looks at the password, so `LoginPage` checks the password itself and counts a wrong one (D-030 (1)).
-  Registration answers an existing address like a new one.
+  Registration answers an existing address like a new one. Resending the confirmation answers every address alike and
+  emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
+  account; the reset page answers an unknown or unconfirmed account like a bad token (R-084).
+- **Password reset:** the link carries an Identity token that `ResetPasswordAsync` uses up (it renews the security
+  stamp), the new password is typed twice, and a reset revokes every token and authorization of the user like a
+  password change. It never signs the user in. A missing `User` role (seeding off) leaves a new account without a role
+  instead of failing the registration.
 - **Sign-in age:** `auth_time` and `max_age` read the sign-in time the cookie's `OnSigningIn` records in its
   properties, never the cookie's `IssuedUtc`, which moves on every renewal (sliding expiration, the zero-interval stamp
   check; D-030 (2), R-067).
@@ -49,10 +55,12 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   protocol endpoints (`ConnectEndpoints`) and the sign-in pages (`/account` group) carry `.AllowAnonymous()`; the
   handlers read the sign-in session themselves. OpenIddict's own endpoints (discovery, JWKS, revocation) answer in the
   authentication middleware, before authorization.
-- **Pages and forms:** plain HTML (the core's CSP forbids scripts and styles), antiforgery checked in the handler with
-  `IAntiforgery.IsRequestValidAsync` (the pipeline has no antiforgery middleware, R-061), redirects to local URLs only.
-- **Links from configuration, never from the request:** the email confirmation link starts from `Jwt:Authority`, not the
-  Host header.
+- **Pages and forms:** plain HTML (the core's CSP forbids scripts and styles), rendered by `HtmlPage`; antiforgery
+  checked in the handler with `IAntiforgery.IsRequestValidAsync` (the pipeline has no antiforgery middleware, R-061),
+  redirects to local URLs only. The `/account` group (anonymous, out of the OpenAPI document, `strict` rate limit) is
+  created once in `MapCoreIdentityServer`.
+- **Links from configuration, never from the request:** the emailed links (confirmation, password reset) come from
+  `EmailLinks`, which starts them from `Jwt:Authority`, not the Host header.
 - **Validated request bodies are public records** (`AccountRequests.cs`): .NET 10's validation generator skips internal
   types (R-062). Endpoint classes stay internal.
 - **Audit, don't print secrets.** Security events go through `SecurityAuditLogger` (masked emails, `SECURITY` prefix).
@@ -67,7 +75,7 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   results (`Results<Ok<T>, ValidationProblem, UnauthorizedHttpResult>`, ...), with named internal records for bodies
   (`MessageResponse`), not anonymous objects: the union is the OpenAPI contract. `/connect/*` and `/account/*` stay
   `IResult` (protocol and HTML, excluded from the document). `.AllowAnonymous()` only for
-  pre-sign-in endpoints (register, confirm-email); everything else `.RequireAuthorization()` or
+  pre-sign-in endpoints (register, confirm-email, resend-confirmation-email); everything else `.RequireAuthorization()` or
   `.RequirePermission(IdentityPermissions.X)`. Put the validated body in `AccountRequests.cs` and list it in
   `PublicAPI.Unshipped.txt`.
 - Add the endpoint to the Api host's `ModuleRegistrationTests` and, when it validates, `ValidationTests`.

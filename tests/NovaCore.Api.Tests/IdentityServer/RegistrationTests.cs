@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NovaCore.Identity.OpenIddict;
@@ -97,6 +98,58 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
     }
 
     [Fact]
+    public async Task Resending_the_confirmation_reaches_an_unconfirmed_account_only()
+    {
+        var client = _host.CreateClient();
+        await RegisterAsync(client, "resend@novacore.test");
+        await _host.CreateUserAsync("resend-confirmed@novacore.test", Password);
+
+        var unconfirmed = await ResendAsync(client, "resend@novacore.test");
+        var confirmed = await ResendAsync(client, "resend-confirmed@novacore.test");
+        var unknown = await ResendAsync(client, "resend-nobody@novacore.test");
+
+        Assert.Equal(HttpStatusCode.OK, unconfirmed.StatusCode);
+        var expected = await unconfirmed.Content.ReadAsStringAsync();
+        Assert.Equal(expected, await confirmed.Content.ReadAsStringAsync());
+        Assert.Equal(expected, await unknown.Content.ReadAsStringAsync());
+
+        // The registration's link and the resent one.
+        Assert.Equal(2, fixture.Emails.Sent.Count(email => email.To == "resend@novacore.test"));
+        Assert.DoesNotContain(fixture.Emails.Sent, email => email.To is "resend-confirmed@novacore.test" or "resend-nobody@novacore.test");
+    }
+
+    [Fact]
+    public async Task A_resent_link_confirms_the_email()
+    {
+        var client = _host.CreateClient();
+        await RegisterAsync(client, "resend-link@novacore.test");
+        await ResendAsync(client, "resend-link@novacore.test");
+
+        var sent = fixture.Emails.Sent.Where(email => email.To == "resend-link@novacore.test").ToList();
+        Assert.Equal(2, sent.Count);
+        var link = WebUtility.HtmlDecode(Href().Match(sent[1].HtmlBody).Groups["url"].Value);
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(new Uri(link).PathAndQuery)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Without_a_User_role_registration_still_sends_the_confirmation()
+    {
+        // Seeding off, as in Development by default: there are no roles at all.
+        var emails = new CapturingEmailSender();
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+        {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Identity:Seed:SeedOnStartup"] = "false" });
+            builder.Services.AddSingleton<IEmailSender>(emails);
+        });
+
+        var response = await RegisterAsync(host.CreateClient(), "no-role@novacore.test");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Single(emails.Sent, email => email.To == "no-role@novacore.test");
+    }
+
+    [Fact]
     public async Task Outside_Development_the_host_needs_an_email_sender()
     {
         var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
@@ -122,6 +175,9 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
 
     private static Task<HttpResponseMessage> RegisterAsync(HttpClient client, string email) =>
         client.PostAsJsonAsync("/api/v1/auth/register", new { email, password = Password, displayName = "Test" });
+
+    private static Task<HttpResponseMessage> ResendAsync(HttpClient client, string email) =>
+        client.PostAsJsonAsync("/api/v1/auth/resend-confirmation-email", new { email });
 
     private string ConfirmationLink(string email)
     {

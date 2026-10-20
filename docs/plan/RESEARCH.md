@@ -767,3 +767,27 @@ Biçim:
 - Kaynak: https://github.com/advisories/GHSA-846f-f764-76mx · https://github.com/advisories/GHSA-2fmv-rv2c-59x7 · https://learn.microsoft.com/nuget/concepts/auditing-packages · https://learn.microsoft.com/nuget/consume-packages/central-package-management#transitive-pinning
 - Sonuç (D-036 (8)): Catalog ve Payments, Pkcs 10.0.13'e doğrudan referans verir (CPM'de sürüm). Api ve testler onu proje referansından en yakın sürüm olarak alır. `list package --vulnerable` 13 projede temiz.
 
+### R-084: Parola sıfırlama ve onay e-postasını yeniden gönderme: hesabın varlığını ele vermeden (2026-10-20, faz 4d; kaynak + kırmızı test)
+- Soru: Sıfırlama ve yeniden gönderme uçları nasıl çalışmalı ki yanıt hesabın varlığını ele vermesin? Sıfırlamadan sonra ne olmalı? Link mi, kod mu?
+- Bulgu:
+  - ASP.NET Core `MapIdentityApi` (release/10.0, `IdentityApiEndpointRouteBuilderExtensions.cs`):
+    - `/forgotPassword` yalnızca kullanıcı var ve e-postası onaylıysa token üretip gönderir, her durumda `Ok` döner. Kod yorumu: "Don't reveal that the user does not exist or is not confirmed".
+    - `/resetPassword` bilinmeyen ya da onaysız kullanıcıya bozuk token'la aynı `InvalidToken` hatasını verir. Token Base64Url'dir. Lockout'a dokunmaz.
+    - `/resendConfirmationEmail` bilinmeyen adrese `Ok` döner, bulunan her kullanıcıya (onaylı olsa da) link gönderir.
+  - `UserManager.ResetPasswordAsync` token'ı (stamp dahil) doğrular, sonra parola politikasını uygular ve security stamp'i yeniler. Aynı token ikinci kez doğrulanmaz.
+  - MS Learn (Account confirmation and password recovery): ForgotPassword "fails silently if the user email has not been confirmed"; parola sıfırlama e-postadaki linkle açılan bir sayfada yapılır. Blazor WASM rehberinde onay e-postasını yeniden gönderme linki istemcinin kayıt ekranında.
+  - OWASP Forgot Password Cheat Sheet:
+    - Var olan ve olmayan hesap için aynı mesaj ve tutarlı yanıt süresi.
+    - Token rastgele, tek kullanımlık ve süreli.
+    - Başarılı sıfırlamadan sonra otomatik giriş yok; oturumlar iptal edilebilir.
+    - Yeni parola iki kez girilir.
+    - Sayfada `Referrer-Policy: no-referrer` (çekirdek zaten her yanıtta gönderiyor).
+    - Token gösterilmeden hesapta değişiklik yapılmaz (ör. kilitleme).
+  - Kırmızı test: seed kapalıyken (`User` rolü yok) `register` hesabı oluşturup `AddToRoleAsync`'te 500 veriyordu, onay e-postası da gitmiyordu.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Core/src/IdentityApiEndpointRouteBuilderExtensions.cs · https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Extensions.Core/src/UserManager.cs · https://learn.microsoft.com/aspnet/core/security/authentication/accconfirm · https://learn.microsoft.com/aspnet/core/blazor/security/webassembly/standalone-with-identity/account-confirmation-and-password-recovery · https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
+- Sonuç (D-038 (1)–(4)):
+  - Sıfırlama sağlayıcının HTML sayfalarıyla yapılır: kullanıcı parolasını giriş sayfasında unutur ve link bir sayfa açmalıdır.
+  - Yeniden gönderme kayıt gibi bir JSON uçtur ve yalnızca onaysız hesaba e-posta yollar.
+  - Sıfırlama oturumları iptal eder, otomatik giriş yapmaz.
+  - Kalan fark: bilinen hesapta e-posta gönderimi yanıtı uzatabilir (PROGRESS → Sonraya bırakılanlar).
+

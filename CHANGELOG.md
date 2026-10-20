@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Password reset in `NovaCore.Identity.OpenIddict`: the sign-in page links to `/account/forgot-password`, which emails a
+  confirmed account a link to `/account/reset-password` (from `Jwt:Authority`, never the Host header). The new password
+  is typed twice; the link works once and expires with the other Identity tokens (6 hours). A reset revokes every refresh
+  token and authorization of the user and doesn't sign them in. Unknown and unconfirmed addresses get the same page and
+  no email. Audited as `SECURITY password_reset_requested` and `password_reset`.
+- `POST /api/v1/auth/resend-confirmation-email` (anonymous, `strict` rate limit) sends the confirmation link again to an
+  account that isn't confirmed yet; every address gets the same answer.
+
 - Reverse proxy support: `UseCoreWeb` applies `X-Forwarded-For` and `X-Forwarded-Proto` first, from the proxies and
   networks listed under `ForwardedHeaders:KnownProxies` and `ForwardedHeaders:KnownIPNetworks` only (validated on
   start). Behind a trusted proxy the rate limiter partitions by the real client and the request scheme is the client's,
@@ -314,6 +322,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   code, but their message (which can carry connection strings, paths or other internals) is only logged.
 
 ### Fixed
+
+- Registering through `NovaCore.Identity.OpenIddict` without a seeded `User` role (seeding off, the Development
+  default) answered 500 after creating the account, and sent no confirmation email. The account now starts without a
+  role and gets its confirmation link.
 
 - A request body Minimal APIs can't read (malformed JSON in Development, where they throw `BadHttpRequestException`)
   answers with the exception's status (400) instead of 500.
