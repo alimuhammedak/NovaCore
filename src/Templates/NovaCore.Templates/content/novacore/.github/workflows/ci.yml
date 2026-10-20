@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # The NovaCore packages come from GitHub Packages (nuget.config). Store a token with read:packages as the repository
+      # secret NOVACORE_PACKAGES_TOKEN; NuGet reads the "novacore" source's credentials from this variable. Only the
+      # steps that reach the feed get it. A high or critical vulnerability in any package fails restore (NuGet audit).
+      - name: Restore
+        env:
+          NuGetPackageSourceCredentials_novacore: Username=${{ github.actor }};Password=${{ secrets.NOVACORE_PACKAGES_TOKEN }}
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Test
+        run: dotnet test -c Release --no-build
+
+      # Each module owns a DbContext and its migrations; a model change without a migration fails here.
+      - name: Migrations match the model
+        run: |
+          dotnet tool restore
+          module=src/Modules/Todos/MyService.Modules.Todos
+          dotnet ef migrations has-pending-model-changes --project "$module" --startup-project "$module" \
+            --context TodosDbContext --configuration Release --no-build
+#if (BuiltInAuth)
+          dotnet ef migrations has-pending-model-changes --project src/Api/MyService.Api --startup-project src/Api/MyService.Api \
+            --context IdentityServerDbContext --configuration Release --no-build
+#endif
+
+      # One migration bundle per DbContext: an executable that applies the migrations at deployment time, run as a
+      # one-shot job by an account with schema rights (efbundle --connection "..."); the application's own account needs
+      # none. Framework-dependent, so the job runs where the app's .NET runtime is (add --self-contained otherwise, at
+      # about twice the size). Built for pushes to the default branch only: each bundle is tens of megabytes of artifact
+      # storage. Change the runtime to your deployment target.
+      - name: Migration bundles
+        if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+          NuGetPackageSourceCredentials_novacore: Username=${{ github.actor }};Password=${{ secrets.NOVACORE_PACKAGES_TOKEN }}
+        run: |
+          module=src/Modules/Todos/MyService.Modules.Todos
+          dotnet ef migrations bundle --project "$module" --startup-project "$module" --context TodosDbContext \
+            --configuration Release --target-runtime linux-x64 --output artifacts/migrations/todos/efbundle
+#if (BuiltInAuth)
+          dotnet ef migrations bundle --project src/Api/MyService.Api --startup-project src/Api/MyService.Api \
+            --context IdentityServerDbContext --configuration Release --target-runtime linux-x64 \
+            --output artifacts/migrations/identity/efbundle
+#endif
+
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+        with:
+          name: migration-bundles
+          path: artifacts/migrations
+          retention-days: 7
+
+      # `dotnet list package --vulnerable` exits 0 even when it finds advisories, so its JSON output is checked instead.
+      # Any severity fails the build.
+      - name: No vulnerable packages
+        env:
+          NuGetPackageSourceCredentials_novacore: Username=${{ github.actor }};Password=${{ secrets.NOVACORE_PACKAGES_TOKEN }}
+        run: |
+          dotnet list package --vulnerable --include-transitive --format json > vulnerable.json
+          jq -e '[.projects[].frameworks[]? | (.topLevelPackages // [])[], (.transitivePackages // [])[]] | length == 0' vulnerable.json \
+            || { cat vulnerable.json; exit 1; }

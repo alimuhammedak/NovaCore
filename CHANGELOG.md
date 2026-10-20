@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   solution that references the NovaCore packages of the template's own version instead of copying this repository. It
   has an API host, a sample `Todos` module (CRUD-style slices, permissions, validation, `Result` → ProblemDetails, its
   own schema, migrations and outbox), integration tests with an in-memory OpenID Connect issuer, a `nuget.config` that
-  maps the NovaCore packages to their feed, and `appsettings.json` with a production checklist. `--auth BuiltIn`
+  maps the NovaCore packages to their feed, `appsettings.json` with a production checklist, and a CI workflow that checks
+  the migrations against the model and, on the default branch, builds a migration bundle per DbContext. `--auth BuiltIn`
   (default) runs the identity provider in the host; `--auth External` only validates an external provider's tokens.
   Outside Development the host can answer probes on a management port (`HealthChecks:ProbePort`).
 - `eng/template-smoke.sh` packs every package into a local feed, creates a project from the template with each identity

@@ -904,7 +904,7 @@ Plan onayı 2026-10-20. Uygulama sırası F5.4 → F5.1a → F5.1b → F5.1c →
   - Repo'nun Api host'u Serilog'da kalıyor; Serilog diğer provider'lara yazmadığı için davranış aynı.
   - Testler 276 → 277: `ObservabilityTests` (OTel log provider'ı kayıtlı, iki seçenek açık). Önce kırmızı.
   - Güncellenenler: CHANGELOG (Changed), `src/PACKAGE.md`, README (OTel satırları), eklentinin csproj açıklaması.
-- [x] F5.1b (bkz. commit): Template package `BMD.NovaCore.Templates` (`src/Templates/NovaCore.Templates`), D-040 (3)–(7), D-041, R-090, R-091.
+- [x] F5.1b (216741f): Template package `BMD.NovaCore.Templates` (`src/Templates/NovaCore.Templates`), D-040 (3)–(7), D-041, R-090, R-091.
   - MS templatepack düzeni; kökteki `.template.config` silindi. Derlenen kodu olmadığı için `Directory.Build.targets`'taki sembol, package validation, XML doc ve PublicAPI kuralları şablon paketine uygulanmıyor (`NovaCoreLibraryPackage`). NU5128 `SuppressDependenciesWhenPacking` ile.
   - Üretilen projenin NovaCore sürümü pack anında yazılıyor (`TargetsForTfmSpecificContentInPackage`); `--version-suffix` da geçiyor.
   - İçerik: Api host (`Program.cs`, kontrol listeli `appsettings`, Development dışı probe örneği, üretilen portlar), `Todos` örnek modülü (4 slice, izinler, validation, `Result`→ProblemDetails, `todos` şeması, `Initial` migration, outbox), test projesi (`ApiFactory`, `TestIdentityProvider`, 7 test + BuiltIn'de discovery testi), `nuget.config` (source mapping), CPM, TWAE. `--auth BuiltIn|External`.
@@ -915,7 +915,10 @@ Plan onayı 2026-10-20. Uygulama sırası F5.4 → F5.1a → F5.1b → F5.1c →
   - Şablon `src/` altında olduğu için mimari testler onun `.cs` dosyalarını da tarıyor: `SourceHygieneTests` şablonun test yardımcısındaki `TimeProvider.System.GetUtcNow()`'ı yakaladı. Test gevşetilmedi; `TestIdentityProvider` saati constructor'dan alıyor.
   - Repo: 0 uyarı, 277/277.
   - Güncellenenler: README (template satırları, proje ağacı, paket ID'leri), kök CLAUDE.md (komutlar), `src/PACKAGE.md`, CHANGELOG.
-- [ ] F5.1c Üretilen projenin CI'ı
+- [x] F5.1c (bkz. commit): Üretilen projenin CI'ı (`content/novacore/.github/workflows/ci.yml`), D-040 (8), R-092.
+  - Adımlar: restore (NuGet audit), Release build, test, context başına `has-pending-model-changes` ve migration bundle (artifact), açık paket kontrolü. Feed token'ı `NOVACORE_PACKAGES_TOKEN` secret'ından, yalnızca restore, bundle ve açık kontrolü adımlarına.
+  - **Sürpriz:** self-contained bundle context başına ~180 MB, framework-dependent ~82 MB. Bundle'lar framework-dependent ve yalnızca varsayılan dala push'ta üretilip 7 gün saklanıyor; private repo'nun artifact kotası her push'ta dolmasın.
+  - Doğrulama: adımlar üretilen BuiltIn projede yerelde çalıştı (0 uyarı, 8/8, iki context temiz, iki bundle, açık yok; `jq` yerine Python eşdeğeri). YAML iki seçenekte de ayrıştırılıyor; External'da kimlik context'i yok.
 - [ ] F5.2 Tüketici smoke testi
 - [~] F5.3 → Faz 4b'ye taşındı (D-033)
 - [x] F5.4 (a7f6bdf): Kanal GitHub Packages (D-013 kalır), ilk sürüm `0.1.0-preview.1` (Q-32, Q-33 → D-039). Kod değişmiyor; `release.yml` şablon paketini de aynı sürümle yayımlayacak (F5.1b'den sonra doğrulanır). Tag ve push faz sonunda ayrıca sorulacak.
