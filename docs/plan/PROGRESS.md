@@ -1018,7 +1018,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-20, Faz 4c: Tüketici hazırlığı (tamam, merge onayı bekleniyor).** Branch `faz/4c-tuketici-hazirligi`, 11 commit.
+**2026-10-20, Faz 4c: Tüketici hazırlığı (tamam, merge onayı bekleniyor).** Branch `faz/4c-tuketici-hazirligi`, 10 commit.
 
 - **Yapılanlar:**
   - F4c.1: fallback policy her uçta kimlik istiyor, açık uçlar `AllowAnonymous`; Development dışında boş CORS listesi hiçbir origin'e izin vermiyor.
