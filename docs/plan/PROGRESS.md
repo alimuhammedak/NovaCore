@@ -18,7 +18,7 @@
 | 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20, kullanıcı isteği) |
-| 5 | 🔄 devam ediyor | `faz/5-sablon-yayin` | 2026-10-20 | | |
+| 5 | ✅ tamam | `faz/5-sablon-yayin` | 2026-10-20 | 2026-10-20 | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
 
@@ -933,7 +933,7 @@ Plan onayı 2026-10-20. Uygulama sırası F5.4 → F5.1a → F5.1b → F5.1c →
   - D-032 kullanıcıya bırakıldı: `docs/plan/DECISIONS.md` `.claude/hooks/package-policy.json` `protectedPaths`'e geri eklenecek (hook dosyasını model düzenleyemiyor).
 
 - Faz doğrulaması (2026-10-20, code review'dan önce): `restore --force` NU uyarısı yok; Release `--no-incremental` 0 uyarı, 0 hata; test 277/277; `list package --vulnerable` 14 projede açık yok; `has-pending-model-changes` üç context'te temiz; `bash eng/template-smoke.sh` yeşil (BuiltIn 8/8, External 7/7).
-- [x] Code review düzeltmeleri (bkz. commit): `code-review` (high, `main...faz/5-sablon-yayin`) 7 bulgu verdi.
+- [x] Code review düzeltmeleri (3423e71): `code-review` (high, `main...faz/5-sablon-yayin`) 7 bulgu verdi.
   - Düzeltilenler:
     - (#1) Sürüm damgalama hedefi dosyayı ters bölülü bir yolla `File.ReadAllText`'e veriyordu; Linux'taki pack (release.yml, `template-smoke`) dosyayı bulamayabilirdi. Yollar ileri bölü. Linux'ta ilk doğrulama push'tan sonra CI'da (Docker bu makinede kapalı).
     - (#2) Port yer tutucuları çıplak sayılardı (`5443`, `5080`); template engine her geçişi değiştirdiği için ileride üretilecek bir migration'ın zaman damgası bozulabilirdi. Yer tutucular `NOVACORE_HTTPS_PORT` / `NOVACORE_HTTP_PORT`; smoke testi çözülmemiş yer tutucuyu da arıyor.
@@ -1116,7 +1116,6 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 5) Şablonun Development dışı probe örneği (`UseHealthChecks(path, port)`) testle korunmuyor: TestServer'da bağlantının yerel portu yok. *Koşul:* ilk container dağıtımında bir kez elle denenir.
 - (Faz 5, R-092) Üretilen projenin CI'ındaki bundle adımı yalnızca varsayılan dala push'ta çalışıyor ve repo'nun `template-smoke` job'ı onu koşturmuyor (yalnızca yerelde denendi). *Koşul:* `content/novacore/.github/workflows/ci.yml` değişirse adımlar üretilen bir projede yeniden denenir (src/Templates/CLAUDE.md).
 - (Faz 5) Üretilen projede `using`'ler kaynak adına göre sıralanmıyor (ör. `using Siparis.Modules.Todos;` `NovaCore.*`'dan önce kalıyor); şablon `MyService`'e göre sıralı. Analyzer bunu hata saymıyor. Kozmetik.
-- (Faz 5) Kök `.gitignore` `artifacts/` diyor; şablon içeriğinin `.gitignore`'u ayrı. Repo'daki `eng/template-smoke.sh` çalışma klasörünü argümanla alıyor, varsayılanı `mktemp -d`; yerel koşularda geçici klasörler silinmiyor.
 - (Faz 5, code review #4) Şablonun örnek `CompleteTodo`'su okuyup `IsCompleted`'ı kontrol ediyor ve concurrency token olmadan kaydediyor; aynı anda gelen iki tamamlama ikisi de 204 alır (biri 409 almalıydı). Örnek basit tutuldu; token eklemek migration'ı ve örneği büyütür. *Koşul:* örnek modül bir eşzamanlılık kalıbı da öğretecekse (repo'da `Product.Stock` örneği var).
 - (Faz 5, code review #5) Üretilen projenin CI'ı restore için `NOVACORE_PACKAGES_TOKEN` secret'ını ister; fork'tan gelen ve Dependabot PR'larında secret olmadığı için restore 401 alır. *Koşul:* üretilen bir projede Dependabot ya da dış katkı açılır (Dependabot secret'ı ya da `pull_request_target` tasarımı gerekir).
 - (Faz 5, code review #6) Repo CI'ında `template-smoke` job'ı çözümü `build-and-test`'ten ayrı olarak bir kez daha derleyip pack ediyor. *Koşul:* CI süresi sorun olur; pack edilmiş paketler artifact olarak job'lar arasında taşınabilir.
@@ -1125,38 +1124,25 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-20, Faz 4d: Kimlik eklentisi üretim eksikleri (tamam, `main`'e merge ve push edildi).** Branch `faz/4d-kimlik-uretim`, 7 commit.
+**2026-10-20, Faz 5: Şablon, dağıtım, yayın hazırlığı (tamam, merge onayı bekleniyor).** Branch `faz/5-sablon-yayin`, 8 commit.
 
 - **Yapılanlar:**
-  - F4d.1: IdP modeli (a) kendi host'unda eklenti (Q-31, D-037).
-  - F4d.2:
-    - Parola sıfırlama HTML sayfalarıyla (`/account/forgot-password`, `/account/reset-password`). Yanıt her adres için aynı, link tek kullanımlık, sıfırlama oturumları iptal ediyor.
-    - `POST /api/v1/auth/resend-confirmation-email`, yalnızca onaysız hesaba e-posta gönderiyor.
-    - `User` rolü yokken kayıt artık 500 vermiyor.
-  - F4d.3: 2FA adımı kurtarma kodunu da kabul ediyor. Kod tek kullanımlık; kilitli hesap kodla giremiyor, hatalı kod sayılıyor.
-  - F4d.4:
-    - `/connect/endsession` önce soruyor (logout CSRF).
-    - Bilinmeyen e-posta da hash harcıyor (zamanlama).
-    - `change-password` lockout'a bağlandı.
-  - F4d.5: `ExpiredTokenPruner` açılışta ve saatte bir OpenIddict kayıtlarını temizliyor (14 gün, yeni paket yok).
-  - Code review düzeltmeleri.
-  - Testler 248 → 276. Kararlar D-037, D-038 (1)–(9), R-084…R-088.
+  - F5.4: kanal GitHub Packages (D-013 kalır), ilk sürüm `0.1.0-preview.1` (Q-32, Q-33 → D-039).
+  - F5.1a: tek log hattı OpenTelemetry; `AddCoreObservability` log'ları biçimlenmiş mesaj ve scope'larla taşıyor (R-089).
+  - F5.1b: template package `BMD.NovaCore.Templates` (`src/Templates/NovaCore.Templates`): Api host, `Todos` örnek modülü, test projesi, `nuget.config` (source mapping), kontrol listeli `appsettings`, probe örneği, `--auth BuiltIn|External`. Kökteki `.template.config` silindi. Bütün paket ID'leri `BMD.NovaCore.*` (Q-34 → D-041).
+  - F5.1c: üretilen projenin CI'ı (migration kontrolü, varsayılan dalda bundle'lar).
+  - F5.2: `eng/template-smoke.sh` ve CI'da `template-smoke` job'ı.
+  - F5.5: README'de tüketici rehberi, CHANGELOG `[0.1.0-preview.1]`, CLAUDE.md'ler (yeni `src/Templates/CLAUDE.md`), memory.
+  - Code review düzeltmeleri. Testler 276 → 277 (repo); üretilen projelerde BuiltIn 8, External 7. Kararlar D-039, D-040 (1)–(9), D-041; R-089…R-092.
 - **Sürprizler:**
-  - `SignInManager.TwoFactorRecoveryCodeSignInAsync` lockout'a bakmıyor ve hatalı kodu saymıyor (R-085).
-  - `SignInManager` bilinmeyen kullanıcıda hiç hash'lemiyor (R-087).
-  - OpenIddict'in store'u token süresini veritabanının saatiyle karşılaştırıyor (R-088).
-  - `IdentityServerTestHost`'un tek `SqliteConnection`'ı arka plan işine uygun değildi; context başına bağlantıya geçildi.
+  - `UseOtlpExporter` log'ları zaten açıyordu; eksik olan mesaj ve scope'lardı (R-089).
+  - nuget.org'da başka sahiplerin `NovaCore.Templates`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` paketleri var; `dotnet new`'in güncelleme kontrolü yabancı şablonu önerdi. Paket ID'leri `BMD.NovaCore.*` oldu (R-091).
+  - `ContentTargetFolders=content` içeriği `content/content` altına koydu (R-090).
+  - Bundle'lar context başına 82 MB (framework-dependent) / 180 MB (self-contained); varsayılan dalla sınırlandı (R-092).
 - **Kullanıcıya:**
-  - Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmadı (kullanıcı kararı).
-  - Merge ve push: kullanıcı onayıyla ("Merge ve push") `main`'e `--no-ff` merge edildi ve origin'e push edildi (2026-10-20).
-- **Sonraki fazın (5) bilmesi gerekenler:**
-  - Şablonun yerleşik IdP seçeneği (F5.1) artık parola sıfırlama sayfalarını ve temizlik servisini de getiriyor.
-  - Üretim kontrol listesi değişmedi: gerçek `IEmailSender` sıfırlama linkleri için de gerekli.
-  - "Sonraya bırakılanlar"da 4d'den 5 madde var:
-    - e-posta gönderen uçlarda zamanlama farkı;
-    - parola bildirim e-postası;
-    - kurtarma kodu uyarısı ve yenileme ucu;
-    - çıkış sorusunda vazgeçme yolu;
-    - 128 karakter sınırının tekrarı.
-  - D-032: DECISIONS.md'nin hook korumasına geri eklenmesi Faz 5 sonunda.
-- **Sıradaki:** yeni bir oturumda `/novacore-phase 5`.
+  - **Merge, push ve tag onayı bekleniyor** (`faz/5-sablon-yayin` → `main`, `v0.1.0-preview.1`). Tag `release.yml`'i tetikler ve sekiz paketi GitHub Packages'a yükler; Linux'ta pack'in ilk doğrulaması da o zaman (ve push'taki `template-smoke` job'ında) olur.
+  - Tag atılmazsa CHANGELOG'daki `[0.1.0-preview.1]` başlığı `Unreleased`'a geri alınmalı.
+  - **D-032:** `docs/plan/DECISIONS.md`'yi `.claude/hooks/package-policy.json` `protectedPaths` listesine geri ekleyin (hook dosyasını model düzenleyemiyor). DECISIONS başlığındaki "hook onay ister" notu o zaman yeniden geçerli olur.
+  - Tüketen projeler için: GitHub'da `read:packages` yetkili bir token; yerelde `dotnet nuget add source ... -n novacore`, üretilen repoda `NOVACORE_PACKAGES_TOKEN` secret'ı.
+  - Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmadı.
+- **Sonrası:** plan bitti. İlk gerçek proje şablonla açılır; 1.0 kararı (PublicAPI.Shipped, package validation baseline) o proje bu sürümle çalıştıktan sonra ayrıca verilir (PLAN F5.4). "Sonraya bırakılanlar"da Faz 5'ten 9 madde var.
