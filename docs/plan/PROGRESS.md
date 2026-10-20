@@ -18,7 +18,7 @@
 | 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20, kullanıcı isteği) |
-| 5 | ⏳ başlamadı | | | | |
+| 5 | 🔄 devam ediyor | `faz/5-sablon-yayin` | 2026-10-20 | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
 
@@ -897,10 +897,12 @@ Plan onayı 2026-10-20. Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents
   - `has-pending-model-changes`: üç context'te temiz.
 
 ### Faz 5
+Plan onayı 2026-10-20. Uygulama sırası F5.4 → F5.1a → F5.1b → F5.1c → F5.2 → F5.5 (ID'ler sabit). Kanal ve ilk sürüm plan aşamasında soruldu (Q-32, Q-33). Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmuyor (4d'deki kullanıcı kararı); commit'ler dosya dosya stage'leniyor.
+
 - [ ] F5.1 Template package
 - [ ] F5.2 Tüketici smoke testi
 - [~] F5.3 → Faz 4b'ye taşındı (D-033)
-- [ ] F5.4 Yayın kararı
+- [x] F5.4 (bkz. commit): Kanal GitHub Packages (D-013 kalır), ilk sürüm `0.1.0-preview.1` (Q-32, Q-33 → D-039). Kod değişmiyor; `release.yml` şablon paketini de aynı sürümle yayımlayacak (F5.1b'den sonra doğrulanır). Tag ve push faz sonunda ayrıca sorulacak.
 - [ ] F5.5 Final dokümanlar
 
 ## Açık sorular (Q)
@@ -940,6 +942,8 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-29 | F3b.3'te Development'taki simetrik JWT doğrulaması (D-024 (1)) ne olsun? | F3b.3 | **Kaldır**: `Jwt:SigningKey`/`Issuer`/geliştirme anahtarı silinir, `Jwt:Authority` her ortamda zorunlu (2026-09-27, kullanıcı) → D-028 |
 | Q-30 | F4b.1: Stok rezervasyonu senkron bir contract (`ReserveStockAsync`) ile mi, event ile mi yapılsın? | F4b.1 | **Event akışı** (2026-09-28, kullanıcı). Sunulan seçenekler: senkron contract (iki commit arasında stok kaybı, outbox kullanılmaz), senkron rezervasyon + event'le ödeme kaydı (POST 202'ye döner), event akışı (önerilen). R-075 → D-034 |
 | Q-31 | F4d.1: İlk proje hangi IdP modelini kullanacak? (a) kendi host'unda eklenti, (b) projeler arası merkezi IdP, (c) harici IdP (Entra, Keycloak) | F4d.1 | **(a) kendi host'unda eklenti** (2026-10-20, kullanıcı; önerilen seçenek). Faz 4d yürür → D-037 |
+| Q-32 | F5.4 (1): NovaCore paketleri ve şablon paketi hangi kanaldan tüketilsin? (GitHub Packages, nuget.org, yalnızca yerel klasör feed'i) | F5.4 (şablonun `nuget.config`'i ve CI'ı buna bağlı, bu yüzden plan aşamasında) | **GitHub Packages** (2026-10-20, kullanıcı; önerilen seçenek). D-013 olduğu gibi kalır → D-039 |
+| Q-33 | F5.4 (2): İlk sürüm `0.1.0-preview.1` mi, `0.1.0` mı? | F5.4 | **`0.1.0-preview.1`** (2026-10-20, kullanıcı; önerilen seçenek). Tag ve push faz sonunda ayrıca sorulur → D-039 |
 
 ## Sonraya bırakılanlar
 
@@ -990,7 +994,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 2a, code review) DECISIONS'ta D-018…D-020 satırları D-017'nin üstüne eklendi, tablo ID sırasında değil. Düzeltmek korunan dosyada yalnızca biçimsel bir düzenleme.
 - (Faz 2a) Kodsuz Api pack uyarısı, Y-10 → Y-44 notu ve mediator cümlesi hâlâ açık (yukarıdaki maddeler).
 - (Faz 1) `.snupkg` GitHub Packages'a gitmiyor (R-039), yalnızca workflow artifact'i. İleride nuget.org seçilirse sembol sunucusu kullanılabilir.
-- (Faz 1, F5.4) Package validation baseline'ı (`PackageValidationBaselineVersion`) `Microsoft.NET.ApiCompat.targets:18`'de değerlendirme anında okunuyor, import'u Directory.Build.targets'tan sonra geliyor. F5.4'te nereye yazılacağı doğrulanmalı (R-040).
+- (Faz 1, F5.4) Package validation baseline'ı (`PackageValidationBaselineVersion`) `Microsoft.NET.ApiCompat.targets:18`'de değerlendirme anında okunuyor, import'u Directory.Build.targets'tan sonra geliyor. F5.4'te nereye yazılacağı doğrulanmalı (R-040). **F5.4'te ertelendi (D-039):** ilk sürüm önizleme, baseline 1.0 kararıyla gelir; nereye yazılacağı o gün doğrulanır.
 - ~~(Faz 1) `NovaCore.Core.Web` paketinin nuspec bağımlılıklarında FluentValidation, Serilog, OpenTelemetry ve Scalar var (D-003 ihlali). F2a.2 ve F2c'nin işi.~~ → F2a.2'de çözüldü (Serilog/OTel/Scalar eklentilere, FluentValidation `NovaCore.FluentValidation`'a taşındı), F2a.4 testleri koruyor.
 - ~~(Faz 2a, F2a.4 → F2c.1) **Y-20'nin modül kısmı henüz testli değil.**~~ → F2c.1e'de çözüldü: `ExplicitRegistrationTests` artık tüm `src`'yi tarıyor ve `*FromAssembly*` kayıt yardımcılarını da yakalıyor. EF'in `ApplyConfigurationsFromAssembly`'si model yapılandırması olduğu için hariç (D-023 (5)). Eski not: Modüller validator'ları `AddValidatorsFromAssembly` ile (assembly taraması) kaydediyor. Bu FluentValidation ile birlikte F2c.1'de gidiyor; o zaman `ExplicitRegistrationTests`'in taraması `src/Modules`'ü de kapsamalı. `ApplyConfigurationsFromAssembly` (EF model yapılandırması, DI kaydı değil) Y-20 kapsamında mı, o gün karar verilmeli.
 - (Faz 2a, F2a.2c) `SecurityHeadersMiddleware` hâlâ `/scalar` yolunu CSP'den muaf tutuyor. Scalar artık bir eklenti; çekirdeğin eklentinin yolunu bilmesi küçük bir bağlılık. Davranış değişikliği olacağı için 2a'da dokunulmadı.
