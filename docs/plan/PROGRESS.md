@@ -925,12 +925,21 @@ Plan onayı 2026-10-20. Uygulama sırası F5.4 → F5.1a → F5.1b → F5.1c →
   - Güncellenenler: README (Test), CHANGELOG.
 - [~] F5.3 → Faz 4b'ye taşındı (D-033)
 - [x] F5.4 (a7f6bdf): Kanal GitHub Packages (D-013 kalır), ilk sürüm `0.1.0-preview.1` (Q-32, Q-33 → D-039). Kod değişmiyor; `release.yml` şablon paketini de aynı sürümle yayımlayacak (F5.1b'den sonra doğrulanır). Tag ve push faz sonunda ayrıca sorulacak.
-- [x] F5.5 (bkz. commit): Final dokümanlar.
+- [x] F5.5 (4cc3195): Final dokümanlar.
   - README: yeni "Yeni Proje (Tüketici Rehberi)" bölümü: kurulum (feed, token, şablon, `--auth`), şablonun ürettikleri, sorumluluk modeli, yeni proje kontrol listesi, ezilebilir ayarlar tablosu (kod okunarak; `JwtBearerOptions` için `Configure` şart, R-056), nesne düzeyi yetki rehberi (resource-based authorization, OWASP API1), BFF önerisi, migration dağıtımı (bundle / idempotent script), güncelleme. Eski "Hızlı Başlangıç" artık "Bu Repoda Çalışmak". Paket/lisans tablosu ve mediator satırları (Y-01) düzeltildi.
   - CHANGELOG: `[0.1.0-preview.1] - 2026-10-20` başlığı (tag onayı faz sonunda; onay gelmezse başlık `Unreleased`'a döner).
   - CLAUDE.md'ler: kök (paket ID'leri, şablon, mediator → Y-01, Y-10 → Y-44), `tests/CLAUDE.md` ve `Directory.Build.props` yorumu (Y-44), `src/BuildingBlocks/CLAUDE.md` (OTel log'ları, paket ID'leri), yeni `src/Templates/CLAUDE.md`. `src/PACKAGE.md` (outbox). Memory: `novacore-project`, `novacore-stack`, index.
   - "Sonraya bırakılanlar": bu fazda kapanan 7 madde işaretlendi, Faz 5'ten 7 yeni madde.
   - D-032 kullanıcıya bırakıldı: `docs/plan/DECISIONS.md` `.claude/hooks/package-policy.json` `protectedPaths`'e geri eklenecek (hook dosyasını model düzenleyemiyor).
+
+- Faz doğrulaması (2026-10-20, code review'dan önce): `restore --force` NU uyarısı yok; Release `--no-incremental` 0 uyarı, 0 hata; test 277/277; `list package --vulnerable` 14 projede açık yok; `has-pending-model-changes` üç context'te temiz; `bash eng/template-smoke.sh` yeşil (BuiltIn 8/8, External 7/7).
+- [x] Code review düzeltmeleri (bkz. commit): `code-review` (high, `main...faz/5-sablon-yayin`) 7 bulgu verdi.
+  - Düzeltilenler:
+    - (#1) Sürüm damgalama hedefi dosyayı ters bölülü bir yolla `File.ReadAllText`'e veriyordu; Linux'taki pack (release.yml, `template-smoke`) dosyayı bulamayabilirdi. Yollar ileri bölü. Linux'ta ilk doğrulama push'tan sonra CI'da (Docker bu makinede kapalı).
+    - (#2) Port yer tutucuları çıplak sayılardı (`5443`, `5080`); template engine her geçişi değiştirdiği için ileride üretilecek bir migration'ın zaman damgası bozulabilirdi. Yer tutucular `NOVACORE_HTTPS_PORT` / `NOVACORE_HTTP_PORT`; smoke testi çözülmemiş yer tutucuyu da arıyor.
+    - (#3) Şablonun test factory'si izinleri issuer'a göre seçiyordu; BuiltIn'de sağlayıcının issuer'ı da test issuer'ı olduğu için sağlayıcının token'ları host'un resolver'ına hiç gitmiyordu. Artık subject'e göre: yalnızca `CreateClientWithPermissions`'ın yarattığı subject'ler verilen izinleri alır.
+    - (#7) Script, varsayılan `mktemp -d` çalışma klasörünü çıkışta siliyor.
+  - "Sonraya bırakılanlar"a yazılanlar: #4 (örnek `CompleteTodo`'da eşzamanlı iki tamamlama ikisi de 204), #5 (fork ve Dependabot PR'larında secret olmadığı için üretilen CI'ın restore'u 401), #6 (`template-smoke` job'ı çözümü bir kez daha derliyor).
 
 ## Açık sorular (Q)
 
@@ -1108,6 +1117,9 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 5, R-092) Üretilen projenin CI'ındaki bundle adımı yalnızca varsayılan dala push'ta çalışıyor ve repo'nun `template-smoke` job'ı onu koşturmuyor (yalnızca yerelde denendi). *Koşul:* `content/novacore/.github/workflows/ci.yml` değişirse adımlar üretilen bir projede yeniden denenir (src/Templates/CLAUDE.md).
 - (Faz 5) Üretilen projede `using`'ler kaynak adına göre sıralanmıyor (ör. `using Siparis.Modules.Todos;` `NovaCore.*`'dan önce kalıyor); şablon `MyService`'e göre sıralı. Analyzer bunu hata saymıyor. Kozmetik.
 - (Faz 5) Kök `.gitignore` `artifacts/` diyor; şablon içeriğinin `.gitignore`'u ayrı. Repo'daki `eng/template-smoke.sh` çalışma klasörünü argümanla alıyor, varsayılanı `mktemp -d`; yerel koşularda geçici klasörler silinmiyor.
+- (Faz 5, code review #4) Şablonun örnek `CompleteTodo`'su okuyup `IsCompleted`'ı kontrol ediyor ve concurrency token olmadan kaydediyor; aynı anda gelen iki tamamlama ikisi de 204 alır (biri 409 almalıydı). Örnek basit tutuldu; token eklemek migration'ı ve örneği büyütür. *Koşul:* örnek modül bir eşzamanlılık kalıbı da öğretecekse (repo'da `Product.Stock` örneği var).
+- (Faz 5, code review #5) Üretilen projenin CI'ı restore için `NOVACORE_PACKAGES_TOKEN` secret'ını ister; fork'tan gelen ve Dependabot PR'larında secret olmadığı için restore 401 alır. *Koşul:* üretilen bir projede Dependabot ya da dış katkı açılır (Dependabot secret'ı ya da `pull_request_target` tasarımı gerekir).
+- (Faz 5, code review #6) Repo CI'ında `template-smoke` job'ı çözümü `build-and-test`'ten ayrı olarak bir kez daha derleyip pack ediyor. *Koşul:* CI süresi sorun olur; pack edilmiş paketler artifact olarak job'lar arasında taşınabilir.
 
 ## Son devir notu
 

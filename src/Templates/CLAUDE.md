@@ -20,8 +20,8 @@ D-040/D-041 for why it is built this way (RESEARCH R-090…R-092).
   `template.json` → `sources.modifiers`; differences inside a file use the template engine's conditionals:
   `#if (BuiltInAuth)` in `.cs` and `.yml`, `<!--#if (BuiltInAuth) -->` in MSBuild files and `nuget.config`,
   `//#if (BuiltInAuth)` in `.json`.
-- Ports come from the `port` generator: `5443` (https) and `5080` (http) in the content are placeholders. Don't use those
-  numbers for anything else.
+- Ports come from the `port` generator: `NOVACORE_HTTPS_PORT` and `NOVACORE_HTTP_PORT` in the content are its
+  placeholders. Placeholders are never bare numbers: the engine replaces every occurrence, a migration's timestamp too.
 
 ## Rules for the content
 

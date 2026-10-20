@@ -41,7 +41,7 @@
         "high": 7300,
         "fallback": 7001
       },
-      "replaces": "5443"
+      "replaces": "NOVACORE_HTTPS_PORT"
     },
     "HttpPort": {
       "type": "generated",
@@ -51,7 +51,7 @@
         "high": 5300,
         "fallback": 5001
       },
-      "replaces": "5080"
+      "replaces": "NOVACORE_HTTP_PORT"
     }
   },
   "sources": [

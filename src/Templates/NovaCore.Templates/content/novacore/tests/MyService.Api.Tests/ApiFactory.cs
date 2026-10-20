@@ -9,7 +9,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.IdentityModel.JsonWebTokens;
 using MyService.Modules.Todos.Infrastructure;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
@@ -184,15 +183,14 @@ public class ApiFactory : WebApplicationFactory<Program>
     private sealed class GrantingPermissionResolver(
         IReadOnlyDictionary<string, string[]> grants, IPermissionResolver? fallback) : IPermissionResolver
     {
+        // By subject, not by issuer: the host's own provider (BuiltIn) issues its tokens as Jwt:Authority, which here is the
+        // test issuer too, so only a subject CreateClientWithPermissions made is answered from the grants.
         public Task<IReadOnlyCollection<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken cancellationToken)
         {
-            if (fallback is not null && user.FindFirstValue(JwtRegisteredClaimNames.Iss) != TestIdentityProvider.Issuer)
-                return fallback.GetPermissionsAsync(user, cancellationToken);
+            if (user.FindFirstValue(NovaClaims.Subject) is { } subject && grants.TryGetValue(subject, out var granted))
+                return Task.FromResult<IReadOnlyCollection<string>>(granted);
 
-            return Task.FromResult<IReadOnlyCollection<string>>(
-                user.FindFirstValue(NovaClaims.Subject) is { } subject && grants.TryGetValue(subject, out var granted)
-                    ? granted
-                    : []);
+            return fallback?.GetPermissionsAsync(user, cancellationToken) ?? Task.FromResult<IReadOnlyCollection<string>>([]);
         }
     }
 }

@@ -18,7 +18,8 @@
     <!-- No assemblies, so no dependencies: NU5128's documented fix for a package without lib/ref files. -->
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);NovaCoreStampPackageVersion</TargetsForTfmSpecificContentInPackage>
-    <NovaCoreTemplatePackagesProps>content\novacore\Directory.Packages.props</NovaCoreTemplatePackagesProps>
+    <!-- Forward slashes: the target reads the file with a property function, which doesn't convert separators on Linux. -->
+    <NovaCoreTemplatePackagesProps>content/novacore/Directory.Packages.props</NovaCoreTemplatePackagesProps>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,13 +34,13 @@
   -->
   <Target Name="NovaCoreStampPackageVersion">
     <PropertyGroup>
-      <_NovaCoreStampedPackagesProps>$(IntermediateOutputPath)template\Directory.Packages.props</_NovaCoreStampedPackagesProps>
-      <_NovaCoreStampedContent>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\$(NovaCoreTemplatePackagesProps)').Replace('NOVACORE_PACKAGE_VERSION', '$(PackageVersion)'))</_NovaCoreStampedContent>
+      <_NovaCoreStampedPackagesProps>$(IntermediateOutputPath)template/Directory.Packages.props</_NovaCoreStampedPackagesProps>
+      <_NovaCoreStampedContent>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/$(NovaCoreTemplatePackagesProps)').Replace('NOVACORE_PACKAGE_VERSION', '$(PackageVersion)'))</_NovaCoreStampedContent>
     </PropertyGroup>
     <WriteLinesToFile File="$(_NovaCoreStampedPackagesProps)" Lines="$([MSBuild]::Escape($(_NovaCoreStampedContent)))"
                       Overwrite="true" WriteOnlyWhenDifferent="true" />
     <ItemGroup>
-      <TfmSpecificPackageFile Include="$(_NovaCoreStampedPackagesProps)" PackagePath="content\novacore\Directory.Packages.props" />
+      <TfmSpecificPackageFile Include="$(_NovaCoreStampedPackagesProps)" PackagePath="content/novacore/Directory.Packages.props" />
     </ItemGroup>
   </Target>
 

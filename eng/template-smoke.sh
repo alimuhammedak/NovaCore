@@ -6,7 +6,12 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-work="${1:-$(mktemp -d)}"
+if [[ -n "${1:-}" ]]; then
+  work="$1"
+else
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+fi
 rm -rf "$work/feed" "$work/hive" "$work/packages" "$work/projects"
 mkdir -p "$work/projects"
 
@@ -57,7 +62,7 @@ for auth in BuiltIn External; do
   if find "$project" -name 'PublicAPI.*.txt' -not -path '*/bin/*' -not -path '*/obj/*' | grep -q .; then
     echo "::error::$name contains PublicAPI files"; exit 1
   fi
-  if grep -rIl --exclude-dir=bin --exclude-dir=obj -e 'Muhammed' -e 'NOVACORE_PACKAGE_VERSION' -e 'MyService' "$project"; then
+  if grep -rIl --exclude-dir=bin --exclude-dir=obj -e 'Muhammed' -e 'NOVACORE_PACKAGE_VERSION' -e 'NOVACORE_HTTPS_PORT' -e 'NOVACORE_HTTP_PORT' -e 'MyService' "$project"; then
     echo "::error::$name contains the author's name or an unreplaced template token (files above)"; exit 1
   fi
 done

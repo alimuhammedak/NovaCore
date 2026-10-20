@@ -6,7 +6,7 @@
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "scalar/v1",
-      "applicationUrl": "https://localhost:5443;http://localhost:5080",
+      "applicationUrl": "https://localhost:NOVACORE_HTTPS_PORT;http://localhost:NOVACORE_HTTP_PORT",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
@@ -16,7 +16,7 @@
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "scalar/v1",
-      "applicationUrl": "http://localhost:5080",
+      "applicationUrl": "http://localhost:NOVACORE_HTTP_PORT",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
