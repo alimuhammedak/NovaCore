@@ -17,7 +17,7 @@
 | 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push edilmedi) |
-| 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | merge onayı bekleniyor |
+| 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20, kullanıcı isteği) |
 | 5 | ⏳ başlamadı | | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
@@ -1073,7 +1073,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-20, Faz 4d: Kimlik eklentisi üretim eksikleri (tamam, merge onayı bekleniyor).** Branch `faz/4d-kimlik-uretim`, 7 commit.
+**2026-10-20, Faz 4d: Kimlik eklentisi üretim eksikleri (tamam, `main`'e merge ve push edildi).** Branch `faz/4d-kimlik-uretim`, 7 commit.
 
 - **Yapılanlar:**
   - F4d.1: IdP modeli (a) kendi host'unda eklenti (Q-31, D-037).
@@ -1096,7 +1096,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - `IdentityServerTestHost`'un tek `SqliteConnection`'ı arka plan işine uygun değildi; context başına bağlantıya geçildi.
 - **Kullanıcıya:**
   - Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmadı (kullanıcı kararı).
-  - Merge (`faz/4d-kimlik-uretim` → `main`) kullanıcı onayı bekliyor. Push kullanıcının kararı.
+  - Merge ve push: kullanıcı onayıyla ("Merge ve push") `main`'e `--no-ff` merge edildi ve origin'e push edildi (2026-10-20).
 - **Sonraki fazın (5) bilmesi gerekenler:**
   - Şablonun yerleşik IdP seçeneği (F5.1) artık parola sıfırlama sayfalarını ve temizlik servisini de getiriyor.
   - Üretim kontrol listesi değişmedi: gerçek `IEmailSender` sıfırlama linkleri için de gerekli.
@@ -1107,4 +1107,4 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
     - çıkış sorusunda vazgeçme yolu;
     - 128 karakter sınırının tekrarı.
   - D-032: DECISIONS.md'nin hook korumasına geri eklenmesi Faz 5 sonunda.
-- **Sıradaki:** merge onayından sonra yeni bir oturumda `/novacore-phase 5`.
+- **Sıradaki:** yeni bir oturumda `/novacore-phase 5`.
