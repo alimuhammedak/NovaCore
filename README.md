@@ -584,6 +584,10 @@ dotnet test
   yalnızca Microsoft paketlerine bağlı olduğunu ve paketler arası bağımlılık yönünü doğrular (`NovaCore.Abstractions`
   ASP.NET/EF içermez), building block'larda assembly taraması olmadığını kontrol eder. Modül sırası ve endpoint listesi
   de testle sabitlenmiştir.
+- **Şablon (tüketici smoke testi):** `bash eng/template-smoke.sh` ve CI'daki `template-smoke` job'ı bütün paketleri yerel
+  bir feed'e pack eder, şablonu kendi hive'ına kurar, `--auth BuiltIn` ve `External` ile birer proje üretir; projeler
+  paketleri o feed'den alarak (repo'nun projelerinden değil) uyarılar hata sayılarak derlenir, testleri ve
+  `has-pending-model-changes` çalışır, içlerinde repo'ya özgü dosya olmadığı kontrol edilir.
 
 ---
 

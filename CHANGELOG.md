@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (default) runs the identity provider in the host; `--auth External` only validates an external provider's tokens.
   Outside Development the host can answer probes on a management port (`HealthChecks:ProbePort`).
 - `eng/template-smoke.sh` packs every package into a local feed, creates a project from the template with each identity
-  option, and builds, tests and checks its migrations the way a consumer would.
+  option, and builds, tests and checks its migrations the way a consumer would. CI runs it as the `template-smoke` job.
 - `NovaCore.Identity.OpenIddict` prunes its store: at startup and every hour, OpenIddict's `PruneAsync` deletes the tokens
   that are expired, revoked or redeemed and the authorizations that are no longer valid and have no token left, once
   they are 14 days old (OpenIddict.Quartz's defaults; no new package). A failed pass is logged as an error and retried on

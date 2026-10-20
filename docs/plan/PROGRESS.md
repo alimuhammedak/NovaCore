@@ -915,11 +915,14 @@ Plan onayı 2026-10-20. Uygulama sırası F5.4 → F5.1a → F5.1b → F5.1c →
   - Şablon `src/` altında olduğu için mimari testler onun `.cs` dosyalarını da tarıyor: `SourceHygieneTests` şablonun test yardımcısındaki `TimeProvider.System.GetUtcNow()`'ı yakaladı. Test gevşetilmedi; `TestIdentityProvider` saati constructor'dan alıyor.
   - Repo: 0 uyarı, 277/277.
   - Güncellenenler: README (template satırları, proje ağacı, paket ID'leri), kök CLAUDE.md (komutlar), `src/PACKAGE.md`, CHANGELOG.
-- [x] F5.1c (bkz. commit): Üretilen projenin CI'ı (`content/novacore/.github/workflows/ci.yml`), D-040 (8), R-092.
+- [x] F5.1c (a1bfe90): Üretilen projenin CI'ı (`content/novacore/.github/workflows/ci.yml`), D-040 (8), R-092.
   - Adımlar: restore (NuGet audit), Release build, test, context başına `has-pending-model-changes` ve migration bundle (artifact), açık paket kontrolü. Feed token'ı `NOVACORE_PACKAGES_TOKEN` secret'ından, yalnızca restore, bundle ve açık kontrolü adımlarına.
   - **Sürpriz:** self-contained bundle context başına ~180 MB, framework-dependent ~82 MB. Bundle'lar framework-dependent ve yalnızca varsayılan dala push'ta üretilip 7 gün saklanıyor; private repo'nun artifact kotası her push'ta dolmasın.
   - Doğrulama: adımlar üretilen BuiltIn projede yerelde çalıştı (0 uyarı, 8/8, iki context temiz, iki bundle, açık yok; `jq` yerine Python eşdeğeri). YAML iki seçenekte de ayrıştırılıyor; External'da kimlik context'i yok.
-- [ ] F5.2 Tüketici smoke testi
+- [x] F5.2 (bkz. commit): Tüketici smoke testi CI'da: `.github/workflows/ci.yml`'de `build-and-test`'e paralel `template-smoke` job'ı, `bash eng/template-smoke.sh "$RUNNER_TEMP/template-smoke"` (D-040 (9)).
+  - Script F5.1b'de kabul kriterinin aracı olarak commit'lenmişti; bu adım onu CI'a bağlıyor.
+  - Doğrulama: script yerelde yeşil (BuiltIn 8/8, External 7/7, migration'lar temiz, üretilen `ci.yml` iki seçenekte doğru). Workflow YAML olarak ayrıştırılıyor. Remote CI koşusu push'tan sonra görülecek (push kullanıcı onayıyla).
+  - Güncellenenler: README (Test), CHANGELOG.
 - [~] F5.3 → Faz 4b'ye taşındı (D-033)
 - [x] F5.4 (a7f6bdf): Kanal GitHub Packages (D-013 kalır), ilk sürüm `0.1.0-preview.1` (Q-32, Q-33 → D-039). Kod değişmiyor; `release.yml` şablon paketini de aynı sürümle yayımlayacak (F5.1b'den sonra doğrulanır). Tag ve push faz sonunda ayrıca sorulacak.
 - [ ] F5.5 Final dokümanlar
