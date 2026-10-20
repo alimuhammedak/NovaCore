@@ -152,6 +152,26 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task A_message_processed_late_does_not_hold_back_the_expired_ones_after_it()
+    {
+        using var host = await CreateHostAsync(services =>
+            services.AddScoped<IDomainEventHandler<OrderPlaced>, RecordingHandler>());
+        var now = _clock.GetUtcNow();
+        // The lowest Id, processed just now (as after retries): it shares the first batch with 49 of the 50 expired ones.
+        var late = await AddProcessedMessageAsync(now - TimeSpan.FromMinutes(1), "LateHandler");
+        for (var i = 0; i < 50; i++)
+            await AddProcessedMessageAsync(now - Retention - TimeSpan.FromDays(1), "ExpiredHandler");
+        await SaveOrderAsync(host);
+
+        // One pass, the one at startup, takes all 50.
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(async () => await ConsumerCountAsync() == 2);
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["LateHandler"], await ConsumersAsync(late));
+    }
+
+    [Fact]
     public async Task A_message_left_for_inspection_is_kept_whatever_its_age()
     {
         using var host = await CreateHostAsync(services =>

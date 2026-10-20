@@ -273,8 +273,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `System.Security.Cryptography.Pkcs` 9.0.11, which Microsoft.Data.SqlClient brings under EF Core's SQL Server
   provider, had two high-severity denial-of-service advisories (CVE-2026-84008, CVE-2026-70162; GHSA-846f-f764-76mx,
-  GHSA-2fmv-rv2c-59x7) and failed the restore. The Catalog and Payments modules reference the patched 10.0.13
-  directly; no packable package is affected.
+  GHSA-2fmv-rv2c-59x7) and failed the restore. Every project that references the SQL Server provider (the Catalog and
+  Payments modules, the Api host) references the patched 10.0.13 directly; no packable package is affected.
 
 - `NovaCore.Identity.OpenIddict` stops the host outside Development unless the host configured a Data Protection key
   store (`PersistKeysToFileSystem`, `PersistKeysToDbContext`, a blob or Redis store). The sign-in cookies, antiforgery

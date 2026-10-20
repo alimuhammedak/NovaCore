@@ -30,7 +30,6 @@ public static class InfrastructureServiceCollectionExtensions
             var traceId = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
             context.ProblemDetails.Extensions["traceId"] = traceId;
             context.ProblemDetails.Instance ??= request.PathBase.Add(request.Path).ToUriComponent();
-            ExceptionMapping.Describe(context);
         });
 
         // Not an IExceptionHandler: those run in registration order and the first to handle wins, so a catch-all one
@@ -38,6 +37,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.Configure<ExceptionHandlerOptions>(options =>
         {
             options.StatusCodeSelector = ExceptionMapping.StatusCodeFor;
+            options.ExceptionHandler = ExceptionMapping.WriteResponseAsync;
             options.SuppressDiagnosticsCallback = ExceptionMapping.SuppressDiagnostics;
         });
 

@@ -70,8 +70,10 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
 - **The core's exception mapping is no `IExceptionHandler`.** Those run in registration order and the first `true` wins
   (R-046), so a catch-all one would shadow a project's handler registered after it. The mapping is the exception
   handler middleware's fallback instead: `ExceptionHandlerOptions.StatusCodeSelector` (`AppException` → its type's
-  status, `BadHttpRequestException` → its status, else 500), `ProblemDetailsOptions.CustomizeProblemDetails` (title,
-  `type`, and `detail` for an `AppException` only) and `SuppressDiagnosticsCallback` (the framework logs 500s; client
+  status, `BadHttpRequestException` → its status, else 500), `ExceptionHandlerOptions.ExceptionHandler` (writes the
+  ProblemDetails: title, `type`, and `detail` for an `AppException` only; it runs only when no handler handled the
+  exception, so a project handler's ProblemDetails is never rewritten; not `CustomizeProblemDetails`, which sees every
+  write) and `SuppressDiagnosticsCallback` (the framework logs 500s; client
   errors and handler-handled exceptions aren't logged). Don't add a core `IExceptionHandler` (R-079).
 - Caching: inject `HybridCache` directly. It is already an abstract class with a default implementation (R-008), so
   don't wrap it (Y-15). `AddCoreCaching` registers it with the default entry lifetime from `Cache:DefaultExpiration`.

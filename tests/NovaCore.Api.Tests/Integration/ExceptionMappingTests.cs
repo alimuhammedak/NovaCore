@@ -95,6 +95,19 @@ public sealed class ExceptionMappingTests
     }
 
     [Fact]
+    public async Task The_problem_details_a_project_handler_writes_are_its_own()
+    {
+        // The MS docs' IExceptionHandler shape: ProblemDetails written through IProblemDetailsService, exception attached.
+        await using var host = await StartAsync(builder => builder.Services.AddExceptionHandler<ProblemDetailsTimeoutHandler>());
+
+        var (status, problem) = await GetProblemAsync(host, $"/throw/{nameof(TimeoutException)}");
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, status);
+        Assert.Equal("Service busy", problem.GetProperty("title").GetString());
+        Assert.Equal("Try again in a minute.", problem.GetProperty("detail").GetString());
+    }
+
+    [Fact]
     public async Task Server_errors_are_logged_and_client_errors_are_not()
     {
         var log = new LogCapture();
@@ -165,6 +178,23 @@ public sealed class ExceptionMappingTests
             httpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
             await httpContext.Response.WriteAsync("try again later", cancellationToken);
             return true;
+        }
+    }
+
+    private sealed class ProblemDetailsTimeoutHandler(IProblemDetailsService problemDetails) : IExceptionHandler
+    {
+        public ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
+        {
+            if (exception is not TimeoutException)
+                return ValueTask.FromResult(false);
+
+            httpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            return problemDetails.TryWriteAsync(new ProblemDetailsContext
+            {
+                HttpContext = httpContext,
+                Exception = exception,
+                ProblemDetails = { Status = StatusCodes.Status503ServiceUnavailable, Title = "Service busy", Detail = "Try again in a minute." }
+            });
         }
     }
 }

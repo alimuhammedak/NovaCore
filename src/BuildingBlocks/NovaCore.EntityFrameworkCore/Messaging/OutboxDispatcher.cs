@@ -177,7 +177,8 @@ internal sealed partial class OutboxDispatcher(
 
     // SQLite can't compare DateTimeOffset values in SQL (docs/plan/RESEARCH.md R-068), so the age is checked here, on the
     // oldest processed messages in Id order, a batch at a time. Messages are processed roughly in that order, so the
-    // first batch with one still within the retention ends the sweep; a later expired one goes on a later pass.
+    // first batch without an expired one ends the sweep. A batch that still holds a message processed late (a retried
+    // one, a low Id) doesn't: the expired ones after it would otherwise wait for it, 49 deletions a pass.
     private async Task DeleteExpiredAsync(DbContext outbox, CancellationToken cancellationToken)
     {
         var cutoff = timeProvider.GetUtcNow() - ProcessedRetention;
@@ -200,7 +201,7 @@ internal sealed partial class OutboxDispatcher(
                     .ExecuteDeleteAsync(cancellationToken);
             }
 
-            if (batch.Count < BatchSize || expired.Count < batch.Count)
+            if (batch.Count < BatchSize || expired.Count == 0)
                 return;
 
             after = batch[^1].Id;
