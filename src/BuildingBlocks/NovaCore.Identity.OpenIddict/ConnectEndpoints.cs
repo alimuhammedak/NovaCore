@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -20,11 +21,13 @@ namespace NovaCore.Identity.OpenIddict;
 
 /// <summary>
 /// The protocol endpoints OpenIddict hands over after validating the request (passthrough): authorization, token and
-/// end session. The revocation endpoint is OpenIddict's own.
+/// end session, which asks a signed-in browser before it signs it out. The revocation endpoint is OpenIddict's own.
 /// </summary>
 internal static class ConnectEndpoints
 {
     private const string AuthenticationTimeItem = ".auth_time";
+
+    private const string EndSessionPath = "/connect/endsession";
 
     // Anonymous to the core's authorization: OpenIddict has validated the request and the client, and each handler
     // reads the sign-in session itself.
@@ -34,7 +37,7 @@ internal static class ConnectEndpoints
             .ExcludeFromDescription().AllowAnonymous();
         endpoints.MapPost("/connect/token", Exchange)
             .ExcludeFromDescription().AllowAnonymous().RequireRateLimiting("strict");
-        endpoints.MapMethods("/connect/endsession", [HttpMethods.Get, HttpMethods.Post], EndSession)
+        endpoints.MapMethods(EndSessionPath, [HttpMethods.Get, HttpMethods.Post], EndSession)
             .ExcludeFromDescription().AllowAnonymous();
     }
 
@@ -151,10 +154,23 @@ internal static class ConnectEndpoints
     }
 
     private static async Task<IResult> EndSession(
-        HttpContext context, UserManager<ApplicationUser> users, SecurityAuditLogger audit)
+        HttpContext context,
+        IAntiforgery antiforgery,
+        IOptions<AntiforgeryOptions> antiforgeryOptions,
+        UserManager<ApplicationUser> users,
+        SecurityAuditLogger audit)
     {
         var session = await context.AuthenticateAsync(IdentityConstants.ApplicationScheme);
-        if (session.Succeeded && await users.GetUserAsync(session.Principal) is { } user)
+        var user = session.Succeeded ? await users.GetUserAsync(session.Principal) : null;
+
+        // A signed-in browser is asked first, so a link or a form on another site can't sign it out (logout CSRF;
+        // RP-Initiated Logout 1.0 §2 asks for the question when there's no id_token_hint, docs/plan/RESEARCH.md R-086).
+        // Only the question's own form carries the antiforgery token. IsRequestValidAsync answers true for a GET, hence
+        // the method check. A signed-out browser has nothing to lose and goes straight on.
+        if (user is not null && !(HttpMethods.IsPost(context.Request.Method) && await antiforgery.IsRequestValidAsync(context)))
+            return await SignOutQuestionAsync(context, antiforgery, antiforgeryOptions.Value.FormFieldName);
+
+        if (user is not null)
             audit.SignedOut(user.Id);
 
         await context.SignOutAsync(IdentityConstants.ApplicationScheme);
@@ -163,6 +179,22 @@ internal static class ConnectEndpoints
         return Results.SignOut(
             new AuthenticationProperties { RedirectUri = "/" },
             [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+    }
+
+    // The question posts the end-session request's own parameters back (client_id, post_logout_redirect_uri, state, ...),
+    // so OpenIddict validates the confirmed request like the first one (OpenIddict's samples do the same).
+    private static async Task<IResult> SignOutQuestionAsync(HttpContext context, IAntiforgery antiforgery, string tokenField)
+    {
+        var parameters = context.Request.HasFormContentType
+            ? (IEnumerable<KeyValuePair<string, StringValues>>)await context.Request.ReadFormAsync(context.RequestAborted)
+            : context.Request.Query;
+
+        var hidden = parameters
+            .Where(parameter => !string.Equals(parameter.Key, tokenField, StringComparison.Ordinal))
+            .SelectMany(parameter => parameter.Value.Select(value => new KeyValuePair<string, string?>(parameter.Key, value)));
+
+        return HtmlPage.Form(context, antiforgery, "Sign out", EndSessionPath, hidden, error: null,
+            "  <p>Do you want to sign out?</p>\n", submit: "Sign out");
     }
 
     private static async Task<ClaimsIdentity> CreateIdentityAsync(

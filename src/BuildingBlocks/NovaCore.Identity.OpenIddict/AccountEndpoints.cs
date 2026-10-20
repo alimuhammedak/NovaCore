@@ -185,15 +185,23 @@ internal static class AccountEndpoints
         if (user is null)
             return TypedResults.Unauthorized();
 
+        // Like the sign-in page: a locked account changes nothing and a wrong current password counts toward lockout, so a
+        // stolen access token can't guess the password more often than the sign-in page allows. ChangePasswordAsync checks
+        // the password itself, so it is hashed once.
+        if (await users.IsLockedOutAsync(user))
+            return PasswordProblem(["The account is locked. Try again later."]);
+
         // ChangePasswordAsync also renews the security stamp, which ends the provider's sign-in cookie.
         var result = await users.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
         if (!result.Succeeded)
         {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["password"] = result.Errors.Select(error => error.Description).ToArray()
-            });
+            if (result.Errors.Any(error => error.Code == nameof(IdentityErrorDescriber.PasswordMismatch)))
+                await users.AccessFailedAsync(user);
+
+            return PasswordProblem(result.Errors.Select(error => error.Description).ToArray());
         }
+
+        await users.ResetAccessFailedCountAsync(user);
 
         // Defence in depth: a password change ends every session.
         await RevokeSessionsAsync(user, tokens, authorizations, cancellationToken);
@@ -286,6 +294,9 @@ internal static class AccountEndpoints
     {
         ["code"] = ["The verification code is invalid."]
     });
+
+    private static ValidationProblem PasswordProblem(string[] errors) =>
+        TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["password"] = errors });
 
     private static async Task<Results<Ok<MessageResponse>, BadRequest<MessageResponse>>> ConfirmEmail(
         Guid userId,

@@ -400,6 +400,9 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   (OWASP Authentication: "no composition rules").
 - **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**, hatalı 2FA ya da kurtarma kodu da sayılır), giriş sayfası, token ucu ve
   hesap API'sinde rate limiting (`strict`), bilinmeyen hesap / yanlış parola / kilitli hesap için **tek hata mesajı**.
+  Bilinmeyen e-posta da bir parola hash'i doğrular (host'un hasher'ıyla bir kez üretilen sahte hash), böylece yanıt
+  süresi hesabın varlığını ele vermez. `change-password`'da yanlış mevcut parola da lockout sayacını artırır; kilitli
+  hesapta parola değişmez.
 - **E-posta onayı** zorunlu (dev'de link loglanır; link `Jwt:Authority`'den üretilir, Host başlığından değil),
   **TOTP 2FA** (authenticator app). 2FA adımı `/2fa/enable`'ın verdiği 10 kurtarma kodundan birini de kabul eder: her
   kod bir kez kullanılır, kilitli hesap kodla da giremez, kullanılan kod `SECURITY recovery_code_used` (Warning) olarak
@@ -441,7 +444,7 @@ de izinlerini önbellek süresi dolunca kaybeder.
 |---|---|
 | `GET·POST /connect/authorize` | Authorization Code + PKCE (oturum yoksa `/account/login`'e yönlendirir) |
 | `POST /connect/token` | Code, refresh token (rotation + reuse detection) ve client credentials grant'ları |
-| `POST /connect/revoke` · `GET·POST /connect/endsession` | Token iptali / sağlayıcıdan çıkış |
+| `POST /connect/revoke` · `GET·POST /connect/endsession` | Token iptali / sağlayıcıdan çıkış (oturumlu tarayıcıya önce antiforgery'li bir onay formu sorulur: logout CSRF) |
 | `POST /api/v1/auth/register` | Kayıt (anti-enumeration generic yanıt) + onay e-postası |
 | `GET /api/v1/auth/confirm-email` | E-posta onayı |
 | `POST /api/v1/auth/resend-confirmation-email` | Onay linkini yeniden gönder (yalnızca onaysız hesaba, generic yanıt) |

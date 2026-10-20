@@ -34,7 +34,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **Anti-enumeration:** the sign-in page shows one message for an unknown account, a wrong password and a locked
   account; the "confirm your email" message comes only after the right password. `SignInManager` answers `NotAllowed`
   before it looks at the password, so `LoginPage` checks the password itself and counts a wrong one (D-030 (1)).
-  Registration answers an existing address like a new one. Resending the confirmation answers every address alike and
+  An unknown email costs a password hash like a known one (`DummyPasswordHash`, made once by the host's hasher), so the
+  answer's timing doesn't reveal accounts either (R-087). Registration answers an existing address like a new one. Resending the confirmation answers every address alike and
   emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
   account; the reset page answers an unknown or unconfirmed account like a bad token (R-084).
 - **Password reset:** the link carries an Identity token that `ResetPasswordAsync` uses up (it renews the security
@@ -53,6 +54,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   claim is informational and never passes a permission check (D-036 (2)). The core's
   claims transformation runs on OpenIddict's scheme too, so a principal copied into a token drops `permission` claims
   (D-029 (3)).
+- **Sign-out asks first:** `/connect/endsession` shows a signed-in browser a question whose form posts the request's
+  parameters back with an antiforgery token; only that POST signs out (logout CSRF, RP-Initiated Logout §2, R-086). A
+  signed-out browser goes straight on to the post-logout redirect.
 - **Anonymous by declaration:** the core's fallback policy closes every endpoint without authorization metadata, so the
   protocol endpoints (`ConnectEndpoints`) and the sign-in pages (`/account` group) carry `.AllowAnonymous()`; the
   handlers read the sign-in session themselves. OpenIddict's own endpoints (discovery, JWKS, revocation) answer in the
@@ -69,7 +73,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   Never log passwords, codes, raw tokens or full JWTs.
 - **Password change and "sign out everywhere"** revoke every token and authorization of the user and renew the security
   stamp; the cookie's stamp is checked on every use (`ValidationInterval = 0`), so the provider session ends at once.
-  Issued access tokens stay valid until they expire.
+  Issued access tokens stay valid until they expire. A wrong current password counts toward lockout and a locked
+  account's password doesn't change, as on the sign-in page: a stolen access token mustn't guess more often (R-087).
 
 ## Adding an account endpoint
 

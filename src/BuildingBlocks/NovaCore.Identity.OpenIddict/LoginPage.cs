@@ -46,6 +46,8 @@ internal static class LoginPage
         IAntiforgery antiforgery,
         UserManager<ApplicationUser> users,
         SignInManager<ApplicationUser> signIn,
+        IPasswordHasher<ApplicationUser> hasher,
+        DummyPasswordHash dummyHash,
         SecurityAuditLogger audit)
     {
         if (!context.Request.HasFormContentType || !await antiforgery.IsRequestValidAsync(context))
@@ -58,6 +60,10 @@ internal static class LoginPage
         var user = string.IsNullOrWhiteSpace(email) ? null : await users.FindByEmailAsync(email);
         if (user is null || string.IsNullOrEmpty(password))
         {
+            // An unknown address costs a password hash too, so the answer doesn't come sooner than for a known one.
+            if (user is null && !string.IsNullOrEmpty(password))
+                dummyHash.Check(hasher, password);
+
             audit.LoginFailed(email, ip, "unknown-user");
             return PasswordForm(context, antiforgery, returnUrl, email, InvalidCredentials);
         }

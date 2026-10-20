@@ -805,3 +805,51 @@ Biçim:
 - Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Core/src/SignInManager.cs · https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Extensions.Core/src/UserManager.cs · https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.identity.userstorebase-5.redeemcodeasync · https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.identity.signinmanager-1.twofactorrecoverycodesigninasync
 - Sonuç (D-038 (5)): 2FA adımı tek alan. Altı hane authenticator koduna gider, gerisi kurtarma koduna. Kurtarma kodundan önce `IsLockedOutAsync`, hatalı kodda `AccessFailedAsync` eklenti tarafında yapılır. Kod büyük harfe çevrilir. Kullanılan kod `recovery_code_used` (Warning) olarak loglanır.
 
+### R-086: Sağlayıcıdan çıkışta onay (logout CSRF) (2026-10-20, faz 4d; kaynak + kırmızı test)
+- Soru: `/connect/endsession` herhangi bir GET'le oturumu kapatıyordu. Spec ne istiyor, OpenIddict nasıl öneriyor?
+- Bulgu:
+  - OpenID Connect RP-Initiated Logout 1.0 §2:
+    - OP kullanıcıya OP'den de çıkmak isteyip istemediğini "SHOULD" sormalı.
+    - `id_token_hint` yoksa (ya da OP oturumuna ait değilse) bu soru "MUST".
+    - OP logout ucunda GET ve POST'u desteklemeli.
+  - §4: Oturum açık değilken çıkış istemek hata değildir.
+  - §6: `id_token_hint`'siz istekler bir hizmet reddi yoludur.
+  - OpenIddict'in Velusia örneği:
+    - GET bir onay sayfası gösterir.
+    - Sayfanın formu isteğin bütün parametrelerini (form ya da query) hidden input olarak aynı uca POST eder.
+    - POST `[ValidateAntiForgeryToken]` ile korunur, `SignInManager.SignOutAsync` ve OpenIddict şemasıyla `SignOut` yapar.
+    - OpenIddict, client'ın kayıtlı `post_logout_redirect_uri`'sine yönlendirir.
+  - `IAntiforgery.IsRequestValidAsync` güvenli metotlarda (GET dahil) true döner; POST ayrıca kontrol edilmelidir.
+  - Kırmızı test: oturumlu tarayıcının GET'i ve antiforgery'siz POST'u oturumu kapatıyordu.
+- Kaynak: https://openid.net/specs/openid-connect-rpinitiated-1_0.html · https://github.com/openiddict/openiddict-samples/blob/dev/samples/Velusia/Velusia.Server/Controllers/AuthorizationController.cs · https://github.com/openiddict/openiddict-samples/blob/dev/samples/Velusia/Velusia.Server/Views/Authorization/Logout.cshtml · https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.antiforgery.iantiforgery.isrequestvalidasync
+- Sonuç (D-038 (6)):
+  - Oturumlu tarayıcıya her durumda soru sorulur. `id_token_hint` doğrulanmaz; spec'e uyuyor ve daha az kod.
+  - Yalnızca geçerli antiforgery token'lı POST çıkış yapar.
+  - Oturumsuz tarayıcı doğrudan yönlendirilir.
+
+### R-087: Giriş sayfasında yanıt süresi ve `change-password`'da lockout (2026-10-20, faz 4d; kaynak + kırmızı test)
+- Soru:
+  - Bilinmeyen e-posta neden daha hızlı dönüyor ve nasıl eşitlenir?
+  - `change-password` lockout'a neden bakmıyor, nasıl bağlanır?
+- Bulgu:
+  - Zamanlama:
+    - `SignInManager.PasswordSignInAsync(string, ...)` bilinmeyen kullanıcıda hemen `Failed` döner, hash hesaplamaz. `UserManager.CheckPasswordAsync` de null kullanıcıda hash'lemez.
+    - Bilinen kullanıcıda PBKDF2 600.000 iterasyon harcanır.
+    - OWASP Authentication Cheat Sheet "quick exit" örneğini yanlış gösteriyor ve kullanıcı ne olursa olsun aynı işlemin yapılmasını öneriyor.
+  - Hasher kaydı: `IPasswordHasher<TUser>` `AddIdentityCore`'da `TryAddScoped`'tır. Host kendi hasher'ını önce kaydederse o kullanılır, bu yüzden sahte hash de onunla üretilmeli. Singleton tutucu hasher'ı her çağrıda alır (Y-26). Static alan kullanılmaz (Y-24).
+  - Lockout:
+    - `UserManager.ChangePasswordAsync` eşleşmeyen parolada `PasswordMismatch` döner, `AccessFailedAsync` çağırmaz.
+    - `SignInManager.CheckPasswordSignInAsync` lockout'u kontrol edip sayardı ama parola iki kez hash'lenirdi: bir kez kontrolde, bir kez `ChangePasswordAsync`'te.
+    - OWASP: parola değişimi mevcut parolayı doğrular; brute-force koruması bütün kimlik doğrulama yollarında geçerli.
+  - Kırmızı test:
+    - Bilinmeyen e-posta hasher'ı hiç çağırmıyordu.
+    - 5 yanlış mevcut parola hesabı kilitlemiyordu, ardından doğru parola parolayı değiştiriyordu.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Core/src/SignInManager.cs · https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Extensions.Core/src/UserManager.cs · https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Extensions.Core/src/IdentityServiceCollectionExtensions.cs · https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+- Sonuç (D-038 (7), (8)):
+  - `DummyPasswordHash` singleton'ı, host'un hasher'ıyla bir kez üretilen hash'i tutar. Bilinmeyen e-postada parola ona karşı doğrulanır.
+  - `change-password`, giriş sayfasının `CheckUnconfirmedAsync` kalıbını izler:
+    - kilitliyse reddeder;
+    - `PasswordMismatch`'te `AccessFailedAsync` çağırır;
+    - başarıda sayacı sıfırlar.
+    Hash tek kez hesaplanır.
+

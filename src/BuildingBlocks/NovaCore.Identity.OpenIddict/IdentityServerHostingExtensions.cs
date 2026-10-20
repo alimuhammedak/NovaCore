@@ -91,6 +91,7 @@ public static class IdentityServerHostingExtensions
             .ValidateOnStart();
 
         services.AddSingleton<SecurityAuditLogger>();
+        services.AddSingleton<DummyPasswordHash>();
 
         // LoggingEmailSender writes confirmation links to the log: Development only, and only when the host brings none.
         // Anywhere else the host registers a real sender, or EmailSenderStartupCheck stops the host.

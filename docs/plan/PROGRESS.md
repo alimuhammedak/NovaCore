@@ -851,13 +851,23 @@ Plan onayı 2026-10-20. Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents
   - Ortak parçalar: `HtmlPage` (LoginPage'in sayfa/form kodu taşındı), `EmailLinks` (kayıt ve sıfırlama linkleri, token Base64Url). `/account` grubu `MapCoreIdentityServer`'da tek yerde kuruluyor. Audit: `password_reset_requested`, `password_reset`.
   - Testler 248 → 264: yeni `PasswordResetTests` (11: uçtan uca sıfırlama ve oturumların bitmesi, tek kullanım, bilinmeyen/onaysız adres aynı yanıt ve e-posta yok, iki parola, politika, bozuk token ile bilinmeyen kullanıcı aynı yanıt, Host başlığı, giriş sayfasındaki link, üç uçta "strict"); `RegistrationTests` +3 (yeniden gönderme yalnızca onaysız hesaba, yeniden gönderilen link onaylıyor, seed'siz kayıt); `ValidationTests`, `SecureDefaultsTests` ve `ModuleRegistrationTests` listelerine yeni uçlar. Önce kırmızı: 16 test (biri yanlışlıkla yeşildi, kayıt e-postasını okuyordu; ikinci e-postayı şart koşacak şekilde düzeltildi).
   - Kararlar D-038 (1)–(4), R-084. Güncellenenler: README (uçlar, kimlik sağlayıcı, hesaplar, yetkilendirme, audit), eklenti CLAUDE.md, CHANGELOG.
-- [x] F4d.3 (HASH): Kurtarma koduyla giriş.
+- [x] F4d.3 (f428ff3): Kurtarma koduyla giriş.
   - 2FA adımı tek alan: altı haneli giriş authenticator koduna, gerisi kurtarma koduna gidiyor (`XXXXX-XXXXX`, büyük harfe çevriliyor). Kod tek kullanımlık (`RedeemTwoFactorRecoveryCodeAsync`).
   - **Sürpriz (R-085):** `SignInManager.TwoFactorRecoveryCodeSignInAsync` lockout'a bakmıyor ve hatalı kodu saymıyor. Eklenti ikisini kendisi yapıyor: kilitli hesap kodla giremiyor, hatalı kod başarısız deneme sayılıyor.
   - Audit: `recovery_code_used` (Warning, EventId 27); hatalı kodun nedeni `bad-recovery-code`.
   - Testler 264 → 267: `TwoFactorTests` +3 (kod bir kez giriş yapar ve küçük harfle de kabul edilir, hatalı kod sayılır, kilitli hesap kodla giremez). `EnableAsync` yardımcısı kurtarma kodlarını da döndürüyor. Önce kırmızı: 3 test.
   - Kararlar D-038 (5), R-085. Güncellenenler: README (Hesaplar), eklenti CLAUDE.md (Hardening), CHANGELOG.
-- [ ] F4d.4 Güvenlik düzeltmeleri
+- [x] F4d.4 (HASH): Güvenlik düzeltmeleri.
+  - Logout CSRF: `/connect/endsession` oturumlu tarayıcıya önce bir soru gösteriyor. Formu isteğin parametrelerini antiforgery token'ıyla aynı uca POST ediyor ve yalnızca bu POST çıkış yapıyor (OpenIddict'in Velusia örneği). Oturumsuz tarayıcı doğrudan yönlendiriliyor.
+  - Zamanlama: bilinmeyen e-postada parola, host'un hasher'ıyla bir kez üretilen sahte hash'e karşı doğrulanıyor (`DummyPasswordHash`). `SignInManager` bilinmeyen kullanıcıda hiç hash'lemiyordu.
+  - `change-password`: kilitli hesapta parola değişmiyor, yanlış mevcut parola `AccessFailedAsync` çağırıyor, başarı sayacı sıfırlıyor. Hash tek kez.
+  - Testler 267 → 273:
+    - `AuthorizationCodeFlowTests` +3: GET soru gösteriyor ve oturum sürüyor; antiforgery'siz POST oturumu kapatmıyor; oturumsuz tarayıcı soru görmüyor. Sonuncusu mevcut davranışı sabitliyor, önceden de yeşildi.
+    - `SignInHardeningTests` +1: sayan bir hasher'la, bilinmeyen e-posta bilinen kadar hash doğruluyor.
+    - `SessionTests` +2: 5 yanlış mevcut parola kilitliyor; başarılı değişim sayacı sıfırlıyor.
+    - Değişen test (plan onayı, Y-44): `End_session_signs_the_browser_out_of_the_provider` onay adımını geçiyor.
+    - Önce kırmızı: 6 test.
+  - Kararlar D-038 (6)–(8), R-086, R-087. Güncellenenler: README (Hesaplar, Endpoint'ler), eklenti CLAUDE.md, CHANGELOG (Security).
 - [ ] F4d.5 Token temizliği
 
 ### Faz 5
@@ -917,7 +927,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - ~~`outbox_consumers` anahtarı (Faz 4a, #12) ve işlenmiş mesajların hiç silinmemesi (Faz 4a) → F4c.7.~~ → F4c.7'de yapıldı.
 - ~~Parola sıfırlama, onay e-postasını yeniden gönderme, `User` rolü yokken kayıtta 500 (Faz 3b) → F4d.2.~~ → F4d.2'de yapıldı.
 - ~~Kurtarma kodları (Faz 3b) → F4d.3.~~ → F4d.3'te yapıldı.
-- Logout CSRF, giriş zamanlama farkı, `change-password` lockout'u (Faz 3b) → F4d.4.
+- ~~Logout CSRF, giriş zamanlama farkı, `change-password` lockout'u (Faz 3b) → F4d.4.~~ → F4d.4'te yapıldı.
 - OpenIddict kayıtlarının temizlenmemesi (Faz 3b) → F4d.5.
 - Template'in paket kimliğini taşıması (Faz 1, F5.1) → F5.1.
 - ~~Catalog/Payments uçtan uca testleri (Faz 2c) → F5.3 (4b'de).~~ → F5.3'te yapıldı (Faz 4b).
@@ -990,12 +1000,12 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 3b, plan kapsamı dışı) OpenIddict token ve authorization kayıtları hiç temizlenmiyor (Quartz entegrasyonu ya da `PruneAsync` çağıran bir hosted service). Tablolar zamanla büyür.
 - (Faz 3b, plan kapsamı dışı) userinfo ucu, Razor/Identity UI, OpenIddict.Validation ve reference token yok (D-026).
 - (Faz 3b) Test süresi: eklenti testleri `DisableParallelization` koleksiyonunda ve PBKDF2 600k ile yaklaşık 1 dk 20 sn. Tüm paket yaklaşık 2 dk. Testlerde iterasyon sayısını düşürmek hızlandırır, ama sertleştirme testini ayrı tutmak gerekir.
-- (Faz 3b, code review) Giriş sayfasında zamanlama farkı: bilinmeyen e-posta PBKDF2'siz hemen dönüyor, bilinen e-posta 600k iterasyon harcıyor. Aynı mesaja rağmen yanıt süresi hesabın varlığını ele veriyor (eski modülde de vardı). Çözüm: bilinmeyen kullanıcıda sahte bir hash doğrulamak. Kayıt ucunda da benzer bir fark var (yeni hesapta hash + e-posta).
+- ~~(Faz 3b, code review) Giriş sayfasında zamanlama farkı: bilinmeyen e-posta PBKDF2'siz hemen dönüyor, bilinen e-posta 600k iterasyon harcıyor. Aynı mesaja rağmen yanıt süresi hesabın varlığını ele veriyor (eski modülde de vardı). Çözüm: bilinmeyen kullanıcıda sahte bir hash doğrulamak. Kayıt ucunda da benzer bir fark var (yeni hesapta hash + e-posta).~~ → F4d.4'te giriş sayfası için çözüldü (sahte hash). Kayıt ucundaki ve parola sıfırlama formundaki fark kalıyor (aşağıdaki F4d.2 maddesi).
 - ~~(Faz 3b, code review) Kurtarma kodları kullanılamıyor: `/2fa/enable` 10 kod veriyor ama giriş sayfasının kod adımı yalnızca authenticator kodunu kabul ediyor (`TwoFactorRecoveryCodeSignInAsync` çağrılmıyor). Eski modülde de böyleydi.~~ → F4d.3'te çözüldü.
-- (Faz 3b, code review) `change-password`'da yanlış mevcut parola lockout sayacını artırmıyor. Çalınmış bir access token'la yalnızca IP rate limit'iyle sınırlı bir parola denemesi yapılabiliyor (eski modülde de vardı).
+- ~~(Faz 3b, code review) `change-password`'da yanlış mevcut parola lockout sayacını artırmıyor. Çalınmış bir access token'la yalnızca IP rate limit'iyle sınırlı bir parola denemesi yapılabiliyor (eski modülde de vardı).~~ → F4d.4'te çözüldü.
 - ~~(Faz 3b, code review) `register`, `User` rolü yoksa (seed kapalıyken, Development varsayılanı) kullanıcıyı oluşturduktan sonra 500 veriyor. Onay e-postası gitmiyor, tekrar kayıt genel 200'le dönüyor; adres takılı kalıyor (eski modülde de vardı).~~ → F4d.2'de çözüldü: rol yoksa hesap rolsüz oluşuyor; takılan adres için yeniden gönderme ucu var.
 - (Faz 3b, code review) Refresh'te lockout kontrolü: e-postayı bilen biri 5 yanlış parolayla kurbanın bütün refresh oturumlarını düşürebiliyor. OpenIddict örneği yalnızca `CanSignIn`'e bakıyor. Bu bir tasarım ödünleşimi; kaldırmak D-029'a eklenecek bir karar ister.
-- (Faz 3b, code review) `/connect/endsession`, `id_token_hint` ya da onay adımı olmadan GET'le oturumu kapatıyor (logout CSRF). OpenIddict örnekleri bir onay formu gösteriyor.
+- ~~(Faz 3b, code review) `/connect/endsession`, `id_token_hint` ya da onay adımı olmadan GET'le oturumu kapatıyor (logout CSRF). OpenIddict örnekleri bir onay formu gösteriyor.~~ → F4d.4'te çözüldü.
 - (Faz 3b, code review, altitude) Eklenti token'a kopyaladığı principal'dan `permission` claim'lerini ayıklıyor, çünkü çekirdeğin `IClaimsTransformation`'ı her şemada (cookie, OpenIddict) çalışıyor ve her `/connect/token`'da resolver'a gidiyor. Kök çözüm izinleri yalnızca bearer principal'ı için çözmek (ör. `JwtBearerEvents.OnTokenValidated`). Bu R-057 ve D-029 (3)'ü yeniden açar; çekirdek değişikliği.
 - (Faz 3b, code review) Seed her açılışta gizli client'ların secret'ını yeniden hash'leyip yazıyor (`UpdateAsync(app, descriptor)` düz secret'ı hash'le karşılaştırıyor).
 - (Faz 3b, code review) `IdentityPermissionResolver` rol başına iki sorgu atıyor (N+1). Cache'li; eski modülden geldi.
