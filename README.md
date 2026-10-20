@@ -77,8 +77,10 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 
 ### 5 dakikada yeni proje (template)
 ```bash
-dotnet new install .                 # bu repoyu template olarak kur
-dotnet new novacore -n SiparisServisi
+# Bir kez: GitHub Packages feed'i, read:packages yetkili bir token'la (bkz. Çekirdeği Dağıtma)
+dotnet nuget add source https://nuget.pkg.github.com/alimuhammedak/index.json -n novacore -u <github-kullanıcısı> -p <token>
+dotnet new install BMD.NovaCore.Templates::0.1.0-preview.1
+dotnet new novacore -n SiparisServisi            # --auth BuiltIn (varsayılan) | External
 ```
 
 ---
@@ -141,7 +143,7 @@ NovaCore.slnx
 ├── docker-compose.yml             # opsiyonel SQL Server + Seq + Jaeger (imaj sürümleri pinli)
 ├── docker-compose.keycloak.yml    # opsiyonel harici IdP: Keycloak + örnek realm (deploy/keycloak/)
 ├── .env.example                   # compose parolaları için şablon (.env git-ignored)
-├── .template.config/template.json # `dotnet new novacore`
+├── eng/template-smoke.sh          # şablonu paketlerden kurup her kimlik seçeneğiyle build/test eden smoke testi
 │
 ├── src/
 │   ├── BuildingBlocks/
@@ -161,9 +163,12 @@ NovaCore.slnx
 │   │       ├── NovaCore.Modules.Payments.Contracts/ # PaymentCreated (Catalog'un tepki verdiği event)
 │   │       └── NovaCore.Modules.Payments/           # PaymentsModule (schema: payments) — Catalog'a Contracts ile bağlı
 │   │
-│   └── Api/
-│       └── NovaCore.Api/           # Program.cs: composition root, her şeyi açıkça ekler
-│           └── Identity/           # kimlik sağlayıcının migration'ları + design-time factory (schema: identity)
+│   ├── Api/
+│   │   └── NovaCore.Api/           # Program.cs: composition root, her şeyi açıkça ekler
+│   │       └── Identity/           # kimlik sağlayıcının migration'ları + design-time factory (schema: identity)
+│   │
+│   └── Templates/
+│       └── NovaCore.Templates/     # `dotnet new novacore` şablon paketi (BMD.NovaCore.Templates); şablon content/novacore'da
 │
 └── tests/
     └── NovaCore.Api.Tests/         # unit + integration (WebApplicationFactory) + architecture testleri
@@ -586,21 +591,27 @@ dotnet test
 
 İki tamamlayıcı yol:
 
-1. **`dotnet new` template (birincil):** tüm iskeleti saniyeler içinde üretir.
+1. **`dotnet new` template (birincil):** `BMD.NovaCore.Templates` şablon paketi (`src/Templates/NovaCore.Templates`)
+   iskeleti paketlere bağlı olarak üretir: Api host, örnek `Todos` modülü, test projesi, CI. Repo'nun kendi dosyaları
+   (BuildingBlocks kaynağı, plan belgeleri, `.claude/`, `release.yml`, PublicAPI dosyaları) şablona girmez.
    ```bash
-   dotnet new install .
-   dotnet new novacore -n YeniProje
+   dotnet new install BMD.NovaCore.Templates::0.1.0-preview.1
+   dotnet new novacore -n YeniProje --auth BuiltIn   # ya da External: yalnızca Jwt:Authority, kimlik sağlayıcı yok
    ```
 2. **Lokal/özel NuGet paketi (BuildingBlocks için):** yalnızca stabil çekirdeği versiyonlu paketleyip
    bir bug fix'i tüm projelere yayın.
    ```bash
    dotnet pack NovaCore.slnx -c Release -o ./artifacts                               # 0.1.0
    dotnet pack NovaCore.slnx -c Release -o ./artifacts --version-suffix preview.1    # 0.1.0-preview.1
-   # artifacts/ klasörünü lokal feed olarak ekleyin, sonra: dotnet add package NovaCore.AspNetCore (ve ihtiyaca göre diğerleri)
+   # artifacts/ klasörünü lokal feed olarak ekleyin, sonra: dotnet add package BMD.NovaCore.AspNetCore (ve ihtiyaca göre diğerleri)
    ```
-   - Yedi paket üretilir: çekirdek `NovaCore.Abstractions`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore`;
-     eklentiler `NovaCore.Serilog`, `NovaCore.OpenTelemetry`, `NovaCore.Scalar`, `NovaCore.Identity.OpenIddict`.
-     Modüller paketlenmez.
+   - Yedi kütüphane paketi ve şablon paketi üretilir: çekirdek `BMD.NovaCore.Abstractions`, `BMD.NovaCore.AspNetCore`,
+     `BMD.NovaCore.EntityFrameworkCore`; eklentiler `BMD.NovaCore.Serilog`, `BMD.NovaCore.OpenTelemetry`,
+     `BMD.NovaCore.Scalar`, `BMD.NovaCore.Identity.OpenIddict`; şablon `BMD.NovaCore.Templates`. Modüller paketlenmez.
+   - **Paket ID'leri `BMD.` önekini taşır, içlerindeki assembly ve namespace'ler `NovaCore.*`'dır** (`BMD.NovaCore.AspNetCore`
+     → `using NovaCore.AspNetCore;`). nuget.org'da başka sahiplerin `NovaCore.*` paketleri var (`NovaCore.AspNetCore`,
+     `NovaCore.Templates` dahil); paket ID'si her yerde benzersiz olmalı (DECISIONS D-041). Üretilen projenin
+     `nuget.config`'i `BMD.NovaCore.*`'ı yalnızca GitHub feed'ine eşler (package source mapping).
    - Sürüm `Directory.Build.props`'taki `VersionPrefix`'ten gelir. API kararlı olana kadar 0.x kalır.
    - Her paket XML dokümanını, `src/PACKAGE.md`'den gelen README'yi, MIT lisans ifadesini ve repo linkini taşır. Yanında bir `.snupkg` sembol paketi üretilir.
    - Public API `PublicAPI.*.txt` dosyalarında izlenir. İzlenmeyen bir değişiklik build'i kırar.

@@ -69,9 +69,11 @@ dotnet ef database update     --project src/Modules/<M>/NovaCore.Modules.<M> --s
 # The identity provider's context comes from the NovaCore.Identity.OpenIddict package; its migrations live in the Api (R-060):
 dotnet ef migrations add <Name> --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context IdentityServerDbContext --output-dir Identity/Migrations
 
-# Scaffold a fresh project from this repo (it is a `dotnet new` template)
-dotnet new install .
-dotnet new novacore -n MyProject
+# The template package (src/Templates/NovaCore.Templates, package BMD.NovaCore.Templates) and its smoke test: packs every
+# package into a local feed, creates a project with --auth BuiltIn and External, builds, tests and checks its migrations.
+bash eng/template-smoke.sh [work-dir]
+dotnet new install BMD.NovaCore.Templates::<version>    # from the GitHub Packages feed
+dotnet new novacore -n MyProject [--auth BuiltIn|External]
 
 # NuGet packages (the seven IsPackable building blocks) → artifacts/ (git-ignored). Version: VersionPrefix in Directory.Build.props.
 dotnet pack NovaCore.slnx -c Release -o artifacts [--version-suffix preview.1]

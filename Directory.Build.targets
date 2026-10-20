@@ -6,11 +6,25 @@
     (docs/plan/RESEARCH.md R-032). These properties are read when pack runs, so setting them this late is fine.
   -->
   <PropertyGroup Condition="'$(IsPackable)' == 'true'">
+    <!--
+      Package IDs carry the BMD prefix: other owners already publish NovaCore.* packages on nuget.org (NovaCore.AspNetCore,
+      NovaCore.Templates, ...), and a package ID must be unique wherever it can be resolved (docs/plan/DECISIONS.md
+      D-041). Assembly and namespace names stay NovaCore.*: BMD.NovaCore.AspNetCore contains NovaCore.AspNetCore.dll.
+    -->
+    <PackageId>BMD.$(MSBuildProjectName)</PackageId>
     <Authors>Muhammed Ali AK</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/alimuhammedak/NovaCore</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <!--
+    Symbols, package validation, XML docs and the public API baseline concern assemblies. A template package
+    (PackageType=Template, src/Templates) packs files only, so none of them applies to it.
+  -->
+  <PropertyGroup Condition="'$(IsPackable)' == 'true' And '$(PackageType)' != 'Template'">
+    <NovaCoreLibraryPackage>true</NovaCoreLibraryPackage>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EnablePackageValidation>true</EnablePackageValidation>
@@ -18,6 +32,9 @@
 
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)src/PACKAGE.md" Pack="true" PackagePath="README.md" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(NovaCoreLibraryPackage)' == 'true'">
     <!--
       The public API baseline read by Microsoft.CodeAnalysis.PublicApiAnalyzers. The package doesn't add these itself
       (checked in its buildTransitive files, R-037). Everything goes to Unshipped until a release is declared (F5.4).
@@ -31,7 +48,7 @@
     .csproj sets GenerateDocumentationFile itself. This check stops a new package from shipping without docs.
   -->
   <Target Name="NovaCoreRequirePackageDocumentation" BeforeTargets="CoreCompile"
-          Condition="'$(IsPackable)' == 'true' And '$(DocumentationFile)' == ''">
+          Condition="'$(NovaCoreLibraryPackage)' == 'true' And '$(DocumentationFile)' == ''">
     <Error Text="$(MSBuildProjectName) is packable but generates no XML documentation. Set &lt;GenerateDocumentationFile&gt;true&lt;/GenerateDocumentationFile&gt; next to IsPackable in its .csproj (docs/plan/DECISIONS.md D-014)." />
   </Target>
 
@@ -39,7 +56,7 @@
     The PublicAPI.*.txt files above are only checked when the project references the analyzer. Without it, a new package
     would silently ship an untracked public API, so a packable project without the reference fails the build (D-020).
   -->
-  <Target Name="NovaCoreRequirePublicApiTracking" BeforeTargets="CoreCompile" Condition="'$(IsPackable)' == 'true'">
+  <Target Name="NovaCoreRequirePublicApiTracking" BeforeTargets="CoreCompile" Condition="'$(NovaCoreLibraryPackage)' == 'true'">
     <ItemGroup>
       <_NovaCorePublicApiAnalyzers Include="@(PackageReference)" Condition="'%(Identity)' == 'Microsoft.CodeAnalysis.PublicApiAnalyzers'" />
     </ItemGroup>

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- The host: a thin composition root over the NovaCore packages and the modules. -->
+  <PropertyGroup>
+    <UserSecretsId>myservice-api</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BMD.NovaCore.AspNetCore" />
+    <PackageReference Include="BMD.NovaCore.EntityFrameworkCore" />
+    <PackageReference Include="BMD.NovaCore.OpenTelemetry" />
+    <PackageReference Include="BMD.NovaCore.Scalar" />
+<!--#if (BuiltInAuth) -->
+    <!-- The identity provider and its store, which runs on SQL Server; its migrations live in this project. -->
+    <PackageReference Include="BMD.NovaCore.Identity.OpenIddict" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <!-- Lifts SqlClient's vulnerable System.Security.Cryptography.Pkcs (see Directory.Packages.props). -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+    <!-- Lets `dotnet ef` use this project for the identity provider's migrations. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+<!--#endif -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Modules\Todos\MyService.Modules.Todos\MyService.Modules.Todos.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,27 @@
+## Build output
+bin/
+obj/
+out/
+artifacts/
+TestResults/
+*.trx
+
+## IDEs
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+## Local secrets and settings
+.env
+*.local.json
+appsettings.*.local.json
+secrets.json
+
+## Logs and local databases
+logs/
+*.log
+*.db
+*.db-shm
+*.db-wal

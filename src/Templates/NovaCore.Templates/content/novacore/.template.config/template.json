@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "NovaCore",
+  "classifications": [ "Web", "API", "Modular Monolith", "Vertical Slice" ],
+  "identity": "NovaCore.ModularMonolith.CSharp",
+  "name": "NovaCore modular monolith (.NET 10 Web API)",
+  "description": "A .NET 10 modular-monolith Web API on the NovaCore packages: an API host, a sample vertical-slice module, integration tests with an in-memory OpenID Connect issuer, and a CI workflow that checks the migrations and bundles them.",
+  "shortName": "novacore",
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "sourceName": "MyService",
+  "preferNameDirectory": true,
+  "symbols": {
+    "auth": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "Where the access tokens the API accepts come from.",
+      "choices": [
+        {
+          "choice": "BuiltIn",
+          "description": "The host runs its own OpenID Connect provider (NovaCore.Identity.OpenIddict): accounts, sign-in pages and tokens."
+        },
+        {
+          "choice": "External",
+          "description": "An external OpenID Connect provider (Entra ID, Keycloak, ...) issues the tokens; the host only validates them through Jwt:Authority."
+        }
+      ],
+      "defaultValue": "BuiltIn"
+    },
+    "BuiltInAuth": {
+      "type": "computed",
+      "value": "(auth == \"BuiltIn\")"
+    },
+    "HttpsPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": {
+        "low": 7000,
+        "high": 7300,
+        "fallback": 7001
+      },
+      "replaces": "5443"
+    },
+    "HttpPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": {
+        "low": 5000,
+        "high": 5300,
+        "fallback": 5001
+      },
+      "replaces": "5080"
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "condition": "(!BuiltInAuth)",
+          "exclude": [
+            "src/Api/MyService.Api/Identity/**",
+            "tests/MyService.Api.Tests/IdentityProviderTests.cs"
+          ]
+        }
+      ]
+    }
+  ]
+}

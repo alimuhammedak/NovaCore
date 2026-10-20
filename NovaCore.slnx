@@ -21,6 +21,9 @@
     <Project Path="src/Modules/Payments/NovaCore.Modules.Payments.Contracts/NovaCore.Modules.Payments.Contracts.csproj" />
     <Project Path="src/Modules/Payments/NovaCore.Modules.Payments/NovaCore.Modules.Payments.csproj" />
   </Folder>
+  <Folder Name="/src/Templates/">
+    <Project Path="src/Templates/NovaCore.Templates/NovaCore.Templates.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NovaCore.Api.Tests/NovaCore.Api.Tests.csproj" />
   </Folder>

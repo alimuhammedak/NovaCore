@@ -3,6 +3,9 @@
 Building blocks for .NET 10 modular-monolith Web APIs. The core packages depend on the BCL and Microsoft packages
 only; third-party integrations are separate, optional add-ons.
 
+The packages are `BMD.NovaCore.*`; the assemblies and namespaces inside them are `NovaCore.*` (`BMD.NovaCore.AspNetCore`
+contains `NovaCore.AspNetCore`).
+
 | Package | Contents |
 |---|---|
 | `NovaCore.Abstractions` | `Result`/`Error`, paging, base entities, domain-event and current-user abstractions (BCL only) |
@@ -12,6 +15,7 @@ only; third-party integrations are separate, optional add-ons.
 | `NovaCore.OpenTelemetry` | Add-on: OpenTelemetry logs, metrics and tracing, OTLP export |
 | `NovaCore.Scalar` | Add-on: Scalar API reference UI (Development) |
 | `NovaCore.Identity.OpenIddict` | Add-on: OpenID Connect provider (ASP.NET Core Identity + OpenIddict) |
+| `NovaCore.Templates` | The `dotnet new novacore` template: an API host, a sample module, tests and CI, on these packages |
 
 > **Pre-release (0.x).** The public API is not stable yet. Package names and namespaces are expected to change before
 > 1.0, and a 0.x minor version may contain breaking changes.

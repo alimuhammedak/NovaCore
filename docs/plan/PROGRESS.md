@@ -899,12 +899,22 @@ Plan onayı 2026-10-20. Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents
 ### Faz 5
 Plan onayı 2026-10-20. Uygulama sırası F5.4 → F5.1a → F5.1b → F5.1c → F5.2 → F5.5 (ID'ler sabit). Kanal ve ilk sürüm plan aşamasında soruldu (Q-32, Q-33). Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmuyor (4d'deki kullanıcı kararı); commit'ler dosya dosya stage'leniyor.
 
-- [x] F5.1a (bkz. commit): Tek log hattı OpenTelemetry (R-089, D-040 (1)–(2)).
+- [x] F5.1a (d3c612b): Tek log hattı OpenTelemetry (R-089, D-040 (1)–(2)).
   - **Sürpriz:** `UseOtlpExporter`, paketin kendi dokümanına göre log'ları zaten açıyordu ("automatically enables logging, metrics, and tracing"). Yani endpoint tanımlıyken log'lar OTLP'ye gidiyordu, ama biçimlenmiş mesaj ve scope'lar olmadan. Adım bu yüzden plandakinden dar: `AddCoreObservability` log sinyalini `WithLogging` ile açıkça kuruyor, `IncludeFormattedMessage` ve `IncludeScopes` açık (MS'in OTLP örneği ve Aspire ServiceDefaults gibi).
   - Repo'nun Api host'u Serilog'da kalıyor; Serilog diğer provider'lara yazmadığı için davranış aynı.
   - Testler 276 → 277: `ObservabilityTests` (OTel log provider'ı kayıtlı, iki seçenek açık). Önce kırmızı.
   - Güncellenenler: CHANGELOG (Changed), `src/PACKAGE.md`, README (OTel satırları), eklentinin csproj açıklaması.
-- [ ] F5.1b Template package
+- [x] F5.1b (bkz. commit): Template package `BMD.NovaCore.Templates` (`src/Templates/NovaCore.Templates`), D-040 (3)–(7), D-041, R-090, R-091.
+  - MS templatepack düzeni; kökteki `.template.config` silindi. Derlenen kodu olmadığı için `Directory.Build.targets`'taki sembol, package validation, XML doc ve PublicAPI kuralları şablon paketine uygulanmıyor (`NovaCoreLibraryPackage`). NU5128 `SuppressDependenciesWhenPacking` ile.
+  - Üretilen projenin NovaCore sürümü pack anında yazılıyor (`TargetsForTfmSpecificContentInPackage`); `--version-suffix` da geçiyor.
+  - İçerik: Api host (`Program.cs`, kontrol listeli `appsettings`, Development dışı probe örneği, üretilen portlar), `Todos` örnek modülü (4 slice, izinler, validation, `Result`→ProblemDetails, `todos` şeması, `Initial` migration, outbox), test projesi (`ApiFactory`, `TestIdentityProvider`, 7 test + BuiltIn'de discovery testi), `nuget.config` (source mapping), CPM, TWAE. `--auth BuiltIn|External`.
+  - **Sürpriz 1 (R-090):** `ContentTargetFolders=content` içeriği `content/content/...` altına koydu; `PackagePath="content"` ile düzeldi.
+  - **Sürpriz 2 (R-091, Q-34):** nuget.org'da başka sahiplerin `NovaCore.Templates`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` paketleri var; `dotnet new`'in güncelleme kontrolü yabancı şablonu önerdi. Kullanıcı kararıyla bütün paket ID'leri `BMD.NovaCore.*` (D-041); assembly ve namespace'ler aynı.
+  - Doğrulama (`bash eng/template-smoke.sh`, yalıtılmış hive ve NuGet önbelleği): BuiltIn 8/8, External 7/7 test; TWAE altında 0 uyarı; `has-pending-model-changes` iki seçenekte temiz; repo'ya özgü dosya, yazar adı ya da çözülmemiş token yok.
+  - Hook: şablonun `Directory.Packages.props`'u ilk kez Bash'le yazılmıştı; paket denetiminden geçmesi için Write ile yeniden yazıldı.
+  - Şablon `src/` altında olduğu için mimari testler onun `.cs` dosyalarını da tarıyor: `SourceHygieneTests` şablonun test yardımcısındaki `TimeProvider.System.GetUtcNow()`'ı yakaladı. Test gevşetilmedi; `TestIdentityProvider` saati constructor'dan alıyor.
+  - Repo: 0 uyarı, 277/277.
+  - Güncellenenler: README (template satırları, proje ağacı, paket ID'leri), kök CLAUDE.md (komutlar), `src/PACKAGE.md`, CHANGELOG.
 - [ ] F5.1c Üretilen projenin CI'ı
 - [ ] F5.2 Tüketici smoke testi
 - [~] F5.3 → Faz 4b'ye taşındı (D-033)
@@ -950,6 +960,7 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-31 | F4d.1: İlk proje hangi IdP modelini kullanacak? (a) kendi host'unda eklenti, (b) projeler arası merkezi IdP, (c) harici IdP (Entra, Keycloak) | F4d.1 | **(a) kendi host'unda eklenti** (2026-10-20, kullanıcı; önerilen seçenek). Faz 4d yürür → D-037 |
 | Q-32 | F5.4 (1): NovaCore paketleri ve şablon paketi hangi kanaldan tüketilsin? (GitHub Packages, nuget.org, yalnızca yerel klasör feed'i) | F5.4 (şablonun `nuget.config`'i ve CI'ı buna bağlı, bu yüzden plan aşamasında) | **GitHub Packages** (2026-10-20, kullanıcı; önerilen seçenek). D-013 olduğu gibi kalır → D-039 |
 | Q-33 | F5.4 (2): İlk sürüm `0.1.0-preview.1` mi, `0.1.0` mı? | F5.4 | **`0.1.0-preview.1`** (2026-10-20, kullanıcı; önerilen seçenek). Tag ve push faz sonunda ayrıca sorulur → D-039 |
+| Q-34 | F5.1b: nuget.org'da başka sahiplerin `NovaCore.Templates`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` paketleri var (R-091). Bizim paket ID'lerimiz ne olsun? (yalnızca şablonun ID'si değişsin / hiçbiri değişmesin / hepsine sahip öneki) | F5.1b | Kullanıcı: "hiçbir sorun yaşamayacak şekilde ilerleyelim, benim ismimi koyma"; önek sorusuna: **"BMD ile başlasın"** (2026-10-20). Bütün ID'ler `BMD.NovaCore.*`, assembly ve namespace'ler aynı → D-041 |
 
 ## Sonraya bırakılanlar
 
