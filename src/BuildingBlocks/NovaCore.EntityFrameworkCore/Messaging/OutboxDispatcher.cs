@@ -25,6 +25,8 @@ namespace NovaCore.EntityFrameworkCore.Messaging;
 /// <item>No transaction is opened here, so each query and write is a retriable unit of the context's execution
 /// strategy.</item>
 /// <item>One dispatcher per database is assumed: two hosts over the same database could both deliver a message.</item>
+/// <item>A processed message stays for <see cref="ProcessedRetention"/>, for inspection, and is then deleted with its
+/// handlers' records. A message left after <see cref="MaxAttempts"/> stays until someone removes it.</item>
 /// </list>
 /// </remarks>
 internal sealed partial class OutboxDispatcher(
@@ -45,6 +47,12 @@ internal sealed partial class OutboxDispatcher(
 
     /// <summary>The longest handler type name <see cref="OutboxConsumer.Handler"/> keeps.</summary>
     public const int MaxHandlerLength = 256;
+
+    /// <summary>
+    /// How long a processed message is kept. A message is only delivered again while it waits in the outbox, so the
+    /// records aren't needed after that; the time is for looking at what happened.
+    /// </summary>
+    public static readonly TimeSpan ProcessedRetention = TimeSpan.FromDays(7);
 
     private const int BatchSize = 50;
 
@@ -89,6 +97,8 @@ internal sealed partial class OutboxDispatcher(
                 }
             }
             while (batch.Count == BatchSize);
+
+            await DeleteExpiredAsync(outbox, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
@@ -107,7 +117,7 @@ internal sealed partial class OutboxDispatcher(
             var invoker = invokers.For(domainEvent.GetType());
             var finished = await outbox.Set<OutboxConsumer>()
                 .AsNoTracking()
-                .Where(consumer => consumer.EventId == message.EventId)
+                .Where(consumer => consumer.MessageId == message.Id)
                 .Select(consumer => consumer.Handler)
                 .ToListAsync(cancellationToken);
 
@@ -130,7 +140,7 @@ internal sealed partial class OutboxDispatcher(
 
                     outbox.Add(new OutboxConsumer
                     {
-                        EventId = message.EventId,
+                        MessageId = message.Id,
                         Handler = name,
                         ProcessedOnUtc = timeProvider.GetUtcNow()
                     });
@@ -162,6 +172,38 @@ internal sealed partial class OutboxDispatcher(
                 LogDeliveryFailed(message.EventId, message.Type, attempt, MaxAttempts, exception);
             else
                 LogDeliveryAbandoned(message.EventId, message.Type, attempt, exception);
+        }
+    }
+
+    // SQLite can't compare DateTimeOffset values in SQL (docs/plan/RESEARCH.md R-068), so the age is checked here, on the
+    // oldest processed messages in Id order, a batch at a time. Messages are processed roughly in that order, so the
+    // first batch with one still within the retention ends the sweep; a later expired one goes on a later pass.
+    private async Task DeleteExpiredAsync(DbContext outbox, CancellationToken cancellationToken)
+    {
+        var cutoff = timeProvider.GetUtcNow() - ProcessedRetention;
+        var after = 0L;
+        while (true)
+        {
+            var batch = await outbox.Set<OutboxMessage>()
+                .AsNoTracking()
+                .Where(message => message.ProcessedOnUtc != null && message.Id > after)
+                .OrderBy(message => message.Id)
+                .Take(BatchSize)
+                .Select(message => new { message.Id, message.ProcessedOnUtc })
+                .ToListAsync(cancellationToken);
+
+            var expired = batch.Where(message => message.ProcessedOnUtc < cutoff).Select(message => message.Id).ToList();
+            if (expired.Count > 0)
+            {
+                await outbox.Set<OutboxMessage>()
+                    .Where(message => expired.Contains(message.Id))
+                    .ExecuteDeleteAsync(cancellationToken);
+            }
+
+            if (batch.Count < BatchSize || expired.Count < batch.Count)
+                return;
+
+            after = batch[^1].Id;
         }
     }
 

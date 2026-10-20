@@ -127,7 +127,7 @@ NovaCore.AspNetCore        NovaCore.EntityFrameworkCore     (çekirdek: yalnızc
 | OpenAPI (+ Scalar eklentisi), rate limiting, CORS | |
 | JWT bearer auth (`Jwt:Authority`) + permission-based authz altyapısı | Kimlik sağlayıcının store'u ve migration'ları (host'ta) |
 | Kimlik sağlayıcı eklentisi (`NovaCore.Identity.OpenIddict`) | Client'lar, seed yöneticisi, üretim sertifikaları |
-| Auditing interceptor, domain-event dispatcher | |
+| Auditing interceptor, transactional outbox ve dispatcher'ı | |
 
 ---
 
@@ -147,7 +147,7 @@ NovaCore.slnx
 │   ├── BuildingBlocks/
 │   │   ├── NovaCore.Abstractions/        # Result, PagedList, Entity, IDomainEvent/DomainEvent, ICurrentUser (yalnızca BCL)
 │   │   ├── NovaCore.AspNetCore/          # IModule + AddModule<T>, AddCoreDefaults/AddCoreWeb, ProblemDetails, Result→HTTP, JWT, authz, OpenAPI, HybridCache
-│   │   ├── NovaCore.EntityFrameworkCore/ # AddModuleDbContext, AddCorePersistence: auditing, startup migration, domain-event dispatcher
+│   │   ├── NovaCore.EntityFrameworkCore/ # AddModuleDbContext, AddCorePersistence: auditing, startup migration, outbox + dispatcher
 │   │   ├── NovaCore.Serilog/             # eklenti: AddCoreLogging (Console + opsiyonel Seq)
 │   │   ├── NovaCore.OpenTelemetry/       # eklenti: AddCoreObservability (metrics + tracing, OTLP)
 │   │   ├── NovaCore.Scalar/              # eklenti: MapCoreScalar (Scalar UI, yalnızca Development)
@@ -313,9 +313,13 @@ outbox**): entity değişikliği ve event ya birlikte kalıcı olur ya hiç olma
 - açılışta bir tur çalışır, sonra 5 saniyede bir. Önce en eski mesaj alınır, ama hata alan bir mesaj sonraki turda
   daha yenilerinden sonra denenir: sıra garantisi yoktur;
 - her mesaj için bir DI scope açar; o mesajın handler'ları bu scope'u paylaşır;
-- işini bitiren handler'ı `outbox_consumers`'a (processed tablosu) yazar. Hata olursa mesaj sonraki turda yeniden
-  denenir, ama başarılı handler'lar tekrar çalışmaz;
-- 10 denemeden sonra mesajı inceleme için outbox'ta bırakır.
+- işini bitiren handler'ı `outbox_consumers`'a (processed tablosu, anahtarı mesaj satırının `Id`'si + handler) yazar.
+  Hata olursa mesaj sonraki turda yeniden denenir, ama başarılı handler'lar tekrar çalışmaz;
+- 10 denemeden sonra mesajı inceleme için outbox'ta bırakır;
+- işlenmiş mesajı 7 gün sonra siler; handler kayıtları FK'nin cascade delete'iyle onunla gider. İncelemeye bırakılan
+  mesaj silinmez.
+
+Event'leri dağıtmanın tek yolu budur: entity event'lerini outbox'ı atlayıp hemen çalıştıran bir dispatcher yoktur.
 
 Garanti **en az bir kez**dir: bir handler'ın kendi kaydıyla bu işaret arasında süreç ölürse handler bir kez daha
 çalışır. Handler'lar bu yüzden idempotent yazılır. Veritabanı başına tek dispatcher varsayılır.

@@ -8,7 +8,7 @@ Stack: **xUnit v3** (test projects are `OutputType=Exe`). Run a single test with
 ## Three flavors, one project
 
 - **Unit** (`Unit/`) — pure logic (`Result<T>`, pagination), and building blocks on a small generic host of their own
-  (`Host.CreateApplicationBuilder`, never the Api): startup migrations, domain-event dispatch and the outbox.
+  (`Host.CreateApplicationBuilder`, never the Api): startup migrations and the outbox.
 - **Integration** (`Integration/`) — boot the real host via `NovaCoreApiFactory` (`WebApplicationFactory`).
   DB-free tests (health, OpenAPI, security headers, 401/validation gates) need no seeding. A caller with specific roles
   comes from `factory.CreateClientWithClaims(...)`: the factory's in-memory issuer (`factory.IdentityProvider`, see
@@ -68,6 +68,9 @@ call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsT
 - Wait on visible effects (the outbox row, the handler log), polling with a timeout. One advance can yield two passes,
   so assert "at least" or keep advancing until the end state; to show that a pass ran, save a later "barrier"
   message and wait for it.
+- Don't advance the clock by days: `FakeTimeProvider` fires a periodic timer once per period it moves over, so 7 days
+  of a 5-second timer is 120,000 callbacks (about a minute). Age rows by their timestamps instead
+  (`AddProcessedMessageAsync` for the retention tests).
 
 On the Api host the dispatcher runs too. With `FakeClockApiFactory` its timer follows the fake clock:
 `OutboxDelivery.RunUntilAsync(factory.Clock, condition)` advances it by the polling interval until the effect shows up

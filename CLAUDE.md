@@ -124,8 +124,10 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
   the entity writes it to the module's `outbox_messages` in the same transaction (`OutboxInterceptor`, added by
   `AddModuleDbContext`; the context calls `modelBuilder.AddOutbox()`). `OutboxDispatcher`, a `BackgroundService` from
   `AddCorePersistence`, delivers the events to their `IDomainEventHandler<T>`s: each message in its own DI scope, each
-  handler once (`outbox_consumers` records the finished ones), retried on later passes, left for inspection after 10
-  failures. Delivery is at least once, so handlers must be idempotent; one dispatcher per database (D-031, R-068).
+  handler once (`outbox_consumers` records the finished ones, keyed by the message row), retried on later passes, left
+  for inspection after 10 failures; processed messages are deleted with their records after 7 days. Delivery is at
+  least once, so handlers must be idempotent; one dispatcher per database (D-031, D-036 (7), R-068). The outbox is the
+  only event path: there is no in-process dispatcher.
 
 - **Security** is a first-class subsystem. The core only *validates* access tokens (D-002): JWT bearer against an
   OpenID Connect provider, `Jwt:Authority` (issuer + JWKS discovered, asymmetric algorithms only), required in every

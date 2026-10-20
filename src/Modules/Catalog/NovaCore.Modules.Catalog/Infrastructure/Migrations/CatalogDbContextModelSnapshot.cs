@@ -25,8 +25,8 @@ namespace NovaCore.Modules.Catalog.Infrastructure.Migrations
 
             modelBuilder.Entity("NovaCore.EntityFrameworkCore.Messaging.OutboxConsumer", b =>
                 {
-                    b.Property<Guid>("EventId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<long>("MessageId")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("Handler")
                         .HasMaxLength(256)
@@ -35,7 +35,7 @@ namespace NovaCore.Modules.Catalog.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("ProcessedOnUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.HasKey("EventId", "Handler");
+                    b.HasKey("MessageId", "Handler");
 
                     b.ToTable("outbox_consumers", "catalog");
                 });
@@ -170,6 +170,15 @@ namespace NovaCore.Modules.Catalog.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("stock_reservations", "catalog");
+                });
+
+            modelBuilder.Entity("NovaCore.EntityFrameworkCore.Messaging.OutboxConsumer", b =>
+                {
+                    b.HasOne("NovaCore.EntityFrameworkCore.Messaging.OutboxMessage", null)
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

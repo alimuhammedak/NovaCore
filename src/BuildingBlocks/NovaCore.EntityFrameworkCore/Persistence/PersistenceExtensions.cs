@@ -17,10 +17,10 @@ public static class PersistenceExtensions
     private const string ReadyTag = "ready";
 
     /// <summary>
-    /// Registers the persistence services every module DbContext relies on: the audit-stamping interceptor, the
-    /// in-process domain-event dispatcher, the startup migrations, which run only when <c>Database:ApplyMigrations</c> is
-    /// true, and the outbox dispatcher, a background service that delivers the events in every module's outbox to their
-    /// handlers. Call it before registering the modules, so the migrations run before any module's own hosted services.
+    /// Registers the persistence services every module DbContext relies on: the audit-stamping interceptor, the startup
+    /// migrations, which run only when <c>Database:ApplyMigrations</c> is true, and the outbox dispatcher, a background
+    /// service that delivers the events in every module's outbox to their handlers and deletes processed messages after
+    /// a retention. Call it before registering the modules, so the migrations run before any module's own hosted services.
     /// </summary>
     /// <param name="builder">The host application builder.</param>
     /// <returns><paramref name="builder"/>, for chaining.</returns>
@@ -32,8 +32,7 @@ public static class PersistenceExtensions
         services.TryAddScoped<AuditableEntityInterceptor>();
         services.TryAddSingleton(TimeProvider.System);
 
-        // In-process domain-event dispatch, in the caller's scope: handlers are usually scoped (they use a DbContext).
-        services.TryAddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+        // How the outbox dispatcher finds and runs the handlers of an event type, built once per type.
         services.TryAddSingleton<DomainEventHandlerInvokers>();
 
         // Opt-in: apply every module's EF Core migrations on startup. Off by default so test hosts and DB-less runs

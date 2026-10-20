@@ -737,3 +737,23 @@ Biçim:
   - Azure App Service'in otomatik `%HOME%` deposu da açık sayılmaz; host onu tek satırla (`PersistKeysToFileSystem`) belirtir.
   - Depo paketi eklenmez (`Microsoft.AspNetCore.DataProtection.EntityFrameworkCore`); depoyu host seçer.
 
+### R-082: Outbox tüketici anahtarı, saklama süresi ve migration'ın veri dönüşümü (2026-10-20, faz 4c; kaynak + ölçüm)
+- Soru: `outbox_consumers` mesaj satırına nasıl bağlanır? İşlenmiş mesajlar ne zaman ve nasıl silinir (SQLite testleri dahil)? Migration mevcut satırları güvenle nasıl dönüştürür?
+- Bulgu:
+  - Anahtar: R-068'deki SQL Server index rehberi (dar, benzersiz, sürekli artan clustered anahtar) tüketici tablosu için de geçerli. (`bigint` mesaj `Id`'si, Handler) bunu sağlıyor; (`uniqueidentifier`, `nvarchar(256)`) sağlamıyordu. FK'nin cascade delete'i, toplu silmede kayıtları veritabanının silmesini sağlar.
+  - Saklama:
+    - MS Idempotent Consumer, işlenmiş kayıtların tekrar teslim penceresinden uzun tutulmasını öneriyor (R-068).
+    - Burada bir mesaj yalnızca outbox'ta bekledikçe yeniden teslim edilir (10 deneme × 5 sn ≈ 50 sn); süre inceleme içindir. 7 gün seçildi.
+    - SQLite `DateTimeOffset` karşılaştırmasını SQL'e çeviremediği için (R-068) süre bellekte karşılaştırılır. En eski işlenmiş mesajlar `Id` sırasıyla 50'şer okunur, süresi dolanlar `ExecuteDelete` ile silinir.
+  - Ölçüm (FakeTimeProvider): saati 7 gün ilerletmek, 5 sn periyotlu `PeriodicTimer`'ı her periyot için bir kez tetikledi; iki test yaklaşık 55'er sn sürdü. Testler artık satırları zaman damgasıyla yaşlandırıyor ve 50–110 ms sürüyor.
+  - Migration:
+    - EF'in ürettiği adımlar (`DropColumn EventId` + `AddColumn MessageId default 0`) mevcut kayıtları kaybettirirdi.
+    - Elle yazılan adımlar: nullable kolon ekle → `UPDATE … JOIN` ile doldur → sahipsiz kaydı sil → PK ve `EventId`'yi kaldır → `NOT NULL` → yeni PK ve FK.
+    - `dotnet ef migrations script` migration'ı tek batch olarak üretiyor. Yeni kolonu kullanan ifade aynı batch'te derlenirse SQL Server "Invalid column name" verir; bu yüzden ifadeler `EXEC(N'…')` içindedir.
+    - Yerel SQL Server'da geçici bir veritabanıyla denendi:
+      - Script ile Up: iki kayıt dönüştü, sahipsiz kayıt silindi, mesajın silinmesi kaydını cascade ile götürdü.
+      - Çalışma zamanında Down `EventId`'yi geri getirdi, tekrar Up başarılı oldu.
+      - Payments'ın bütün zinciri boş şemada uygulandı. Veritabanı sonra silindi.
+- Kaynak: https://learn.microsoft.com/sql/relational-databases/sql-server-index-design-guide#clustered-index-design-guidelines · https://learn.microsoft.com/azure/architecture/patterns/idempotent-consumer · https://learn.microsoft.com/ef/core/providers/sqlite/limitations · https://learn.microsoft.com/ef/core/managing-schemas/migrations/managing#customize-migration-code · https://learn.microsoft.com/sql/t-sql/language-elements/execute-transact-sql
+- Sonuç (D-036 (7)).
+

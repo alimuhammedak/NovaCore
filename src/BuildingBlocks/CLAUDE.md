@@ -25,18 +25,21 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 
 - **`NovaCore.EntityFrameworkCore`** — persistence without ASP.NET Core: `AddModuleDbContext` (also a "ready"-tagged
   `AddDbContextCheck` per context, and the `OutboxInterceptor` on every module context), `AddOutbox()` (maps a module's
-  `outbox_messages`), `AddCorePersistence` (`AuditableEntityInterceptor`, a scoped `IDomainEventDispatcher` that runs
-  handlers in the caller's scope, `DatabaseMigrationService`, which migrates only when `Database:ApplyMigrations` is
-  true). Handlers of an event type are resolved and invoked through a `DomainEventHandlerInvoker<TEvent>` built once per
-  type, so dispatching costs no reflection. Depends on Abstractions,
+  `outbox_messages` and `outbox_consumers`), `AddCorePersistence` (`AuditableEntityInterceptor`,
+  `DatabaseMigrationService`, which migrates only when `Database:ApplyMigrations` is true, and the outbox dispatcher).
+  The dispatcher resolves and invokes the handlers of an event type through a `DomainEventHandlerInvoker<TEvent>` built
+  once per type, so dispatching costs no reflection. There is no in-process dispatcher: an event that skipped the
+  outbox would skip its transaction too (F4c.7). Depends on Abstractions,
   EF Core and `Microsoft.Extensions` hosting/options/health-check packages only, never on AspNetCore (D-020).
   `OutboxInterceptor` adds the outbox rows in `SavingChanges`, which EF Core runs before it detects changes and saves,
   so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068).
   `AddCorePersistence` also registers `OutboxDispatcher` (a `BackgroundService`): a pass at startup, then every 5 seconds
   on a `PeriodicTimer` driven by `TimeProvider`. It reads each outbox in `Id` order in keyset batches, gives each message
-  a DI scope for its handlers and records the finished handlers in `outbox_consumers`. It opens no transaction, so every
-  query and write is a retriable unit of the context's execution strategy. The interval, batch size and 10 attempts are
-  constants: no consumer needs them configurable yet (Y-19).
+  a DI scope for its handlers and records the finished handlers in `outbox_consumers` (key: the message's `Id` + the
+  handler, FK with cascade delete). Each pass then deletes the processed messages older than `ProcessedRetention`
+  (7 days); the age is compared in memory over `Id`-ordered batches, since SQLite can't compare `DateTimeOffset` in SQL
+  (R-068). It opens no transaction, so every query and write is a retriable unit of the context's execution strategy.
+  The interval, batch size, 10 attempts and the retention are constants: no consumer needs them configurable yet (Y-19).
 
 **Add-ons** (optional, one third-party library each; they may reference AspNetCore/Abstractions only):
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`), `NovaCore.Scalar`

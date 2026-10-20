@@ -116,6 +116,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `outbox_consumers` is keyed by the message row (`MessageId`, the outbox's `bigint` key) and the handler, with a
+  cascading foreign key, instead of the event id: narrow and ever-increasing like the outbox's own key. The
+  `OutboxConsumersByMessage` migrations carry existing records over. The outbox dispatcher deletes processed messages,
+  and with them their records, 7 days after they were processed; messages left for inspection stay.
+
 - `ToHttpResult` returns typed unions instead of `IResult`: `Result` → `Results<NoContent, ProblemHttpResult>`,
   `Result<T>` → `Results<Ok<T>, ProblemHttpResult>`, and `ToHttpResult(value => TypedResults.Created(...))` →
   `Results<TSuccess, ProblemHttpResult>`; `Problem(Error)` returns `ProblemHttpResult`. The `(Result, int)` overload is
@@ -242,6 +247,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DomainEventDispatcher` is now internal; use `IDomainEventDispatcher`.
 
 ### Removed
+
+- `IDomainEventDispatcher` (and its implementation), the in-process way to run domain-event handlers. Nothing called
+  it, and an event dispatched through it skipped the transactional outbox. Events go through the outbox only.
 
 - `GlobalExceptionHandler`. Its mapping is now the exception handler middleware's own fallback
   (`ExceptionHandlerOptions.StatusCodeSelector` and the ProblemDetails customization), so an `IExceptionHandler` a project
