@@ -899,10 +899,16 @@ Plan onayı 2026-10-20. Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents
 ### Faz 5
 Plan onayı 2026-10-20. Uygulama sırası F5.4 → F5.1a → F5.1b → F5.1c → F5.2 → F5.5 (ID'ler sabit). Kanal ve ilk sürüm plan aşamasında soruldu (Q-32, Q-33). Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmuyor (4d'deki kullanıcı kararı); commit'ler dosya dosya stage'leniyor.
 
-- [ ] F5.1 Template package
+- [x] F5.1a (bkz. commit): Tek log hattı OpenTelemetry (R-089, D-040 (1)–(2)).
+  - **Sürpriz:** `UseOtlpExporter`, paketin kendi dokümanına göre log'ları zaten açıyordu ("automatically enables logging, metrics, and tracing"). Yani endpoint tanımlıyken log'lar OTLP'ye gidiyordu, ama biçimlenmiş mesaj ve scope'lar olmadan. Adım bu yüzden plandakinden dar: `AddCoreObservability` log sinyalini `WithLogging` ile açıkça kuruyor, `IncludeFormattedMessage` ve `IncludeScopes` açık (MS'in OTLP örneği ve Aspire ServiceDefaults gibi).
+  - Repo'nun Api host'u Serilog'da kalıyor; Serilog diğer provider'lara yazmadığı için davranış aynı.
+  - Testler 276 → 277: `ObservabilityTests` (OTel log provider'ı kayıtlı, iki seçenek açık). Önce kırmızı.
+  - Güncellenenler: CHANGELOG (Changed), `src/PACKAGE.md`, README (OTel satırları), eklentinin csproj açıklaması.
+- [ ] F5.1b Template package
+- [ ] F5.1c Üretilen projenin CI'ı
 - [ ] F5.2 Tüketici smoke testi
 - [~] F5.3 → Faz 4b'ye taşındı (D-033)
-- [x] F5.4 (bkz. commit): Kanal GitHub Packages (D-013 kalır), ilk sürüm `0.1.0-preview.1` (Q-32, Q-33 → D-039). Kod değişmiyor; `release.yml` şablon paketini de aynı sürümle yayımlayacak (F5.1b'den sonra doğrulanır). Tag ve push faz sonunda ayrıca sorulacak.
+- [x] F5.4 (a7f6bdf): Kanal GitHub Packages (D-013 kalır), ilk sürüm `0.1.0-preview.1` (Q-32, Q-33 → D-039). Kod değişmiyor; `release.yml` şablon paketini de aynı sürümle yayımlayacak (F5.1b'den sonra doğrulanır). Tag ve push faz sonunda ayrıca sorulacak.
 - [ ] F5.5 Final dokümanlar
 
 ## Açık sorular (Q)

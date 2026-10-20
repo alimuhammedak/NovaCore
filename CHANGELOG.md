@@ -131,6 +131,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `AddCoreObservability` (`NovaCore.OpenTelemetry`) sets up the log signal itself: `ILogger` records go through
+  OpenTelemetry with their rendered message and scopes, and are exported over OTLP with the metrics and traces when
+  `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Before, OTLP export turned logs on implicitly without the message and scopes. A
+  host that uses Serilog (`AddCoreLogging`) is unaffected: Serilog doesn't write to other logging providers.
+
 - `outbox_consumers` is keyed by the message row (`MessageId`, the outbox's `bigint` key) and the handler, with a
   cascading foreign key, instead of the event id: narrow and ever-increasing like the outbox's own key. The
   `OutboxConsumersByMessage` migrations carry existing records over. The outbox dispatcher deletes processed messages,

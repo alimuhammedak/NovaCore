@@ -9,7 +9,7 @@ only; third-party integrations are separate, optional add-ons.
 | `NovaCore.AspNetCore` | Modules (`AddModule<T>`), ProblemDetails exception handling, `Result` → HTTP, OpenAPI document, JWT authentication, permission authorization, rate limiting, security headers |
 | `NovaCore.EntityFrameworkCore` | Module-owned `DbContext`s, audit stamping, startup migrations, in-process domain events |
 | `NovaCore.Serilog` | Add-on: Serilog logging (console, Seq) |
-| `NovaCore.OpenTelemetry` | Add-on: OpenTelemetry metrics and tracing, OTLP export |
+| `NovaCore.OpenTelemetry` | Add-on: OpenTelemetry logs, metrics and tracing, OTLP export |
 | `NovaCore.Scalar` | Add-on: Scalar API reference UI (Development) |
 | `NovaCore.Identity.OpenIddict` | Add-on: OpenID Connect provider (ASP.NET Core Identity + OpenIddict) |
 

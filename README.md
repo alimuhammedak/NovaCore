@@ -149,7 +149,7 @@ NovaCore.slnx
 │   │   ├── NovaCore.AspNetCore/          # IModule + AddModule<T>, AddCoreDefaults/AddCoreWeb, ProblemDetails, Result→HTTP, JWT, authz, OpenAPI, HybridCache
 │   │   ├── NovaCore.EntityFrameworkCore/ # AddModuleDbContext, AddCorePersistence: auditing, startup migration, outbox + dispatcher
 │   │   ├── NovaCore.Serilog/             # eklenti: AddCoreLogging (Console + opsiyonel Seq)
-│   │   ├── NovaCore.OpenTelemetry/       # eklenti: AddCoreObservability (metrics + tracing, OTLP)
+│   │   ├── NovaCore.OpenTelemetry/       # eklenti: AddCoreObservability (logs + metrics + tracing, OTLP)
 │   │   ├── NovaCore.Scalar/              # eklenti: MapCoreScalar (Scalar UI, yalnızca Development)
 │   │   └── NovaCore.Identity.OpenIddict/ # eklenti: AddCoreIdentityServer/MapCoreIdentityServer (OIDC sağlayıcı: Identity + OpenIddict)
 │   │
@@ -337,7 +337,7 @@ handler, tekrar teslime karşı iş anahtarıyla bir kayıt tutar ve onu değiş
 |---|---|---|
 | **Exception handling** | `UseExceptionHandler` + `AddProblemDetails` (RFC 9457), `StatusCodeSelector` | Eşleme middleware'in kendi yedek yolunda: projenin `IExceptionHandler`'ları her zaman önce çalışır. `AppException` → durumu + mesajı, `BadHttpRequestException` → kendi durumu, diğer her şey → 500, mesajsız; yalnızca 500'ler loglanır |
 | **Logging** | Serilog (structured) + OTel korelasyon | `AddCoreLogging` (`NovaCore.Serilog` eklentisi) — Console + opsiyonel Seq |
-| **Tracing/Metrics** | OpenTelemetry | `AddCoreObservability` (`NovaCore.OpenTelemetry` eklentisi) — OTLP yalnızca endpoint konfigüre ise |
+| **Tracing/Metrics/Logs** | OpenTelemetry | `AddCoreObservability` (`NovaCore.OpenTelemetry` eklentisi) — `ILogger` log'ları da (biçimlenmiş mesaj ve scope'larla); OTLP yalnızca endpoint konfigüre ise. Serilog kullanan host'ta log'lar Serilog'dan gider |
 | **Caching** | HybridCache (L1 + opsiyonel L2) | `HybridCache` doğrudan enjekte edilir (zaten soyut bir sınıf, sarmalayıcı yok). `AddCoreCaching` varsayılan süreyi `Cache:DefaultExpiration`'dan alır |
 | **Validation** | .NET 10 yerleşik validation (`AddValidation`, DataAnnotations) | Her modül `AddModule`'de `services.AddValidation()` çağırır; kurallar request record'unda |
 | **Mapping** | Mapperly (source-gen) | `[Mapper]` statik partial sınıflar, EF-translatable `ProjectToDto` |
@@ -509,7 +509,7 @@ de izinlerini önbellek süresi dolunca kaybeder.
   "Seq":           { "ServerUrl": "" }              // dolu = Seq'e log gönder
 }
 ```
-Çevre değişkeni `OTEL_EXPORTER_OTLP_ENDPOINT` doluysa traces/metrics OTLP ile dışa aktarılır (ör. Jaeger).
+Çevre değişkeni `OTEL_EXPORTER_OTLP_ENDPOINT` doluysa log, trace ve metrikler OTLP ile dışa aktarılır (ör. Aspire Dashboard, bir OTel collector).
 
 > `Jwt:Authority` her ortamda zorunludur; Development dışında mutlak bir `https` URI olmalıdır.
 > Gizli değerler (admin parolası, client secret'ları) için `dotnet user-secrets` ya da ortam değişkenleri kullanın.

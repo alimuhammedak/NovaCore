@@ -876,3 +876,16 @@ Biçim:
   - Tur hatası loglanır, host durmaz.
   - Yeni paket yok.
 
+
+## Faz 5 araştırması (2026-10-20)
+
+### R-089: Şablonun tek log hattı: Serilog mu, OpenTelemetry mi? (2026-10-20, faz 5; kaynak + kırmızı test)
+- Soru: PLAN F5.1 "log hattı tektir; hangisi olacağı fazda bir R-kaydıyla seçilir" diyor. Bugün log'lar Serilog'a (console/Seq), metrik ve trace OTLP'ye gidiyor (proposals/tuketici-hazirligi.md F2). Şablon hangisini açmalı ve eklentide ne eksik?
+- Bulgu:
+  - MS'in .NET observability belgesi ve OTLP örneği log'ları `ILogger` üzerinden OpenTelemetry'ye alıyor (`builder.Logging.AddOpenTelemetry`, `IncludeFormattedMessage` ve `IncludeScopes` açık) ve üç sinyali tek OTLP exporter'la gönderiyor. Aspire ServiceDefaults'un `Extensions.cs`'i de aynısını yapıyor.
+  - OpenTelemetry.Exporter.OpenTelemetryProtocol 1.19.1, `UseOtlpExporter` dokümanı: *"Calling this method automatically enables logging, metrics, and tracing."* Yani `NovaCore.OpenTelemetry` endpoint tanımlıyken log'ları zaten OTLP'ye gönderiyordu, ama `OpenTelemetryLoggerOptions` varsayılanlarıyla: biçimlenmiş mesaj ve scope'lar (isteğin scope'u dahil) kayda girmiyordu.
+  - OpenTelemetry 1.19.1: `OpenTelemetryBuilder.WithLogging(configureBuilder, configureOptions)` `OpenTelemetry` adlı `ILoggerProvider`'ı kaydediyor ve seçenekleri bağlıyor.
+  - Serilog'un `AddSerilog`'u (`writeToProviders: false`) logger factory'yi değiştirdiği için diğer `ILoggerProvider`'lara yazmıyor; Serilog'u kullanan bir host'ta OTel'in log provider'ı boşta kalır, davranış değişmez.
+  - Kırmızı test: `AddCoreObservability` sonrası host'ta `OpenTelemetryLoggerProvider` yoktu (endpoint tanımsızken).
+- Kaynak: https://learn.microsoft.com/dotnet/core/diagnostics/observability-otlp-example · https://learn.microsoft.com/dotnet/core/diagnostics/observability-with-otel · https://github.com/microsoft/aspire/blob/main/src/Aspire.ProjectTemplates/templates/aspire-servicedefaults/Extensions.cs · NuGet önbelleğindeki `OpenTelemetry.Exporter.OpenTelemetryProtocol.xml` ve `OpenTelemetry.Extensions.Hosting.xml` (1.19.1)
+- Sonuç (D-040 (2)): Şablonun hattı OpenTelemetry; şablon Serilog eklentisini kullanmaz. `AddCoreObservability` log sinyalini açıkça kurar (`WithLogging`, biçimlenmiş mesaj ve scope'lar açık), exporter koşulu aynı. Repo'nun Api host'u Serilog'da kalıyor (eklentinin tek tüketicisi). Daha basit alternatif, şablonun `Program.cs`'inin bu ayarı kendisi yapması, aynı satırları her projeye kopyalatırdı.

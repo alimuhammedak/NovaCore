@@ -11,8 +11,9 @@ namespace NovaCore.OpenTelemetry;
 public static class OpenTelemetryHostingExtensions
 {
     /// <summary>
-    /// Adds OpenTelemetry metrics and tracing for ASP.NET Core, HttpClient and the runtime, exported over OTLP when
-    /// <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> is configured.
+    /// Adds OpenTelemetry logs, metrics and tracing: the host's <c>ILogger</c> records (with their rendered message and
+    /// scopes), metrics and traces for ASP.NET Core, HttpClient and the runtime. All three are exported over OTLP when
+    /// <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> is configured, so the host needs no second logging pipeline.
     /// </summary>
     public static IHostApplicationBuilder AddCoreObservability(this IHostApplicationBuilder builder)
     {
@@ -21,6 +22,14 @@ public static class OpenTelemetryHostingExtensions
         otel.ConfigureResource(resource => resource.AddService(
             serviceName: builder.Environment.ApplicationName,
             serviceVersion: typeof(OpenTelemetryHostingExtensions).Assembly.GetName().Version?.ToString()));
+
+        // Logs travel with the traces and metrics, as in Aspire's ServiceDefaults. A record keeps its rendered message
+        // and its scopes (the request's, among others), which the OTLP record would otherwise drop.
+        otel.WithLogging(configureBuilder: null, configureOptions: logging =>
+        {
+            logging.IncludeFormattedMessage = true;
+            logging.IncludeScopes = true;
+        });
 
         otel.WithMetrics(metrics => metrics
             .AddAspNetCoreInstrumentation()
@@ -31,7 +40,7 @@ public static class OpenTelemetryHostingExtensions
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation());
 
-        // Export over OTLP only when an endpoint is configured (e.g. an OTel collector / Aspire dashboard).
+        // Export all three over OTLP only when an endpoint is configured (e.g. an OTel collector / Aspire dashboard).
         if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
             otel.UseOtlpExporter();
 
