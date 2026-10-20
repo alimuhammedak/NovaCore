@@ -18,7 +18,7 @@
 | 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20, kullanıcı isteği) |
-| 5 | ✅ tamam | `faz/5-sablon-yayin` | 2026-10-20 | 2026-10-20 | |
+| 5 | ✅ tamam | `faz/5-sablon-yayin` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20; `v0.1.0-preview.1` tag'i CI yeşil olunca ayrıca sorulacak) |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
 
@@ -1124,7 +1124,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-20, Faz 5: Şablon, dağıtım, yayın hazırlığı (tamam, merge onayı bekleniyor).** Branch `faz/5-sablon-yayin`, 8 commit.
+**2026-10-20, Faz 5: Şablon, dağıtım, yayın hazırlığı (tamam, `main`'e merge ve push edildi; tag bekliyor).** Branch `faz/5-sablon-yayin`, 8 commit.
 
 - **Yapılanlar:**
   - F5.4: kanal GitHub Packages (D-013 kalır), ilk sürüm `0.1.0-preview.1` (Q-32, Q-33 → D-039).
@@ -1140,7 +1140,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - `ContentTargetFolders=content` içeriği `content/content` altına koydu (R-090).
   - Bundle'lar context başına 82 MB (framework-dependent) / 180 MB (self-contained); varsayılan dalla sınırlandı (R-092).
 - **Kullanıcıya:**
-  - **Merge, push ve tag onayı bekleniyor** (`faz/5-sablon-yayin` → `main`, `v0.1.0-preview.1`). Tag `release.yml`'i tetikler ve sekiz paketi GitHub Packages'a yükler; Linux'ta pack'in ilk doğrulaması da o zaman (ve push'taki `template-smoke` job'ında) olur.
+  - Merge ve push: kullanıcı onayıyla ("Merge + push, tag CI'dan sonra") `main`'e `--no-ff` merge edildi ve push'landı (2026-10-20). **`v0.1.0-preview.1` tag'i push'taki CI yeşil olunca ayrıca sorulacak.** Tag `release.yml`'i tetikler ve sekiz paketi GitHub Packages'a yükler; Linux'ta pack'in ilk doğrulaması da o zaman (ve push'taki `template-smoke` job'ında) olur.
   - Tag atılmazsa CHANGELOG'daki `[0.1.0-preview.1]` başlığı `Unreleased`'a geri alınmalı.
   - **D-032:** `docs/plan/DECISIONS.md`'yi `.claude/hooks/package-policy.json` `protectedPaths` listesine geri ekleyin (hook dosyasını model düzenleyemiyor). DECISIONS başlığındaki "hook onay ister" notu o zaman yeniden geçerli olur.
   - Tüketen projeler için: GitHub'da `read:packages` yetkili bir token; yerelde `dotnet nuget add source ... -n novacore`, üretilen repoda `NOVACORE_PACKAGES_TOKEN` secret'ı.
