@@ -857,7 +857,7 @@ Plan onayı 2026-10-20. Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents
   - Audit: `recovery_code_used` (Warning, EventId 27); hatalı kodun nedeni `bad-recovery-code`.
   - Testler 264 → 267: `TwoFactorTests` +3 (kod bir kez giriş yapar ve küçük harfle de kabul edilir, hatalı kod sayılır, kilitli hesap kodla giremez). `EnableAsync` yardımcısı kurtarma kodlarını da döndürüyor. Önce kırmızı: 3 test.
   - Kararlar D-038 (5), R-085. Güncellenenler: README (Hesaplar), eklenti CLAUDE.md (Hardening), CHANGELOG.
-- [x] F4d.4 (HASH): Güvenlik düzeltmeleri.
+- [x] F4d.4 (e91fcac): Güvenlik düzeltmeleri.
   - Logout CSRF: `/connect/endsession` oturumlu tarayıcıya önce bir soru gösteriyor. Formu isteğin parametrelerini antiforgery token'ıyla aynı uca POST ediyor ve yalnızca bu POST çıkış yapıyor (OpenIddict'in Velusia örneği). Oturumsuz tarayıcı doğrudan yönlendiriliyor.
   - Zamanlama: bilinmeyen e-postada parola, host'un hasher'ıyla bir kez üretilen sahte hash'e karşı doğrulanıyor (`DummyPasswordHash`). `SignInManager` bilinmeyen kullanıcıda hiç hash'lemiyordu.
   - `change-password`: kilitli hesapta parola değişmiyor, yanlış mevcut parola `AccessFailedAsync` çağırıyor, başarı sayacı sıfırlıyor. Hash tek kez.
@@ -868,7 +868,12 @@ Plan onayı 2026-10-20. Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents
     - Değişen test (plan onayı, Y-44): `End_session_signs_the_browser_out_of_the_provider` onay adımını geçiyor.
     - Önce kırmızı: 6 test.
   - Kararlar D-038 (6)–(8), R-086, R-087. Güncellenenler: README (Hesaplar, Endpoint'ler), eklenti CLAUDE.md, CHANGELOG (Security).
-- [ ] F4d.5 Token temizliği
+- [x] F4d.5 (HASH): Token temizliği.
+  - Yeni `ExpiredTokenPruner` (`BackgroundService`): ilk tur açılışta, sonra saatte bir. Her tur önce token'lar, sonra authorization'lar için OpenIddict'in `PruneAsync`'ini 14 günlük eşikle çağırıyor; değerler OpenIddict.Quartz'ın varsayılanları (R-088). Yeni paket yok. Tur hatası loglanıyor, host durmuyor.
+  - **Sürpriz:** OpenIddict'in store'u süreyi veritabanının saatiyle (`DateTime.UtcNow` sorgunun içinde) karşılaştırıyor, eşik ise `TimeProvider`'dan geliyor. Test süre tarihlerini gerçek saate göre veriyor.
+  - Test altyapısı: `IdentityServerTestHost` tek bir `SqliteConnection` paylaşıyordu. Arka plandaki tur istekle aynı anda o bağlantıyı kullanacağı için host, Api factory'si gibi adlı paylaşımlı in-memory veritabanına ve context başına bağlantıya geçti (R-069). Değişiklikten sonra eklentinin 95 testi temizlik servisi eklenmeden yeşildi.
+  - Testler 273 → 274: `TokenPruningTests` (sahte saat bir saat ilerliyor; süresi dolmuş token ve iptal edilmiş authorization siliniyor, geçerli kalıcı authorization ve yeni token kalıyor). Önce kırmızı. Kasıtlı bozma (commit'lenmedi): saat ilerletilmeyince test kırmızı, yani silmeyi saatlik tur yapıyor. Api host'unun testlerinde kimlik şeması çoğunlukla yok; açılış turu hata loglayıp devam ediyor, host durmuyor.
+  - Kararlar D-038 (9), R-088. Güncellenenler: README (Kimlik sağlayıcı), eklenti ve tests CLAUDE.md, CHANGELOG.
 
 ### Faz 5
 - [ ] F5.1 Template package
@@ -928,7 +933,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - ~~Parola sıfırlama, onay e-postasını yeniden gönderme, `User` rolü yokken kayıtta 500 (Faz 3b) → F4d.2.~~ → F4d.2'de yapıldı.
 - ~~Kurtarma kodları (Faz 3b) → F4d.3.~~ → F4d.3'te yapıldı.
 - ~~Logout CSRF, giriş zamanlama farkı, `change-password` lockout'u (Faz 3b) → F4d.4.~~ → F4d.4'te yapıldı.
-- OpenIddict kayıtlarının temizlenmemesi (Faz 3b) → F4d.5.
+- ~~OpenIddict kayıtlarının temizlenmemesi (Faz 3b) → F4d.5.~~ → F4d.5'te yapıldı.
 - Template'in paket kimliğini taşıması (Faz 1, F5.1) → F5.1.
 - ~~Catalog/Payments uçtan uca testleri (Faz 2c) → F5.3 (4b'de).~~ → F5.3'te yapıldı (Faz 4b).
 
@@ -997,7 +1002,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 - (Faz 3b, plan kapsamı dışı) Keycloak ya da başka bir harici sağlayıcı için `IPermissionResolver` yok. README ve compose yorumu host'un kendisinin kaydetmesini söylüyor. İki issuer'a birlikte güvenilecekse izin anahtarına `iss` eklenmeli (yukarıdaki Faz 3a maddesi).
 - ~~(Faz 3b, plan kapsamı dışı) Parola sıfırlama yok (eski modülde de yoktu). Onaylanmamış hesaba yeniden onay e-postası gönderme ucu da yok.~~ → F4d.2'de yapıldı.
-- (Faz 3b, plan kapsamı dışı) OpenIddict token ve authorization kayıtları hiç temizlenmiyor (Quartz entegrasyonu ya da `PruneAsync` çağıran bir hosted service). Tablolar zamanla büyür.
+- ~~(Faz 3b, plan kapsamı dışı) OpenIddict token ve authorization kayıtları hiç temizlenmiyor (Quartz entegrasyonu ya da `PruneAsync` çağıran bir hosted service). Tablolar zamanla büyür.~~ → F4d.5'te çözüldü (`ExpiredTokenPruner`).
 - (Faz 3b, plan kapsamı dışı) userinfo ucu, Razor/Identity UI, OpenIddict.Validation ve reference token yok (D-026).
 - (Faz 3b) Test süresi: eklenti testleri `DisableParallelization` koleksiyonunda ve PBKDF2 600k ile yaklaşık 1 dk 20 sn. Tüm paket yaklaşık 2 dk. Testlerde iterasyon sayısını düşürmek hızlandırır, ama sertleştirme testini ayrı tutmak gerekir.
 - ~~(Faz 3b, code review) Giriş sayfasında zamanlama farkı: bilinmeyen e-posta PBKDF2'siz hemen dönüyor, bilinen e-posta 600k iterasyon harcıyor. Aynı mesaja rağmen yanıt süresi hesabın varlığını ele veriyor (eski modülde de vardı). Çözüm: bilinmeyen kullanıcıda sahte bir hash doğrulamak. Kayıt ucunda da benzer bir fark var (yeni hesapta hash + e-posta).~~ → F4d.4'te giriş sayfası için çözüldü (sahte hash). Kayıt ucundaki ve parola sıfırlama formundaki fark kalıyor (aşağıdaki F4d.2 maddesi).

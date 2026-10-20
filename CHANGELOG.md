@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `NovaCore.Identity.OpenIddict` prunes its store: at startup and every hour, OpenIddict's `PruneAsync` deletes the tokens
+  that are expired, revoked or redeemed and the authorizations that are no longer valid and have no token left, once
+  they are 14 days old (OpenIddict.Quartz's defaults; no new package). A failed pass is logged as an error and retried on
+  the next one.
 - Password reset in `NovaCore.Identity.OpenIddict`: the sign-in page links to `/account/forgot-password`, which emails a
   confirmed account a link to `/account/reset-password` (from `Jwt:Authority`, never the Host header). The new password
   is typed twice; the link works once and expires with the other Identity tokens (6 hours). A reset revokes every refresh

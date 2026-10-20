@@ -379,6 +379,9 @@ Tasarım OWASP cheat sheet'lerine, RFC 9700 (OAuth 2.0 Security BCP) ve Microsof
 - **Refresh:** 7 gün, her kullanımda döner (rolling). Kullanılmış bir refresh token OpenIddict'in 30 sn'lik payından
   sonra yeniden gelirse **o authorization'ın bütün token'ları iptal edilir** (hırsızlık tespiti). Her refresh'te hesap
   yeniden denetlenir: silinmiş, girişi engellenmiş ya da kilitli kullanıcı yeni token alamaz.
+- **Temizlik:** açılışta ve saatte bir, 14 günden eski ve artık kullanılamayan kayıtlar silinir (OpenIddict'in
+  `PruneAsync`'i, OpenIddict.Quartz'ın varsayılanları; yeni paket yok): süresi dolmuş, iptal edilmiş ya da kullanılmış
+  token'lar ve token'ı kalmamış geçersiz authorization'lar. Geçerli kalıcı authorization kalır.
 - **Anahtarlar:** Development'ta geçici (ephemeral) RSA. Diğer ortamlarda host sertifikaları OpenIddict'in kendi
   API'siyle ekler (`services.AddOpenIddict().AddServer(o => o.AddSigningCertificate(...).AddEncryptionCertificate(...))`);
   eksikse uygulama açılmaz. EC anahtarla ES256 da çalışır.

@@ -853,3 +853,26 @@ Biçim:
     - başarıda sayacı sıfırlar.
     Hash tek kez hesaplanır.
 
+### R-088: OpenIddict kayıtlarının temizlenmesi: `PruneAsync`'in anlamı ve OpenIddict.Quartz'ın varsayılanları (2026-10-20, faz 4d; kaynak + kırmızı test)
+- Soru: Token ve authorization tabloları neyle, ne sıklıkla ve hangi eşikle temizlenir? Yeni paket olmadan nasıl çalışır?
+- Bulgu:
+  - `IOpenIddictTokenManager.PruneAsync(threshold)`, EF Core store'unda (7.7.1) şunları siler: `CreationDate < threshold` olan ve durumu `Valid`/`Inactive` dışında olan ya da authorization'ı artık geçerli olmayan ya da süresi dolmuş (`ExpirationDate < DateTime.UtcNow`) token'lar.
+    - Süre karşılaştırması sorgunun içinde, yani veritabanının saatiyle yapılıyor. Eşik çağıranın saatinden geliyor.
+    - 1.000'lik parçalar halinde `ExecuteDeleteAsync` ile siliyor. Hataları toplayıp sonunda `AggregateException` atıyor.
+  - `IOpenIddictAuthorizationManager.PruneAsync(threshold)`: `CreationDate < threshold`, durumu `Valid` değil ya da tipi ad hoc, ve token'ı kalmamış authorization'lar.
+    - Geçerli kalıcı authorization hiç silinmiyor. Eklenti kullanıcı ve client başına bir tane yeniden kullanıyor, sayı sınırlı.
+    - Dokümanı token'ların önce temizlenmesini söylüyor.
+  - OpenIddict.Quartz (7.7.1):
+    - `MinimumTokenLifespan` ve `MinimumAuthorizationLifespan` = 14 gün. Eşik `TimeProvider.GetUtcNow() − lifespan`.
+    - Önce token'lar, sonra authorization'lar.
+    - Saatte bir tetikleniyor, ilk çalışma açılıştan 1–9 dk sonra. Yorumdaki gerekçe: uygulama bir saat dolmadan yeniden başlarsa da bir kez çalışsın.
+  - OpenIddict `TimeProvider`'ı DI'dan alıyor (`OpenIddictCoreOptions.TimeProvider`).
+  - Kırmızı test: süresi dolmuş token ve iptal edilmiş authorization bir saat sonra da duruyordu.
+  - Test altyapısı: `IdentityServerTestHost` bütün context'lere tek bir `SqliteConnection` veriyordu. Arka plandaki tur istekle aynı anda o bağlantıyı kullanacağı için host, Api factory'si gibi paylaşımlı adlı in-memory veritabanına ve context başına bağlantıya geçti (R-069).
+- Kaynak: https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.EntityFrameworkCore/Stores/OpenIddictEntityFrameworkCoreTokenStore.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.EntityFrameworkCore/Stores/OpenIddictEntityFrameworkCoreAuthorizationStore.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Quartz/OpenIddictQuartzJob.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Quartz/OpenIddictQuartzOptions.cs · https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Quartz/OpenIddictQuartzExtensions.cs
+- Sonuç (D-038 (9)):
+  - Eklentide `ExpiredTokenPruner` (`BackgroundService`). Zamanlayıcı `PeriodicTimer(1 saat, TimeProvider)`, eşik 14 gün, önce token'lar.
+  - İlk tur açılışta, `OutboxDispatcher` gibi. Quartz'ın 1–9 dakikalık rastgele gecikmesi birden çok örneği yaymak içindir; burada veritabanı başına tek örnek varsayılıyor (D-031) ve aynı satırları iki kez silmek zararsız.
+  - Tur hatası loglanır, host durmaz.
+  - Yeni paket yok.
+

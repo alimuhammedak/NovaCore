@@ -118,9 +118,13 @@ So tokens go through the real Authority → metadata → JWKS path with no netwo
 
 `IdentityServer/` tests `NovaCore.Identity.OpenIddict` on `IdentityServerTestHost`: a `WebApplication` composed only of
 the core packages and the add-on (no modules, no Api project), on TestServer at `https://localhost` with an in-memory
-SQLite store. That address is also `Jwt:Authority`, and JwtBearer's backchannel goes to the same server, so the add-on's
+SQLite store. The store is a named, shared in-memory database and every context instance opens its own connection, like
+the Api factory's: the add-on's token pruner reads it in the background (a pass at startup, then hourly) while requests
+do. That address is also `Jwt:Authority`, and JwtBearer's backchannel goes to the same server, so the add-on's
 tokens are validated through its own discovery document and keys. `OidcFlow` plays the browser (cookies, no automatic
-redirects) and the public client: authorize → sign-in form (antiforgery token) → code → token endpoint.
+redirects) and the public client: authorize → sign-in form (antiforgery token) → code → token endpoint. Other forms
+(password reset, the sign-out question) go through `OidcFlow.SubmitFormAsync`, which posts a page's hidden fields with
+the given ones. `TokenPruningTests` moves a fake clock by an hour to run a pruning pass; it signs nobody in.
 `IdentityServerFixture` shares one host per class; tests that need a different host start their own
 (`IdentityServerTestHost.StartAsync(environment, configure)`). These classes run in the `IdentityServerTestGroup`
 collection, apart from the parallel tests: their CPU load made the `WebApplicationFactory` startup race (R-055) hit

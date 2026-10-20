@@ -194,6 +194,11 @@ public static class IdentityServerHostingExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<IdentityServerOptions>, IdentityServerOptionsValidator>());
         services.AddHostedService<IdentityServerSeeder>();
 
+        // Expired, revoked and redeemed tokens and their authorizations would stay in the store forever
+        // (docs/plan/RESEARCH.md R-088).
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddHostedService<ExpiredTokenPruner>();
+
         services.AddScoped<IPermissionResolver, IdentityPermissionResolver>();
         services.AddPermissionDefinitions<IdentityPermissionProvider>();
 
