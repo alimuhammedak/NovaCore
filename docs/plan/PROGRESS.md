@@ -807,7 +807,17 @@ Plan onayı 2026-10-20. Yeni test altyapısı `CoreWebTestHost` (yalnızca çeki
   - Testler 245 → 247: depo yokken Production host'u açılmıyor, depo varken açılıyor; Development'ta framework varsayılanı yeterli. Önce kırmızı: depo olmadan açılıyordu.
   - İmza anahtarı eksikliğini ve e-posta göndericisi eksikliğini bekleyen iki mevcut test, kendi hatalarını görmeye devam etsin diye depoyla kuruluyor (plan).
   - Kararlar D-036 (6), R-081. Güncellenenler: README (Üretimde mutlaka), eklenti ve tests CLAUDE.md, CHANGELOG.
-- [ ] F4c.7 Outbox şeması ve bakımı — devam ediyor
+- [x] F4c.7 (cd269cb): Outbox şeması ve bakımı.
+  - `outbox_consumers`: anahtar (`MessageId`, Handler); `MessageId` → `outbox_messages.Id`, cascade delete'li FK. Dispatcher kayıtları mesajın `Id`'siyle okuyup yazıyor.
+  - Saklama: her turun sonunda `ProcessedRetention`'dan (7 gün) eski işlenmiş mesajlar siliniyor. Süre, `Id` sırasıyla okunan 50'lik parçalarda bellekte karşılaştırılıyor (SQLite `DateTimeOffset`'i SQL'de karşılaştıramıyor). İncelemeye bırakılan mesaj kalıyor.
+  - `IDomainEventDispatcher` (Abstractions, public) ve `DomainEventDispatcher` silindi; `DomainEventHandlerInvokers` dispatcher için kaldı.
+  - Migration `OutboxConsumersByMessage` (Catalog, Payments): EF'in ürettiği adımlar mevcut kayıtları kaybettirirdi, elle yeniden yazıldı. Kayıtlar `EventId` üzerinden mesajın `Id`'sine dönüşüyor, sahipsiz kayıt siliniyor; Down tersini yapıyor.
+  - **Sürpriz 1:** `migrations script` migration'ı tek batch üretiyor; yeni kolonu kullanan ifade `EXEC(N'…')` içine alındı. Yerel SQL Server'da geçici bir veritabanında denendi: script ile Up, çalışma zamanında Down ve Up, Payments'ın bütün zinciri. Veritabanı silindi (R-082).
+  - **Sürpriz 2:** `FakeTimeProvider` 7 günlük ilerletmede 5 sn'lik zamanlayıcıyı ~120 bin kez tetikliyor (test başına ~55 sn). Saklama testleri satırları zaman damgasıyla yaşlandırıyor (tests/CLAUDE.md'ye not).
+  - Testler 247 → 246: `OutboxDispatcherTests`'e saklama süresi geçen mesajın kayıtlarıyla silinmesi ve incelemeye bırakılan mesajın kalması (+2), tüketici sorgusu `MessageId` üzerinden. `DomainEventDispatcherTests` (3) sınıfla birlikte gitti (plan onayı, Y-44). Önce kırmızı: 4 test (kolon yok, temizlik yok). Kasıtlı bozma: temizlik çağrısı kapatılınca saklama testi kırmızı (commit'lenmedi).
+  - `has-pending-model-changes` üç context'te temiz.
+  - Kararlar D-036 (7) (D-031 (5) ve (7) revizyon kuralıyla işaretlendi, D-033 (7)), R-082. "Sonraya bırakılanlar"da 4 madde kapandı.
+  - Güncellenenler: README (outbox, proje ağacı), kök/BuildingBlocks/tests CLAUDE.md, CHANGELOG.
 
 ### Faz 4d (koşullu)
 - [ ] F4d.1 IdP modeli kararı
@@ -972,6 +982,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - ~~(Faz 4a, code review #12) `outbox_consumers`'ın clustered anahtarı (uniqueidentifier, nvarchar(256)) geniş ve SQL Server sırasında rastgele.~~ → F4c.7'de çözüldü (D-036 (7)). Outbox tablosu için R-068'de kullanılan gerekçenin aynısı geçerli. Mesaj satırının `bigint Id`'si + Handler (FK ve cascade delete ile, temizlik için de uygun) daha iyi olur. D-031 (5)'i değiştirir; tablo boşken, ilk kullanımdan önce yapmak ucuz.
 
 - (Faz 4b, F4b.2b) `GET /api/v1/payments` SQLite test veritabanında 500 dönüyor: liste `CreatedAtUtc`'ye (DateTimeOffset) göre sıralıyor, SQLite bunu çeviremiyor (R-068). SQL Server'da sorun yok, ama listenin başarı yolu testlenmiyor. Çözüm yolları: test context'lerinde DateTimeOffset'i sıralanabilir bir türe çeviren bir dönüştürücü ya da gerçek SQL Server'la test (Testcontainers, paket onayı gerekir).
+- (Faz 4c, D-036 (8)) Catalog ve Payments'ta `System.Security.Cryptography.Pkcs` 10.0.13'e doğrudan referans var: Microsoft.Data.SqlClient açıklı 9.0.11'e bağlı (R-083). *Koşul:* EF Core SqlServer'ın getirdiği SqlClient düzeltilmiş bir Pkcs'e (≥ 9.0.21 / 10.0.13) bağlanınca referans ve CPM satırı kalkar; `dotnet nuget why <modül> System.Security.Cryptography.Pkcs` ile kontrol edilir.
 - (Faz 4b, D-035 (6)) Failed bir ödemenin nedeni istemciye dönmüyor; neden yalnızca Catalog'daki rezervasyon satırında (`Reason`) duruyor. *Koşul:* bir istemci nedeni göstermek ister.
 - (Faz 4b) İade ve iadede stoğun geri verilmesi yok (`Refund` kullanılmadığı için silindi). *Koşul:* iade bir ürün gereksinimi olur. Rezervasyonu serbest bırakan bir event ve rezervasyona yeni bir durum gerekir.
 - (Faz 4b, code review #2) Pending'de kalan bir ödeme için zaman aşımı ya da telafi yok. Catalog'un handler'ı 10 denemede başarısız olursa mesaj incelemeye bırakılır ve ödeme Pending kalır. *Koşul:* üretimde görülür. Pending ödemelerin yaşını izlemek ya da bir telafi adımı gerekir.

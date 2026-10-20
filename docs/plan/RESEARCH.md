@@ -757,3 +757,13 @@ Biçim:
 - Kaynak: https://learn.microsoft.com/sql/relational-databases/sql-server-index-design-guide#clustered-index-design-guidelines · https://learn.microsoft.com/azure/architecture/patterns/idempotent-consumer · https://learn.microsoft.com/ef/core/providers/sqlite/limitations · https://learn.microsoft.com/ef/core/managing-schemas/migrations/managing#customize-migration-code · https://learn.microsoft.com/sql/t-sql/language-elements/execute-transact-sql
 - Sonuç (D-036 (7)).
 
+### R-083: SqlClient'ın getirdiği Pkcs açığı (2026-10-20, faz 4c doğrulaması; kaynak + ölçüm)
+- Soru: Faz doğrulamasında `restore --force` NU1903 verdi. Açık nereden geliyor, nasıl kapatılır?
+- Bulgu:
+  - GitHub Advisory: GHSA-846f-f764-76mx (CVE-2026-84008) ve GHSA-2fmv-rv2c-59x7 (CVE-2026-70162), 2026-10-13, .NET DoS. `System.Security.Cryptography.Pkcs` 9.0.0–9.0.20 ve 10.0.0–10.0.12 açıklı; düzeltmeler 9.0.21 ve 10.0.13.
+  - `dotnet nuget why`: EF Core SqlServer 10.0.12 → Microsoft.Data.SqlClient 6.1.6 → Pkcs 9.0.11. EF Core 10.0.13 SqlClient 6.1.7'ye bağlı, o da hâlâ Pkcs 9.0.11'e. SqlClient 7.1.1 net9.0 için Pkcs 9.0.18'e bağlı. Yani üst paketi güncellemek açığı kapatmıyor.
+  - Hiçbir packable projenin grafiğinde Pkcs yok; yalnızca Catalog, Payments, Api ve testler.
+  - NuGet (R-014): üst paket açığı kapatmıyorsa sıradaki yol doğrudan referans ya da CPM transitive pinning. Transitive pinning bütün projelerde açılır ve packable paketlerin nuspec bağımlılıklarını değiştirebilir.
+- Kaynak: https://github.com/advisories/GHSA-846f-f764-76mx · https://github.com/advisories/GHSA-2fmv-rv2c-59x7 · https://learn.microsoft.com/nuget/concepts/auditing-packages · https://learn.microsoft.com/nuget/consume-packages/central-package-management#transitive-pinning
+- Sonuç (D-036 (8)): Catalog ve Payments, Pkcs 10.0.13'e doğrudan referans verir (CPM'de sürüm). Api ve testler onu proje referansından en yakın sürüm olarak alır. `list package --vulnerable` 13 projede temiz.
+
