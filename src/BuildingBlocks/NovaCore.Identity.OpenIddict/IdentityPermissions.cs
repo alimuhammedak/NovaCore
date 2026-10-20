@@ -1,5 +1,4 @@
 using NovaCore.AspNetCore.Authorization;
-using NovaCore.AspNetCore.Identity;
 
 namespace NovaCore.Identity.OpenIddict;
 
@@ -17,8 +16,11 @@ internal static class IdentityPermissions
 /// <summary>The two roles every seeded store has.</summary>
 internal static class IdentityRoles
 {
-    /// <summary>Holds every permission, and passes every check as the core's super-admin role.</summary>
-    public const string Administrator = HttpContextCurrentUser.SuperAdminRole;
+    /// <summary>
+    /// Holds every permission the modules declare: the permission resolver grants them to its members, whether or not the
+    /// seed has written them on the role yet.
+    /// </summary>
+    public const string Administrator = "Administrator";
 
     /// <summary>Every registered user: the business modules' read permissions, none of the admin ones.</summary>
     public const string User = "User";

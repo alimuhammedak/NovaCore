@@ -16,8 +16,8 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   creation), `ICurrentUser`. If a new type needs a framework, it does **not** belong here.
 
 - **`NovaCore.AspNetCore`** — the web host: `IModule` + `AddModule<TModule>()`/`MapModules`, `AddCoreDefaults`
-  (health + HttpClient resilience), `AddCoreWeb`/`UseCoreWeb`, `GlobalExceptionHandler` (RFC 9457) and the
-  `AppException` types, `ResultHttpExtensions.ToHttpResult`, JWT auth (`AddCoreAuthentication`: `Jwt:Authority` +
+  (health + HttpClient resilience), `AddCoreWeb`/`UseCoreWeb`, the exception mapping (`ExceptionMapping`, RFC 9457) and
+  the `AppException` types, `ResultHttpExtensions.ToHttpResult`, JWT auth (`AddCoreAuthentication`: `Jwt:Authority` +
   JWKS, asymmetric keys only, D-028), permission authz (`IPermissionResolver` + a claims transformation that
   resolves permissions on the server and caches them in HybridCache)
   (`Authorization/`), the OpenAPI document, `SecurityHeadersMiddleware`, HybridCache (`AddCoreCaching`). Depends on
@@ -25,18 +25,21 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 
 - **`NovaCore.EntityFrameworkCore`** — persistence without ASP.NET Core: `AddModuleDbContext` (also a "ready"-tagged
   `AddDbContextCheck` per context, and the `OutboxInterceptor` on every module context), `AddOutbox()` (maps a module's
-  `outbox_messages`), `AddCorePersistence` (`AuditableEntityInterceptor`, a scoped `IDomainEventDispatcher` that runs
-  handlers in the caller's scope, `DatabaseMigrationService`, which migrates only when `Database:ApplyMigrations` is
-  true). Handlers of an event type are resolved and invoked through a `DomainEventHandlerInvoker<TEvent>` built once per
-  type, so dispatching costs no reflection. Depends on Abstractions,
+  `outbox_messages` and `outbox_consumers`), `AddCorePersistence` (`AuditableEntityInterceptor`,
+  `DatabaseMigrationService`, which migrates only when `Database:ApplyMigrations` is true, and the outbox dispatcher).
+  The dispatcher resolves and invokes the handlers of an event type through a `DomainEventHandlerInvoker<TEvent>` built
+  once per type, so dispatching costs no reflection. There is no in-process dispatcher: an event that skipped the
+  outbox would skip its transaction too (F4c.7). Depends on Abstractions,
   EF Core and `Microsoft.Extensions` hosting/options/health-check packages only, never on AspNetCore (D-020).
   `OutboxInterceptor` adds the outbox rows in `SavingChanges`, which EF Core runs before it detects changes and saves,
   so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068).
   `AddCorePersistence` also registers `OutboxDispatcher` (a `BackgroundService`): a pass at startup, then every 5 seconds
   on a `PeriodicTimer` driven by `TimeProvider`. It reads each outbox in `Id` order in keyset batches, gives each message
-  a DI scope for its handlers and records the finished handlers in `outbox_consumers`. It opens no transaction, so every
-  query and write is a retriable unit of the context's execution strategy. The interval, batch size and 10 attempts are
-  constants: no consumer needs them configurable yet (Y-19).
+  a DI scope for its handlers and records the finished handlers in `outbox_consumers` (key: the message's `Id` + the
+  handler, FK with cascade delete). Each pass then deletes the processed messages older than `ProcessedRetention`
+  (7 days); the age is compared in memory over `Id`-ordered batches, since SQLite can't compare `DateTimeOffset` in SQL
+  (R-068). It opens no transaction, so every query and write is a retriable unit of the context's execution strategy.
+  The interval, batch size, 10 attempts and the retention are constants: no consumer needs them configurable yet (Y-19).
 
 **Add-ons** (optional, one third-party library each; they may reference AspNetCore/Abstractions only):
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`), `NovaCore.Scalar`
@@ -64,10 +67,25 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
 - **Time comes from `TimeProvider`**: register `TimeProvider.System` with `TryAddSingleton` where its consumer is
   registered, so the package works whichever `AddCore*` the host calls first.
 - **Health endpoints are Development-only** (`MapDefaultEndpoints`, D-022); `/health` includes every module database.
-- **`IExceptionHandler` order matters** — they run in registration order (R-046). `GlobalExceptionHandler` is the
-  catch-all, so a more specific handler must be registered ahead of it.
+- **The core's exception mapping is no `IExceptionHandler`.** Those run in registration order and the first `true` wins
+  (R-046), so a catch-all one would shadow a project's handler registered after it. The mapping is the exception
+  handler middleware's fallback instead: `ExceptionHandlerOptions.StatusCodeSelector` (`AppException` → its type's
+  status, `BadHttpRequestException` → its status, else 500), `ExceptionHandlerOptions.ExceptionHandler` (writes the
+  ProblemDetails: title, `type`, and `detail` for an `AppException` only; it runs only when no handler handled the
+  exception, so a project handler's ProblemDetails is never rewritten; not `CustomizeProblemDetails`, which sees every
+  write) and `SuppressDiagnosticsCallback` (the framework logs 500s; client
+  errors and handler-handled exceptions aren't logged). Don't add a core `IExceptionHandler` (R-079).
 - Caching: inject `HybridCache` directly. It is already an abstract class with a default implementation (R-008), so
   don't wrap it (Y-15). `AddCoreCaching` registers it with the default entry lifetime from `Cache:DefaultExpiration`.
+- **Forwarded headers are opt-in by proxy:** `UseCoreWeb` runs `UseForwardedHeaders` first; `ForwardedHeaders:KnownProxies`
+  and `KnownIPNetworks` (validated on start) replace the framework's loopback defaults, and only `X-Forwarded-For` and
+  `X-Forwarded-Proto` apply. Empty leaves `ForwardedHeadersOptions` untouched (nothing applied). Anything that reads the
+  client IP or the scheme reads `HttpContext.Connection.RemoteIpAddress`/`Request.Scheme` after this middleware.
+- **Authorization is closed by default:** `AddCoreAuthorization` sets `FallbackPolicy = RequireAuthenticatedUser`, so an
+  endpoint without authorization metadata, and a request that matches none, needs a signed-in caller (R-073). An
+  endpoint a building block maps for anonymous callers (health, the OpenAPI document, Scalar, the identity provider's
+  `/connect/*` and `/account/*`) says `.AllowAnonymous()`; `SecureDefaultsTests` pins them. CORS with an empty
+  `Cors:AllowedOrigins` allows any origin in Development only.
 - Permission authorization: `RequirePermissionAttribute` carries a `PermissionRequirement`
   (`IAuthorizationRequirementData`, R-053), which `PermissionAuthorizationHandler` checks. There is no custom policy
   provider and no named policy per permission. Use `RequirePermission(...)` / `[RequirePermission]` rather than
@@ -79,6 +97,7 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
   - Every public member has an XML doc comment. The docs also appear in consumers' OpenAPI documents (R-041), so
     describe behaviour and keep the claims true to the code.
   - `PublicAPI.Unshipped.txt` must list every public API (RS0016/RS0017).
-  - No two public overloads with optional parameters (RS0026). `ToHttpResult` has four plain overloads for this reason.
+  - No two public overloads with optional parameters (RS0026). `ToHttpResult` has three plain overloads, each returning
+    a `Results<TSuccess, ProblemHttpResult>` union (F4c.5).
   - `Result<T>`'s own `Success`/`Failure` are internal (CA1000). Callers use `Result.Success<T>(…)`/`Result.Failure<T>(…)`
     or the implicit conversions.

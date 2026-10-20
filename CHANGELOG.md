@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Reverse proxy support: `UseCoreWeb` applies `X-Forwarded-For` and `X-Forwarded-Proto` first, from the proxies and
+  networks listed under `ForwardedHeaders:KnownProxies` and `ForwardedHeaders:KnownIPNetworks` only (validated on
+  start). Behind a trusted proxy the rate limiter partitions by the real client and the request scheme is the client's,
+  so cookies get their `Secure` flag. With no list, no caller's headers apply (the framework default).
+
 - MIT `LICENSE` and this changelog.
 - Architecture tests for the testable bans in `docs/plan/DECISIONS.md` (banned packages, module boundaries, repository
   and helper types, DI scope validation, domain types in endpoint signatures, TODO/FIXME in `src/`).
@@ -110,6 +115,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     adds `catalog.stock_reservations`.
 
 ### Changed
+
+- `outbox_consumers` is keyed by the message row (`MessageId`, the outbox's `bigint` key) and the handler, with a
+  cascading foreign key, instead of the event id: narrow and ever-increasing like the outbox's own key. The
+  `OutboxConsumersByMessage` migrations carry existing records over. The outbox dispatcher deletes processed messages,
+  and with them their records, 7 days after they were processed; messages left for inspection stay.
+
+- `ToHttpResult` returns typed unions instead of `IResult`: `Result` → `Results<NoContent, ProblemHttpResult>`,
+  `Result<T>` → `Results<Ok<T>, ProblemHttpResult>`, and `ToHttpResult(value => TypedResults.Created(...))` →
+  `Results<TSuccess, ProblemHttpResult>`; `Problem(Error)` returns `ProblemHttpResult`. The `(Result, int)` overload is
+  removed. Module handlers return these unions and drop their success `.Produces<T>()`; the OpenAPI document is
+  unchanged for them. The identity provider's `/api/v1/auth/*` and `/api/v1/admin/*` endpoints return typed results
+  too, so their responses (bodies, 204s, 400/404/409) now appear in the OpenAPI document instead of an untyped 200.
+  Response bodies are unchanged.
+
+- `ArgumentException`, `FormatException`, `KeyNotFoundException`, `UnauthorizedAccessException` and an
+  `OperationCanceledException` the server raised itself are answered with 500 instead of 400/404/403/499: they are bugs,
+  not client errors. A client's abort is still the framework's 499. The framework's exception handler middleware logs
+  the 500s (`UnhandledException`, Error) instead of the core; `AppException`s and bad requests are no longer logged, like
+  a failed `Result`. Response titles and types are unchanged.
 
 - Every project builds with the `latest-recommended` analyzers, `EnforceCodeStyleInBuild` and `TreatWarningsAsErrors`.
   Low and moderate NuGet advisories (NU1901/NU1902) stay warnings.
@@ -224,6 +248,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- `IDomainEventDispatcher` (and its implementation), the in-process way to run domain-event handlers. Nothing called
+  it, and an event dispatched through it skipped the transactional outbox. Events go through the outbox only.
+
+- `GlobalExceptionHandler`. Its mapping is now the exception handler middleware's own fallback
+  (`ExceptionHandlerOptions.StatusCodeSelector` and the ProblemDetails customization), so an `IExceptionHandler` a project
+  registers runs first, whether it was added before or after `AddCoreWeb`; before, the catch-all handler registered by
+  `AddCoreWeb` answered first and later handlers never ran.
+
 - Unused dependencies and wiring: `Scrutor` (never called), `Asp.Versioning.Http` + `AddApiVersioning` (no endpoint used a
   version set), `AddOutputCache`/`UseOutputCache` (no policy or endpoint used it).
 - **Breaking:** `PagedList<T>.Empty(int)` (it had no callers).
@@ -238,6 +270,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Payment.Refund()` and `PaymentStatus.Refunded` (Payments sample module): nothing called them.
 
 ### Security
+
+- `System.Security.Cryptography.Pkcs` 9.0.11, which Microsoft.Data.SqlClient brings under EF Core's SQL Server
+  provider, had two high-severity denial-of-service advisories (CVE-2026-84008, CVE-2026-70162; GHSA-846f-f764-76mx,
+  GHSA-2fmv-rv2c-59x7) and failed the restore. Every project that references the SQL Server provider (the Catalog and
+  Payments modules, the Api host) references the patched 10.0.13 directly; no packable package is affected.
+
+- `NovaCore.Identity.OpenIddict` stops the host outside Development unless the host configured a Data Protection key
+  store (`PersistKeysToFileSystem`, `PersistKeysToDbContext`, a blob or Redis store). The sign-in cookies, antiforgery
+  tokens and email confirmation links are protected with these keys; the framework's fallback store is lost when a
+  container is replaced and differs between instances, which signed users out and broke links without an error.
+
+- The `Administrator` role no longer bypasses permission checks through the token's `role` claim, which a removed
+  administrator kept until the token expired. Permissions, an administrator's included, are resolved on the server:
+  the identity provider's resolver gives an `Administrator` member every permission the modules declare, so a removed
+  administrator loses them within `Cache:PermissionExpiration`. `HttpContextCurrentUser.SuperAdminRole` is removed and
+  `ICurrentUser.HasPermission` checks the resolved permissions only.
+
+- Authorization is closed by default: `AddCoreAuthorization` sets a fallback policy that requires an authenticated
+  caller, so an endpoint without authorization metadata (a forgotten `RequirePermission`) is no longer public, and a
+  request that matches no endpoint gets 401 instead of 404 when anonymous. The endpoints meant to be public declare
+  `AllowAnonymous`: health, the OpenAPI document, Scalar, the identity provider's `/connect/*` endpoints and sign-in
+  pages, registration and email confirmation.
+- With an empty `Cors:AllowedOrigins`, only Development allows any origin; other environments allow none (previously
+  every origin, in every environment).
 
 - `docker-compose.yml` reads the SQL Server SA password from a git-ignored `.env` file instead of a hard-coded value.
 - Carried-over account flaws closed in `NovaCore.Identity.OpenIddict`: the sign-in page says "confirm your email" only
@@ -258,6 +314,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   code, but their message (which can carry connection strings, paths or other internals) is only logged.
 
 ### Fixed
+
+- A request body Minimal APIs can't read (malformed JSON in Development, where they throw `BadHttpRequestException`)
+  answers with the exception's status (400) instead of 500.
 
 - The ProblemDetails `instance` member is a URI reference, the request path (e.g. `/api/v1/products/42`), instead of
   `"GET /api/v1/products/42"`. The query string is left out.

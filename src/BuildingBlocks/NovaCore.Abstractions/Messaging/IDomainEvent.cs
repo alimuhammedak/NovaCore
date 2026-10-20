@@ -47,16 +47,3 @@ public interface IDomainEventHandler<in TEvent>
     /// <param name="cancellationToken">Cancels the handling.</param>
     Task HandleAsync(TEvent domainEvent, CancellationToken cancellationToken = default);
 }
-
-/// <summary>
-/// Runs the handlers of domain events now, in the caller's DI scope, so they share its scoped services. Not durable: the
-/// events are gone if a handler or the process fails. The events an entity raises don't need it: saving the entity writes
-/// them to its module's outbox, and the outbox dispatcher delivers them from there.
-/// </summary>
-public interface IDomainEventDispatcher
-{
-    /// <summary>Invokes every registered <see cref="IDomainEventHandler{TEvent}"/> for each event, one after another.</summary>
-    /// <param name="domainEvents">The events to publish.</param>
-    /// <param name="cancellationToken">Cancels the dispatch.</param>
-    Task DispatchAsync(IEnumerable<IDomainEvent> domainEvents, CancellationToken cancellationToken = default);
-}

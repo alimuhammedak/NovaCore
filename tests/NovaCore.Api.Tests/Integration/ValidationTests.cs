@@ -1,8 +1,8 @@
 using System.Net;
-using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
-using NovaCore.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
+using NovaCore.AspNetCore.Authorization;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -37,10 +37,12 @@ public class ValidationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCor
     public async Task Invalid_request_is_rejected_with_a_validation_problem(
         string method, string path, string body, string[] expectedFields)
     {
-        // The super-admin passes every permission check, so the request reaches validation on every endpoint.
-        using var client = _factory.CreateClientWithClaims(
-            new Claim(NovaClaims.Subject, Guid.NewGuid().ToString()),
-            new Claim(NovaClaims.Role, HttpContextCurrentUser.SuperAdminRole));
+        // Every declared permission, as an administrator holds them, so the request reaches validation on every endpoint.
+        using var client = _factory.CreateClientWithPermissions(_factory.Services
+            .GetServices<IPermissionDefinitionProvider>()
+            .SelectMany(provider => provider.GetPermissions())
+            .Select(permission => permission.Name)
+            .ToArray());
         using var request = new HttpRequestMessage(new HttpMethod(method), path)
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json")

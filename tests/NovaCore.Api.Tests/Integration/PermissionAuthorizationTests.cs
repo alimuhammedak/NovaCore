@@ -12,9 +12,8 @@ namespace NovaCore.Api.Tests.Integration;
 
 /// <summary>
 /// Permission-based authorization end to end: a permission granted on the server opens its endpoint and nothing else,
-/// the Administrator role (a token claim) opens every endpoint, an authenticated caller without the permission gets 403
-/// (anonymous callers get 401, <see cref="AuthGateTests"/>), and a permission claim in the token itself grants nothing
-/// (PLAN F3a.2). Written against the dynamic policy provider before F2c.2 replaced it with
+/// an authenticated caller without the permission gets 403 (anonymous callers get 401, <see cref="AuthGateTests"/>), and
+/// neither a permission claim nor the Administrator role in the token itself grants anything (PLAN F3a.2, F4c.2). Written against the dynamic policy provider before F2c.2 replaced it with
 /// <c>RequirePermissionAttribute</c> (IAuthorizationRequirementData).
 /// </summary>
 public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>, IAsyncLifetime
@@ -50,13 +49,15 @@ public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : I
     }
 
     [Fact]
-    public async Task The_administrator_role_grants_every_endpoint()
+    public async Task The_administrator_role_in_the_token_grants_nothing()
     {
-        using var client = ClientWith(new Claim(NovaClaims.Role, HttpContextCurrentUser.SuperAdminRole));
+        // A token's roles say who the caller was when it was issued; a removed administrator keeps the claim until the
+        // token expires. Permissions, an administrator's included, come from the server (F4c.2).
+        using var client = ClientWith(new Claim(NovaClaims.Role, "Administrator"));
 
         var response = await client.GetAsync("/api/v1/products");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

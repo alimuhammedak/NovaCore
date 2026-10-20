@@ -1,7 +1,9 @@
+using System.Net;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -19,8 +21,9 @@ using NovaCore.AspNetCore.Security;
 namespace NovaCore.AspNetCore.Web;
 
 /// <summary>
-/// The web-layer composition root: ProblemDetails, exception handling, the OpenAPI document, JWT auth,
-/// permission authorization, rate limiting and CORS — all behind two calls. The Scalar UI is the NovaCore.Scalar add-on.
+/// The web-layer composition root: forwarded headers, ProblemDetails, exception handling, the OpenAPI document, JWT
+/// auth, permission authorization, rate limiting and CORS — all behind two calls. The Scalar UI is the NovaCore.Scalar
+/// add-on.
 /// </summary>
 public static class CoreWebExtensions
 {
@@ -29,7 +32,8 @@ public static class CoreWebExtensions
 
     /// <summary>
     /// Registers the web services: ProblemDetails and the global exception handler, OpenAPI, JWT authentication,
-    /// permission authorization, rate limiting and CORS.
+    /// permission authorization, rate limiting, CORS, and the reverse proxies whose forwarded headers to apply
+    /// (<c>ForwardedHeaders:KnownProxies</c> and <c>KnownIPNetworks</c>; none by default).
     /// </summary>
     public static IHostApplicationBuilder AddCoreWeb(this IHostApplicationBuilder builder)
     {
@@ -41,13 +45,14 @@ public static class CoreWebExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 
-        services.AddCoreInfrastructure(); // adds ProblemDetails + GlobalExceptionHandler + caching
+        services.AddCoreInfrastructure(); // adds ProblemDetails, the exception mapping and caching
 
         services.AddCoreAuthentication();
         services.AddCoreAuthorization(); // the handler behind RequirePermission(...)
 
         services.AddOpenApi(options => options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 
+        AddForwardedHeaders(services);
         AddRateLimiting(services);
         AddCors(services);
 
@@ -57,6 +62,9 @@ public static class CoreWebExtensions
     /// <summary>Adds the middleware that pairs with <see cref="AddCoreWeb"/>, in the order it must run.</summary>
     public static WebApplication UseCoreWeb(this WebApplication app)
     {
+        // Before anything that reads the client's address or the scheme: the rate limiter, HSTS, authentication, the
+        // links and cookies the handlers write. Without trusted proxies it changes nothing.
+        app.UseForwardedHeaders();
         app.UseSecurityHeaders();            // defensive response headers first, so every response carries them
         app.UseExceptionHandler();
         app.UseStatusCodePages();
@@ -68,7 +76,7 @@ public static class CoreWebExtensions
 
         // The OpenAPI document, in Development only. The Scalar UI over it is the NovaCore.Scalar add-on (MapCoreScalar).
         if (app.Environment.IsDevelopment())
-            app.MapOpenApi();
+            app.MapOpenApi().AllowAnonymous();
 
         app.UseCors(CorsPolicyName);
         app.UseRateLimiter();
@@ -81,6 +89,37 @@ public static class CoreWebExtensions
 
     // Configuration is read when the options are first built, not here: values layered in after CreateBuilder (e.g. by
     // WebApplicationFactory) still apply, and invalid values fail on start (docs/plan/RESEARCH.md R-048).
+    private static void AddForwardedHeaders(IServiceCollection services)
+    {
+        services.AddOptions<TrustedProxiesOptions>()
+            .BindConfiguration(TrustedProxiesOptions.SectionName)
+            .Validate(proxies => proxies.KnownProxies.All(TrustedProxiesOptions.IsAddress),
+                "ForwardedHeaders:KnownProxies entries must be IP addresses, such as 10.0.0.1 or fd00::1.")
+            .Validate(proxies => proxies.KnownIPNetworks.All(TrustedProxiesOptions.IsNetwork),
+                "ForwardedHeaders:KnownIPNetworks entries must be networks in CIDR notation, such as 10.0.0.0/8, without "
+                + "host bits set.")
+            .ValidateOnStart();
+
+        // Only the client's address and the scheme: X-Forwarded-Host could rewrite the host, which no handler needs (the
+        // public URL is Jwt:Authority). Empty: left as the framework has it (no headers applied), which also keeps
+        // ASPNETCORE_FORWARDEDHEADERS_ENABLED working (docs/plan/RESEARCH.md R-078).
+        services.AddOptions<ForwardedHeadersOptions>().Configure<IOptions<TrustedProxiesOptions>>((options, proxies) =>
+        {
+            if (proxies.Value.IsEmpty)
+                return;
+
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+            // The configured proxies replace the framework's loopback defaults.
+            options.KnownProxies.Clear();
+            options.KnownIPNetworks.Clear();
+            foreach (var proxy in proxies.Value.KnownProxies)
+                options.KnownProxies.Add(IPAddress.Parse(proxy));
+            foreach (var network in proxies.Value.KnownIPNetworks)
+                options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
+        });
+    }
+
     private static void AddRateLimiting(IServiceCollection services)
     {
         services.AddOptions<RateLimitingOptions>()
@@ -133,14 +172,16 @@ public static class CoreWebExtensions
 
         services.AddCors();
 
-        services.AddOptions<CorsOptions>().Configure<IOptions<CorsOriginsOptions>>((options, cors) =>
+        services.AddOptions<CorsOptions>().Configure<IOptions<CorsOriginsOptions>, IHostEnvironment>((options, cors, environment) =>
             options.AddPolicy(CorsPolicyName, policy =>
             {
                 var origins = cors.Value.AllowedOrigins;
                 if (origins.Length > 0)
                     policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
-                else
+                else if (environment.IsDevelopment())
                     policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+
+                // Otherwise the policy allows no origin: a deployment names its origins or gets no cross-origin access.
             }));
     }
 }

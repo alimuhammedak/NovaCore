@@ -2,9 +2,12 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using NovaCore.Identity.OpenIddict;
@@ -77,10 +80,34 @@ public sealed class IdentityServerConfigurationTests
     [Fact]
     public async Task Outside_Development_the_host_does_not_start_without_keys()
     {
-        var exception = await Assert.ThrowsAnyAsync<Exception>(
-            () => IdentityServerTestHost.StartAsync(Environments.Production));
+        // With a Data Protection key store, so the missing signing keys are what stops the host.
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
+            Environments.Production, builder => InMemoryKeyStore.AddTo(builder.Services)));
 
         Assert.Contains("key must be registered", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Outside_Development_the_host_needs_a_data_protection_key_store()
+    {
+        // Cookies, antiforgery tokens and confirmation links are protected with these keys: without a store they would
+        // change on every restart and differ between instances (PLAN F4c.6).
+        var exception = await Assert.ThrowsAnyAsync<Exception>(
+            () => IdentityServerTestHost.StartAsync(Environments.Production, builder => AddProductionServices(builder, keyStore: false)));
+
+        Assert.Contains("Data Protection key store", exception.Message, StringComparison.Ordinal);
+
+        await using var host = await IdentityServerTestHost.StartAsync(
+            Environments.Production, builder => AddProductionServices(builder, keyStore: true));
+        Assert.IsType<InMemoryKeyStore>(host.Services.GetRequiredService<IOptions<KeyManagementOptions>>().Value.XmlRepository);
+    }
+
+    [Fact]
+    public async Task In_Development_the_framework_default_key_store_is_enough()
+    {
+        await using var host = await IdentityServerTestHost.StartAsync();
+
+        Assert.Null(host.Services.GetRequiredService<IOptions<KeyManagementOptions>>().Value.XmlRepository);
     }
 
     [Fact]
@@ -92,6 +119,7 @@ public sealed class IdentityServerConfigurationTests
                 .AddEphemeralSigningKey(SecurityAlgorithms.EcdsaSha256)
                 .AddEphemeralEncryptionKey());
             builder.Services.AddSingleton<IEmailSender>(new CapturingEmailSender());
+            InMemoryKeyStore.AddTo(builder.Services);
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Identity:Clients:1:ClientId"] = "worker",
@@ -152,6 +180,16 @@ public sealed class IdentityServerConfigurationTests
 
         // The core's own rule: the provider can't pick an issuer without it.
         Assert.Contains("Jwt:Authority must be the absolute URI of an OpenID Connect provider", exception.Message, StringComparison.Ordinal);
+    }
+
+    // What a production host brings besides the configuration: certificates (ephemeral keys here), an email sender and,
+    // unless a test leaves it out, a Data Protection key store.
+    private static void AddProductionServices(WebApplicationBuilder builder, bool keyStore)
+    {
+        builder.Services.AddOpenIddict().AddServer(server => server.AddEphemeralSigningKey().AddEphemeralEncryptionKey());
+        builder.Services.AddSingleton<IEmailSender>(new CapturingEmailSender());
+        if (keyStore)
+            InMemoryKeyStore.AddTo(builder.Services);
     }
 
     private static async Task<List<JsonElement>> SigningKeysAsync(IdentityServerTestHost host)

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using NovaCore.Abstractions.Results;
@@ -26,12 +27,11 @@ public static class UpdateProduct
             .WithName("UpdateProduct")
             .WithSummary("Update a product")
             .RequirePermission(CatalogPermissions.ProductsUpdate)
-            .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
 
-    private static async Task<IResult> Handle(
+    private static async Task<Results<NoContent, ProblemHttpResult>> Handle(
         Guid id,
         Request request,
         CatalogDbContext dbContext,

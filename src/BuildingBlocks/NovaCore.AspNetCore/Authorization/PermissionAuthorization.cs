@@ -12,8 +12,9 @@ public sealed class PermissionRequirement(string permission) : IAuthorizationReq
 }
 
 /// <summary>
-/// Grants access when the principal carries a matching <c>permission</c> claim, or belongs to the super-admin role.
-/// The permission claims are the ones resolved on the server (<see cref="IPermissionResolver"/>), never the token's own.
+/// Grants access when the principal carries a matching <c>permission</c> claim. The permission claims are the ones
+/// resolved on the server (<see cref="IPermissionResolver"/>), never the token's own, and no role in the token bypasses
+/// them: an administrator's permissions are resolved like anyone's.
 /// </summary>
 public sealed class PermissionAuthorizationHandler : AuthorizationHandler<PermissionRequirement>
 {
@@ -21,11 +22,7 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
     protected override Task HandleRequirementAsync(
         AuthorizationHandlerContext context, PermissionRequirement requirement)
     {
-        var hasPermission =
-            context.User.IsInRole(HttpContextCurrentUser.SuperAdminRole) ||
-            context.User.HasClaim(NovaClaims.Permission, requirement.Permission);
-
-        if (hasPermission)
+        if (context.User.HasClaim(NovaClaims.Permission, requirement.Permission))
             context.Succeed(requirement);
 
         return Task.CompletedTask;
@@ -33,7 +30,7 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
 }
 
 /// <summary>
-/// Requires an authenticated caller that holds <see cref="Permission"/> (or the super-admin role):
+/// Requires an authenticated caller that holds <see cref="Permission"/>:
 /// <c>[RequirePermission("catalog:products:create")]</c> on a handler, or <c>.RequirePermission(...)</c> on an endpoint.
 /// The attribute carries its own <see cref="PermissionRequirement"/> (<see cref="IAuthorizationRequirementData"/>), so
 /// no named policy is registered per permission. .NET 10 enforces it on Minimal API and other routed endpoints, not on

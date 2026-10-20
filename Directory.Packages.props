@@ -43,6 +43,12 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+    <!--
+      Security: Microsoft.Data.SqlClient (6.1.x, under EF Core SqlServer) depends on System.Security.Cryptography.Pkcs
+      9.0.11 (CVE-2026-84008, CVE-2026-70162, high). Every project that references the SQL Server provider (the
+      modules and the Api host) references the patched version directly. No packable project has it in its graph.
+    -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup>

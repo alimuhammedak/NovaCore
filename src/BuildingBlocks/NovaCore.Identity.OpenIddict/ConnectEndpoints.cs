@@ -26,11 +26,16 @@ internal static class ConnectEndpoints
 {
     private const string AuthenticationTimeItem = ".auth_time";
 
+    // Anonymous to the core's authorization: OpenIddict has validated the request and the client, and each handler
+    // reads the sign-in session itself.
     public static void Map(IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapMethods("/connect/authorize", [HttpMethods.Get, HttpMethods.Post], Authorize).ExcludeFromDescription();
-        endpoints.MapPost("/connect/token", Exchange).ExcludeFromDescription().RequireRateLimiting("strict");
-        endpoints.MapMethods("/connect/endsession", [HttpMethods.Get, HttpMethods.Post], EndSession).ExcludeFromDescription();
+        endpoints.MapMethods("/connect/authorize", [HttpMethods.Get, HttpMethods.Post], Authorize)
+            .ExcludeFromDescription().AllowAnonymous();
+        endpoints.MapPost("/connect/token", Exchange)
+            .ExcludeFromDescription().AllowAnonymous().RequireRateLimiting("strict");
+        endpoints.MapMethods("/connect/endsession", [HttpMethods.Get, HttpMethods.Post], EndSession)
+            .ExcludeFromDescription().AllowAnonymous();
     }
 
     private static async Task<IResult> Authorize(

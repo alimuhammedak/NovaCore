@@ -50,12 +50,13 @@ public static class HostingExtensions
         if (!endpoints.ServiceProvider.GetRequiredService<IHostEnvironment>().IsDevelopment())
             return endpoints;
 
-        endpoints.MapHealthChecks("/health");
+        // Probes don't sign in.
+        endpoints.MapHealthChecks("/health").AllowAnonymous();
 
         endpoints.MapHealthChecks("/alive", new HealthCheckOptions
         {
             Predicate = registration => registration.Tags.Contains("live")
-        });
+        }).AllowAnonymous();
 
         return endpoints;
     }

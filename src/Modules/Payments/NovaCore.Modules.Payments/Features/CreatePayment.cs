@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using NovaCore.Abstractions.Results;
 using NovaCore.AspNetCore.Http;
@@ -38,12 +39,11 @@ public static class CreatePayment
             .WithName("CreatePayment")
             .WithSummary("Create a payment for a product")
             .RequirePermission(PaymentsPermissions.Create)
-            .Produces<Response>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
 
-    private static async Task<IResult> Handle(
+    private static async Task<Results<Created<Response>, ProblemHttpResult>> Handle(
         Request request,
         IProductCatalog catalog,
         PaymentsDbContext dbContext,

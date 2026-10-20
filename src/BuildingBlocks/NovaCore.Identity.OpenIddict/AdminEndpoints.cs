@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -39,7 +40,11 @@ internal static class AdminEndpoints
 
     internal sealed record UserSummary(Guid Id, string? Email, string? UserName, bool EmailConfirmed, bool TwoFactorEnabled, bool LockedOut);
 
-    private static async Task<IResult> ListUsers(
+    internal sealed record RoleSummary(Guid Id, string? Name, string? Description);
+
+    internal sealed record PermissionGroup(string Group, IReadOnlyList<PermissionDefinition> Permissions);
+
+    private static async Task<Ok<PagedList<UserSummary>>> ListUsers(
         UserManager<ApplicationUser> users,
         TimeProvider timeProvider,
         CancellationToken cancellationToken,
@@ -59,31 +64,32 @@ internal static class AdminEndpoints
                 user.LockoutEnd != null && user.LockoutEnd > now))
             .ToListAsync(cancellationToken);
 
-        return Results.Ok(new PagedList<UserSummary>(items, pagination.Page, pagination.PageSize, total));
+        return TypedResults.Ok(new PagedList<UserSummary>(items, pagination.Page, pagination.PageSize, total));
     }
 
-    private static async Task<IResult> ListRoles(RoleManager<ApplicationRole> roles, CancellationToken cancellationToken)
+    private static async Task<Ok<List<RoleSummary>>> ListRoles(RoleManager<ApplicationRole> roles, CancellationToken cancellationToken)
     {
         var list = await roles.Roles
             .AsNoTracking()
-            .Select(role => new { role.Id, role.Name, role.Description })
+            .Select(role => new RoleSummary(role.Id, role.Name, role.Description))
             .ToListAsync(cancellationToken);
 
-        return Results.Ok(list);
+        return TypedResults.Ok(list);
     }
 
-    private static IResult ListPermissions(IEnumerable<IPermissionDefinitionProvider> providers)
+    private static Ok<PermissionGroup[]> ListPermissions(IEnumerable<IPermissionDefinitionProvider> providers)
     {
         var permissions = providers
             .SelectMany(provider => provider.GetPermissions())
             .DistinctBy(permission => permission.Name)
             .GroupBy(permission => permission.Group)
-            .Select(group => new { group = group.Key, permissions = group.OrderBy(permission => permission.Name) });
+            .Select(group => new PermissionGroup(group.Key, [.. group.OrderBy(permission => permission.Name)]))
+            .ToArray();
 
-        return Results.Ok(permissions);
+        return TypedResults.Ok(permissions);
     }
 
-    private static async Task<IResult> AssignRole(
+    private static async Task<Results<NoContent, NotFound<AccountEndpoints.MessageResponse>, ValidationProblem>> AssignRole(
         Guid userId,
         AssignRoleRequest request,
         UserManager<ApplicationUser> users,
@@ -93,17 +99,17 @@ internal static class AdminEndpoints
     {
         var user = await users.FindByIdAsync(userId.ToString());
         if (user is null)
-            return Results.NotFound(new { message = "User not found." });
+            return UserNotFound();
 
         if (!await roles.RoleExistsAsync(request.Role))
-            return Results.NotFound(new { message = "Role not found." });
+            return TypedResults.NotFound(new AccountEndpoints.MessageResponse("Role not found."));
 
         if (!await users.IsInRoleAsync(user, request.Role))
         {
             var result = await users.AddToRoleAsync(user, request.Role);
             if (!result.Succeeded)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
+                return TypedResults.ValidationProblem(new Dictionary<string, string[]>
                 {
                     ["role"] = result.Errors.Select(error => error.Description).ToArray()
                 });
@@ -113,10 +119,10 @@ internal static class AdminEndpoints
             audit.RoleAssigned(user.Id, request.Role, currentUser.UserId);
         }
 
-        return Results.NoContent();
+        return TypedResults.NoContent();
     }
 
-    private static async Task<IResult> RemoveRole(
+    private static async Task<Results<NoContent, NotFound<AccountEndpoints.MessageResponse>>> RemoveRole(
         Guid userId,
         string role,
         UserManager<ApplicationUser> users,
@@ -125,7 +131,7 @@ internal static class AdminEndpoints
     {
         var user = await users.FindByIdAsync(userId.ToString());
         if (user is null)
-            return Results.NotFound(new { message = "User not found." });
+            return UserNotFound();
 
         if (await users.IsInRoleAsync(user, role))
         {
@@ -133,6 +139,9 @@ internal static class AdminEndpoints
             audit.RoleRemoved(user.Id, role, currentUser.UserId);
         }
 
-        return Results.NoContent();
+        return TypedResults.NoContent();
     }
+
+    private static NotFound<AccountEndpoints.MessageResponse> UserNotFound() =>
+        TypedResults.NotFound(new AccountEndpoints.MessageResponse("User not found."));
 }

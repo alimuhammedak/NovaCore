@@ -127,7 +127,7 @@ NovaCore.AspNetCore        NovaCore.EntityFrameworkCore     (çekirdek: yalnızc
 | OpenAPI (+ Scalar eklentisi), rate limiting, CORS | |
 | JWT bearer auth (`Jwt:Authority`) + permission-based authz altyapısı | Kimlik sağlayıcının store'u ve migration'ları (host'ta) |
 | Kimlik sağlayıcı eklentisi (`NovaCore.Identity.OpenIddict`) | Client'lar, seed yöneticisi, üretim sertifikaları |
-| Auditing interceptor, domain-event dispatcher | |
+| Auditing interceptor, transactional outbox ve dispatcher'ı | |
 
 ---
 
@@ -147,7 +147,7 @@ NovaCore.slnx
 │   ├── BuildingBlocks/
 │   │   ├── NovaCore.Abstractions/        # Result, PagedList, Entity, IDomainEvent/DomainEvent, ICurrentUser (yalnızca BCL)
 │   │   ├── NovaCore.AspNetCore/          # IModule + AddModule<T>, AddCoreDefaults/AddCoreWeb, ProblemDetails, Result→HTTP, JWT, authz, OpenAPI, HybridCache
-│   │   ├── NovaCore.EntityFrameworkCore/ # AddModuleDbContext, AddCorePersistence: auditing, startup migration, domain-event dispatcher
+│   │   ├── NovaCore.EntityFrameworkCore/ # AddModuleDbContext, AddCorePersistence: auditing, startup migration, outbox + dispatcher
 │   │   ├── NovaCore.Serilog/             # eklenti: AddCoreLogging (Console + opsiyonel Seq)
 │   │   ├── NovaCore.OpenTelemetry/       # eklenti: AddCoreObservability (metrics + tracing, OTLP)
 │   │   ├── NovaCore.Scalar/              # eklenti: MapCoreScalar (Scalar UI, yalnızca Development)
@@ -246,6 +246,13 @@ public sealed class OrdersModule : IModule
 Her özellik tek dosya: request (validation attribute'larıyla) + response + route + handler bir arada. Mediator yok;
 handler bağımlılıklarını doğrudan minimal-API DI'dan alır. Örnek: [`CreateProduct.cs`](src/Modules/Catalog/NovaCore.Modules.Catalog/Features/CreateProduct.cs).
 
+Handler'ın dönüş tipi yanıt sözleşmesidir: `Task<Results<Ok<ProductDto>, ProblemHttpResult>>` gibi bir union.
+`result.ToHttpResult()` bu union'ı üretir (`Result` → `NoContent`, `Result<T>` → `Ok<T>`, özel başarı için
+`ToHttpResult(value => TypedResults.Created(...))`). Başarı yanıtını OpenAPI belgesine union'ın kendisi yazar, bu yüzden
+`.Produces<T>()` yazılmaz; derleyici de bildirilmeyen bir yanıtı reddeder. Hata durum kodları `.ProducesProblem(404)`
+ile bildirilir, çünkü ProblemDetails'in durumu çalışma anında belli olur. `EndpointContractTests` OpenAPI'de görünen hiçbir
+handler'ın düz `IResult` dönmediğini doğrular.
+
 Validation, .NET 10'un yerleşik Minimal API validation'ıdır. Kurallar request record'unun parametrelerindeki
 DataAnnotations'tır (`[Required, MaxLength(200)] string Name`). Hazır bir attribute'un ifade edemediği kural, tek bir
 değer için özel bir `ValidationAttribute`'tur (ör. `CreatePayment`'taki `NotEmpty`), birden çok özellik için
@@ -306,9 +313,13 @@ outbox**): entity değişikliği ve event ya birlikte kalıcı olur ya hiç olma
 - açılışta bir tur çalışır, sonra 5 saniyede bir. Önce en eski mesaj alınır, ama hata alan bir mesaj sonraki turda
   daha yenilerinden sonra denenir: sıra garantisi yoktur;
 - her mesaj için bir DI scope açar; o mesajın handler'ları bu scope'u paylaşır;
-- işini bitiren handler'ı `outbox_consumers`'a (processed tablosu) yazar. Hata olursa mesaj sonraki turda yeniden
-  denenir, ama başarılı handler'lar tekrar çalışmaz;
-- 10 denemeden sonra mesajı inceleme için outbox'ta bırakır.
+- işini bitiren handler'ı `outbox_consumers`'a (processed tablosu, anahtarı mesaj satırının `Id`'si + handler) yazar.
+  Hata olursa mesaj sonraki turda yeniden denenir, ama başarılı handler'lar tekrar çalışmaz;
+- 10 denemeden sonra mesajı inceleme için outbox'ta bırakır;
+- işlenmiş mesajı 7 gün sonra siler; handler kayıtları FK'nin cascade delete'iyle onunla gider. İncelemeye bırakılan
+  mesaj silinmez.
+
+Event'leri dağıtmanın tek yolu budur: entity event'lerini outbox'ı atlayıp hemen çalıştıran bir dispatcher yoktur.
 
 Garanti **en az bir kez**dir: bir handler'ın kendi kaydıyla bu işaret arasında süreç ölürse handler bir kez daha
 çalışır. Handler'lar bu yüzden idempotent yazılır. Veritabanı başına tek dispatcher varsayılır.
@@ -324,7 +335,7 @@ handler, tekrar teslime karşı iş anahtarıyla bir kayıt tutar ve onu değiş
 
 | Concern | Yaklaşım (.NET 10) | NovaCore'da |
 |---|---|---|
-| **Exception handling** | `IExceptionHandler` + `AddProblemDetails` (RFC 9457) | `GlobalExceptionHandler` |
+| **Exception handling** | `UseExceptionHandler` + `AddProblemDetails` (RFC 9457), `StatusCodeSelector` | Eşleme middleware'in kendi yedek yolunda: projenin `IExceptionHandler`'ları her zaman önce çalışır. `AppException` → durumu + mesajı, `BadHttpRequestException` → kendi durumu, diğer her şey → 500, mesajsız; yalnızca 500'ler loglanır |
 | **Logging** | Serilog (structured) + OTel korelasyon | `AddCoreLogging` (`NovaCore.Serilog` eklentisi) — Console + opsiyonel Seq |
 | **Tracing/Metrics** | OpenTelemetry | `AddCoreObservability` (`NovaCore.OpenTelemetry` eklentisi) — OTLP yalnızca endpoint konfigüre ise |
 | **Caching** | HybridCache (L1 + opsiyonel L2) | `HybridCache` doğrudan enjekte edilir (zaten soyut bir sınıf, sarmalayıcı yok). `AddCoreCaching` varsayılan süreyi `Cache:DefaultExpiration`'dan alır |
@@ -337,7 +348,7 @@ handler, tekrar teslime karşı iş anahtarıyla bir kayıt tutar ve onu değiş
 | **Health** | Yerleşik Health Checks + `AddDbContextCheck` | `/health` (her modül DB'si, "ready" etiketi) + `/alive`, yalnızca Development |
 | **API docs** | `Microsoft.AspNetCore.OpenApi` + Scalar | Bearer security scheme transformer ile; Scalar UI `NovaCore.Scalar` eklentisinde (`MapCoreScalar`) |
 | **Modül kaydı** | Açık kayıt | `builder.AddModule<TModule>()` (assembly taraması yok) |
-| **Result** | Result pattern | Sıfır-bağımlılık `Result<T>` + `ToHttpResult()` |
+| **Result** | Result pattern | Sıfır-bağımlılık `Result<T>` + `ToHttpResult()`, tipli union döner (`Results<Ok<T>, ProblemHttpResult>`) |
 
 `Result<T>` **beklenen** hatalar (NotFound/Validation/Conflict) için; gerçek istisnai durumlar için
 exception. Exception'ı akış kontrolü için kullanmaktan kaçınılır.
@@ -395,6 +406,11 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
 
 ### Yetkilendirme (authorization) — permission-based
 - Roller (Identity) **+ ince taneli izinler**. İzinler `module:resource:action` (ör. `catalog:products:create`).
+- **Varsayılan kapalı:** yetki meta verisi olmayan bir uç ve hiçbir uca eşleşmeyen istek kimlik doğrulama ister
+  (`FallbackPolicy = RequireAuthenticatedUser`, MS'in "tercih edilen yol" dediği yöntem). `RequirePermission`'ı unutulan
+  bir uç böylece herkese açılmaz (OWASP API5). Anonim olması gereken uç bunu `AllowAnonymous()` ile söyler: kimlik
+  sağlayıcının `/connect/*` uçları ve giriş sayfası, kayıt ve e-posta onayı, health uçları, OpenAPI belgesi ve Scalar.
+  Bir sonucu: tanımsız bir yola anonim istek 404 yerine 401 alır.
 - `RequirePermissionAttribute` (`AuthorizeAttribute` + `IAuthorizationRequirementData`) kendi `PermissionRequirement`'ını
   taşır, `PermissionAuthorizationHandler` onu denetler. Özel policy provider ya da izin başına bir named policy yok.
   Kullanım: `endpoint.RequirePermission("catalog:products:create")` veya handler'da `[RequirePermission(...)]`.
@@ -404,7 +420,9 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   rollerinden ve doğrudan izinlerinden, servis client'ları için `Identity:Clients`'tan okur. Sonuç HybridCache'te `sub` + security stamp anahtarıyla
   `Cache:PermissionExpiration` (varsayılan 5 dk) boyunca tutulur: bir rol değişikliği oturum açmış kullanıcıya en geç bu
   sürede yansır, yeni bir security stamp'li token cache'i atlar. Host'ta bir `IPermissionResolver` kayıtlı değilse
-  uygulama açılmaz. `Administrator` rolü (token'daki rol claim'i) super-admin'dir, tüm kontrolleri geçer.
+  uygulama açılmaz. Token'daki hiçbir rol izin kontrolünü atlatmaz. Kimlik eklentisinde `Administrator` rolünün üyesi,
+modüllerin tanımladığı bütün izinleri sunucuda alır (seed o izni role yazmamış olsa da). Rolünden çıkarılan bir admin
+de izinlerini önbellek süresi dolunca kaybeder.
 - **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder hepsini toplayıp
   rollere bağlar (`User` rolü = iş modüllerinin yalnızca `:read` izinleri — least privilege).
 
@@ -424,6 +442,11 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
 | `POST·DELETE /api/v1/admin/users/{id}/roles` | Rol ata/kaldır (`identity:users:manage`) |
 
 ### Ek sertleştirme
+- **Reverse proxy arkasında:** `UseCoreWeb` pipeline'ın başında `UseForwardedHeaders`'ı çalıştırır. Yalnızca
+  `ForwardedHeaders:KnownProxies`/`KnownIPNetworks`'te listelenen kaynakların `X-Forwarded-For` ve `X-Forwarded-Proto`
+  başlıkları uygulanır; böylece rate limiter gerçek istemciyi ayırır, istek şeması (ve `Secure` cookie'ler) https olur.
+  Liste boşsa hiç kimsenin başlığı uygulanmaz (framework varsayılanı, loopback dahil). `X-Forwarded-Host` işlenmez:
+  public adres `Jwt:Authority`'den gelir.
 - **Security headers** (her yanıtta): `X-Content-Type-Options`, `X-Frame-Options: DENY`,
   `Referrer-Policy`, `Content-Security-Policy: default-src 'none'`, `Server` başlığı kaldırılır; prod'da **HSTS**.
 - **Audit logging:** giriş (başarılı/başarısız), lockout, 2FA, refresh, çıkış, parola değişimi, oturum iptali, rol
@@ -434,8 +457,11 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
 
 > **Üretimde mutlaka:** `Jwt:Authority`'yi host'un public https adresine (ya da harici sağlayıcıya) ayarla, imza ve
 > şifreleme sertifikalarını host'ta ekle, TLS/HTTPS'i edge'de zorla, gerçek bir `IEmailSender` (SMTP/SendGrid) tak,
-> admin parolasını ve client secret'larını user-secrets/ortam değişkeniyle ver. `LoggingEmailSender` yalnızca
-> Development'ta kayıtlıdır; diğer ortamlarda `IEmailSender` ya da anahtarlar eksikse uygulama açılışta durur.
+> admin parolasını ve client secret'larını user-secrets/ortam değişkeniyle ver, bir **Data Protection anahtar deposu**
+> seç (kalıcı volume'da `PersistKeysToFileSystem`, `PersistKeysToDbContext` ya da blob/Redis). Giriş cookie'leri,
+> antiforgery token'ları ve onay linkleri bu anahtarlarla korunur; framework'ün varsayılan deposu container
+> yenilenince kaybolur ve her örnekte farklıdır. `LoggingEmailSender` yalnızca Development'ta kayıtlıdır; diğer
+> ortamlarda `IEmailSender`, imza anahtarları ya da anahtar deposu eksikse uygulama açılışta durur.
 
 **Kaynaklar:** [OWASP Authentication CS](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) ·
 [OWASP Password Storage CS](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) ·
@@ -460,7 +486,8 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
                      "Clients": [] },                // { ClientId, DisplayName, ClientSecret, RedirectUris, PostLogoutRedirectUris, Permissions }
   "Cache":         { "DefaultExpiration": "00:05:00", "PermissionExpiration": "00:05:00" },
   "RateLimiting":  { "PermitLimit": 100, "WindowSeconds": 60 },   // giriş ve hesap uçları 1/10'unu kullanır ("strict")
-  "Cors":          { "AllowedOrigins": [] },        // boş = her ortamda her origin'e izin (credentials olmadan)
+  "Cors":          { "AllowedOrigins": [] },        // boş = Development'ta her origin (credentials olmadan), diğer ortamlarda hiçbiri
+  "ForwardedHeaders": { "KnownProxies": [], "KnownIPNetworks": [] },  // reverse proxy'nin IP'leri / CIDR ağları; boş = başlıklar işlenmez
   "Seq":           { "ServerUrl": "" }              // dolu = Seq'e log gönder
 }
 ```
@@ -478,6 +505,8 @@ host'u, ayarın adını veren bir hatayla durdurur:
 - `RateLimiting`: `PermitLimit` ve `WindowSeconds` ≥ 1. `Cache:DefaultExpiration` ve `Cache:PermissionExpiration`
   pozitif birer süre.
 - `Cors:AllowedOrigins`: her giriş çıplak bir origin olmalı (`https://app.example.com`): yol, sondaki `/` ve `*` yok.
+- `ForwardedHeaders:KnownProxies`: IP adresleri (IPv4 dört bölümüyle, `10.0.0` gibi kısaltma yok);
+  `ForwardedHeaders:KnownIPNetworks`: CIDR ağları (`10.0.0.0/8`, host bitleri sıfır).
 - `Database:ApplyMigrations`: `true`/`false`.
 
 Değerler kayıt anında değil, ilk kullanımda okunur. Bu yüzden `CreateBuilder`'dan sonra eklenen config (ör. testlerde

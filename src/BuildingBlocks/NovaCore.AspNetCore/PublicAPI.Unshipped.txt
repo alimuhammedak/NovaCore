@@ -39,9 +39,6 @@ NovaCore.AspNetCore.Exceptions.ConflictException
 NovaCore.AspNetCore.Exceptions.ConflictException.ConflictException(string! message) -> void
 NovaCore.AspNetCore.Exceptions.ForbiddenException
 NovaCore.AspNetCore.Exceptions.ForbiddenException.ForbiddenException(string! message = "You are not allowed to perform this action.") -> void
-NovaCore.AspNetCore.Exceptions.GlobalExceptionHandler
-NovaCore.AspNetCore.Exceptions.GlobalExceptionHandler.GlobalExceptionHandler(Microsoft.AspNetCore.Http.IProblemDetailsService! problemDetailsService, Microsoft.Extensions.Logging.ILogger<NovaCore.AspNetCore.Exceptions.GlobalExceptionHandler!>! logger) -> void
-NovaCore.AspNetCore.Exceptions.GlobalExceptionHandler.TryHandleAsync(Microsoft.AspNetCore.Http.HttpContext! httpContext, System.Exception! exception, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
 NovaCore.AspNetCore.Exceptions.NotFoundException
 NovaCore.AspNetCore.Exceptions.NotFoundException.NotFoundException(string! message) -> void
 NovaCore.AspNetCore.Hosting.HostingExtensions
@@ -71,7 +68,6 @@ NovaCore.AspNetCore.Security.SecurityHeadersMiddleware.InvokeAsync(Microsoft.Asp
 NovaCore.AspNetCore.Security.SecurityHeadersMiddleware.SecurityHeadersMiddleware(Microsoft.AspNetCore.Http.RequestDelegate! next) -> void
 NovaCore.AspNetCore.Web.CoreWebExtensions
 const NovaCore.AspNetCore.Auth.JwtOptions.SectionName = "Jwt" -> string!
-const NovaCore.AspNetCore.Identity.HttpContextCurrentUser.SuperAdminRole = "Administrator" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Email = "email" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Name = "name" -> string!
 const NovaCore.AspNetCore.Identity.NovaClaims.Permission = "permission" -> string!
@@ -95,13 +91,12 @@ static NovaCore.AspNetCore.Exceptions.NotFoundException.For(string! entity, obje
 static NovaCore.AspNetCore.Hosting.HostingExtensions.AddCoreDefaults(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static NovaCore.AspNetCore.Hosting.HostingExtensions.AddCoreHealthChecks(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static NovaCore.AspNetCore.Hosting.HostingExtensions.MapDefaultEndpoints(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
-static NovaCore.AspNetCore.Http.ResultHttpExtensions.Problem(NovaCore.Abstractions.Results.Error error) -> Microsoft.AspNetCore.Http.IResult!
-static NovaCore.AspNetCore.Http.ResultHttpExtensions.ToHttpResult(this NovaCore.Abstractions.Results.Result! result) -> Microsoft.AspNetCore.Http.IResult!
-static NovaCore.AspNetCore.Http.ResultHttpExtensions.ToHttpResult(this NovaCore.Abstractions.Results.Result! result, int successStatusCode) -> Microsoft.AspNetCore.Http.IResult!
-static NovaCore.AspNetCore.Http.ResultHttpExtensions.ToHttpResult<T>(this NovaCore.Abstractions.Results.Result<T>! result) -> Microsoft.AspNetCore.Http.IResult!
-static NovaCore.AspNetCore.Http.ResultHttpExtensions.ToHttpResult<T>(this NovaCore.Abstractions.Results.Result<T>! result, System.Func<T, Microsoft.AspNetCore.Http.IResult!>? onSuccess) -> Microsoft.AspNetCore.Http.IResult!
 static NovaCore.AspNetCore.Modules.ModuleExtensions.AddModule<TModule>(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static NovaCore.AspNetCore.Modules.ModuleExtensions.MapModules(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
 static NovaCore.AspNetCore.Security.SecurityHeadersExtensions.UseSecurityHeaders(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
 static NovaCore.AspNetCore.Web.CoreWebExtensions.AddCoreWeb(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static NovaCore.AspNetCore.Web.CoreWebExtensions.UseCoreWeb(this Microsoft.AspNetCore.Builder.WebApplication! app) -> Microsoft.AspNetCore.Builder.WebApplication!
+static NovaCore.AspNetCore.Http.ResultHttpExtensions.Problem(NovaCore.Abstractions.Results.Error error) -> Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult!
+static NovaCore.AspNetCore.Http.ResultHttpExtensions.ToHttpResult(this NovaCore.Abstractions.Results.Result! result) -> Microsoft.AspNetCore.Http.HttpResults.Results<Microsoft.AspNetCore.Http.HttpResults.NoContent!, Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult!>!
+static NovaCore.AspNetCore.Http.ResultHttpExtensions.ToHttpResult<T, TSuccess>(this NovaCore.Abstractions.Results.Result<T>! result, System.Func<T, TSuccess>! onSuccess) -> Microsoft.AspNetCore.Http.HttpResults.Results<TSuccess, Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult!>!
+static NovaCore.AspNetCore.Http.ResultHttpExtensions.ToHttpResult<T>(this NovaCore.Abstractions.Results.Result<T>! result) -> Microsoft.AspNetCore.Http.HttpResults.Results<Microsoft.AspNetCore.Http.HttpResults.Ok<T>!, Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult!>!

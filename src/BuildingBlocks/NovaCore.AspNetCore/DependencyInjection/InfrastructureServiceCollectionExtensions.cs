@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -10,7 +11,13 @@ namespace NovaCore.AspNetCore.DependencyInjection;
 /// <summary>Service registration for the cross-cutting infrastructure.</summary>
 public static class InfrastructureServiceCollectionExtensions
 {
-    /// <summary>Wires the cross-cutting infrastructure: ProblemDetails, exception handling and caching.</summary>
+    /// <summary>
+    /// Wires the cross-cutting infrastructure: ProblemDetails, exception handling and caching. An exception no
+    /// <c>IExceptionHandler</c> handles becomes a ProblemDetails response through the exception handler middleware's own
+    /// fallback, so a project's handlers run first, registered before or after this call. An <see cref="AppException"/>
+    /// answers with its status and message, a <c>BadHttpRequestException</c> with its status, anything else with 500
+    /// and no message; only the 500s are logged.
+    /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns><paramref name="services"/>, for chaining.</returns>
     public static IServiceCollection AddCoreInfrastructure(this IServiceCollection services)
@@ -24,7 +31,15 @@ public static class InfrastructureServiceCollectionExtensions
             context.ProblemDetails.Extensions["traceId"] = traceId;
             context.ProblemDetails.Instance ??= request.PathBase.Add(request.Path).ToUriComponent();
         });
-        services.AddExceptionHandler<GlobalExceptionHandler>();
+
+        // Not an IExceptionHandler: those run in registration order and the first to handle wins, so a catch-all one
+        // would shadow every handler registered after it (docs/plan/RESEARCH.md R-073, R-079).
+        services.Configure<ExceptionHandlerOptions>(options =>
+        {
+            options.StatusCodeSelector = ExceptionMapping.StatusCodeFor;
+            options.ExceptionHandler = ExceptionMapping.WriteResponseAsync;
+            options.SuppressDiagnosticsCallback = ExceptionMapping.SuppressDiagnostics;
+        });
 
         services.AddCoreCaching();
         return services;

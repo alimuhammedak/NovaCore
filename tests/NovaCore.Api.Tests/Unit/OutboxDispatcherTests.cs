@@ -18,14 +18,18 @@ namespace NovaCore.Api.Tests.Unit;
 
 /// <summary>
 /// PLAN F4a.2: the outbox dispatcher hands every saved event to each of its handlers once. It records every handler
-/// that finished (<c>outbox_consumers</c>), retries the others on later passes, gives up after ten attempts and opens
-/// no transaction of its own, so it works under a retrying execution strategy. The clock is a
+/// that finished (<c>outbox_consumers</c>, keyed by the message), retries the others on later passes, gives up after ten
+/// attempts and opens no transaction of its own, so it works under a retrying execution strategy. PLAN F4c.7: a processed
+/// message is deleted, with its handlers' records, once it is older than the retention. The clock is a
 /// <see cref="FakeTimeProvider"/>: the dispatcher runs a pass when the host starts and whenever the clock moves past the
 /// polling interval.
 /// </summary>
 public sealed class OutboxDispatcherTests : IAsyncDisposable
 {
     private static readonly TimeSpan NextPass = TimeSpan.FromMinutes(1);
+
+    // OutboxDispatcher.ProcessedRetention, which is internal to NovaCore.EntityFrameworkCore.
+    private static readonly TimeSpan Retention = TimeSpan.FromDays(7);
 
     // A named in-memory database that every connection with this name shares; this open connection keeps it alive (no
     // pooling, so nothing else does). The dispatcher, the test and the handlers use their own connections: a
@@ -123,6 +127,70 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
         Assert.Null(message.ProcessedOnUtc);
         Assert.Contains(AlwaysFailsHandler.Failure, message.Error, StringComparison.Ordinal);
         Assert.Equal(10, _log.Calls.Count(call => call.EventId == poisoned));
+    }
+
+    // The rows below are aged by their timestamps, not by advancing the clock: FakeTimeProvider fires a periodic timer
+    // once per period it advances over, and the dispatcher's 5-second timer would fire 120,000 times in 7 days.
+    [Fact]
+    public async Task A_processed_message_is_deleted_with_its_records_once_the_retention_has_passed()
+    {
+        using var host = await CreateHostAsync(services =>
+            services.AddScoped<IDomainEventHandler<OrderPlaced>, RecordingHandler>());
+        var now = _clock.GetUtcNow();
+        var expired = await AddProcessedMessageAsync(now - Retention - TimeSpan.FromMinutes(1), "ExpiredHandler");
+        var kept = await AddProcessedMessageAsync(now - Retention + TimeSpan.FromMinutes(1), "KeptHandler");
+        var delivered = await SaveOrderAsync(host);
+
+        // The pass at startup delivers the new message, then sweeps.
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(async () => !await MessageExistsAsync(expired));
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["KeptHandler"], await ConsumersAsync(kept));
+        Assert.Equal([typeof(RecordingHandler).FullName!], await ConsumersAsync(delivered));
+        Assert.Equal(2, await ConsumerCountAsync());   // the expired message's record went with it
+    }
+
+    [Fact]
+    public async Task A_message_processed_late_does_not_hold_back_the_expired_ones_after_it()
+    {
+        using var host = await CreateHostAsync(services =>
+            services.AddScoped<IDomainEventHandler<OrderPlaced>, RecordingHandler>());
+        var now = _clock.GetUtcNow();
+        // The lowest Id, processed just now (as after retries): it shares the first batch with 49 of the 50 expired ones.
+        var late = await AddProcessedMessageAsync(now - TimeSpan.FromMinutes(1), "LateHandler");
+        for (var i = 0; i < 50; i++)
+            await AddProcessedMessageAsync(now - Retention - TimeSpan.FromDays(1), "ExpiredHandler");
+        await SaveOrderAsync(host);
+
+        // One pass, the one at startup, takes all 50.
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(async () => await ConsumerCountAsync() == 2);
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["LateHandler"], await ConsumersAsync(late));
+    }
+
+    [Fact]
+    public async Task A_message_left_for_inspection_is_kept_whatever_its_age()
+    {
+        using var host = await CreateHostAsync(services =>
+            services.AddScoped<IDomainEventHandler<OrderPlaced>, RecordingHandler>());
+        var poisoned = Guid.CreateVersion7();
+        await using (var context = CreateContext())
+        {
+            await context.Database.ExecuteSqlRawAsync(
+                "INSERT INTO outbox_messages (EventId, Type, Content, OccurredOnUtc, Attempts, Error) VALUES ({0}, {1}, {2}, {3}, 10, 'failed')",
+                [poisoned, "System.String, System.Private.CoreLib", "\"text\"", _clock.GetUtcNow() - TimeSpan.FromDays(30)],
+                TestContext.Current.CancellationToken);
+        }
+        var delivered = await SaveOrderAsync(host);
+
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(async () => (await MessageAsync(delivered)).ProcessedOnUtc is not null);
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(10, (await MessageAsync(poisoned)).Attempts);
     }
 
     [Fact]
@@ -275,12 +343,47 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
             .SingleAsync(TestContext.Current.CancellationToken);
     }
 
+    // A message processed at processedOnUtc, with one handler's record, as an earlier pass would have left it.
+    private async Task<Guid> AddProcessedMessageAsync(DateTimeOffset processedOnUtc, string handler)
+    {
+        var eventId = Guid.CreateVersion7();
+        await using var context = CreateContext();
+        await context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO outbox_messages (EventId, Type, Content, OccurredOnUtc, ProcessedOnUtc, Attempts) VALUES ({0}, {1}, {2}, {3}, {3}, 0)",
+            [eventId, "System.String, System.Private.CoreLib", "\"text\"", processedOnUtc],
+            TestContext.Current.CancellationToken);
+        await context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO outbox_consumers (MessageId, Handler, ProcessedOnUtc) SELECT Id, {1}, {2} FROM outbox_messages WHERE EventId = {0}",
+            [eventId, handler, processedOnUtc],
+            TestContext.Current.CancellationToken);
+        return eventId;
+    }
+
+    private async Task<bool> MessageExistsAsync(Guid eventId)
+    {
+        await using var context = CreateContext();
+        return await context.Database
+            .SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM outbox_messages WHERE EventId = {0}", eventId)
+            .SingleAsync(TestContext.Current.CancellationToken) == 1;
+    }
+
+    // A handler's record belongs to the message row (MessageId), not to the event id.
     private async Task<List<string>> ConsumersAsync(Guid eventId)
     {
         await using var context = CreateContext();
         return await context.Database
-            .SqlQueryRaw<string>("SELECT Handler AS Value FROM outbox_consumers WHERE EventId = {0}", eventId)
+            .SqlQueryRaw<string>(
+                "SELECT c.Handler AS Value FROM outbox_consumers c JOIN outbox_messages m ON m.Id = c.MessageId WHERE m.EventId = {0}",
+                eventId)
             .ToListAsync(TestContext.Current.CancellationToken);
+    }
+
+    private async Task<int> ConsumerCountAsync()
+    {
+        await using var context = CreateContext();
+        return await context.Database
+            .SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM outbox_consumers")
+            .SingleAsync(TestContext.Current.CancellationToken);
     }
 
     // The dispatcher runs in the background: poll its visible effect until it shows up.

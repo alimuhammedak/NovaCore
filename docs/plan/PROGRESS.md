@@ -16,7 +16,7 @@
 | 3b | ✅ tamam | `faz/3b-idp` | 2026-09-27 | 2026-09-27 | 2026-09-27 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4a | ✅ tamam | `faz/4a-outbox` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push 2026-09-28, kullanıcı isteği) |
 | 4b | ✅ tamam | `faz/4b-referans-moduller` | 2026-09-28 | 2026-09-28 | 2026-09-28 (kullanıcı onayı, `--no-ff`; push edilmedi) |
-| 4c | ⏳ başlamadı | | | | |
+| 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4d | ⏳ başlamadı (koşullu, F4d.1) | | | | |
 | 5 | ⏳ başlamadı | | | | |
 
@@ -764,13 +764,81 @@ Plan onayı 2026-09-28. F4b.1'de kullanıcı event akışını seçti (Q-30, D-0
   - Akış ve eşzamanlılık testleri art arda 3 koşuda yeşil (27/27).
 
 ### Faz 4c
-- [ ] F4c.1 Güvenli varsayılanlar (FallbackPolicy, CORS)
-- [ ] F4c.2 Super-admin sunucu tarafında
-- [ ] F4c.3 Forwarded headers
-- [ ] F4c.4 Projenin hata eşlemesi
-- [ ] F4c.5 Tipli yanıt sözleşmesi
-- [ ] F4c.6 Data Protection anahtar deposu koruması
-- [ ] F4c.7 Outbox şeması ve bakımı
+Plan onayı 2026-10-20. Yeni test altyapısı `CoreWebTestHost` (yalnızca çekirdek web paketiyle kurulan tüketici host'u) F4c.1'de gelir, F4c.3 ve F4c.4 de kullanır. Plan onayı şu test değişikliklerini de kapsıyor (Y-44): `GlobalExceptionHandlerTests` ve `DomainEventDispatcherTests` silinen sınıflarla birlikte gider; super-admin testi ve framework exception durum kodları tasarım gereği değişir; health'in Production testi, `JwtValidationTests` ve `ValidationTests` aynı amaçla kurulum değiştirir.
+
+- [x] F4c.1 (7a060b8): Güvenli varsayılanlar.
+  - `AddCoreAuthorization` `FallbackPolicy = RequireAuthenticatedUser` kuruyor. `AllowAnonymous` alanlar: `/connect/authorize|token|endsession`, `/account` grubu, health, OpenAPI belgesi, Scalar. OpenIddict'in discovery/JWKS/revoke istekleri authentication middleware'inde yanıtlandığı için etkilenmiyor (R-076).
+  - CORS: `Cors:AllowedOrigins` boşken Development her origin'e izin veriyor, diğer ortamlar hiçbirine.
+  - Yeni test altyapısı `CoreWebTestHost`. Testler 219 → 227: `SecureDefaultsTests` (meta verisiz uç 401/200, beş açık uç anonim 200, Production'da CORS kapalı, Development'ta açık). Önce kırmızı: meta verisiz uç 200, Production CORS `*` döndü.
+  - Kasıtlı bozma (commit'lenmedi): eklentideki `AllowAnonymous` işaretleri kaldırılınca kimlik akış testlerinden 11'i kırmızı.
+  - Değişen test: health'in Production testi kimlikli client'la 404'ü doğruluyor; anonim istek artık 401 alıyor (tanımsız yola fallback, MS'in belgelediği davranış).
+  - Kararlar D-036 (1)'de. Güncellenenler: README (Konfigürasyon, Yetkilendirme), kök/BuildingBlocks/eklenti/tests CLAUDE.md, CHANGELOG, memory `novacore-security`.
+- [x] F4c.2 (c1f0075): Super-admin sunucu tarafında.
+  - Çekirdekte super-admin kalmadı: `PermissionAuthorizationHandler` ve `HttpContextCurrentUser.HasPermission` yalnızca çözülen izinlere bakıyor, `SuperAdminRole` silindi (public API, 0.x).
+  - Eklentinin resolver'ı store'daki `Administrator` üyeliğini modüllerin tanımladığı bütün izinlere çözüyor, seed'in o izni role yazıp yazmadığından bağımsız. `IPermissionResolver` değişmedi.
+  - Testler 227 → 229. Önce kırmızı: token rolüyle 200, seed'in yazmadığı izin çözülmedi, rolden çıkarılan admin önbellek süresinden sonra da 200 aldı. Yeni: `AdministratorRemovalTests` (sahte saat; admin ucu ve `/probe` 403), resolver testi. Değişenler: super-admin testi 403 bekliyor; `JwtValidationTests` sunucuda izin verilmiş bir okuyucu, `ValidationTests` tanımlı bütün izinler kullanıyor.
+  - Kararlar D-036 (2), R-077. Güncellenenler: README (Yetkilendirme), kök ve eklenti CLAUDE.md, CHANGELOG, memory `novacore-security`.
+- [x] F4c.3 (1c6751c): Forwarded headers.
+  - `UseCoreWeb` `UseForwardedHeaders()`'ı en başta çalıştırıyor. `ForwardedHeaders:KnownProxies` (IP) ve `KnownIPNetworks` (CIDR) yeni internal `TrustedProxiesOptions`'a bağlanıyor ve açılışta doğrulanıyor; dolu listede yalnızca For + Proto uygulanıyor, framework'ün loopback varsayılanlarının yerine bu liste geçiyor. Boş listede options'a dokunulmuyor.
+  - Plan "ForwardedHeadersSettings" adını anıyordu; diğer options tipleriyle aynı biçimde `TrustedProxiesOptions` oldu.
+  - Testler 229 → 238: `ForwardedHeadersTests` (`CoreWebTestHost`: güvenilen proxy ve ağ istemciyi ve şemayı belirler, başka kaynak ve dolu listede loopback yok sayılır, liste yokken hiçbir şey uygulanmaz, "strict" limiter forwarded istemciye göre bölünür, dört geçersiz giriş açılışı durdurur). Önce kırmızı: 6 test.
+  - **Sürpriz:** `IPAddress.TryParse("10.0.0")` başarılı ve `10.0.0.0` dönüyor; IPv4 için dört bölüm şartı eklendi (R-078).
+  - Api `appsettings.json`'a boş `ForwardedHeaders` bölümü eklendi. "Sonraya bırakılanlar"da 3 madde kapandı, 1'i kısmen.
+  - Kararlar D-036 (3), R-078. Güncellenenler: README (Konfigürasyon, Ek sertleştirme), BuildingBlocks CLAUDE.md, CHANGELOG.
+- [x] F4c.4 (f28d973): Projenin hata eşlemesi.
+  - `GlobalExceptionHandler` silindi (public API). Yerine internal `ExceptionMapping`: `ExceptionHandlerOptions.StatusCodeSelector`, `CustomizeProblemDetails` içinde başlık/`type`/`detail` ve `SuppressDiagnosticsCallback`. `ErrorType` → durum/başlık eşlemesi artık `ResultHttpExtensions` ile ortak (`internal`).
+  - Davranış: `AppException` durumu ve mesajı aynı; `BadHttpRequestException` kendi durumu (bozuk JSON 400); diğer her şey, sunucunun kendi `OperationCanceledException`'ı dahil, mesajsız 500. 500'leri framework'ün `UnhandledException` logu yazıyor; istemci hataları ve projenin handler'larının işledikleri loglanmıyor.
+  - Testler 238 → 244: `ExceptionMappingTests` (13) geldi, `GlobalExceptionHandlerTests` (7) sınıfla birlikte gitti (plan onayı, Y-44). Önce kırmızı: 7 test (sonradan kaydedilen handler çalışmıyordu, framework exception'ları 4xx/499, bozuk JSON 500). Kasıtlı bozma: bastırma kapatılınca log testi kırmızı (commit'lenmedi).
+  - Kararlar D-036 (4), R-079. "Sonraya bırakılanlar"da `BadHttpRequestException` maddeleri kapandı; review #9'un koşul notu güncellendi (kanca artık var, kod değişmedi).
+  - Güncellenenler: README (Cross-cutting tablosu), BuildingBlocks CLAUDE.md, CHANGELOG.
+- [x] F4c.5 (2cc1743): Tipli yanıt sözleşmesi.
+  - `ToHttpResult` union dönüyor: `Results<NoContent, ProblemHttpResult>`, `Results<Ok<T>, ProblemHttpResult>`, `Results<TSuccess, ProblemHttpResult>`. `Problem(Error)` → `ProblemHttpResult`. `(Result, int)` overload'u silindi (çağıranı yoktu). Public API değişikliği (0.x).
+  - Modül handler'ları `Task<Results<…>>` dönüyor; başarı için yazılan `.Produces<T>()`/`.Produces(204)` satırları kalktı, `.ProducesProblem(...)` kaldı (`ProblemHttpResult` meta veri üretmiyor, R-080).
+  - Kimlik eklentisinin `/api/v1/auth/*` ve `/api/v1/admin/*` uçları tipli sonuçlara geçti. Anonim gövdeler aynı JSON'u üreten internal record'lar oldu: `MessageResponse`, `RecoveryCodesResponse`, `RoleSummary`, `PermissionGroup`. `/connect/*` ve `/account/*` `IResult` kaldı.
+  - OpenAPI farkı (adım öncesi ve sonrası, geçici bir snapshot testiyle; commit'lenmedi):
+    - 7 modül ucunun yanıtları bayt bayt aynı.
+    - 13 kimlik ucu şemasız `200`'den tipli yanıtlara geçti: gövde şemaları, `204`'ler, 400 validation, 404/409 mesajları. `logout-all`, `change-password`, `2fa/disable` ve admin rol uçları artık gerçekteki `204`'ü bildiriyor.
+    - Hiçbir şema silinmedi, 9 şema eklendi, `responses` dışındaki kısım aynı.
+  - Testler 244 → 245: `EndpointContractTests.Described_endpoints_return_typed_results`. Önce kırmızı: kimlik ve modül uçlarındaki düz `IResult` handler'lar. Yanıt gövdelerini mevcut uç testleri koruyor.
+  - Kararlar D-036 (5), R-080. "Sonraya bırakılanlar"da Y-31 kör noktası kapandı. Güncellenenler: README (Result, slice anatomisi), kök/Modules/BuildingBlocks/eklenti CLAUDE.md, CHANGELOG.
+- [x] F4c.6 (7365696): Data Protection anahtar deposu koruması.
+  - Eklenti `KeyManagementOptions`'ı `Validate<IHostEnvironment>` + `ValidateOnStart` ile doğruluyor: Development dışında `XmlRepository` boşsa (hiçbir `PersistKeysTo*` çağrılmamışsa) host açılmıyor; hata mesajı seçenekleri sayıyor. Depo paketi eklenmedi; depoyu host seçiyor.
+  - Test altyapısı: `InMemoryKeyStore` (`IXmlRepository`); `NovaCoreApiFactory` Development dışında onu da ekliyor.
+  - Testler 245 → 247: depo yokken Production host'u açılmıyor, depo varken açılıyor; Development'ta framework varsayılanı yeterli. Önce kırmızı: depo olmadan açılıyordu.
+  - İmza anahtarı eksikliğini ve e-posta göndericisi eksikliğini bekleyen iki mevcut test, kendi hatalarını görmeye devam etsin diye depoyla kuruluyor (plan).
+  - Kararlar D-036 (6), R-081. Güncellenenler: README (Üretimde mutlaka), eklenti ve tests CLAUDE.md, CHANGELOG.
+- [x] F4c.7 (cd269cb): Outbox şeması ve bakımı.
+  - `outbox_consumers`: anahtar (`MessageId`, Handler); `MessageId` → `outbox_messages.Id`, cascade delete'li FK. Dispatcher kayıtları mesajın `Id`'siyle okuyup yazıyor.
+  - Saklama: her turun sonunda `ProcessedRetention`'dan (7 gün) eski işlenmiş mesajlar siliniyor. Süre, `Id` sırasıyla okunan 50'lik parçalarda bellekte karşılaştırılıyor (SQLite `DateTimeOffset`'i SQL'de karşılaştıramıyor). İncelemeye bırakılan mesaj kalıyor.
+  - `IDomainEventDispatcher` (Abstractions, public) ve `DomainEventDispatcher` silindi; `DomainEventHandlerInvokers` dispatcher için kaldı.
+  - Migration `OutboxConsumersByMessage` (Catalog, Payments): EF'in ürettiği adımlar mevcut kayıtları kaybettirirdi, elle yeniden yazıldı. Kayıtlar `EventId` üzerinden mesajın `Id`'sine dönüşüyor, sahipsiz kayıt siliniyor; Down tersini yapıyor.
+  - **Sürpriz 1:** `migrations script` migration'ı tek batch üretiyor; yeni kolonu kullanan ifade `EXEC(N'…')` içine alındı. Yerel SQL Server'da geçici bir veritabanında denendi: script ile Up, çalışma zamanında Down ve Up, Payments'ın bütün zinciri. Veritabanı silindi (R-082).
+  - **Sürpriz 2:** `FakeTimeProvider` 7 günlük ilerletmede 5 sn'lik zamanlayıcıyı ~120 bin kez tetikliyor (test başına ~55 sn). Saklama testleri satırları zaman damgasıyla yaşlandırıyor (tests/CLAUDE.md'ye not).
+  - Testler 247 → 246: `OutboxDispatcherTests`'e saklama süresi geçen mesajın kayıtlarıyla silinmesi ve incelemeye bırakılan mesajın kalması (+2), tüketici sorgusu `MessageId` üzerinden. `DomainEventDispatcherTests` (3) sınıfla birlikte gitti (plan onayı, Y-44). Önce kırmızı: 4 test (kolon yok, temizlik yok). Kasıtlı bozma: temizlik çağrısı kapatılınca saklama testi kırmızı (commit'lenmedi).
+  - `has-pending-model-changes` üç context'te temiz.
+  - Kararlar D-036 (7) (D-031 (5) ve (7) revizyon kuralıyla işaretlendi, D-033 (7)), R-082. "Sonraya bırakılanlar"da 4 madde kapandı.
+  - Güncellenenler: README (outbox, proje ağacı), kök/BuildingBlocks/tests CLAUDE.md, CHANGELOG.
+
+- [x] Pkcs açığı (df35563): faz doğrulamasında `restore --force` NU1903 verdi. 13 Ekim'de yayımlanan `System.Security.Cryptography.Pkcs` açıkları (CVE-2026-84008, CVE-2026-70162) Microsoft.Data.SqlClient üzerinden geliyordu ve en yeni EF/SqlClient da açıklı sürüme bağlı (R-083). Kullanıcıya seçenekler soruldu; soruyu reddedip "devam et" dedi, önerilen seçenek uygulandı: SQL Server sağlayıcısını kullanan projelere doğrudan Pkcs 10.0.13 (D-036 (8)).
+- Faz doğrulaması (2026-10-20, code review'dan önce):
+  - `restore --force`: Pkcs düzeltmesinden sonra NU uyarısı yok (önce NU1903).
+  - Release `--no-incremental`: 0 uyarı, 0 hata.
+  - Test: 246/246 Debug. Release'te bir koşuda `ConfigurationValidationTests`'in Production/`http` Authority satırı kırmızı oldu; mesajı yakalanamadı, sonraki 3 sınıf koşusu ve 2 tam Release koşusu yeşil. R-055'in (açılış hatası bekleyen testlerde aralıklı `ObjectDisposedException`) etkilediği test ailesinden; kanıtsız olduğu için kesin neden yazılmadı.
+  - `list package --vulnerable`: 13 projede açık yok.
+  - `has-pending-model-changes`: üç context'te temiz.
+- [x] Code review düzeltmeleri (fed25c4): `code-review` (high, `main...faz/4c-tuketici-hazirligi`) 5 bulgu verdi.
+  - Düzeltilenler:
+    - (#1) Exception eşlemesi `CustomizeProblemDetails` içindeydi ve exception taşıyan her ProblemDetails yazımını eziyordu; projenin handler'ının yazdığı başlık ve detay da gidiyordu. Eşleme `ExceptionHandlerOptions.ExceptionHandler` delegate'ine taşındı; middleware onu yalnızca hiçbir handler işlemediğinde çağırıyor. Kırmızı test: `The_problem_details_a_project_handler_writes_are_its_own`.
+    - (#2) Saklama taraması, hâlâ saklanan bir mesaj içeren ilk parçada duruyordu; geç işlenmiş düşük Id'li bir mesaj turu 49 silmeyle sınırlıyordu. Artık süresi dolmuş mesaj içermeyen ilk parçada duruyor. Kırmızı test: `A_message_processed_late_does_not_hold_back_the_expired_ones_after_it` (eski kuralla zaman aşımı).
+    - (#3) Api host'u SQL Server sağlayıcısını kendisi referans alıyor; Pkcs düzeltmesini yalnızca modüller üzerinden alıyordu. Api'ye de doğrudan referans eklendi.
+  - "Sonraya bırakılanlar"a yazılanlar: #4 (her turda tarama sorgusu), #5 (iç içe `MessageResponse`).
+  - Testler 246 → 248.
+- Faz doğrulaması, düzeltmelerden sonra (2026-10-20):
+  - `restore --force`: NU uyarısı yok.
+  - `list package --vulnerable`: 13 projede açık yok.
+  - Release `--no-incremental`: 0 uyarı, 0 hata.
+  - Test: 248/248, Release ve Debug.
+  - `has-pending-model-changes`: üç context'te temiz.
 
 ### Faz 4d (koşullu)
 - [ ] F4d.1 IdP modeli kararı
@@ -828,11 +896,11 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konular. Her faz sonunda kullanıcı bunları gözden geçirir.
 
 **D-033 ile plana alınanlar (2026-09-28).** Aşağıdaki maddeler artık bir adıma bağlı. O adım bitince madde üstü çizilir.
-- Forwarded headers yok (Faz 0) ve proxy arkasında cookie'lerin `Secure` bayrağı (Faz 3b) → F4c.3.
-- Y-31 testinin `IResult` kör noktası (Faz 0, F0.7) → F4c.5.
-- `BadHttpRequestException`'ın 500 dönmesi (Faz 2b) → F4c.4.
-- Super-admin bypass'ının token rolüne dayanması (Faz 3a) → F4c.2.
-- `outbox_consumers` anahtarı (Faz 4a, #12) ve işlenmiş mesajların hiç silinmemesi (Faz 4a) → F4c.7.
+- ~~Forwarded headers yok (Faz 0) ve proxy arkasında cookie'lerin `Secure` bayrağı (Faz 3b) → F4c.3.~~ → F4c.3'te yapıldı.
+- ~~Y-31 testinin `IResult` kör noktası (Faz 0, F0.7) → F4c.5.~~ → F4c.5'te yapıldı.
+- ~~`BadHttpRequestException`'ın 500 dönmesi (Faz 2b) → F4c.4.~~ → F4c.4'te yapıldı.
+- ~~Super-admin bypass'ının token rolüne dayanması (Faz 3a) → F4c.2.~~ → F4c.2'de yapıldı.
+- ~~`outbox_consumers` anahtarı (Faz 4a, #12) ve işlenmiş mesajların hiç silinmemesi (Faz 4a) → F4c.7.~~ → F4c.7'de yapıldı.
 - Parola sıfırlama, onay e-postasını yeniden gönderme, `User` rolü yokken kayıtta 500 (Faz 3b) → F4d.2.
 - Kurtarma kodları (Faz 3b) → F4d.3.
 - Logout CSRF, giriş zamanlama farkı, `change-password` lockout'u (Faz 3b) → F4d.4.
@@ -850,10 +918,10 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 - xUnit v3 → 4.x ve xunit.runner.visualstudio 4.x major güncellemesi (F0.2 kapsamı dışında). Kaynak: `dotnet list package --outdated`, 2026-09-24.
 - (Faz 0, Q-09) `Microsoft.Extensions.Caching.Hybrid` ve `Microsoft.Extensions.Http.Resilience` 10.0.0 → 10.10.0, `Microsoft.NET.Test.Sdk` 18.6.0 → 18.10.1. Açıkları yok. Hybrid için F2c.3, Resilience için F2a.2 (eklenti paketi) uygun yer olabilir.
-- (Faz 0) Global ve "strict" rate limiter partition anahtarı olarak `RemoteIpAddress` kullanıyor. Bir reverse proxy arkasında bu proxy'nin IP'si olur. `ForwardedHeaders` yapılandırılmamış.
+- ~~(Faz 0) Global ve "strict" rate limiter partition anahtarı olarak `RemoteIpAddress` kullanıyor. Bir reverse proxy arkasında bu proxy'nin IP'si olur. `ForwardedHeaders` yapılandırılmamış.~~ → F4c.3'te çözüldü: güvenilen proxy'nin `X-Forwarded-For`'u `RemoteIpAddress`'i istemcinin adresi yapıyor.
 - (Faz 0, F0.2) Bu makinede kurulu shared framework 10.0.8, paketler artık 10.0.12. Runtime'ı 10.0.12'ye güncellemek ortam işi, repo işi değil.
 - (Faz 0, F0.8) GitHub Actions uyarısı (ilk CI koşusu, 2026-09-25): `ubuntu-latest` etiketi 19 Ekim 2026'dan itibaren Ubuntu 26'ya geçecek (actions/runner-images#14748). Etki beklenmiyor. İlk koşularda kırmızı olursa runner'ı `ubuntu-24.04`'e sabitlemek bir seçenek.
-- (Faz 0, F0.7) Y-31 testi ApiExplorer'a dayanıyor. `Task<IResult>` dönen ve `Produces<T>` bildirmeyen handler'ların yanıt payload'ını göremez (Identity uç noktalarının çoğu böyle). ApiExplorer dışı endpoint'ler de kapsam dışı (health, `ExcludeFromDescription`). Handler'lar typed result'a (`Results<Ok<T>, …>`) geçerse kapsam kendiliğinden genişler.
+- ~~(Faz 0, F0.7) Y-31 testi ApiExplorer'a dayanıyor. `Task<IResult>` dönen ve `Produces<T>` bildirmeyen handler'ların yanıt payload'ını göremez (Identity uç noktalarının çoğu böyle).~~ → F4c.5'te çözüldü: belgede görünen bütün handler'lar tipli sonuç dönüyor ve `EndpointContractTests` bunu doğruluyor. ApiExplorer dışı uçlar (health, `ExcludeFromDescription`) hâlâ kapsam dışı.
 - (Faz 0, F0.6) Kök `CLAUDE.md` Standards bölümünde "If a mediator is ever truly needed, use MIT `martinothamar/Mediator`" yazıyor. Bu, DECISIONS Y-01 ile çelişiyor ("herhangi bir mediator veya request-dispatch soyutlaması" yasak). Öncelik DECISIONS'ta, ama not gelecekteki oturumları yanıltabilir. Cümle kaldırılmalı veya Y-01'e yönlendirilmeli.
 - ~~(Faz 0) "strict" policy'nin tek tüketicisi Identity'nin `/api/v1/auth` grubu.~~ → Faz 3b'de değerlendirildi: policy'yi artık eklentinin `/connect/token`, `/account/*` ve `/api/v1/auth/*` uçları kullanıyor, `StrictRateLimitTests` `/connect/token`'ı sınıyor (D-009'un anlamı korundu).
 - (Faz 1) ~~F2b.6'da yapılacak: `.editorconfig`'teki geçici CA1848/CA1873 satırları silinecek.~~ → F2b.6 Faz 2a'nın ilk adımı oldu (D-017), Faz 2a adım listesinde.
@@ -877,7 +945,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - ~~(Faz 2a, F2a.4 → F2c.1) **Y-20'nin modül kısmı henüz testli değil.**~~ → F2c.1e'de çözüldü: `ExplicitRegistrationTests` artık tüm `src`'yi tarıyor ve `*FromAssembly*` kayıt yardımcılarını da yakalıyor. EF'in `ApplyConfigurationsFromAssembly`'si model yapılandırması olduğu için hariç (D-023 (5)). Eski not: Modüller validator'ları `AddValidatorsFromAssembly` ile (assembly taraması) kaydediyor. Bu FluentValidation ile birlikte F2c.1'de gidiyor; o zaman `ExplicitRegistrationTests`'in taraması `src/Modules`'ü de kapsamalı. `ApplyConfigurationsFromAssembly` (EF model yapılandırması, DI kaydı değil) Y-20 kapsamında mı, o gün karar verilmeli.
 - (Faz 2a, F2a.2c) `SecurityHeadersMiddleware` hâlâ `/scalar` yolunu CSP'den muaf tutuyor. Scalar artık bir eklenti; çekirdeğin eklentinin yolunu bilmesi küçük bir bağlılık. Davranış değişikliği olacağı için 2a'da dokunulmadı.
 - (Faz 2a, F2a.2b) OpenTelemetry `service.version` olarak uygulamanın değil NovaCore eklentisinin assembly sürümünü (0.1.0.0) raporluyor. Davranış 2a'da korundu. Doğrusu muhtemelen giriş assembly'sinin sürümü.
-- (Faz 2b, code review) `GlobalExceptionHandler.Map`'te `BadHttpRequestException` için bir durum yok. Development'ta minimal API'ler bozuk gövdede bu exception'ı fırlatıyor (`ThrowOnBadRequest`), yanıt 400 yerine 500 oluyor ve Error seviyesinde log düşüyor. Bu 2b'den önce de böyleydi; status eşlemesini değiştirmek F2b.4'ün kapsamı dışında. Çözüm: `BadHttpRequestException.StatusCode`'u kullanmak.
+- ~~(Faz 2b, code review) `GlobalExceptionHandler.Map`'te `BadHttpRequestException` için bir durum yok.~~ → F4c.4'te çözüldü: kendi durum kodunu dönüyor. Development'ta minimal API'ler bozuk gövdede bu exception'ı fırlatıyor (`ThrowOnBadRequest`), yanıt 400 yerine 500 oluyor ve Error seviyesinde log düşüyor. Bu 2b'den önce de böyleydi; status eşlemesini değiştirmek F2b.4'ün kapsamı dışında. Çözüm: `BadHttpRequestException.StatusCode`'u kullanmak.
 - (Faz 2b, code review) DbContext health check'lerinde timeout yok. SQL Server'a erişilemezse `/health` bağlantı timeout'u kadar bekleyebilir. Uçlar yalnızca Development'ta olduğu için şimdi etkisi düşük. Production'da probe gerekince (D-022) `HealthCheckRegistration.Timeout` ile birlikte ele alınmalı.
 - (Faz 2b, code review) Test yardımcıları tekrar ediyor: `NoOpEmailSender` iki dosyada (`EmailSenderRegistrationTests`, `ConfigurationValidationTests`), kullanıcı seed'i iki dosyada (`AuthFlowTests`, `RefreshTokenExpiryTests`). Paylaşılan bir test yardımcısına taşınabilir; mevcut testleri değiştirmek gerektiği için yapılmadı.
 - (Faz 2b) `NovaCore.OpenTelemetry`, `OTEL_EXPORTER_OTLP_ENDPOINT`'i kayıt anında okuyor (`OpenTelemetryHostingExtensions.cs:35`). F2b.1'in kapsamı iki çekirdek paketti. Bu okuma `ConfigureAppConfiguration` ile ezilemiyor, ama MS ServiceDefaults da aynı kalıbı kullanıyor.
@@ -894,7 +962,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 2b → Faz 3a; **F3a.1'de değerlendirildi, yapılmadı**, R-058: `TokenValidationParameters`'ta `TimeProvider` yok, tek yol varsayılan doğrulamanın yerini alan bir `LifetimeValidator` delegesi.) Token üretimi `TimeProvider`'dan okuyor, JwtBearer'ın lifetime doğrulaması (IdentityModel) ise gerçek saatten. Sahte saatli testler bu yüzden gerçek "şimdi"den başlıyor (R-050). F3a.1'de doğrulama yeniden yazılırken `TimeProvider` ile hizalanabilir.
 
 - ~~(Faz 3a → F3b.3)~~ → F3b.3b'de çözüldü (D-028): üretim kodu ve Development simetrik modu kaldırıldı. Eski not: Çekirdekteki `ITokenService`/`JwtTokenService`/`AccessToken` ve `JwtOptions`'ın issuance alanlarının (`AccessTokenMinutes`, `RefreshTokenDays`) tek tüketicisi Identity modülü (D-024 (3)). Modülle birlikte kaldırılmalı. O gün HS256 üreten bir issuer kalmayacak; Development'taki simetrik doğrulamanın (`Jwt:SigningKey`) kalıp kalmayacağına karar verilmeli (ör. `dotnet user-jwts` için).
-- (Faz 3a, code review → 3b; **3b'de yapılmadı**, plan kapsamı dışında bırakıldı) **Super-admin bypass'ı token'daki rol claim'ine dayanıyor.** `Administrator` rolünden çıkarılan bir kullanıcı, token'ın ömrü boyunca (Identity'de 15 dk) her izni geçmeye devam ediyor. İzinler ise cache TTL'iyle yansıyor. IdP 3b'de gelirken super-admin de sunucu tarafında çözülmeli (resolver'dan dönen bir işaret ya da rol).
+- ~~(Faz 3a, code review → 3b; **3b'de yapılmadı**, plan kapsamı dışında bırakıldı) **Super-admin bypass'ı token'daki rol claim'ine dayanıyor.**~~ → F4c.2'de çözüldü (D-036 (2)). `Administrator` rolünden çıkarılan bir kullanıcı, token'ın ömrü boyunca (Identity'de 15 dk) her izni geçmeye devam ediyor. İzinler ise cache TTL'iyle yansıyor. IdP 3b'de gelirken super-admin de sunucu tarafında çözülmeli (resolver'dan dönen bir işaret ya da rol).
 - ~~(Faz 3a, code review)~~ → F3b.3b'de çözüldü: `Jwt:SigningKey` yok (D-028). Eski not: Development'ta hem `Jwt:Authority` hem `Jwt:SigningKey` varsa JwtBearer issuer'ları ve anahtarları bağsız birleştiriyor (R-056): Authority'nin issuer'ını taşıyan ama HS256 geliştirme anahtarıyla imzalanmış bir token kabul ediliyor. Yalnızca Development. Simetrik mod 3b'de yeniden değerlendirilince (yukarıdaki madde) birlikte ele alınmalı.
 - (Faz 3a → 3b; **3b'de yapılmadı**: Api host'u tek Authority'ye, kendi sağlayıcısına güveniyor, Keycloak ise yerine geçen bir seçenek) İzin önbelleğinin anahtarında `iss` yok (PLAN: `sub` + stamp). OIDC'de `sub` yalnızca issuer içinde tekil. Tek Authority ile sorun yok, ama Development/test'te iki issuer (test IdP + Identity) ve 3b'de OpenIddict + Keycloak birlikte güvenilirse `sub` çakışabilir. İkinci bir issuer desteklenirken anahtara `iss` eklenmeli.
 - (Faz 3a, code review) İzin önbelleğinin değeri `string[]`. HybridCache bunu değişmez saymadığı için her L1 okumasında JSON'dan yeniden üretiyor, yani her kimlikli istekte küçük bir deserialize maliyeti var. `[ImmutableObject(true)]` işaretli bir tip bunu önler, ama L2 (Redis) eklenince serileştirilebilir kalması doğrulanmalı.
@@ -917,14 +985,14 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 3b, code review, altitude) Eklenti token'a kopyaladığı principal'dan `permission` claim'lerini ayıklıyor, çünkü çekirdeğin `IClaimsTransformation`'ı her şemada (cookie, OpenIddict) çalışıyor ve her `/connect/token`'da resolver'a gidiyor. Kök çözüm izinleri yalnızca bearer principal'ı için çözmek (ör. `JwtBearerEvents.OnTokenValidated`). Bu R-057 ve D-029 (3)'ü yeniden açar; çekirdek değişikliği.
 - (Faz 3b, code review) Seed her açılışta gizli client'ların secret'ını yeniden hash'leyip yazıyor (`UpdateAsync(app, descriptor)` düz secret'ı hash'le karşılaştırıyor).
 - (Faz 3b, code review) `IdentityPermissionResolver` rol başına iki sorgu atıyor (N+1). Cache'li; eski modülden geldi.
-- (Faz 3b, code review) `SecurePolicy = Always` yalnızca uygulama cookie'sinde. 2FA kullanıcı cookie'si ve antiforgery cookie'si varsayılanda. Forwarded headers'sız bir TLS proxy'si arkasında `Secure` bayrağı olmadan çıkıyorlar (yukarıdaki Faz 0 `ForwardedHeaders` maddesiyle ilgili).
+- (Faz 3b, code review; **F4c.3'te kısmen çözüldü**: güvenilen proxy yapılandırılınca istek şeması https olur ve `SameAsRequest` cookie'ler `Secure` alır) `SecurePolicy = Always` yalnızca uygulama cookie'sinde. 2FA kullanıcı cookie'si ve antiforgery cookie'si varsayılanda. Forwarded headers'sız bir TLS proxy'si arkasında `Secure` bayrağı olmadan çıkıyorlar (yukarıdaki Faz 0 `ForwardedHeaders` maddesiyle ilgili).
 - (Faz 3b, F3b.5b, R-066) Scalar'da OAuth2 şeması seçili ama token'sız kalınca elle eklenen `Authorization` başlığı işe yaramıyor (401). Normal kullanımda Scalar popup'la token alıyor; built-in browser popup'ı aynı sekmede açtığı için bu tarayıcıda denenemedi. Gerçek bir tarayıcıda Scalar'ın popup akışı bir kez elle denenmeli.
 
 - (Faz 4a, plan kapsamı dışı) **Birden çok uygulama örneği:** dispatcher veritabanı başına tek örnek varsayıyor. İki host aynı outbox'u okursa aynı mesajı ikisi de teslim edebilir. Çözüm bir claim/lease olabilir (örneğin koşullu `ExecuteUpdate` ile kilit süresi). SQLite `DateTimeOffset` karşılaştırmasını çeviremediği için süre alanının tipi test tarafını da etkiler (R-068).
-- (Faz 4a, plan kapsamı dışı) Outbox ve `outbox_consumers` satırları hiç silinmiyor. MS Idempotent Consumer tekrar teslim penceresinden uzun bir saklama süresi öneriyor. İşlenmiş mesajları ve kayıtlarını belli bir süre sonra silen bir temizlik gerekecek (OpenIddict kayıtları için olan maddeyle birlikte ele alınabilir).
+- ~~(Faz 4a, plan kapsamı dışı) Outbox ve `outbox_consumers` satırları hiç silinmiyor.~~ → F4c.7'de çözüldü: işlenmiş mesajlar 7 gün sonra kayıtlarıyla siliniyor (OpenIddict kayıtları F4d.5'te). MS Idempotent Consumer tekrar teslim penceresinden uzun bir saklama süresi öneriyor. İşlenmiş mesajları ve kayıtlarını belli bir süre sonra silen bir temizlik gerekecek (OpenIddict kayıtları için olan maddeyle birlikte ele alınabilir).
 - (Faz 4a, plan kapsamı dışı) Yeniden deneme her turda (5 sn) yapılıyor, geri çekilme (backoff) yok. 10 deneme yaklaşık 50 saniye sürüyor; bundan uzun süren bir bağımlılık kesintisi mesajı incelemeye düşürür. Aralık, parça boyu ve deneme sayısı sabit (Y-19). Bir tüketici ihtiyaç duyarsa options'a taşınabilir.
 - (Faz 4a → 4b; **4b'de yapılmadı**) Teslim gecikmesi en fazla bir tur (5 sn); event zincirinde her halka bir tur ekliyor. 4b event akışını seçti (D-034), bu yüzden ödemenin sonucu en fazla iki tur (yaklaşık 10 sn) sonra görünüyor. Kayıttan sonra dispatcher'a sinyal veren anında teslim bir çekirdek değişikliği; 4b'nin kapsamı dışında. *Koşul:* bir tüketici bu gecikmeyi sorun eder.
-- (Faz 4a) `IDomainEventDispatcher`'ın `src`'de çağıranı yok. PLAN F4a.3 gereği düzeltildi ve korunuyor, ama entity event'leri outbox'tan dağıtılıyor. Faz 5'te (ya da kullanıcı kararıyla) kaldırılması değerlendirilebilir.
+- ~~(Faz 4a) `IDomainEventDispatcher`'ın `src`'de çağıranı yok.~~ → F4c.7'de kaldırıldı. PLAN F4a.3 gereği düzeltildi ve korunuyor, ama entity event'leri outbox'tan dağıtılıyor. Faz 5'te (ya da kullanıcı kararıyla) kaldırılması değerlendirilebilir.
 - (Faz 4a, R-068) `src/Modules/CLAUDE.md` Guid v7 anahtarları için "friendly to SQL Server clustering" diyor. SQL Server `uniqueidentifier`'ı son 6 bayta göre sıralıyor, v7'nin zaman damgası ise baştaki baytlarda; yani anahtarlar SQL Server sırasında artan değil ve Catalog/Payments'ın clustered PK'ları rastgele sırayla dolar. Çözüm için belge düzeltmesi ya da anahtar stratejisi kararı gerekir (örneğin `SequentialGuidValueGenerator`). Kapsam dışı. Faz 4b'de eklenen `stock_reservations` da aynı durumda: anahtarı ödemenin Guid v7'si (code review #13).
 - (Faz 4a) Outbox interceptor'ını `AddModuleDbContext` ekliyor, audit interceptor'ını ise hâlâ her modül kendisi ekliyor. İkisini aynı yere toplamak modül kaydını kısaltır; modül ve CLAUDE.md değişikliği gerektiği için yapılmadı.
 - (Faz 4a, code review #3) Interceptor event tamponunu event'ler kayda katılırken temizliyor. Kayıt başarısız olur ve aynı entity örneği *yeni* bir context'e eklenirse event'leri kalmamış olur. Örnek: execution strategy'yle elle yazılmış, entity'yi blok dışında oluşturan bir yeniden deneme bloğu. Belgelendi (aynı context'te `SaveChanges`'i yeniden dene). Kalıcı çözüm için tamponu `SavedChanges`'te temizlemek ve zaten izlenen `EventId`'leri atlamak gerekir; açık transaction'da commit hatası yine kapsanmaz.
@@ -932,46 +1000,50 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4a, code review #8) Generic bir event'in saklanan tip adı, tip argümanlarının sürümlü assembly-qualified adlarını taşıyor. Sürümü düşüren bir dağıtımdan sonra `Type.GetType` bağlanamayabilir. Çok uzun bir ad 512 karakteri geçerse iş kaydının kendisi SQL Server'da düşer. Belgelendi; sürümsüz ad üretmek `TypeName` ile ayrıştırma gerektirir.
 - (Faz 4a, code review #9) Modül outbox'ları bir turda sırayla işleniyor. Erişilemeyen bir modül veritabanı (`EnableRetryOnFailure` geri çekilmesiyle) diğer modüllerin teslimini dakikalarca bekletebilir. Modüller aynı SQL Server'ı kullandığı sürece etkisi yok.
 - (Faz 4a → **Faz 5 sonu, unutulmamalı**) D-032: `docs/plan/DECISIONS.md` `.claude/hooks/package-policy.json` `protectedPaths` listesinden kullanıcı tarafından geçici olarak çıkarıldı. Bütün fazlar bitince satır geri eklenir (hook dosyası olduğu için kullanıcı ekler ya da onaylar); DECISIONS başlığındaki "hook onay ister" notu o zaman yeniden geçerli olur.
-- (Faz 4a, code review #12) `outbox_consumers`'ın clustered anahtarı (uniqueidentifier, nvarchar(256)) geniş ve SQL Server sırasında rastgele. Outbox tablosu için R-068'de kullanılan gerekçenin aynısı geçerli. Mesaj satırının `bigint Id`'si + Handler (FK ve cascade delete ile, temizlik için de uygun) daha iyi olur. D-031 (5)'i değiştirir; tablo boşken, ilk kullanımdan önce yapmak ucuz.
+- ~~(Faz 4a, code review #12) `outbox_consumers`'ın clustered anahtarı (uniqueidentifier, nvarchar(256)) geniş ve SQL Server sırasında rastgele.~~ → F4c.7'de çözüldü (D-036 (7)). Outbox tablosu için R-068'de kullanılan gerekçenin aynısı geçerli. Mesaj satırının `bigint Id`'si + Handler (FK ve cascade delete ile, temizlik için de uygun) daha iyi olur. D-031 (5)'i değiştirir; tablo boşken, ilk kullanımdan önce yapmak ucuz.
 
 - (Faz 4b, F4b.2b) `GET /api/v1/payments` SQLite test veritabanında 500 dönüyor: liste `CreatedAtUtc`'ye (DateTimeOffset) göre sıralıyor, SQLite bunu çeviremiyor (R-068). SQL Server'da sorun yok, ama listenin başarı yolu testlenmiyor. Çözüm yolları: test context'lerinde DateTimeOffset'i sıralanabilir bir türe çeviren bir dönüştürücü ya da gerçek SQL Server'la test (Testcontainers, paket onayı gerekir).
+- (Faz 4c, D-036 (8)) Catalog, Payments ve Api'de `System.Security.Cryptography.Pkcs` 10.0.13'e doğrudan referans var: Microsoft.Data.SqlClient açıklı 9.0.11'e bağlı (R-083). *Koşul:* EF Core SqlServer'ın getirdiği SqlClient düzeltilmiş bir Pkcs'e (≥ 9.0.21 / 10.0.13) bağlanınca referans ve CPM satırı kalkar; `dotnet nuget why <modül> System.Security.Cryptography.Pkcs` ile kontrol edilir.
+- (Faz 4c, code review #4) Outbox'ın saklama taraması her turda (5 sn) her modül context'inde bir sorgu atıyor; silinecek mesajlar 7 günlük ölçekte birikiyor. *Koşul:* veritabanı yükü ölçülür ve sorun olursa tarama seyrekleştirilir (ör. saatte bir, `TimeProvider`'la).
+- (Faz 4c, code review #5) `AdminEndpoints`, `AccountEndpoints.MessageResponse`'u kullanıyor (iç içe record). Ortak bir yanıt tipi olarak üst düzeye taşınabilir; yalnızca okunabilirlik.
 - (Faz 4b, D-035 (6)) Failed bir ödemenin nedeni istemciye dönmüyor; neden yalnızca Catalog'daki rezervasyon satırında (`Reason`) duruyor. *Koşul:* bir istemci nedeni göstermek ister.
 - (Faz 4b) İade ve iadede stoğun geri verilmesi yok (`Refund` kullanılmadığı için silindi). *Koşul:* iade bir ürün gereksinimi olur. Rezervasyonu serbest bırakan bir event ve rezervasyona yeni bir durum gerekir.
 - (Faz 4b, code review #2) Pending'de kalan bir ödeme için zaman aşımı ya da telafi yok. Catalog'un handler'ı 10 denemede başarısız olursa mesaj incelemeye bırakılır ve ödeme Pending kalır. *Koşul:* üretimde görülür. Pending ödemelerin yaşını izlemek ya da bir telafi adımı gerekir.
 - (Faz 4b) `Product.Deactivate`/`Reactivate`'i çağıran bir uç yok; akıştaki `product.inactive` reddi bugün yalnızca testte oluşuyor. Genel `Product` kuralları D-033 ile kapsam dışında.
 - (Faz 4b, code review #3) `EnableRetryOnFailure`, commit'in sonucu belirsiz kalınca `SaveChanges`'i yeniden oynatıyor. Stok belirteci yüzünden yeniden oynatılan UPDATE/DELETE 0 satır buluyor ve `UpdateProduct`/`DeleteProduct`, yazım aslında uygulanmış olsa bile 409 dönüyor. Bu MS connection-resiliency rehberindeki "Option 1: do (almost) nothing" ile kabul edildi: nadir bir durum ve istemci yeniden okuyunca kendi yazımını görüyor. *Koşul:* gözlenirse `ExecuteInTransaction` + `verifySucceeded`.
 - (Faz 4b, code review #5) Satır eşzamanlı olarak silinmişse de 409 `product.concurrency_conflict` dönüyor; 404 daha doğru olurdu. Çakışmada `exception.Entries[0].GetDatabaseValuesAsync()` null dönüyorsa 404 verilebilir. İstemci yeniden okuyunca zaten 404 alıyor.
-- (Faz 4b, code review #9) `DbUpdateConcurrencyException`'ın 409'a çevrilmesi, `Product`'ı yazan her uçta ayrı ayrı yapılıyor. Bunu unutan yeni bir uç 500 döner. *Koşul:* `Product`'ı yazan üçüncü bir uç gelir, ya da F4c.4'ün hata eşlemesi modüllere bir kanca verir; o zaman çeviri tek bir yere taşınır.
+- (Faz 4b, code review #9) `DbUpdateConcurrencyException`'ın 409'a çevrilmesi, `Product`'ı yazan her uçta ayrı ayrı yapılıyor. Bunu unutan yeni bir uç 500 döner. *Koşul:* `Product`'ı yazan üçüncü bir uç gelir. F4c.4'ten beri kanca var: modül kendi `IExceptionHandler`'ını kaydedebilir ve o handler çekirdeğin eşlemesinden önce çalışır. Çeviri o gün oraya taşınır.
 
 ## Son devir notu
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-09-28, Faz 4b: Referans modüller (tamam, `main`'e merge edildi).** Branch `faz/4b-referans-moduller`, 8 commit. Oturum `/novacore-phase 4c` ile başladı; 4b başlamadığı için bağımlılık kontrolünde durduruldu, kullanıcı 4b'yi başlattı.
+**2026-10-20, Faz 4c: Tüketici hazırlığı (tamam, `main`'e merge edildi).** Branch `faz/4c-tuketici-hazirligi`, 10 commit.
 
 - **Yapılanlar:**
-  - F4b.1: kullanıcı event akışını seçti (Q-30, D-034). Uygulama kararları D-035'te, kaynaklar R-075'te.
-  - F4b.2a–c:
-    - Payments ödemeyi Pending kaydediyor ve `PaymentCreated`'ı yayımlıyor (yeni `Payments.Contracts` projesi).
-    - Catalog stoğu ayırıyor ya da reddediyor. Cevap, anahtarı PaymentId olan bir `StockReservation`; `StockReserved` ya da `StockReservationFailed` event'iyle birlikte yazılıyor.
-    - Payments ödemeyi Completed ya da Failed yapıyor.
-    - `Product.Stock` bir concurrency token; PUT/DELETE çakışmada 409 dönüyor.
-    - Migration'lar: `StockReservations` ve `StockConcurrencyToken` (yalnızca snapshot).
-  - F4b.3: eşzamanlılık testleri: son birim için iki ödeme, okunduktan sonra başka bir satışın aldığı stok.
-  - F5.3: Catalog CRUD uçtan uca testleri. Ödemenin uçtan uca testi `StockReservationTests`'te.
-  - Code review'daki 13 bulgunun 7'si düzeltildi, 1'i gereksizdi, 5'i "Sonraya bırakılanlar"a yazıldı.
-  - Testler 190 → 219.
+  - F4c.1: fallback policy her uçta kimlik istiyor, açık uçlar `AllowAnonymous`; Development dışında boş CORS listesi hiçbir origin'e izin vermiyor.
+  - F4c.2: çekirdekte super-admin yok; eklentinin resolver'ı `Administrator` üyeliğini tanımlı bütün izinlere çözüyor.
+  - F4c.3: `UseCoreWeb` `UseForwardedHeaders`'ı en başta çalıştırıyor; yalnızca `ForwardedHeaders:KnownProxies`/`KnownIPNetworks`.
+  - F4c.4: `GlobalExceptionHandler` yerine middleware'in yedek yolu (`StatusCodeSelector` + `ExceptionHandler` delegate + `SuppressDiagnosticsCallback`). Framework exception'ları 500, `BadHttpRequestException` kendi durumu.
+  - F4c.5: `ToHttpResult` tipli union dönüyor; modül ve eklenti JSON uçları tipli; Y-31 kör noktası kapandı.
+  - F4c.6: kimlik eklentisi Development dışında Data Protection anahtar deposu istiyor.
+  - F4c.7: `outbox_consumers` mesajın `Id`'sine bağlı (FK, cascade); işlenmiş mesajlar 7 gün sonra siliniyor; `IDomainEventDispatcher` silindi; migration'lar mevcut kayıtları dönüştürüyor.
+  - Pkcs güvenlik açığı (dış kaynaklı) ve code review düzeltmeleri.
+  - Testler 219 → 248. Kararlar D-036 (1)–(8), R-076…R-083.
 - **Sürprizler:**
-  - SQLite `DateTimeOffset`'e göre ORDER BY çeviremiyor, bu yüzden `GET /payments` test veritabanında 500 dönüyor. Testler ödemenin durumunu veritabanından okuyor.
-  - Hiçbir alanı değiştirmeyen bir PUT UPDATE göndermiyor, dolayısıyla çakışmıyor (doğru davranış).
-  - Concurrency token `has-pending-model-changes`'te görünmüyor ama model snapshot'ını değiştiriyor; boş bir migration gerekti (review #6).
-  - Api host'unda önceki testten kalan bir dispatcher turu, aynı anda gönderilen HTTP istekleriyle yarışabiliyor (review #1). Çözüm `ModuleTestData`'daki yardımcılar.
-- **Merge:** kullanıcı onayıyla `main`'e `--no-ff` merge edildi (2026-09-28), push edilmedi. Yerel `main`, `origin/main`'den ileride: D-033 plan commit'i ve Faz 4b. Push kullanıcının kararı.
-- **Bekleyen (kullanıcı):** F4d.1 (IdP modeli) ve F5.4 kendi fazlarının başında sorulacak.
-- **Sonraki fazın (4c) bilmesi gerekenler:**
-  - F4c.5 (tipli sonuçlar): `UpdateProduct`/`DeleteProduct`'ın yeni 409 yolunu da kapsamalı. `CreatePayment` 201 ve `Pending` dönmeye devam ediyor.
-  - F4c.1 (FallbackPolicy): modül uçlarının hepsi `RequirePermission` taşıyor. Event handler'ları HTTP dışında çalıştığı için etkilenmez.
-  - F4c.4 (hata eşlemesi): `DbUpdateConcurrencyException` bugün modüllerde uç başına 409'a çevriliyor (review #9). Çekirdeğin eşlemesi modüllere bir kanca verirse bu çeviri oraya toplanabilir.
-  - F4c.7 (outbox şeması): `outbox_consumers`'a artık Catalog ve Payments handler'ları kayıt yazıyor. Anahtar değişikliği migration'ı mevcut satırları dönüştürmeli; henüz yayın yok, veri yalnızca geliştirme veritabanlarında. F4c.7'nin silmesi planlanan `IDomainEventDispatcher`'ı modüller kullanmıyor.
-  - Test altyapısı: `FakeClockApiFactory` artık sealed değil. Yeni yardımcılar `StockRaceApiFactory`, `ModuleTestData` ve `OutboxDelivery.RunUntilAsync` (tests/CLAUDE.md).
-- **Sıradaki:** merge onayından sonra yeni bir oturumda `/novacore-phase 4c`.
+  - Fallback policy tanımsız yola anonim istekte 404 yerine 401 döndürüyor (MS'in belgelediği davranış).
+  - `IPAddress.TryParse("10.0.0")` kısaltmayı kabul ediyor.
+  - Framework istemci iptalini handler'lardan önce 499 yapıyor.
+  - `CustomizeProblemDetails` her yazıma uygulanıyor (review #1).
+  - `migrations script` tek batch üretiyor (`EXEC` gerekti).
+  - `FakeTimeProvider` günlerce ilerletilince periyodik zamanlayıcıyı her periyot için tetikliyor.
+  - 13 Ekim .NET güvenlik yamasıyla Pkcs açığı geldi.
+- **Kullanıcıya:**
+  - Pkcs sorusu reddedildi, "devam et" ile önerilen seçenek uygulandı. Farklı bir yol isterseniz D-036 (8) yeniden açılır.
+  - Merge: kullanıcı onayıyla ("her şeyi maine al") `main`'e `--no-ff` merge edildi (2026-10-20), push edilmedi. Push kullanıcının kararı.
+- **Sonraki fazın (4d) bilmesi gerekenler:**
+  - F4d.1 kullanıcı kararı (IdP modeli).
+  - Eklentinin JSON uçları artık tipli sonuç dönüyor; yeni uçlar da öyle yazılmalı. Gövdeler için `AccountEndpoints.MessageResponse` var.
+  - Production host'larında Data Protection deposu zorunlu (testlerde `InMemoryKeyStore.AddTo`).
+  - Fallback policy yüzünden yeni anonim uçlar (parola sıfırlama vb.) `AllowAnonymous` almalı.
+- **Sıradaki:** yeni bir oturumda `/novacore-phase 4d`.

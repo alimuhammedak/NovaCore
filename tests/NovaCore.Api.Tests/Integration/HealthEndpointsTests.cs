@@ -1,9 +1,11 @@
 using System.Net;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
+using NovaCore.AspNetCore.Identity;
 using NovaCore.Modules.Catalog.Infrastructure;
 using Xunit;
 
@@ -69,7 +71,8 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
     public async Task Health_endpoints_are_not_mapped_outside_development(string path)
     {
         await using var production = new ProductionApiFactory();
-        var client = production.CreateClient();
+        // Authenticated: an anonymous caller gets 401 for any path the fallback policy guards, mapped or not (F4c.1).
+        var client = production.CreateClientWithClaims(new Claim(NovaClaims.Subject, Guid.NewGuid().ToString()));
 
         var response = await client.GetAsync(path);
 

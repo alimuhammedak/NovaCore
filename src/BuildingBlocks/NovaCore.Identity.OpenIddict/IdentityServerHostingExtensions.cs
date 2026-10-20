@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OpenApi;
@@ -35,7 +36,9 @@ public static class IdentityServerHostingExtensions
     /// The host registers <see cref="IdentityServerDbContext"/> with its database provider (<c>AddModuleDbContext</c>) and
     /// keeps its migrations. In Development the signing and encryption keys are ephemeral; anywhere else the host adds
     /// its certificates with OpenIddict's own API (<c>services.AddOpenIddict().AddServer(...)</c>), and the host does not
-    /// start without them.
+    /// start without them. Outside Development the host also chooses where the Data Protection keys behind the sign-in
+    /// cookies, antiforgery tokens and confirmation links live (e.g. <c>services.AddDataProtection().PersistKeysToFileSystem(...)</c>);
+    /// the host does not start without a key store either.
     /// </remarks>
     /// <param name="builder">The host application builder.</param>
     /// <returns><paramref name="builder"/>, for chaining.</returns>
@@ -72,6 +75,20 @@ public static class IdentityServerHostingExtensions
 
         // Email confirmation tokens expire after six hours.
         services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = TimeSpan.FromHours(6));
+
+        // Those tokens, the sign-in cookies and antiforgery are protected with Data Protection keys. The framework's
+        // fallback store is the user profile or the process memory: lost when a container is replaced, different on every
+        // instance. Where the keys live is the host's call (volume, database, blob store), so outside Development it must
+        // make one (docs/plan/RESEARCH.md R-081). Every PersistKeysTo* sets XmlRepository.
+        services.AddOptions<KeyManagementOptions>()
+            .Validate<IHostEnvironment>(
+                (keys, environment) => environment.IsDevelopment() || keys.XmlRepository is not null,
+                "No Data Protection key store is configured. Outside Development the host must choose one, so the "
+                + "identity provider's sign-in cookies, antiforgery tokens and email confirmation links survive restarts "
+                + "and work on every instance: e.g. services.AddDataProtection().PersistKeysToFileSystem(<a persistent "
+                + "volume>), .PersistKeysToDbContext<TContext>() (Microsoft.AspNetCore.DataProtection.EntityFrameworkCore) "
+                + "or a blob or Redis store.")
+            .ValidateOnStart();
 
         services.AddSingleton<SecurityAuditLogger>();
 

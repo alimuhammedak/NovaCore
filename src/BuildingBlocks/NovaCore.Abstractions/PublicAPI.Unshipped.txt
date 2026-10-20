@@ -54,8 +54,6 @@ NovaCore.Abstractions.Messaging.DomainEvent.OccurredOnUtc.init -> void
 NovaCore.Abstractions.Messaging.IDomainEvent
 NovaCore.Abstractions.Messaging.IDomainEvent.EventId.get -> System.Guid
 NovaCore.Abstractions.Messaging.IDomainEvent.OccurredOnUtc.get -> System.DateTimeOffset
-NovaCore.Abstractions.Messaging.IDomainEventDispatcher
-NovaCore.Abstractions.Messaging.IDomainEventDispatcher.DispatchAsync(System.Collections.Generic.IEnumerable<NovaCore.Abstractions.Messaging.IDomainEvent!>! domainEvents, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 NovaCore.Abstractions.Messaging.IDomainEventHandler<TEvent>
 NovaCore.Abstractions.Messaging.IDomainEventHandler<TEvent>.HandleAsync(TEvent domainEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 NovaCore.Abstractions.Pagination.PagedList<T>

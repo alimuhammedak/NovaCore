@@ -40,9 +40,15 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   after `/2fa/disable`, which takes a code (D-030 (3)).
 - **Claims contract:** access tokens carry `sub`, `name`, `email`, `role` (the names in `NovaClaims`). **Never
   permissions, never the security stamp:** the core resolves permissions per request (`IdentityPermissionResolver`: role
-  + direct `permission` claims for a Guid `sub`, `Identity:Clients:n:Permissions` for a service client's id). The core's
+  + direct `permission` claims for a Guid `sub`, every declared permission for an `Administrator` member,
+  `Identity:Clients:n:Permissions` for a service client's id). The core has no super-admin role: the token's `role`
+  claim is informational and never passes a permission check (D-036 (2)). The core's
   claims transformation runs on OpenIddict's scheme too, so a principal copied into a token drops `permission` claims
   (D-029 (3)).
+- **Anonymous by declaration:** the core's fallback policy closes every endpoint without authorization metadata, so the
+  protocol endpoints (`ConnectEndpoints`) and the sign-in pages (`/account` group) carry `.AllowAnonymous()`; the
+  handlers read the sign-in session themselves. OpenIddict's own endpoints (discovery, JWKS, revocation) answer in the
+  authentication middleware, before authorization.
 - **Pages and forms:** plain HTML (the core's CSP forbids scripts and styles), antiforgery checked in the handler with
   `IAntiforgery.IsRequestValidAsync` (the pipeline has no antiforgery middleware, R-061), redirects to local URLs only.
 - **Links from configuration, never from the request:** the email confirmation link starts from `Jwt:Authority`, not the
@@ -57,7 +63,10 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 
 ## Adding an account endpoint
 
-- JSON API: map it in `AccountEndpoints` under `/api/v1/auth` (the `strict` rate limit). `.AllowAnonymous()` only for
+- JSON API: map it in `AccountEndpoints` under `/api/v1/auth` (the `strict` rate limit). The handler returns typed
+  results (`Results<Ok<T>, ValidationProblem, UnauthorizedHttpResult>`, ...), with named internal records for bodies
+  (`MessageResponse`), not anonymous objects: the union is the OpenAPI contract. `/connect/*` and `/account/*` stay
+  `IResult` (protocol and HTML, excluded from the document). `.AllowAnonymous()` only for
   pre-sign-in endpoints (register, confirm-email); everything else `.RequireAuthorization()` or
   `.RequirePermission(IdentityPermissions.X)`. Put the validated body in `AccountRequests.cs` and list it in
   `PublicAPI.Unshipped.txt`.
@@ -68,5 +77,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - `Jwt:Authority` is the host's public https URL; the signing and encryption certificates are added by the host.
 - A real `IEmailSender` is registered (`LoggingEmailSender` writes confirmation links to the log: Development only;
   `EmailSenderStartupCheck` stops the host otherwise).
+- A Data Protection key store the host chose (`PersistKeysTo*`, which sets `KeyManagementOptions.XmlRepository`): the
+  cookies, antiforgery tokens and confirmation links depend on it. Outside Development `ValidateOnStart` stops the host
+  without one (D-036 (6)); the framework's fallback (user profile or memory) doesn't survive a replaced container.
 - Client secrets and the seed administrator's password come from user secrets or the environment, never appsettings.
 - TLS at the edge; OpenIddict refuses plain HTTP.

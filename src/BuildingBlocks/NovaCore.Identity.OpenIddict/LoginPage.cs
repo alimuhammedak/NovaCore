@@ -29,7 +29,8 @@ internal static class LoginPage
 
     public static void Map(IEndpointRouteBuilder endpoints)
     {
-        var account = endpoints.MapGroup("/account").ExcludeFromDescription().RequireRateLimiting("strict");
+        // The pages a signed-out browser signs in on.
+        var account = endpoints.MapGroup("/account").ExcludeFromDescription().AllowAnonymous().RequireRateLimiting("strict");
 
         account.MapGet("/login", (string? returnUrl, HttpContext context, IAntiforgery antiforgery) =>
             PasswordForm(context, antiforgery, returnUrl, email: null, error: null));

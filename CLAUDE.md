@@ -124,8 +124,10 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
   the entity writes it to the module's `outbox_messages` in the same transaction (`OutboxInterceptor`, added by
   `AddModuleDbContext`; the context calls `modelBuilder.AddOutbox()`). `OutboxDispatcher`, a `BackgroundService` from
   `AddCorePersistence`, delivers the events to their `IDomainEventHandler<T>`s: each message in its own DI scope, each
-  handler once (`outbox_consumers` records the finished ones), retried on later passes, left for inspection after 10
-  failures. Delivery is at least once, so handlers must be idempotent; one dispatcher per database (D-031, R-068).
+  handler once (`outbox_consumers` records the finished ones, keyed by the message row), retried on later passes, left
+  for inspection after 10 failures; processed messages are deleted with their records after 7 days. Delivery is at
+  least once, so handlers must be idempotent; one dispatcher per database (D-031, D-036 (7), R-068). The outbox is the
+  only event path: there is no in-process dispatcher.
 
 - **Security** is a first-class subsystem. The core only *validates* access tokens (D-002): JWT bearer against an
   OpenID Connect provider, `Jwt:Authority` (issuer + JWKS discovered, asymmetric algorithms only), required in every
@@ -158,11 +160,16 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   (in-process interface, e.g. `IProductCatalog`) or a domain event — never another module's DbContext.
 
 - **Expected failures → `Result`/`Result<T>` + `.ToHttpResult()`** (`NovaCore.AspNetCore`). Reserve
-  exceptions for the genuinely exceptional. Domain exceptions live in `NovaCore.AspNetCore/Exceptions`.
+  exceptions for the genuinely exceptional. Handlers return typed results (`Task<Results<Ok<T>, ProblemHttpResult>>`,
+  never a bare `IResult`): the return type is the response contract in the OpenAPI document, so don't add
+  `.Produces<T>()` for the success response; declare the problem statuses with `.ProducesProblem(...)` (F4c.5). Domain exceptions live in `NovaCore.AspNetCore/Exceptions`.
 
 - **Endpoints are guarded by permissions, not ad-hoc role checks:**
-  `endpoint.RequirePermission("module:resource:action")`. Declare a module's permissions via
-  `IPermissionDefinitionProvider` + `AddPermissionDefinitions<T>()`. The `Administrator` role is super-admin.
+  `endpoint.RequirePermission("module:resource:action")`. Authorization is closed by default: an endpoint without
+  authorization metadata requires an authenticated caller (fallback policy, F4c.1), and a public one says
+  `.AllowAnonymous()`. Declare a module's permissions via
+  `IPermissionDefinitionProvider` + `AddPermissionDefinitions<T>()`. No token role bypasses a permission check: the
+  identity provider's resolver gives an `Administrator` member every declared permission, on the server (F4c.2).
 
 - **Central Package Management:** versions live ONLY in `Directory.Packages.props`. `*.csproj` use
   versionless `<PackageReference>`. Common build props are in `Directory.Build.props` (net10.0, nullable,

@@ -28,7 +28,7 @@ public interface ICurrentUser
     /// <param name="role">The role name.</param>
     bool IsInRole(string role);
 
-    /// <summary>True if the caller carries the given fine-grained permission (or is a super-admin).</summary>
+    /// <summary>True if the caller holds the given fine-grained permission, as resolved on the server.</summary>
     /// <param name="permission">The permission name, e.g. <c>catalog:products:create</c>.</param>
     bool HasPermission(string permission);
 }

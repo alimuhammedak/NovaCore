@@ -18,8 +18,7 @@ public static class GetProducts
         group.MapGet("/", Handle)
             .WithName("GetProducts")
             .WithSummary("List products (paged)")
-            .RequirePermission(CatalogPermissions.ProductsRead)
-            .Produces<PagedList<ProductDto>>(StatusCodes.Status200OK);
+            .RequirePermission(CatalogPermissions.ProductsRead);
 
     private static async Task<Ok<PagedList<ProductDto>>> Handle(
         CatalogDbContext dbContext,

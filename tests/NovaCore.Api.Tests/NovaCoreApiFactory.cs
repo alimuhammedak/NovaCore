@@ -27,7 +27,8 @@ namespace NovaCore.Api.Tests;
 /// provider's) is swapped to its own in-memory SQLite database, so the database health checks and the provider's flows
 /// run without a real SQL Server. The module databases start with their schema, as after the migrations, because the
 /// host's outbox dispatcher reads their outboxes from the start. Outside Development the host gets what a production
-/// host must bring: signing and encryption keys for the identity provider and an email sender.
+/// host must bring: signing and encryption keys for the identity provider, an email sender and a Data Protection key
+/// store.
 /// </summary>
 public class NovaCoreApiFactory : WebApplicationFactory<Program>
 {
@@ -141,11 +142,13 @@ public class NovaCoreApiFactory : WebApplicationFactory<Program>
             ReplaceWithSqlite<IdentityServerDbContext>(services,
                 options => options.UseSqlite(_identityDatabase.ConnectionString));
 
-            // A production host brings keys (certificates, stood in for by ephemeral keys) and a real email sender.
+            // A production host brings keys (certificates, stood in for by ephemeral keys), a real email sender and a
+            // Data Protection key store.
             if (EnvironmentName != Environments.Development)
             {
                 services.AddOpenIddict().AddServer(server => server.AddEphemeralSigningKey().AddEphemeralEncryptionKey());
                 services.AddSingleton<IEmailSender>(new CapturingEmailSender());
+                InMemoryKeyStore.AddTo(services);
             }
             ReplaceWithSqlite<CatalogDbContext>(services, options => options.UseSqlite(_catalogDatabase.ConnectionString));
             ReplaceWithSqlite<PaymentsDbContext>(services,

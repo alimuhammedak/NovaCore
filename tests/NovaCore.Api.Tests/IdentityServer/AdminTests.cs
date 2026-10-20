@@ -210,6 +210,48 @@ public sealed class IdentityServerRoleChangeTests(FakeClockIdentityServerFixture
     }
 }
 
+/// <summary>
+/// PLAN F4c.2's acceptance: an administrator removed from the role loses every permission within
+/// <c>Cache:PermissionExpiration</c>, although the token still names the role until it expires.
+/// </summary>
+[Collection(IdentityServerTestGroup.Name)]
+public sealed class AdministratorRemovalTests(FakeClockIdentityServerFixture fixture)
+    : IClassFixture<FakeClockIdentityServerFixture>
+{
+    private const string Email = "former-admin@novacore.test";
+    private const string Password = "a long passphrase for tests";
+
+    // Cache:PermissionExpiration's default; the test host leaves it unset.
+    private static readonly TimeSpan PermissionExpiration = TimeSpan.FromMinutes(5);
+
+    private readonly IdentityServerTestHost _host = fixture.Host;
+
+    [Fact]
+    public async Task A_removed_administrator_is_forbidden_once_the_cache_lifetime_has_passed()
+    {
+        var user = await _host.CreateUserAsync(Email, Password);
+        await ChangeAdministratorAsync(user.Id, (users, account) => users.AddToRoleAsync(account, "Administrator"));
+        using var flow = new OidcFlow(_host);
+        var token = (await flow.SignInAsync(Email, Password)).AccessToken;
+        Assert.Equal(HttpStatusCode.OK, (await flow.CallApiAsync("/api/v1/admin/users", token)).StatusCode);
+
+        await ChangeAdministratorAsync(user.Id, (users, account) => users.RemoveFromRoleAsync(account, "Administrator"));
+
+        // Same token, which still carries role=Administrator: once the cached permissions expire, nothing is left.
+        fixture.Clock.Advance(PermissionExpiration + TimeSpan.FromSeconds(1));
+        Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/api/v1/admin/users", token)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/probe", token)).StatusCode);
+    }
+
+    private async Task ChangeAdministratorAsync(
+        Guid userId, Func<UserManager<ApplicationUser>, ApplicationUser, Task<IdentityResult>> change)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        Assert.True((await change(users, (await users.FindByIdAsync(userId.ToString()))!)).Succeeded);
+    }
+}
+
 /// <summary>A refresh token dies after its lifetime (7 days), the provider's clock deciding.</summary>
 [Collection(IdentityServerTestGroup.Name)]
 public sealed class RefreshTokenLifetimeTests(FakeClockIdentityServerFixture fixture) : IClassFixture<FakeClockIdentityServerFixture>

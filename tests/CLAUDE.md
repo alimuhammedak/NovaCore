@@ -8,7 +8,7 @@ Stack: **xUnit v3** (test projects are `OutputType=Exe`). Run a single test with
 ## Three flavors, one project
 
 - **Unit** (`Unit/`) — pure logic (`Result<T>`, pagination), and building blocks on a small generic host of their own
-  (`Host.CreateApplicationBuilder`, never the Api): startup migrations, domain-event dispatch and the outbox.
+  (`Host.CreateApplicationBuilder`, never the Api): startup migrations and the outbox.
 - **Integration** (`Integration/`) — boot the real host via `NovaCoreApiFactory` (`WebApplicationFactory`).
   DB-free tests (health, OpenAPI, security headers, 401/validation gates) need no seeding. A caller with specific roles
   comes from `factory.CreateClientWithClaims(...)`: the factory's in-memory issuer (`factory.IdentityProvider`, see
@@ -52,7 +52,9 @@ dispatcher reads the module databases in the background while requests use them,
 thread-safe (docs/plan/RESEARCH.md R-069). The Catalog and Payments schemas are created in the factory ctor, as after the
 migrations, so the dispatcher's passes find their outboxes. A test that needs another schema (the identity store's)
 creates it (`EnsureCreated`). Outside Development the factory also brings what a production host must: ephemeral
-signing/encryption keys for the identity provider (standing in for certificates) and an email sender. A subclass can
+signing/encryption keys for the identity provider (standing in for certificates), an email sender and a Data
+Protection key store (`InMemoryKeyStore.AddTo(services)`). A test that expects another startup failure outside
+Development adds the key store too, or the missing store is what stops the host. A subclass can
 call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsTests` points one at a missing file with
 `Mode=ReadWrite`: the dispatcher opens it too, and the default mode would create the file.
 
@@ -66,6 +68,9 @@ call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsT
 - Wait on visible effects (the outbox row, the handler log), polling with a timeout. One advance can yield two passes,
   so assert "at least" or keep advancing until the end state; to show that a pass ran, save a later "barrier"
   message and wait for it.
+- Don't advance the clock by days: `FakeTimeProvider` fires a periodic timer once per period it moves over, so 7 days
+  of a 5-second timer is 120,000 callbacks (about a minute). Age rows by their timestamps instead
+  (`AddProcessedMessageAsync` for the retention tests).
 
 On the Api host the dispatcher runs too. With `FakeClockApiFactory` its timer follows the fake clock:
 `OutboxDelivery.RunUntilAsync(factory.Clock, condition)` advances it by the polling interval until the effect shows up
@@ -120,6 +125,13 @@ redirects) and the public client: authorize → sign-in form (antiforgery token)
 (`IdentityServerTestHost.StartAsync(environment, configure)`). These classes run in the `IdentityServerTestGroup`
 collection, apart from the parallel tests: their CPU load made the `WebApplicationFactory` startup race (R-055) hit
 most full runs.
+
+## The core alone: `CoreWebTestHost`
+
+`CoreWebTestHost` is a host composed only of the core web package (`AddCoreWeb`, a resolver that grants nothing,
+`UseCoreWeb`) whose endpoints each test maps itself: an endpoint without authorization metadata, one that echoes the
+request, one that throws. Tokens come from its own `TestIdentityProvider` (`CreateClientWithClaims`). Use it for
+pipeline behaviour the Api host can't show because its endpoints are fixed (`SecureDefaultsTests`).
 
 ## Test configuration — in-memory config is enough
 

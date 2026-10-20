@@ -2,6 +2,7 @@ using System.Buffers.Text;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
@@ -22,8 +23,11 @@ internal static class AccountEndpoints
 {
     public const string ConfirmEmailPath = "api/v1/auth/confirm-email";
 
-    private static readonly object GenericAccepted =
-        new { message = "If the email address is new, a confirmation link has been sent." };
+    private static readonly MessageResponse GenericAccepted =
+        new("If the email address is new, a confirmation link has been sent.");
+
+    /// <summary>A message for the caller, e.g. after registration or when a resource is missing.</summary>
+    internal sealed record MessageResponse(string Message);
 
     public static RouteGroupBuilder Map(IEndpointRouteBuilder endpoints)
     {
@@ -66,7 +70,7 @@ internal static class AccountEndpoints
         return auth;
     }
 
-    private static async Task<IResult> Register(
+    private static async Task<Results<Ok<MessageResponse>, ValidationProblem>> Register(
         RegisterRequest request,
         UserManager<ApplicationUser> users,
         IEmailSender emailSender,
@@ -88,9 +92,9 @@ internal static class AccountEndpoints
         {
             // An existing account gets the answer a new one gets: the response doesn't reveal it.
             if (result.Errors.All(error => error.Code.Contains("Duplicate", StringComparison.OrdinalIgnoreCase)))
-                return Results.Ok(GenericAccepted);
+                return TypedResults.Ok(GenericAccepted);
 
-            return Results.ValidationProblem(new Dictionary<string, string[]>
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
                 ["password"] = result.Errors.Select(error => error.Description).ToArray()
             });
@@ -109,19 +113,19 @@ internal static class AccountEndpoints
             $"Welcome! Confirm your email address: <a href=\"{link}\">Confirm</a>", cancellationToken);
 
         audit.UserRegistered(user.Id, request.Email);
-        return Results.Ok(GenericAccepted);
+        return TypedResults.Ok(GenericAccepted);
     }
 
     internal sealed record MeResponse(
         string UserId, string? UserName, string? Email, IReadOnlyCollection<string> Roles, IReadOnlyCollection<string> Permissions);
 
     // The permissions are the ones the core resolved on the server for this request, not the token's.
-    private static IResult Me(ICurrentUser currentUser) =>
+    private static Results<Ok<MeResponse>, UnauthorizedHttpResult> Me(ICurrentUser currentUser) =>
         currentUser is { IsAuthenticated: true, UserId: { } userId }
-            ? Results.Ok(new MeResponse(userId, currentUser.UserName, currentUser.Email, currentUser.Roles, currentUser.Permissions))
-            : Results.Unauthorized();
+            ? TypedResults.Ok(new MeResponse(userId, currentUser.UserName, currentUser.Email, currentUser.Roles, currentUser.Permissions))
+            : TypedResults.Unauthorized();
 
-    private static async Task<IResult> LogoutAll(
+    private static async Task<Results<NoContent, UnauthorizedHttpResult>> LogoutAll(
         UserManager<ApplicationUser> users,
         ICurrentUser currentUser,
         IOpenIddictTokenManager tokens,
@@ -131,16 +135,16 @@ internal static class AccountEndpoints
     {
         var user = await FindAsync(users, currentUser);
         if (user is null)
-            return Results.Unauthorized();
+            return TypedResults.Unauthorized();
 
         // A new security stamp ends the provider's sign-in cookie on its next use.
         await users.UpdateSecurityStampAsync(user);
         await RevokeSessionsAsync(user, tokens, authorizations, cancellationToken);
         audit.SessionsRevoked(user.Id, "logout-all");
-        return Results.NoContent();
+        return TypedResults.NoContent();
     }
 
-    private static async Task<IResult> ChangePassword(
+    private static async Task<Results<NoContent, ValidationProblem, UnauthorizedHttpResult>> ChangePassword(
         ChangePasswordRequest request,
         UserManager<ApplicationUser> users,
         ICurrentUser currentUser,
@@ -151,13 +155,13 @@ internal static class AccountEndpoints
     {
         var user = await FindAsync(users, currentUser);
         if (user is null)
-            return Results.Unauthorized();
+            return TypedResults.Unauthorized();
 
         // ChangePasswordAsync also renews the security stamp, which ends the provider's sign-in cookie.
         var result = await users.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
         if (!result.Succeeded)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
                 ["password"] = result.Errors.Select(error => error.Description).ToArray()
             });
@@ -167,7 +171,7 @@ internal static class AccountEndpoints
         await RevokeSessionsAsync(user, tokens, authorizations, cancellationToken);
         audit.PasswordChanged(user.Id);
         audit.SessionsRevoked(user.Id, "password-changed");
-        return Results.NoContent();
+        return TypedResults.NoContent();
     }
 
     // Refresh tokens and authorizations can be revoked; issued access tokens stay valid until they expire (15 minutes).
@@ -184,17 +188,19 @@ internal static class AccountEndpoints
 
     internal sealed record TwoFactorSetupResponse(string SharedKey, string AuthenticatorUri);
 
-    private static async Task<IResult> SetUpTwoFactor(
+    internal sealed record RecoveryCodesResponse(string[] RecoveryCodes);
+
+    private static async Task<Results<Ok<TwoFactorSetupResponse>, Conflict<MessageResponse>, UnauthorizedHttpResult>> SetUpTwoFactor(
         UserManager<ApplicationUser> users, ICurrentUser currentUser, IHostEnvironment environment)
     {
         var user = await FindAsync(users, currentUser);
         if (user is null)
-            return Results.Unauthorized();
+            return TypedResults.Unauthorized();
 
         // An enabled authenticator's key stays secret: with it, any holder of an access token could compute codes and
         // turn two-factor authentication off. A new authenticator starts after disabling (which takes a code).
         if (await users.GetTwoFactorEnabledAsync(user))
-            return Results.Conflict(new { message = "Two-factor authentication is already enabled. Disable it to set up a new authenticator." });
+            return TypedResults.Conflict(new MessageResponse("Two-factor authentication is already enabled. Disable it to set up a new authenticator."));
 
         var key = await users.GetAuthenticatorKeyAsync(user);
         if (string.IsNullOrEmpty(key))
@@ -208,15 +214,15 @@ internal static class AccountEndpoints
         var account = Uri.EscapeDataString(user.Email ?? user.UserName ?? user.Id.ToString());
         var uri = $"otpauth://totp/{issuer}:{account}?secret={key}&issuer={issuer}&digits=6&period=30";
 
-        return Results.Ok(new TwoFactorSetupResponse(key!, uri));
+        return TypedResults.Ok(new TwoFactorSetupResponse(key!, uri));
     }
 
-    private static async Task<IResult> EnableTwoFactor(
+    private static async Task<Results<Ok<RecoveryCodesResponse>, ValidationProblem, UnauthorizedHttpResult>> EnableTwoFactor(
         TwoFactorCodeRequest request, UserManager<ApplicationUser> users, ICurrentUser currentUser, SecurityAuditLogger audit)
     {
         var user = await FindAsync(users, currentUser);
         if (user is null)
-            return Results.Unauthorized();
+            return TypedResults.Unauthorized();
 
         if (!await users.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider, request.Code))
             return InvalidCode();
@@ -225,15 +231,15 @@ internal static class AccountEndpoints
         var recoveryCodes = await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
         audit.TwoFactorEnabled(user.Id);
 
-        return Results.Ok(new { recoveryCodes = recoveryCodes?.ToArray() ?? [] });
+        return TypedResults.Ok(new RecoveryCodesResponse(recoveryCodes?.ToArray() ?? []));
     }
 
-    private static async Task<IResult> DisableTwoFactor(
+    private static async Task<Results<NoContent, ValidationProblem, UnauthorizedHttpResult>> DisableTwoFactor(
         TwoFactorCodeRequest request, UserManager<ApplicationUser> users, ICurrentUser currentUser, SecurityAuditLogger audit)
     {
         var user = await FindAsync(users, currentUser);
         if (user is null)
-            return Results.Unauthorized();
+            return TypedResults.Unauthorized();
 
         if (!await users.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider, request.Code))
             return InvalidCode();
@@ -242,24 +248,24 @@ internal static class AccountEndpoints
         await users.ResetAuthenticatorKeyAsync(user);
         audit.TwoFactorDisabled(user.Id);
 
-        return Results.NoContent();
+        return TypedResults.NoContent();
     }
 
     private static Task<ApplicationUser?> FindAsync(UserManager<ApplicationUser> users, ICurrentUser currentUser) =>
         Guid.TryParse(currentUser.UserId, out var id) ? users.FindByIdAsync(id.ToString()) : Task.FromResult<ApplicationUser?>(null);
 
-    private static IResult InvalidCode() => Results.ValidationProblem(new Dictionary<string, string[]>
+    private static ValidationProblem InvalidCode() => TypedResults.ValidationProblem(new Dictionary<string, string[]>
     {
         ["code"] = ["The verification code is invalid."]
     });
 
-    private static async Task<IResult> ConfirmEmail(
+    private static async Task<Results<Ok<MessageResponse>, BadRequest<MessageResponse>>> ConfirmEmail(
         Guid userId,
         string token,
         UserManager<ApplicationUser> users,
         SecurityAuditLogger audit)
     {
-        var invalid = Results.BadRequest(new { message = "Invalid or expired confirmation token." });
+        var invalid = TypedResults.BadRequest(new MessageResponse("Invalid or expired confirmation token."));
 
         var user = await users.FindByIdAsync(userId.ToString());
         if (user is null)
@@ -279,6 +285,6 @@ internal static class AccountEndpoints
             return invalid;
 
         audit.EmailConfirmed(user.Id);
-        return Results.Ok(new { message = "Email confirmed. You can now sign in." });
+        return TypedResults.Ok(new MessageResponse("Email confirmed. You can now sign in."));
     }
 }

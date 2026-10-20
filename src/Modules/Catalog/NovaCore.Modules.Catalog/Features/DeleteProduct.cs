@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using NovaCore.Abstractions.Results;
@@ -18,11 +19,10 @@ public static class DeleteProduct
             .WithName("DeleteProduct")
             .WithSummary("Delete a product")
             .RequirePermission(CatalogPermissions.ProductsDelete)
-            .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
-    private static async Task<IResult> Handle(
+    private static async Task<Results<NoContent, ProblemHttpResult>> Handle(
         Guid id,
         CatalogDbContext dbContext,
         CancellationToken cancellationToken)

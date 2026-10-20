@@ -641,3 +641,129 @@ Biçim:
   - Ortak bağlantı ve transaction seçenek yapılmadı: modülleri tek veritabanına bağlar ve Catalog.Contracts'a EF sızdırır (`IProductCatalog.cs:4-5`).
   - Senkron contract iki commit arasında stok kaybı bırakırdı ve outbox'ı yine hiçbir modül kullanmazdı.
   - Uygulama kararları D-035'te: `Stock` uygulama yönetimli concurrency token, handler'daki çakışma dispatcher'ın yeniden denemesine bırakılıyor, uç noktalarda 409.
+
+## Faz 4c araştırması (2026-10-20)
+
+### R-076: Fallback policy hangi istekleri kapsar? Anonim kalması gereken uçlar hangileri? (2026-10-20, faz 4c; kaynak + kırmızı test)
+- Soru: `FallbackPolicy = RequireAuthenticatedUser` hangi isteklere uygulanır? Kimlik eklentisinin OpenIddict uçları ve Development uçları (health, OpenAPI, Scalar) nasıl etkilenir? Boş bir CORS policy'si geçerli mi?
+- Bulgu:
+  - MS: fallback policy, yetki meta verisi olmayan ve yetkilendirme middleware'inden geçen isteklere uygulanır; *"A request that doesn't match an endpoint uses the fallback policy if the authorization middleware runs for the request."* Açık uçlar `AllowAnonymous` alır; MS bunu varsayılan olarak kimlik doğrulama istemenin tercih edilen yolu sayıyor.
+  - OpenIddict'in ASP.NET Core sunucusu bir `IAuthenticationRequestHandler`. Discovery, JWKS ve revocation isteklerini authentication middleware'inde kendisi yanıtlar, yetkilendirmeye hiç ulaşmazlar. Passthrough uçları (`/connect/authorize`, `/token`, `/endsession`) ise isteği doğruladıktan sonra endpoint'e bırakır. Bu yüzden onlar `AllowAnonymous` ister.
+  - Kırmızı test: `AllowAnonymous` kaldırılınca kimlik akış testlerinden 11'i kırmızıya döndü (commit'lenmedi).
+  - `CorsPolicyBuilder.Build()` origin'siz bir policy'yi kabul eder; o policy hiçbir origin'e `Access-Control-Allow-Origin` vermez (test: Production'da basit istek ve preflight).
+- Kaynak: https://learn.microsoft.com/aspnet/core/security/authorization/policies?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/security/authorization/secure-data?view=aspnetcore-10.0#secure-user-data · https://learn.microsoft.com/aspnet/core/fundamentals/static-files?view=aspnetcore-10.0#static-file-authorization
+- Sonuç (D-036 (1)):
+  - Fallback policy `AddCoreAuthorization`'da kurulur.
+  - `AllowAnonymous` alan uçlar: `/connect/*` passthrough uçları, `/account` grubu, health, OpenAPI belgesi, Scalar.
+  - Tanımsız bir yola anonim istek artık 404 yerine 401 alır. Health'in Production testi bu yüzden kimlikli bir client'la 404'ü doğruluyor.
+
+### R-077: Super-admin'i sunucu tarafına taşımanın yolu (2026-10-20, faz 4c; kod + kırmızı test)
+- Soru: `PermissionAuthorizationHandler` `Administrator` rolünü token'daki `role` claim'inden okuyor; rolünden çıkarılan bir admin token'ın ömrü boyunca her kontrolü geçiyor. Bypass sunucuda çözülen bilgiye nasıl dayanır, `IPermissionResolver` değişmeli mi?
+- Bulgu:
+  - Kod: seed (`IdentityServerSeeder.SeedRolesAsync`) `Administrator` rolüne o anda tanımlı bütün izinleri claim olarak yazıyor ve yalnızca `SeedOnStartup` açıkken çalışıyor. Resolver rolün claim'lerini zaten okuyor, yani seed'den sonra admin izinlerini token rolü olmadan da alıyor. Bypass yalnızca seed'den sonra tanımlanan izinler ve token rolü için fark yaratıyor.
+  - MS policy rehberi bir handler'ın birden çok koşulla `Succeed` edebileceğini gösteriyor, ama super-admin için bir kalıp önermiyor. Konu bir tasarım seçimi.
+  - Seçenekler:
+    - (a) Bypass'ı silip yalnızca seed'e güvenmek: en basit yol, ama seed kapalıyken yeni bir modülün izinleri admin'e ulaşmaz.
+    - (b) Resolver'ın `Administrator` üyeliğini tanımlı bütün izinlere (`IPermissionDefinitionProvider`) çözmesi: çekirdekte rol kavramı kalmaz, `IPermissionResolver` aynı kalır.
+    - (c) Çekirdekte `"*"` gibi bir işaret izni: tanımsız izinleri de kapsar, ama `ICurrentUser.Permissions`'a ve `/me` yanıtına sihirli bir değer sokar ve public API'ye sabit ekler.
+  - Kırmızı testler: token'da `role: Administrator` olan ama sunucuda izni olmayan çağrı 200 aldı; seed'in role yazmadığı bir izin admin'e çözülmedi; rolden çıkarılan admin önbellek süresinden sonra da 200 aldı.
+- Kaynak: https://learn.microsoft.com/aspnet/core/security/authorization/policies?view=aspnetcore-10.0 · kod: `IdentityServerSeeder.cs`, `PermissionAuthorization.cs`
+- Sonuç (D-036 (2)): (b). Çekirdekte super-admin yok, `HttpContextCurrentUser.SuperAdminRole` kalkar. Tanımlanmamış bir izin admin'e de verilmez.
+
+### R-078: .NET 10'da forwarded headers'ın varsayılanları ve config'ten yapılandırılması (2026-10-20, faz 4c; kaynak + kırmızı test)
+- Soru: `UseForwardedHeaders` neyi varsayılan olarak işler, hangi proxy'lere güvenir? Güvenilen liste config'ten nasıl verilir, boş liste ne yapmalı?
+- Bulgu:
+  - MS:
+    - `ForwardedHeaders` varsayılanı `None`'dır; işlenecek başlıklar açıkça seçilmelidir.
+    - Middleware başlıkları yalnızca `KnownProxies` ve `KnownIPNetworks`'teki kaynaklardan kabul eder. Varsayılan liste loopback'tir.
+    - `ForwardLimit` 1 kalmalıdır.
+    - Middleware, şemaya, host'a ya da istemci IP'sine bakan her şeyden önce çalışmalıdır. Edge'de açılırsa istemci kimliğini taklit edebilir.
+  - .NET 10: `KnownNetworks` ve `Microsoft.AspNetCore.HttpOverrides.IPNetwork` obsolete (ASPDEPR005); yerine `KnownIPNetworks` ve `System.Net.IPNetwork`.
+  - `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` middleware'i kendisi ekler ve listeleri temizler (her kaynağa güvenir). Boş config'te options'a dokunmamak bu yolu bozmaz.
+  - `IPAddress.TryParse("10.0.0")` başarılı olur ve `10.0.0.0` döner (eski kısaltma biçimi). `System.Net.IPNetwork.TryParse` önek olmadan ya da host bitleri set edilmiş bir tabanla başarısız olur.
+  - Kırmızı testler: güvenilen proxy'nin başlıkları ve limiter bölümü uygulanmıyordu; geçersiz girişler açılışı durdurmuyordu. Dolu listede loopback'ın güvenilmediği de testte.
+- Kaynak: https://learn.microsoft.com/aspnet/core/host-and-deploy/proxy-load-balancer?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/fundamentals/servers/kestrel/security-considerations?view=aspnetcore-10.0#security-middleware · https://learn.microsoft.com/aspnet/core/breaking-changes/10/ipnetwork-knownnetworks-obsolete?view=aspnetcore-10.0 · https://learn.microsoft.com/dotnet/api/system.net.ipaddress.tryparse
+- Sonuç (D-036 (3)):
+  - Bölüm `ForwardedHeaders`, anahtarlar `KnownProxies` ve `KnownIPNetworks`.
+  - Yalnızca For ve Proto uygulanır. Liste doluysa framework'ün loopback varsayılanları temizlenir; boşsa options'a dokunulmaz.
+  - IPv4 adresi dört bölümüyle yazılmalıdır.
+
+### R-079: Exception handler middleware'in sırası, yedek yolu ve diagnostics'i (2026-10-20, faz 4c; kaynak + kırmızı test)
+- Soru: Çekirdeğin eşlemesi `IExceptionHandler` olmadan nasıl çalışır? Projenin handler'ı nasıl her zaman önce çalışır? Log ve iptal davranışı ne olur?
+- Bulgu:
+  - Kaynak (`ExceptionHandlerMiddlewareImpl.HandleException`, release/10.0), işlem sırası:
+    1. `OperationCanceledException` ya da `IOException` gelmişse ve `RequestAborted` iptal edilmişse, middleware `RequestAbortedException` logu yazar, durumu 499 yapar ve **handler'lar çalışmadan döner**. Yani eski `GlobalExceptionHandler`'ın 499 eşlemesine yalnızca sunucunun kendi iptalleri ulaşıyordu.
+    2. `Response.StatusCode = StatusCodeSelector?.Invoke(exception) ?? 500`.
+    3. Kayıtlı `IExceptionHandler`'lar sırayla denenir; `true` dönen ilk handler zinciri keser.
+    4. Hiçbiri işlemezse `IProblemDetailsService.TryWriteAsync` çağrılır. Context'te `Exception` ve `ProblemDetails.Status = Response.StatusCode` bulunur, yani `CustomizeProblemDetails` exception'ı görür.
+  - Diagnostics: `SuppressDiagnosticsCallback` null ise yalnızca `ExceptionHandledBy == ExceptionHandlerService` bastırılır. Callback yalnızca middleware'in işlediği exception'larda çağrılır. Bastırılanlar: `UnhandledException` Error logu, `HandledException` EventSource olayı, `error.type` metrik etiketi.
+  - `BadHttpRequestException` bir `IOException`'dır, ama istek iptal edilmediyse 1. adıma takılmaz.
+  - `ProblemHttpResult` da yanıtını `IProblemDetailsService` üzerinden yazar; o yolda `Exception` null'dır.
+  - Kırmızı testler (`ExceptionMappingTests`): `AddCoreWeb`'den sonra kaydedilen handler çalışmıyordu, dört framework exception'ı ve sunucu iptali 4xx/499 alıyordu, bozuk JSON gövdesi 500 dönüyordu. Kasıtlı bozma: bastırma kapatılınca log testi kırmızı (commit'lenmedi).
+- Kaynak: https://raw.githubusercontent.com/dotnet/aspnetcore/release/10.0/src/Middleware/Diagnostics/src/ExceptionHandler/ExceptionHandlerMiddlewareImpl.cs · https://learn.microsoft.com/aspnet/core/fundamentals/error-handling?view=aspnetcore-10.0#iexceptionhandler · https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.builder.exceptionhandleroptions.suppressdiagnosticscallback?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/breaking-changes/10/exception-handler-diagnostics-suppressed?view=aspnetcore-10.0
+- Sonuç (D-036 (4)):
+  - Eşleme `StatusCodeSelector`, `CustomizeProblemDetails` ve `SuppressDiagnosticsCallback` ile yapılır. `GlobalExceptionHandler` silinir.
+  - `OperationCanceledException` özel bir durum almaz.
+  - 500'leri framework loglar. İstemci hataları loglanmaz. Projenin handler'larının işlediği exception'lar, framework varsayılanı gibi bastırılır.
+
+### R-080: Tipli yanıtlar ve OpenAPI meta verisi (2026-10-20, faz 4c; kaynak + ölçüm)
+- Soru: `Result`'tan HTTP'ye dönüşüm başarı tipini handler imzasında nasıl taşır? Hata yanıtları için meta veri nereden gelir? OpenAPI belgesi değişir mi?
+- Bulgu:
+  - MS:
+    - Yalnızca `IEndpointMetadataProvider` uygulayan dönüş tipleri belgede bir `responses` girişi üretir.
+    - `Results<T1,…>` union'ı, tip argümanlarından meta veri sağlayanların meta verisini ekler. Implicit dönüşümleri sayesinde bildirilmeyen bir sonuç derleme hatası verir.
+    - `Produces` yalnızca meta veridir, davranışı kısıtlamaz.
+  - Kaynak (`ProblemHttpResult`, release/10.0): `PopulateMetadata` yalnızca `DisableCookieRedirectMetadata` ekler, yanıt tipi eklemez. `ExecuteAsync` yanıtı `IProblemDetailsService` üzerinden yazar. Yani `.ProducesProblem(...)` gerekir ve `traceId`/`instance` özelleştirmesi aynen uygulanır.
+  - `TypedResults.ValidationProblem`, `Ok<T>`, `NoContent`, `Created<T>`, `NotFound<T>`, `Conflict<T>`, `BadRequest<T>`, `UnauthorizedHttpResult` meta veri sağlar. `Results.X` aynı tipleri `IResult` olarak döndürür, bu yüzden gövdeler değişmez.
+  - Ölçüm: belge adımdan önce ve sonra alındı.
+    - 7 modül ucunun `responses` girişleri bayt bayt aynı. Silinen `.Produces<T>()` satırlarının yerini union tuttu.
+    - 13 kimlik ucu şemasız `200`'den tipli yanıtlara geçti; örneğin `logout-all` artık gerçekteki `204`'ü bildiriyor.
+    - Hiçbir şema silinmedi; 9 şema eklendi. Belgenin `responses` dışındaki kısımları aynı.
+- Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/openapi/include-metadata?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis/responses?view=aspnetcore-10.0 · https://raw.githubusercontent.com/dotnet/aspnetcore/release/10.0/src/Http/Http.Results/src/ProblemHttpResult.cs
+- Sonuç (D-036 (5)): `ToHttpResult` union döner, `(Result, int)` overload'u silinir. Eklentinin JSON uçları tipli sonuç döner; protokol ve HTML uçları `IResult` kalır. `EndpointContractTests` belgede görünen handler'ların düz `IResult` dönmediğini doğrular.
+
+### R-081: Data Protection anahtar deposu açıkça seçilmiş mi, nasıl anlaşılır? (2026-10-20, faz 4c; kaynak + kırmızı test)
+- Soru: Kimlik eklentisi, host'un bir anahtar deposu seçip seçmediğini nasıl anlar? Kontrol hangi mekanizmayla yapılmalı?
+- Bulgu:
+  - MS:
+    - Uygulama ortamını tanımaya çalışır: Azure App Service'te `%HOME%\ASP.NET\DataProtection-Keys`, kullanıcı profili varsa `%LOCALAPPDATA%` ya da `$HOME/.aspnet`, IIS'te registry kullanılır. Hiçbiri yoksa anahtarlar süreç bitince kaybolur.
+    - Docker'da anahtarlar kalıcı bir volume'a ya da harici bir sağlayıcıya yazılmalıdır. Web farm'da varsayılan yapılandırma uygun değildir.
+  - MS (extensibility): uygulama genelindeki depo `KeyManagementOptions.XmlRepository` ile değiştirilir. `PersistKeysToFileSystem`, `PersistKeysToDbContext`, Azure Blob ve Redis bu özelliği ayarlar. Varsayılan sezgisel seçim ise options'a yazılmaz, `XmlKeyManager` onu kendi içinde yapar. Yani `XmlRepository == null` "host bir depo seçmedi" demektir.
+  - Kırmızı test: Production'da anahtarlar ve e-posta göndericisi varken, depo olmadan host açılıyordu.
+  - Yan etki: imza anahtarı eksikliğini bekleyen mevcut test artık önce depo hatasını görüyordu. Teste depo eklendi; amacı aynı kaldı.
+- Kaynak: https://learn.microsoft.com/aspnet/core/security/data-protection/configuration/default-settings?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/security/data-protection/extensibility/key-management?view=aspnetcore-10.0#ixmlrepository · https://learn.microsoft.com/aspnet/core/security/data-protection/implementation/key-storage-providers?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/host-and-deploy/web-farm?view=aspnetcore-10.0
+- Sonuç (D-036 (6)):
+  - Eklenti `KeyManagementOptions`'ı `Validate<IHostEnvironment>` + `ValidateOnStart` ile doğrular: Development ya da `XmlRepository != null`.
+  - Azure App Service'in otomatik `%HOME%` deposu da açık sayılmaz; host onu tek satırla (`PersistKeysToFileSystem`) belirtir.
+  - Depo paketi eklenmez (`Microsoft.AspNetCore.DataProtection.EntityFrameworkCore`); depoyu host seçer.
+
+### R-082: Outbox tüketici anahtarı, saklama süresi ve migration'ın veri dönüşümü (2026-10-20, faz 4c; kaynak + ölçüm)
+- Soru: `outbox_consumers` mesaj satırına nasıl bağlanır? İşlenmiş mesajlar ne zaman ve nasıl silinir (SQLite testleri dahil)? Migration mevcut satırları güvenle nasıl dönüştürür?
+- Bulgu:
+  - Anahtar: R-068'deki SQL Server index rehberi (dar, benzersiz, sürekli artan clustered anahtar) tüketici tablosu için de geçerli. (`bigint` mesaj `Id`'si, Handler) bunu sağlıyor; (`uniqueidentifier`, `nvarchar(256)`) sağlamıyordu. FK'nin cascade delete'i, toplu silmede kayıtları veritabanının silmesini sağlar.
+  - Saklama:
+    - MS Idempotent Consumer, işlenmiş kayıtların tekrar teslim penceresinden uzun tutulmasını öneriyor (R-068).
+    - Burada bir mesaj yalnızca outbox'ta bekledikçe yeniden teslim edilir (10 deneme × 5 sn ≈ 50 sn); süre inceleme içindir. 7 gün seçildi.
+    - SQLite `DateTimeOffset` karşılaştırmasını SQL'e çeviremediği için (R-068) süre bellekte karşılaştırılır. En eski işlenmiş mesajlar `Id` sırasıyla 50'şer okunur, süresi dolanlar `ExecuteDelete` ile silinir.
+  - Ölçüm (FakeTimeProvider): saati 7 gün ilerletmek, 5 sn periyotlu `PeriodicTimer`'ı her periyot için bir kez tetikledi; iki test yaklaşık 55'er sn sürdü. Testler artık satırları zaman damgasıyla yaşlandırıyor ve 50–110 ms sürüyor.
+  - Migration:
+    - EF'in ürettiği adımlar (`DropColumn EventId` + `AddColumn MessageId default 0`) mevcut kayıtları kaybettirirdi.
+    - Elle yazılan adımlar: nullable kolon ekle → `UPDATE … JOIN` ile doldur → sahipsiz kaydı sil → PK ve `EventId`'yi kaldır → `NOT NULL` → yeni PK ve FK.
+    - `dotnet ef migrations script` migration'ı tek batch olarak üretiyor. Yeni kolonu kullanan ifade aynı batch'te derlenirse SQL Server "Invalid column name" verir; bu yüzden ifadeler `EXEC(N'…')` içindedir.
+    - Yerel SQL Server'da geçici bir veritabanıyla denendi:
+      - Script ile Up: iki kayıt dönüştü, sahipsiz kayıt silindi, mesajın silinmesi kaydını cascade ile götürdü.
+      - Çalışma zamanında Down `EventId`'yi geri getirdi, tekrar Up başarılı oldu.
+      - Payments'ın bütün zinciri boş şemada uygulandı. Veritabanı sonra silindi.
+- Kaynak: https://learn.microsoft.com/sql/relational-databases/sql-server-index-design-guide#clustered-index-design-guidelines · https://learn.microsoft.com/azure/architecture/patterns/idempotent-consumer · https://learn.microsoft.com/ef/core/providers/sqlite/limitations · https://learn.microsoft.com/ef/core/managing-schemas/migrations/managing#customize-migration-code · https://learn.microsoft.com/sql/t-sql/language-elements/execute-transact-sql
+- Sonuç (D-036 (7)).
+
+### R-083: SqlClient'ın getirdiği Pkcs açığı (2026-10-20, faz 4c doğrulaması; kaynak + ölçüm)
+- Soru: Faz doğrulamasında `restore --force` NU1903 verdi. Açık nereden geliyor, nasıl kapatılır?
+- Bulgu:
+  - GitHub Advisory: GHSA-846f-f764-76mx (CVE-2026-84008) ve GHSA-2fmv-rv2c-59x7 (CVE-2026-70162), 2026-10-13, .NET DoS. `System.Security.Cryptography.Pkcs` 9.0.0–9.0.20 ve 10.0.0–10.0.12 açıklı; düzeltmeler 9.0.21 ve 10.0.13.
+  - `dotnet nuget why`: EF Core SqlServer 10.0.12 → Microsoft.Data.SqlClient 6.1.6 → Pkcs 9.0.11. EF Core 10.0.13 SqlClient 6.1.7'ye bağlı, o da hâlâ Pkcs 9.0.11'e. SqlClient 7.1.1 net9.0 için Pkcs 9.0.18'e bağlı. Yani üst paketi güncellemek açığı kapatmıyor.
+  - Hiçbir packable projenin grafiğinde Pkcs yok; yalnızca Catalog, Payments, Api ve testler.
+  - NuGet (R-014): üst paket açığı kapatmıyorsa sıradaki yol doğrudan referans ya da CPM transitive pinning. Transitive pinning bütün projelerde açılır ve packable paketlerin nuspec bağımlılıklarını değiştirebilir.
+- Kaynak: https://github.com/advisories/GHSA-846f-f764-76mx · https://github.com/advisories/GHSA-2fmv-rv2c-59x7 · https://learn.microsoft.com/nuget/concepts/auditing-packages · https://learn.microsoft.com/nuget/consume-packages/central-package-management#transitive-pinning
+- Sonuç (D-036 (8)): Catalog ve Payments, Pkcs 10.0.13'e doğrudan referans verir (CPM'de sürüm). Api ve testler onu proje referansından en yakın sürüm olarak alır. `list package --vulnerable` 13 projede temiz.
+

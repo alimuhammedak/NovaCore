@@ -18,8 +18,7 @@ public static class GetPayments
         group.MapGet("/", Handle)
             .WithName("GetPayments")
             .WithSummary("List payments (paged)")
-            .RequirePermission(PaymentsPermissions.Read)
-            .Produces<PagedList<PaymentDto>>(StatusCodes.Status200OK);
+            .RequirePermission(PaymentsPermissions.Read);
 
     private static async Task<Ok<PagedList<PaymentDto>>> Handle(
         PaymentsDbContext dbContext,

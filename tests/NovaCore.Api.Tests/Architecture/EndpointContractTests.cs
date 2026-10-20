@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,18 +10,16 @@ namespace NovaCore.Api.Tests.Architecture;
 /// <summary>
 /// DECISIONS Y-31: endpoints take and return DTOs, never a module's <c>*.Domain</c> types. Checked through ApiExplorer
 /// (registered by AddOpenApi): request parameters bound from the request (not DI services) and declared response types,
-/// following generic arguments, arrays and the properties of first-party DTOs. Blind spot: a handler returning a bare
-/// IResult with no Produces&lt;T&gt; metadata exposes no payload type.
+/// following generic arguments, arrays and the properties of first-party DTOs. A handler that returns a bare
+/// <see cref="IResult"/> would declare no payload at all, so every described handler returns a typed result
+/// (<c>Results&lt;…&gt;</c>, <c>Ok&lt;T&gt;</c>, ...), whose metadata is the response contract (PLAN F4c.5).
 /// </summary>
 public class EndpointContractTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>
 {
     [Fact]
     public void Endpoints_do_not_accept_or_return_domain_types()
     {
-        var endpoints = factory.Services.GetRequiredService<IApiDescriptionGroupCollectionProvider>()
-            .ApiDescriptionGroups.Items
-            .SelectMany(group => group.Items)
-            .ToList();
+        var endpoints = ApiDescriptions();
         Assert.NotEmpty(endpoints);
 
         var violations = new List<string>();
@@ -37,6 +36,30 @@ public class EndpointContractTests(NovaCoreApiFactory factory) : IClassFixture<N
 
         Assert.Empty(violations);
     }
+
+    [Fact]
+    public void Described_endpoints_return_typed_results()
+    {
+        var untyped = ApiDescriptions()
+            .Where(endpoint => endpoint.ActionDescriptor.EndpointMetadata.OfType<MethodInfo>().FirstOrDefault() is { } handler
+                               && Unwrapped(handler.ReturnType) == typeof(IResult))
+            .Select(endpoint => $"{endpoint.HttpMethod} /{endpoint.RelativePath}")
+            .ToList();
+
+        Assert.Empty(untyped);
+    }
+
+    private List<ApiDescription> ApiDescriptions() =>
+        factory.Services.GetRequiredService<IApiDescriptionGroupCollectionProvider>()
+            .ApiDescriptionGroups.Items
+            .SelectMany(group => group.Items)
+            .ToList();
+
+    private static Type Unwrapped(Type returnType) =>
+        returnType.IsGenericType && (returnType.GetGenericTypeDefinition() == typeof(Task<>)
+                                     || returnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
+            ? returnType.GenericTypeArguments[0]
+            : returnType;
 
     private static HashSet<Type> DomainTypesIn(Type? root)
     {
