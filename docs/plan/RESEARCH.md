@@ -985,3 +985,44 @@ Biçim:
   - CycloneDX .NET 6.3.1 (Apache-2.0, `dotnet-CycloneDX`, net8–net10 tool): proje dosyası alır, `--disable-package-restore` ile mevcut restore'u kullanır, `--output-format Json`, `--set-type/--set-name/--set-version`. Ölçüm (`NovaCore.AspNetCore`): `--include-project-references` ile `BMD.NovaCore.Abstractions@0.1.0` (sürüm eki olmadan) ve sahte `NovaCore.Abstractions@1.0.0` bileşenleri çıktı; o seçenek olmadan 25 bileşen, hepsinde purl, `PublicApiAnalyzers` `scope: excluded`. `--recursive` bileşen sayısını değiştirmedi (assets dosyası geçişlileri zaten içeriyor).
 - Kaynak: https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations · https://github.com/actions/attest/blob/v4.2.2/action.yml · https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments · https://github.com/CycloneDX/cyclonedx-dotnet
 - Sonuç: D-051 (6). Gerçek koşu bir sonraki `v*` tag'iyle; o zamana kadar yalnızca lint ve yerel SBOM denemesiyle doğrulandı.
+
+### R-099: TOTP tek kullanımı ve kurtarma kodlarının saklanması (2026-10-21, faz 6b; kaynak)
+- Soru: ASP.NET Core Identity TOTP kodunu tekrar kabul ediyor mu, kurtarma kodlarını nasıl saklıyor; ASVS 6.5.1/6.5.2'ye nasıl uyulur (F6b.1a, F6b.1b)?
+- Bulgu:
+  - `AuthenticatorTokenProvider<TUser>.ValidateAsync` (v10.0.12) `DateTimeOffset.UtcNow`'dan adımı hesaplar, −2…+2 adımdaki kodları kabul eder ve kabul edileni hiçbir yere yazmaz. Yöntem `virtual`; TOTP hesabı `Rfc6238AuthenticationService` (internal).
+  - `UserManager.CreateTwoFactorRecoveryCode` (protected virtual): 10 karakter, alfabe `23456789BCDFGHJKMNPQRTVWXY` (26) → ~47 bit. `UserStoreBase.ReplaceCodesAsync` kodları `;` ile birleştirip düz metin olarak kullanıcı token'ına yazar; `RedeemCodeAsync` düz karşılaştırır. İkisi de `virtual`.
+  - `UserManager.SetTwoFactorEnabledAsync` security stamp'i yeniler. `UserStore.UpdateAsync` `ConcurrencyStamp`'ı concurrency token olarak kullanır, çakışmada `ConcurrencyFailure` döner.
+  - NIST SP 800-63B: 112 bitten az entropili look-up secret tuzlu ve onaylı bir KDF ile saklanır; ASVS 5.0 6.5.2 aynı.
+  - CA5350 "When to suppress": "the level of protection needed for the data does not require a security guarantee" → üretimdeki TOTP için geçerli değil.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/v10.0.12/src/Identity/Extensions.Core/src/AuthenticatorTokenProvider.cs · …/Extensions.Core/src/UserManager.cs · …/Extensions.Stores/src/UserStoreBase.cs · https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca5350 · https://pages.nist.gov/800-63-4/sp800-63b/authenticators/ · ASVS 5.0 V6
+- Sonuç: D-053 (2), (3).
+
+### R-100: HybridCache tag'leri ile izin önbelleğinin silinmesi (2026-10-21, faz 6b; kaynak)
+- Soru: Rol değişikliğinde bir kullanıcının önbellekteki izinleri, security stamp'i bilinmeden nasıl silinir (F6b.2)?
+- Bulgu: `GetOrCreateAsync` tag listesi alır; `RemoveByTagAsync(tag)` o tag'li girdileri "bu andan önce oluşturulanları yok say" kuralıyla mantıksal olarak geçersiz kılar, girdiler süreleri dolunca gider. Silme yerel ve dağıtık önbellekte geçerlidir, diğer sunucuların bellek içi önbelleğinde değil. `*` tag'i ayrılmış.
+- Kaynak: https://learn.microsoft.com/aspnet/core/performance/caching/hybrid?view=aspnetcore-10.0#remove-cache-entries-by-tag · https://learn.microsoft.com/aspnet/core/performance/caching/hybrid?view=aspnetcore-10.0#cache-storage
+- Sonuç: D-053 (6). Çok örnekli dağıtımda diğer örnekler `Cache:PermissionExpiration` içinde güncellenir (belgelenir).
+
+### R-101: Access token türü (`typ`) ve harici sağlayıcılar (2026-10-21, faz 6b; kaynak)
+- Soru: `ValidTypes = ["at+jwt"]` çekirdeğe konabilir mi (F6b.4a)?
+- Bulgu: OpenIddict 7.7.1 access token'larını `typ: at+jwt` ile imzalar (`JsonWebTokenTypes.AccessToken`). Microsoft Entra'nın access token'ında da ID token'ında da başlıktaki `typ` "always JWT". Çekirdek `Jwt:Authority` ile herhangi bir OIDC sağlayıcısını doğruluyor (D-002, şablonun `--auth External`'ı); RFC 9068 §4 `at+jwt` kontrolünü RFC 9068 token'ları için istiyor.
+- Kaynak: https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Abstractions/OpenIddictConstants.cs · https://learn.microsoft.com/entra/identity-platform/access-token-claims-reference · https://www.rfc-editor.org/rfc/rfc9068#section-4
+- Sonuç: D-053 (8). Kontrol eklentide; çekirdek harici sağlayıcılarda audience ile ayırmaya devam eder.
+
+### R-102: CORS'un uç bazında kapatılması (2026-10-21, faz 6b; kaynak)
+- Soru: `UseCors(policyName)` bütün uçlara uygulanırken `/connect/authorize` ve `/account/*` nasıl hariç tutulur (F6b.4b, RFC 9700 §2.6)?
+- Bulgu: `CorsMiddleware` (v10.0.12) önce uç meta verisine bakar: `IDisableCorsAttribute` varsa CORS çalışmaz, preflight 204 alır ama izin başlıkları yoktur. MS'in 2.2→3.0 geçiş belgesi `UseCors("default")` + `[DisableCors]` örneğini verir. `[DisableCors]` yalnızca `RequireCors` ile açılan CORS'u kapatmaz.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/v10.0.12/src/Middleware/CORS/src/Infrastructure/CorsMiddleware.cs · https://learn.microsoft.com/aspnet/core/migration/22-to-30?view=aspnetcore-10.0#cors · https://learn.microsoft.com/aspnet/core/security/cors?view=aspnetcore-10.0
+- Sonuç: Uçlara `DisableCorsAttribute` meta verisi.
+
+### R-103: OpenIddict 7.7.1: saat, refresh token süresi ve revocation (2026-10-21, faz 6b; kaynak)
+- Soru: Mutlak refresh ömrü nasıl ölçülür ve uygulanır, `/connect/revoke`'a uç meta verisi verilebilir mi (F6b.4e, F6b.6c)?
+- Bulgu: `OpenIddictServerOptions.TimeProvider` boşsa DI'daki `TimeProvider`, o da yoksa `TimeProvider.System` kullanılır. `DisableSlidingRefreshTokenExpiration()` yeni refresh token'ın ilk token'ın bitişini almasını sağlar; `DisableRollingRefreshTokens()` ayrı bir seçenek. Passthrough yalnızca authorization, end-session, end-user verification, error, token ve userinfo uçlarında var; revocation OpenIddict'in authentication handler'ında tamamen yanıtlanıyor.
+- Kaynak: https://github.com/openiddict/openiddict-core/blob/7.7.1/src/OpenIddict.Server/OpenIddictServerOptions.cs · …/OpenIddictServerBuilder.cs · …/OpenIddictServerConfiguration.cs · …/OpenIddict.Server.AspNetCore/OpenIddictServerAspNetCoreBuilder.cs
+- Sonuç: F6b.4e ve F6b.6c'nin ölçümü buna göre kurulur.
+
+### R-104: Antiforgery ve 2FA cookie'lerinin `Secure` varsayılanı (2026-10-21, faz 6b; kaynak)
+- Soru: Eklentinin 2FA ve antiforgery cookie'leri hangi `SecurePolicy` ile çıkıyor (F6b.6b)?
+- Bulgu: MS: ASP.NET Core antiforgery cookie'sinin `SecurePolicy`'sini bilerek `CookieSecurePolicy.None` yapar; Development dışında `o.Cookie.SecurePolicy = CookieSecurePolicy.Always` önerilir. Kimlik doğrulamayla ilgili cookie'ler daha sıkı bir politika kullanır. Eklentide yalnızca uygulama cookie'si `Always`.
+- Kaynak: https://learn.microsoft.com/aspnet/core/security/anti-request-forgery?view=aspnetcore-10.0#configure-antiforgery-with-antiforgeryoptions
+- Sonuç: F6b.6b'nin ölçümü ve olası düzeltmesi buna göre.

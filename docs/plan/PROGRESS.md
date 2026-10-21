@@ -20,7 +20,7 @@
 | 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20, kullanıcı isteği) |
 | 5 | ✅ tamam | `faz/5-sablon-yayin` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20; push'taki CI yeşil (`build-and-test`, `template-smoke`); `v0.1.0-preview.1` tag'i kullanıcı onayıyla, release.yml yeşil, 8 paket GitHub Packages'ta) |
 | 6a | ✅ tamam | `faz/6a-ci-sertlestirme` | 2026-10-21 | 2026-10-21 | 2026-10-21 (kullanıcı onayı, `--no-ff`; push 2026-10-21, kullanıcı isteği) |
-| 6b | ⏳ başlamadı | | | | |
+| 6b | 🔄 devam ediyor | `faz/6b-kimlik-guvenlik-siniri` | 2026-10-21 | | |
 | 6c | ⏳ başlamadı | | | | |
 | 6d | ⏳ başlamadı | | | | |
 | 6e | ⏳ başlamadı | | | | |
@@ -1019,6 +1019,17 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - Bırakılan: CodeQL repo içi PR branch'lerinde iki kez koşar (push + PR). Bu repo PR akışı kullanmıyor; faz branch'lerinin taranması için push tetikleyicisi gerekli.
 - Faz doğrulaması (2026-10-21, `133c604` üzerinde): `restore --force` uyarısız, lock dosyaları değişmedi; `restore --locked-mode` geçti; Release build 0 uyarı 0 hata; test 278/278; açık paket 0; lisans kapısı geçti; Betterleaks tam geçmiş temiz; actionlint + zizmor temiz; `docker compose config` geçerli; şablon smoke testi ve üretilen projelerin lint'i yeşil. GitHub: CI (build-and-test, template-smoke, secret-scan, workflow-lint) ve CodeQL yeşil.
 
+### Faz 6b
+Plan onayı (2026-10-21). Kullanıcı kararları: Q-40 (izlenmeyen `.agents/`, `.codex/`, `AGENTS.md`'ye dokunulmaz), Q-41 (User rolü: `catalog:products:read`, `payments:read`, `payments:create`), Q-42 (blocklist kaynağı SecLists xato 1M), Q-43 (faz branch'i faz boyunca push edilir). Model kararları D-053, araştırmalar R-099…R-104. Uygulama sırası F6b.1a → 1b → 1c → F6b.2 → F6b.1d → F6b.3 → F6b.4 → F6b.5 → F6b.6 → F6b.7 (D-053 (1)). Alt adımlar: F6b.1a TOTP tek kullanım, 1b kurtarma kodu hash'i, 1c yeniden kimlik doğrulama, 1d Administrator 2FA; F6b.3a açık rol izinleri, 3b ödeme sahibi; F6b.4a `at+jwt`, 4b CORS, 4c `http` redirect, 4d client secret, 4e mutlak refresh ömrü; F6b.6a zamanlama, 6b cookie bayrakları, 6c revoke rate limit, 6d CodeQL uyarıları.
+
+- [ ] F6b.1 MFA
+- [ ] F6b.2 Yetki yükseltme
+- [ ] F6b.3 Seeding ve Payments
+- [ ] F6b.4 Token/protokol
+- [ ] F6b.5 Şifre politikası
+- [ ] F6b.6 Doğrulanacaklar
+- [ ] F6b.7 Eksik negatif protokol testleri
+
 ## Açık sorular (Q)
 
 Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa DECISIONS'a D-kaydı olarak eklenir.
@@ -1064,6 +1075,10 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-37 | F6a.11: `main` ve `v*` ruleset'leri ne kadar sıkı olsun? (Fazlar yerelde `--no-ff` merge edilip main'e doğrudan push ediliyor.) | F6a.11 | **Koruma, akış aynı** (2026-10-21, kullanıcı; önerilen): main'de force push ve silme engellenir; `v*` tag'lerini yalnızca kullanıcı oluşturur, günceller, siler; `release` environment'ı yalnızca `v*` tag'lerinden ve kullanıcının onayıyla çalışır; status check'ler zorunlu değil |
 | Q-38 | Faz branch'i faz sırasında GitHub'a push edilsin mi? (Workflow'lar ancak GitHub'da koşunca doğrulanıyor.) | F6a.2 | **Evet, faz branch'i** (2026-10-21, kullanıcı; önerilen). main'e dokunulmaz |
 | Q-39 | F6a.4: Lisans kapısı bugünkü grafikte yalnızca Polly.Core/Extensions/RateLimiting 8.4.2'yi (BSD-3-Clause) buldu; `Microsoft.Extensions.Http.Resilience` üzerinden geliyor. Kapı nasıl davransın? (Polly'ye adlı istisna / BSD-3-Clause'a izin / yalnızca doğrudan paketler) | F6a.4 | **Polly'ye adlı istisna** (2026-10-21, kullanıcı; önerilen). Kapı geçişlileri de denetler, Y-06 değişmez → D-052, R-096 |
+| Q-40 | Faz 6b başı: çalışma ağacında izlenmeyen `.agents/`, `.codex/`, `AGENTS.md` var. Faz boyunca ne yapılsın? (dokunma / `.gitignore` / ayrı commit) | Faz 6b başı | **Dokunma** (2026-10-21, kullanıcı; önerilen). Commit'ler yalnız adımın dosyalarını yol yol stage'liyor |
+| Q-41 | F6b.3a: `:read` kuralı kalkınca User rolü hangi izinleri alsın? (okuma + ödeme / bugünkü gibi / yalnız katalog) | F6b.3a | **Okuma + ödeme** (2026-10-21, kullanıcı; önerilen): `catalog:products:read`, `payments:read`, `payments:create`. Kullanıcılar ödeme oluşturur ve kendi ödemelerini görür (D-047) |
+| Q-42 | F6b.5: Yerel blocklist için kaynak dosya indirilsin mi, hangisi? (SecLists xato 1M / SecLists Pwdb 1M / indirme yok, yalnız algoritmik kontrol) | F6b.5 | **SecLists `xato-net-10-million-passwords-1000000.txt`** (2026-10-21, kullanıcı; önerilen). MIT, 8.5 MB, scratchpad'e; repo'ya yalnız ilk 3000 tane 15–128 karakterlik satır atıfla girer |
+| Q-43 | Faz 6b branch'i faz sırasında GitHub'a push edilsin mi? (CodeQL push'ta koşuyor) | Faz 6b başı | **Evet, faz branch'i** (2026-10-21, kullanıcı; önerilen). main'e dokunulmaz |
 
 ## Sonraya bırakılanlar
 
