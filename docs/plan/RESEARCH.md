@@ -953,7 +953,7 @@ Biçim:
   - Ölçüm: digest'ler `docker buildx imagetools inspect` ile (index): actionlint `sha256:b1934ee5…`, zizmor `sha256:42d409db…`. Mevcut workflow'larda zizmor 7 `unpinned-uses` (high), 2 `artipacked`, 1 `use-trusted-publishing` (info) buldu; actionlint temizdi.
   - `use-trusted-publishing`: NuGet'in trusted publishing'i nuget.org'a ait (OIDC token → kısa ömürlü API anahtarı). GitHub Packages'a push job'un kendi kısa ömürlü `GITHUB_TOKEN`'ıyla yapılıyor, uzun ömürlü anahtar yok.
 - Kaynak: https://docs.zizmor.sh/audits/ · https://docs.zizmor.sh/usage/ · https://github.com/zizmorcore/zizmor-action · https://github.com/rhysd/actionlint/blob/main/docs/usage.md · https://learn.microsoft.com/nuget/nuget-org/trusted-publishing · https://docs.github.com/en/actions/reference/security/secure-use
-- Sonuç (D-051 (1)–(3)): SHA + `# vX.Y.Z` yorumu; `eng/lint-workflows.sh` iki aracı digest'e sabit imajlarla çalıştırır, bulguda kırmızıdır; repo'da `workflow-lint` job'u, şablonun workflow'u smoke testinin ürettiği projelerde lint'lenir. `use-trusted-publishing` yalnızca push adımında satır içi `zizmor: ignore` yorumuyla, gerekçesi yanında.
+- Sonuç (D-051 (1)–(3)): SHA + `# vX.Y.Z` yorumu; `eng/lint-workflows.sh` iki aracı digest'e sabit imajlarla çalıştırır, bulguda kırmızıdır; repo'da `workflow-lint` job'u, şablonun workflow'u smoke testinin ürettiği projelerde lint'lenir. `use-trusted-publishing` F6a.2'de push adımında satır içi `zizmor: ignore` ile kapatıldı; F6a.7'de push `id-token: write`'lı ayrı bir job'a taşınınca bulgu üretilmez oldu (ignore'suz kopyayla ölçüldü) ve ignore silindi.
 
 ### R-096: Lisans kapısı: nuget-license'ın davranışı ve bugünkü grafik (2026-10-21, faz 6a; kaynak + ölçüm)
 - Soru: Y-06 (yalnızca MIT/Apache ya da Microsoft paketleri) CI'da nasıl zorlanır, bugünkü bağımlılık grafiği geçer mi (D-048, F6a.4)?
@@ -976,3 +976,12 @@ Biçim:
   - Ölçüm: değer listesiyle (`^…$`, `tests/` ile AND) geçmiş temiz. Aynı değer `src/` altında ve yeni bir test değeri yakalanıyor. Staged sahte `ghp_` token'ı hook'ta durdu.
 - Kaynak: https://github.com/betterleaks/betterleaks/tree/v1.9.0 (README, docs/scanning.md, docs/config.md, .pre-commit-hooks.yaml) · https://github.com/betterleaks/betterleaks/releases/tag/v1.9.0 · `betterleaks git --help`
 - Sonuç: D-051 (4). `.betterleaks.toml` (değer listesi), `.githooks/pre-commit`, `ci.yml` `secret-scan` job'u.
+
+### R-098: Yayın: SBOM ve build provenance (2026-10-21, faz 6a; kaynak + ölçüm)
+- Soru: Release paketleri için SBOM ve imzalı köken bilgisi nasıl üretilir (D-048, F6a.7)?
+- Bulgu:
+  - GitHub "Using artifact attestations": `actions/attest@v4`, `subject-path` ile (glob, en fazla 1024 subject); izinler `id-token: write`, `contents: read`, `attestations: write`. `predicate` ya da `sbom-path` verilmezse build provenance üretir (v4.2.2 `action.yml`). Doğrulama `gh attestation verify <dosya> --repo <owner>/<repo>`. Public repo'da ücretsiz (D-042).
+  - Environments: required reviewers ve deployment tag kuralları public repo'larda Free planda var.
+  - CycloneDX .NET 6.3.1 (Apache-2.0, `dotnet-CycloneDX`, net8–net10 tool): proje dosyası alır, `--disable-package-restore` ile mevcut restore'u kullanır, `--output-format Json`, `--set-type/--set-name/--set-version`. Ölçüm (`NovaCore.AspNetCore`): `--include-project-references` ile `BMD.NovaCore.Abstractions@0.1.0` (sürüm eki olmadan) ve sahte `NovaCore.Abstractions@1.0.0` bileşenleri çıktı; o seçenek olmadan 25 bileşen, hepsinde purl, `PublicApiAnalyzers` `scope: excluded`. `--recursive` bileşen sayısını değiştirmedi (assets dosyası geçişlileri zaten içeriyor).
+- Kaynak: https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations · https://github.com/actions/attest/blob/v4.2.2/action.yml · https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments · https://github.com/CycloneDX/cyclonedx-dotnet
+- Sonuç: D-051 (6). Gerçek koşu bir sonraki `v*` tag'iyle; o zamana kadar yalnızca lint ve yerel SBOM denemesiyle doğrulandı.

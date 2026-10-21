@@ -16,19 +16,22 @@ concurrency:
   cancel-in-progress: false
 
 # Actions are pinned to a full commit SHA, with the release it was resolved from in the comment (D-051).
+#
+# Two jobs (D-051 (6)): `build` compiles, tests and packs with read-only access, so the code it runs (tests, analyzers,
+# build-time packages) can neither publish nor sign. `publish` builds nothing: it signs the build provenance of the
+# packages it is handed and pushes them, in the `release` environment, which waits for the owner's approval and only
+# accepts v* tags.
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
-      packages: write
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
 
     steps:
-      # The token isn't left in .git/config while restore, build and tests run; the push step passes it explicitly.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -59,6 +62,7 @@ jobs:
             exit 1
           fi
           echo "suffix=$suffix" >> "$GITHUB_OUTPUT"
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
 
       # Locked mode: the release is built from exactly the package graph in the committed lock files (R-094).
       - name: Restore
@@ -79,22 +83,77 @@ jobs:
           VERSION_SUFFIX: ${{ steps.version.outputs.suffix }}
         run: dotnet pack NovaCore.slnx -c Release --no-build -o artifacts "-p:VersionSuffix=$VERSION_SUFFIX"
 
+      # One CycloneDX SBOM per library package, from the restored package graph (R-098). It lists the third-party and
+      # Microsoft packages, transitive ones included; the BMD.NovaCore.* packages a package depends on have SBOMs of
+      # their own. The template package has no dependencies, so it has none.
+      - name: SBOMs
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dotnet tool restore
+          for project in src/BuildingBlocks/*/*.csproj; do
+            id="BMD.$(basename "$project" .csproj)"
+            dotnet CycloneDX "$project" --disable-package-restore --output-format Json --set-type Library \
+              --set-name "$id" --set-version "$PACKAGE_VERSION" --output artifacts/sbom --filename "$id.cdx.json"
+          done
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages
+          if-no-files-found: error
           path: |
             artifacts/*.nupkg
             artifacts/*.snupkg
+            artifacts/sbom/*.cdx.json
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      # Only global.json, for the SDK version: this job builds nothing.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: global.json
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: packages
+          path: artifacts
+
+      # Signed SLSA build provenance for every package and SBOM, verifiable with
+      # gh attestation verify <file> --repo alimuhammedak/NovaCore.
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+            artifacts/sbom/*.cdx.json
 
       # Only .nupkg: GitHub Packages rejects .snupkg symbol packages (R-039), which stay in the workflow artifact above.
       # The feed is passed here instead of through setup-dotnet's source-url, which would add it to the restore sources
-      # too (R-043). Trusted publishing (OIDC) is a nuget.org feature; GitHub Packages takes the job's own short-lived
-      # GITHUB_TOKEN, so zizmor's use-trusted-publishing doesn't apply here (R-095).
+      # too (R-043). The key is the job's own short-lived GITHUB_TOKEN.
       - name: Push to GitHub Packages
         env:
           FEED_OWNER: ${{ github.repository_owner }}
           NUGET_API_KEY: ${{ secrets.GITHUB_TOKEN }}
-        run: > # zizmor: ignore[use-trusted-publishing]
+        run: >
           dotnet nuget push "artifacts/*.nupkg"
           --source "https://nuget.pkg.github.com/$FEED_OWNER/index.json"
           --api-key "$NUGET_API_KEY"

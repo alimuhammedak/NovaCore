@@ -977,7 +977,16 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - Tam geçmiş taraması 31 bulgu verdi; hepsi `tests/NovaCore.Api.Tests` altında, 14 farklı test değeri (`"a long passphrase for tests"`, `token=bm90LWEtdG9rZW4` = "not-a-token" ...), tek tek incelendi.
   - **Plandan sapma:** Parmak izi listesi (`.betterleaksignore`) yerine `.betterleaks.toml`'da değer listesi: değer tam eşleşmeli VE `tests/` altında olmalı. Parmak izi commit'e bağlı; testlere her yeni değer, commit'ten sonra ikinci bir commit isterdi. SARIF de yüklenmiyor (D-051 (2) ile aynı gerekçe).
   - Denemeler: liste ile geçmiş temiz. Ayrı bir klasörde aynı değer `src/` altında yakalandı, `tests/` altındaki yeni bir değer de yakalandı. Hook, staged sahte bir `ghp_` token'ıyla commit'i durdurdu (exit 1, commit oluşmadı); temiz bir staged değişiklik geçti.
-- [~] F6a.6: CodeQL ve Scorecard (D-051 (5)). `codeql.yml` (csharp, manual build, locked restore) ve `scorecard.yml` yazıldı, lint temiz. CodeQL'in faz branch'indeki ilk koşusu bekleniyor; Scorecard yalnızca main'de çalıştığı için merge sonrası doğrulanacak.
+- [x] F6a.6 (92fac01): CodeQL ve Scorecard (D-051 (5)).
+  - `codeql.yml` (csharp, manual build, locked restore) ve `scorecard.yml` yazıldı, lint temiz.
+  - CodeQL faz branch'indeki ilk koşuda yeşil (CodeQL 2.27.2, 52 kural). 4 uyarı buldu, hepsi kimlik eklentisinde; `src/` 6a'nın kapsamı dışı, aşağıda "Sonraya bırakılanlar"a (6b girdisi) yazıldı.
+  - Scorecard yalnızca main'de çalışıyor; merge sonrası doğrulanacak.
+- [x] F6a.7: Release tedarik zinciri (D-051 (6), R-098).
+  - `release.yml` iki job oldu. `build` (yalnızca `contents: read`): sürüm kontrolü, locked restore, build, test, pack, kütüphane başına CycloneDX SBOM. `publish` (`environment: release`, `packages`/`id-token`/`attestations: write`): yalnızca `global.json`'ı checkout eder, artifact'i indirir, `actions/attest` ile paket + SBOM provenance'ı imzalar, push eder.
+  - `dotnet-tools.json`'a CycloneDX 6.3.1 (Apache-2.0).
+  - Ölçüm: SBOM döngüsü yerelde yedi paketin hepsinde çalıştı (1–36 bileşen). `--include-project-references` sahte bileşen ürettiği için kullanılmadı.
+  - Yan etki: yayın ayrı job'a taşınınca zizmor'un `use-trusted-publishing` bulgusu kalktı, F6a.2'deki satır içi ignore silindi; workflow'larda zizmor muafiyeti kalmadı.
+  - Gerçek koşu bir sonraki `v*` tag'iyle olacak (environment F6a.11'de kurulur).
 
 ## Açık sorular (Q)
 
@@ -1162,6 +1171,11 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 5, code review #4) Şablonun örnek `CompleteTodo`'su okuyup `IsCompleted`'ı kontrol ediyor ve concurrency token olmadan kaydediyor; aynı anda gelen iki tamamlama ikisi de 204 alır (biri 409 almalıydı). Örnek basit tutuldu; token eklemek migration'ı ve örneği büyütür. *Koşul:* örnek modül bir eşzamanlılık kalıbı da öğretecekse (repo'da `Product.Stock` örneği var).
 - (Faz 5, code review #5) Üretilen projenin CI'ı restore için `NOVACORE_PACKAGES_TOKEN` secret'ını ister; fork'tan gelen ve Dependabot PR'larında secret olmadığı için restore 401 alır. *Koşul:* üretilen bir projede Dependabot ya da dış katkı açılır (Dependabot secret'ı ya da `pull_request_target` tasarımı gerekir).
 - (Faz 5, code review #6) Repo CI'ında `template-smoke` job'ı çözümü `build-and-test`'ten ayrı olarak bir kez daha derleyip pack ediyor. *Koşul:* CI süresi sorun olur; pack edilmiş paketler artifact olarak job'lar arasında taşınabilir.
+
+- (Faz 6a, F6a.6) **CodeQL'in ilk 4 uyarısı (6b girdisi), 2026-10-21, faz branch'i:**
+  - `cs/user-controlled-bypass` (high) ×2: `NovaCore.Identity.OpenIddict/LoginPage.cs:53` ve `:125`. "Hassas bir işlemi koruyan koşulu kullanıcının verdiği bir değer belirliyor."
+  - `cs/exposure-of-sensitive-information` (medium) ×2: `SecurityAuditLogger.cs:14` ve `:25`. E-posta adresi loga yazılıyor.
+  - Hiçbiri henüz doğrulanmadı. *Koşul:* Faz 6b'de her biri ya kırmızı bir testle doğrulanıp düzeltilir ya da gerekçesiyle "false positive" olarak kapatılır (D-044'ün triage kuralı).
 
 ## Son devir notu
 
