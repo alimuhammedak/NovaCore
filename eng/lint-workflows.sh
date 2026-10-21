@@ -23,6 +23,10 @@ for dir in "$@"; do
   for file in "$dir"/.github/workflows/*.yml "$dir"/.github/workflows/*.yaml; do
     if [[ -f "$file" ]]; then workflows+=(".github/workflows/${file##*/}"); fi
   done
+  if [[ ${#workflows[@]} -eq 0 ]]; then
+    echo "::error::$dir has no workflow in .github/workflows" >&2
+    exit 1
+  fi
   docker run --rm -v "$(native "$dir"):/repo" -w /repo "$actionlint_image" -color "${workflows[@]}"
   docker run --rm -e GH_TOKEN -v "$(native "$dir"):/repo" -w /repo "$zizmor_image" --strict-collection .github
 done

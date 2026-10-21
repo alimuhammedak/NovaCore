@@ -11,9 +11,12 @@ namespace NovaCore.Api.Tests.Architecture;
 /// </summary>
 public class WorkflowPinTests
 {
-    // `uses: owner/repo[/path]@ref` in a step; a trailing "# vX.Y.Z" comment names the release the SHA came from.
-    private static readonly Regex Uses = new(@"^\s*(-\s*)?uses:\s*(?<action>[^@\s]+)@(?<ref>[^\s#]+)");
-    private static readonly Regex FullSha = new("^[0-9a-f]{40}$");
+    // `uses: owner/repo[/path]@ref` in a step, quoted or not; a trailing "# vX.Y.Z" comment names the release the SHA
+    // came from. Local actions (./...) have no ref and don't match.
+    private static readonly Regex Uses = new(@"^\s*(-\s*)?uses:\s*['""]?(?<action>[^@\s'""]+)@(?<ref>[^\s'""#]+)");
+
+    // A commit SHA, or the digest of a docker:// image.
+    private static readonly Regex Pinned = new("^([0-9a-f]{40}|sha256:[0-9a-f]{64})$");
 
     private static readonly string[] WorkflowDirectories =
     [
@@ -31,7 +34,7 @@ public class WorkflowPinTests
             from use in uses
             group use by use.Action into action
             let refs = action.Select(use => use.Ref).Distinct().ToList()
-            where refs.Count > 1 || !FullSha.IsMatch(refs[0])
+            where refs.Count > 1 || !Pinned.IsMatch(refs[0])
             select $"{action.Key}: {string.Join(", ", action.Select(use => $"{use.Ref} ({use.Location})"))}";
 
         Assert.Empty(problems);
@@ -39,7 +42,8 @@ public class WorkflowPinTests
 
     private static IEnumerable<(string Action, string Ref, string Location)> AllUses() =>
         from directory in WorkflowDirectories
-        from path in Directory.EnumerateFiles(Path.Combine(Solution.RootDirectory, directory), "*.yml")
+        from path in Directory.EnumerateFiles(Path.Combine(Solution.RootDirectory, directory))
+        where path.EndsWith(".yml", StringComparison.Ordinal) || path.EndsWith(".yaml", StringComparison.Ordinal)
         from line in File.ReadLines(path).Select((text, index) => (text, number: index + 1))
         let match = Uses.Match(line.text)
         where match.Success

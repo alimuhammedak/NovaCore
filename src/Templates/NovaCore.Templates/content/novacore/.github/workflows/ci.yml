@@ -7,9 +7,10 @@ on:
 # Every job states what it needs; the workflow grants nothing by default.
 permissions: {}
 
-# A newer push to the same ref supersedes a running pull-request build; pushes to a branch each finish.
+# A newer push to a pull request supersedes its running build. Every pushed commit gets its own group, so a push never
+# cancels (or, while queued, is replaced by) another push's run: each commit on main keeps its result.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Actions are pinned to a full commit SHA, with the release it was resolved from in the comment.

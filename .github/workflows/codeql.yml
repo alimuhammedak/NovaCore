@@ -12,8 +12,9 @@ on:
 # Every job states what it needs; the workflow grants nothing by default.
 permissions: {}
 
+# Same grouping as ci.yml: pull-request runs supersede each other, every pushed commit is analyzed.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
