@@ -42,7 +42,8 @@ iskelet üreten **şablon** (`BMD.NovaCore.Templates`). Paketler NovaCore'un sor
 ### Kurulum
 
 ```bash
-# 1) Bir kez: paketlerin feed'i. GitHub Packages, paket private olduğu için read:packages yetkili bir token ister.
+# 1) Bir kez: paketlerin feed'i. GitHub Packages'ın NuGet kaydı, paket public olsa da kurulum için read:packages
+#    yetkili bir classic token ister (DECISIONS D-050).
 #    Kaynağın adı novacore olmalı: üretilen nuget.config aynı adla tanımlar, kimlik bilgisi buradan gelir.
 dotnet nuget add source https://nuget.pkg.github.com/alimuhammedak/index.json -n novacore -u <github-kullanıcısı> -p <token>
 
@@ -73,7 +74,8 @@ cd SiparisServisi && dotnet build && dotnet test         # SQL Server gerekmez: 
 | `src/Api/<Ad>.Api` | `Program.cs` (kompozisyon kökü), üretim kontrol listesini yorum olarak taşıyan `appsettings.json`, Development dışı health probe örneği; BuiltIn'de kimlik sağlayıcının migration'ları |
 | `src/Modules/Todos/<Ad>.Modules.Todos` | Örnek modül: dört slice (oluştur, oku, sayfalı listele, tamamla), izinler, validation, `Result` → ProblemDetails, `todos` şeması, migration, outbox. Kendi modülünüzü yanına ekleyin (bkz. [Yeni Modül Ekleme](#yeni-modül-ekleme)), örneği silin |
 | `tests/<Ad>.Api.Tests` | `WebApplicationFactory` + in-memory SQLite + bellek içi OpenID Connect issuer; izinler `CreateClientWithPermissions(...)` ile verilir |
-| `.github/workflows/ci.yml` | Restore (NuGet audit), build, test, context başına migration kontrolü, varsayılan dalda migration bundle'ları, açık paket kontrolü. Repo secret'ı `NOVACORE_PACKAGES_TOKEN` (read:packages) gerekir |
+| `.github/workflows/ci.yml` | Restore (NuGet audit), build, test, context başına migration kontrolü, varsayılan dalda migration bundle'ları, açık paket kontrolü. Repo secret'ı `NOVACORE_PACKAGES_TOKEN` (read:packages) gerekir. Action'lar commit SHA'sına sabit, job izinleri en az düzeyde |
+| `.github/dependabot.yml` | Action SHA'larını haftalık günceller (7 gün bekleme). NuGet güncellemeleri yok: GitHub Packages için Dependabot'a özel registry ve secret gerekir |
 | Kök | `nuget.config`, `Directory.Build.props` (uyarılar hata, analyzer'lar, NuGet audit), `Directory.Packages.props` (merkezi sürümler, `NovaCoreVersion`), `global.json`, `.editorconfig`, `dotnet-tools.json` (dotnet-ef) |
 
 Log hattı tektir: `AddCoreObservability` log, metrik ve trace'i OpenTelemetry'den geçirir, `OTEL_EXPORTER_OTLP_ENDPOINT`
@@ -222,7 +224,8 @@ kod güncellemeyle değişmez; yeni bir şablon özelliğini istiyorsanız yeni 
 
 Bu bölüm NovaCore'un kendisini (paketler, referans Api host'u, Catalog ve Payments modülleri) geliştirmek içindir.
 
-Gereksinim: **.NET 10 SDK** (10.0.300+), **SQL Server** (yerel instance, Windows auth — bkz. `appsettings.json`).
+Gereksinim: **.NET 10 SDK**, tam olarak `global.json`'daki sürüm (10.0.300; `rollForward: disable`, lock dosyaları için),
+**SQL Server** (yerel instance, Windows auth — bkz. `appsettings.json`).
 
 ```bash
 # 1) Bağımlılıkları derle + test et (veritabanı GEREKMEZ — testler SQLite kullanır)
@@ -271,6 +274,47 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 Şablondan yeni proje açmak için bkz. [Yeni Proje (Tüketici Rehberi)](#yeni-proje-tüketici-rehberi). Şablonu bu
 repodan denemek: `bash eng/template-smoke.sh` (bütün paketleri yerel bir feed'e pack eder, iki kimlik seçeneğiyle proje
 üretip derler ve test eder).
+
+### CI, tedarik zinciri ve güvenlik taramaları
+
+Repo public'tir (DECISIONS D-042). Kararlar D-048, D-051 ve D-052'de; kaynaklar `docs/plan/RESEARCH.md` R-094…R-098'de.
+
+| Ne | Nerede | Not |
+|---|---|---|
+| Build, test, migration kontrolü, açık paket kontrolü | `ci.yml` → `build-and-test` | Restore `--locked-mode` ile; ardından lisans kapısı (`eng/check-licenses.sh`) |
+| Şablonun tüketici smoke testi | `ci.yml` → `template-smoke` | Üretilen projelerin workflow'ları da lint'lenir |
+| Secret taraması | `ci.yml` → `secret-scan` | Betterleaks 1.9.0, bütün geçmiş, `.betterleaks.toml` |
+| Workflow denetimi | `ci.yml` → `workflow-lint` | actionlint + zizmor, digest'e sabit imajlarla (`eng/lint-workflows.sh`) |
+| Statik analiz | `codeql.yml` | C#, manual build (kaynak üreteçlerinin kodu da analiz edilir); uyarılar Security sekmesinde |
+| Tedarik zinciri puanı | `scorecard.yml` | OpenSSF Scorecard, main'e push'ta ve haftalık |
+| Güncellemeler | `.github/dependabot.yml` | NuGet, action'lar, SDK, compose imajları; 7 gün bekleme |
+| Yayın | `release.yml` | `build` ve `publish` ayrı job'lar; `publish` `release` environment'ında onay bekler |
+
+```bash
+# Paket grafiği lock dosyalarındadır (Api, modüller, test). Bir paket sürümünü değiştirince lock dosyalarını yenileyin:
+dotnet restore NovaCore.slnx --force-evaluate
+dotnet restore NovaCore.slnx --locked-mode          # CI'ın yaptığı kontrol
+
+bash eng/check-licenses.sh                           # her paket MIT/Apache-2.0 (Microsoft ve Polly istisnası: D-052)
+bash eng/lint-workflows.sh                           # Docker gerekir; GH_TOKEN varsa zizmor online denetimleri de yapar
+
+# Opt-in: staged değişiklikler commit'ten önce taranır (Betterleaks 1.9.0 PATH'te olmalı)
+git config core.hooksPath .githooks
+```
+
+- **Action'lar** tam commit SHA'sına sabittir (`uses: actions/checkout@<sha> # v7.0.1`). Şablonun workflow'u
+  `#if` satırları yüzünden Dependabot'un okuyabileceği bir YAML değil. `WorkflowPinTests`, şablondaki SHA'ların repo'yla
+  aynı olduğunu doğrular; Dependabot repo'yu güncelleyince test, şablon da güncellenene kadar kırmızı kalır.
+- **Test kimlik bilgileri** `.betterleaks.toml`'da değer listesiyle muaf tutulur: değer tam eşleşmeli ve `tests/` altında
+  olmalı. Yeni bir test değeri bu listeye eklenir; yol bazlı muafiyet yoktur.
+- **Repo ayarları:** secret scanning ve push protection açık, Dependabot uyarıları ve güvenlik güncellemeleri açık.
+  `main`'de force push ve silme kapalı. `v*` tag'lerini yalnızca admin oluşturur, taşır, siler.
+- **Yayınlanan paketin doğrulanması:** her `.nupkg`, `.snupkg` ve SBOM (`*.cdx.json`, workflow artifact'inde) imzalı
+  build provenance taşır:
+  ```bash
+  gh attestation verify BMD.NovaCore.AspNetCore.<sürüm>.nupkg --repo alimuhammedak/NovaCore
+  ```
+- `docker-compose*.yml` servisleri yalnızca `127.0.0.1`'de dinler, imajlar tag + digest ile sabittir.
 
 ---
 
@@ -773,7 +817,8 @@ dotnet test
 - **Architecture:** modül sınırlarını zorlar (modüller birbirine yalnızca `*.Contracts` üzerinden bağlı), çekirdek paketlerin
   yalnızca Microsoft paketlerine bağlı olduğunu ve paketler arası bağımlılık yönünü doğrular (`NovaCore.Abstractions`
   ASP.NET/EF içermez), building block'larda assembly taraması olmadığını kontrol eder. Modül sırası ve endpoint listesi
-  de testle sabitlenmiştir.
+  de testle sabitlenmiştir. `WorkflowPinTests` her GitHub Action'ın bütün workflow'larda (şablonunki dahil) tek ve tam
+  bir commit SHA'sına sabitlendiğini doğrular.
 - **Şablon (tüketici smoke testi):** `bash eng/template-smoke.sh` ve CI'daki `template-smoke` job'ı bütün paketleri yerel
   bir feed'e pack eder, şablonu kendi hive'ına kurar, `--auth BuiltIn` ve `External` ile birer proje üretir; projeler
   paketleri o feed'den alarak (repo'nun projelerinden değil) uyarılar hata sayılarak derlenir, testleri ve
@@ -811,6 +856,9 @@ dotnet test
    - Her paket XML dokümanını, `src/PACKAGE.md`'den gelen README'yi, MIT lisans ifadesini ve repo linkini taşır. Yanında bir `.snupkg` sembol paketi üretilir.
    - Public API `PublicAPI.*.txt` dosyalarında izlenir. İzlenmeyen bir değişiklik build'i kırar.
    - Yayın `.github/workflows/release.yml` ile yapılır. `VersionPrefix` ile eşleşen bir `v*` tag'i (ör. `v0.1.0-preview.1`) GitHub Packages'a push eder.
+     `build` job'u yalnızca okuma izniyle derler, test eder, pack eder ve kütüphane başına bir CycloneDX SBOM'u üretir.
+     `publish` job'u `release` environment'ında sahibinin onayını bekler; paketlerin build provenance'ını imzalar
+     (`actions/attest`) ve push eder (DECISIONS D-051 (6)).
 
 ---
 
@@ -828,6 +876,11 @@ dotnet test
 | OpenIddict.Server.AspNetCore / OpenIddict.EntityFrameworkCore | OpenID Connect sağlayıcı (`NovaCore.Identity.OpenIddict` eklentisi) | **Apache-2.0** |
 | Microsoft.EntityFrameworkCore.SqlServer | EF Core sağlayıcı | **MIT** |
 | Microsoft.CodeAnalysis.PublicApiAnalyzers | Public API takibi (yalnızca build, pakete girmez) | **MIT** |
+| Polly.Core / Extensions / RateLimiting | Geçişli: `Microsoft.Extensions.Http.Resilience`'ın bağımlılığı | **BSD-3-Clause** (adlı istisna, D-052) |
+| nuget-license, CycloneDX (dotnet tool) | Lisans kapısı, SBOM (yalnızca CI ve yayın, pakete girmez) | **Apache-2.0** |
+
+CI'daki lisans kapısı (`eng/check-licenses.sh`) geçişliler dahil her paketi denetler: MIT ya da Apache-2.0 olmalı;
+Microsoft paketleri (`Microsoft.*`, `System.*`) lisansa bakılmadan geçer (Y-06), getirdikleri paketler yine denetlenir.
 
 > ⚠️ **MediatR (v13+) ve AutoMapper (v15+) artık ticari** (Lucky Penny). NovaCore bunları kullanmaz. Başka bir mediator
 > ya da request-dispatch soyutlaması da eklenmez (DECISIONS Y-01): handler'lar bağımlılıklarını minimal API DI'dan alır.

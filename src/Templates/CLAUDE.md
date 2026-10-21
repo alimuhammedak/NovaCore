@@ -47,5 +47,8 @@ It packs every package into a local feed (`--version-suffix smoke`), installs th
 own (`--debug:custom-hive`), creates a project with each `--auth` option, points its `novacore` source at the feed,
 restores into a package cache of its own, then builds (warnings are errors), tests, runs `has-pending-model-changes`
 for each context and checks that no repository file or unreplaced token got in. CI runs the same script
-(`template-smoke` job). The generated project's own CI (`content/novacore/.github/workflows/ci.yml`) isn't run by it:
-after changing that file, run its steps in a generated project.
+(`template-smoke` job), which then lints the generated projects' `.github` with `eng/lint-workflows.sh` (actionlint,
+zizmor). The content's workflow pins its actions to the same commit SHAs as the repository's workflows
+(`WorkflowPinTests`): when Dependabot updates the repository's, update `content/novacore/.github/workflows/ci.yml` too.
+The content's `.github/dependabot.yml` keeps a generated project's pins up to date. The generated project's own CI
+isn't run by the smoke test: after changing that workflow, run its steps in a generated project.

@@ -1006,6 +1006,10 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - Ruleset `release tags` (id 25565185): `refs/tags/v*`, `creation` + `update` + `deletion`, bypass yalnızca repository admin (`always`).
   - Environment `release`: required reviewer `alimuhammedak`, `prevent_self_review: false`, `can_admins_bypass: false`; deployment policy yalnızca `v*` tag'leri.
   - Kullanıcıda kalanlar: 8 paketin görünürlüğü (D-050; paket sayfası → Package settings → Change visibility, geri alınamaz) ve nuget.org'da `BMD.*` önek rezervasyonu (D-048 (1)).
+- [x] F6a.12: Dokümanlar.
+  - README: tüketici kurulumunda token notu (D-050), şablonun `dependabot.yml`'i, tam SDK sürümü, yeni "CI, tedarik zinciri ve güvenlik taramaları" bölümü, `WorkflowPinTests`, yayın job'ları ve `gh attestation verify`, lisans tablosunda Polly ve araçlar.
+  - Kök CLAUDE.md: komutlar (lock, lisans, lint, pre-commit), hook notu, "action'lar SHA'ya sabit" ve lock dosyası standartları. tests/CLAUDE.md ve src/Templates/CLAUDE.md da güncellendi.
+  - CHANGELOG `[Unreleased]`: Security ve Changed. Memory `novacore-stack`.
 
 ## Açık sorular (Q)
 

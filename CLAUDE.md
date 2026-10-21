@@ -38,8 +38,9 @@ completed phases update this file.
 - **Another phase's topic?** Read that phase in PLAN.md first. Do the proper work now if it's needed now and
   cheaper overall (record a D-entry); otherwise leave the code alone and note it in PROGRESS →
   "Sonraya bırakılanlar". **No temporary code or suppressions** ("remove in phase X"); they get forgotten (Y-45).
-- **Hooks are guardrails, not obstacles** (`.claude/settings.json`): new non-allowlisted NuGet packages and edits
-  to `PLAN.md`, `DECISIONS.md`, `.claude/settings.json` and `.claude/hooks/` trigger a user approval prompt.
+- **Hooks are guardrails, not obstacles** (`.claude/settings.json`): new non-allowlisted NuGet packages, edits
+  to `PLAN.md`, `DECISIONS.md`, `.claude/settings.json` and `.claude/hooks/`, a workflow `uses:` not pinned to a commit
+  SHA, and a written value that looks like a secret trigger a user approval prompt.
   `DECISIONS.md` prompts even for a new entry; policy-wise new entries are pre-approved (D-016), so batch them
   into one edit per phase step. Banned packages are denied, and the Stop hook blocks finishing while build/tests
   are red. Don't try to route around them. The auto-mode classifier also blocks the model from editing hooks.
@@ -54,6 +55,11 @@ completed phases update this file.
 # Build / test
 dotnet build                                  # whole solution (NovaCore.slnx); TreatWarningsAsErrors: any warning fails the build
 dotnet restore NovaCore.slnx --force          # incremental builds skip restore, so NuGet audit (NU19xx) stays hidden without this
+dotnet restore NovaCore.slnx --force-evaluate # after changing a package version: rewrites the packages.lock.json files
+dotnet restore NovaCore.slnx --locked-mode    # what CI runs: fails if the package graph differs from the lock files
+bash eng/check-licenses.sh                    # license gate: every package MIT/Apache-2.0 (Microsoft and Polly.*: D-052)
+bash eng/lint-workflows.sh [dir ...]          # actionlint + zizmor on .github (Docker; GH_TOKEN enables online audits)
+git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release
 dotnet test                                   # all tests (no SQL Server needed — every DbContext runs on SQLite)
 dotnet test --filter "FullyQualifiedName~AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"   # single test
@@ -81,7 +87,10 @@ dotnet pack NovaCore.slnx -c Release -o artifacts [--version-suffix preview.1]
 
 There is no separate lint step: every build runs the `latest-recommended` analyzers with `EnforceCodeStyleInBuild=true`
 and `TreatWarningsAsErrors=true`. `dotnet format` is available but optional. Publishing is `.github/workflows/release.yml`
-on a `v*` tag that must match `VersionPrefix` (GitHub Packages).
+on a `v*` tag that must match `VersionPrefix` (GitHub Packages): a read-only `build` job, then a `publish` job in the
+`release` environment (owner approval) that signs build provenance and pushes. CI also runs CodeQL (`codeql.yml`),
+Scorecard (`scorecard.yml`), a Betterleaks history scan and the workflow linters; the SDK is pinned exactly
+(`global.json` `rollForward: disable`, D-048).
 The connection string targets a **local SQL Server via Windows auth** (`appsettings.json`).
 
 ---
@@ -182,10 +191,17 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   `IPermissionDefinitionProvider` + `AddPermissionDefinitions<T>()`. No token role bypasses a permission check: the
   identity provider's resolver gives an `Administrator` member every declared permission, on the server (F4c.2).
 
+- **GitHub Actions are pinned to a full commit SHA** with the release in a comment (`uses: actions/checkout@<sha> # v7.0.1`),
+  resolved with `gh api repos/<owner>/<repo>/git/ref/tags/<tag>`. Workflows grant `permissions: {}` and each job only
+  what it needs; checkouts use `persist-credentials: false`. The template's workflow pins the same SHAs as the
+  repository's (`WorkflowPinTests`); Dependabot updates only the repository's, so update the template's with it.
+
 - **Central Package Management:** versions live ONLY in `Directory.Packages.props`. `*.csproj` use
   versionless `<PackageReference>`. Common build props are in `Directory.Build.props` (net10.0, nullable,
   implicit usings, analyzers, version); package metadata for `IsPackable` projects is in `Directory.Build.targets`;
-  per-project csproj stay tiny.
+  per-project csproj stay tiny. Non-packable projects (the Api host, the modules, the tests) commit a
+  `packages.lock.json` (`RestorePackagesWithLockFile`, set in `Directory.Build.targets`); after a version change run
+  `dotnet restore NovaCore.slnx --force-evaluate` and commit the lock files with it.
 
 - **0 warnings is enforced** (`TreatWarningsAsErrors`). Fix a warning; don't suppress it. Suppressing (`NoWarn`,
   `#pragma`, `.editorconfig` severity, `[SuppressMessage]`) needs user approval (DECISIONS Y-44), unless Microsoft's
