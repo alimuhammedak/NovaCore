@@ -1203,6 +1203,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 5, code review #5) Üretilen projenin CI'ı restore için `NOVACORE_PACKAGES_TOKEN` secret'ını ister; fork'tan gelen ve Dependabot PR'larında secret olmadığı için restore 401 alır. *Koşul:* üretilen bir projede Dependabot ya da dış katkı açılır (Dependabot secret'ı ya da `pull_request_target` tasarımı gerekir).
 - (Faz 5, code review #6) Repo CI'ında `template-smoke` job'ı çözümü `build-and-test`'ten ayrı olarak bir kez daha derleyip pack ediyor. *Koşul:* CI süresi sorun olur; pack edilmiş paketler artifact olarak job'lar arasında taşınabilir.
 
+- (Faz 6a, merge sonrası) Scorecard `Security-Policy` 0: `SECURITY.md` ve GitHub'ın private vulnerability reporting'i yok (repo public). *Koşul:* bir dış katkı ya da güvenlik bildirimi beklenmeye başlanınca; ucuz bir iş, plana alınması kullanıcıya önerildi.
 - (Faz 6a, F6a.6) **CodeQL'in ilk 4 uyarısı (6b girdisi), 2026-10-21, faz branch'i:**
   - `cs/user-controlled-bypass` (high) ×2: `NovaCore.Identity.OpenIddict/LoginPage.cs:53` ve `:125`. "Hassas bir işlemi koruyan koşulu kullanıcının verdiği bir değer belirliyor."
   - `cs/exposure-of-sensitive-information` (medium) ×2: `SecurityAuditLogger.cs:14` ve `:25`. E-posta adresi loga yazılıyor.
@@ -1230,5 +1231,13 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - 8 paketi public yap (D-050): her paketin sayfası → Package settings → Change visibility. Geri alınamaz.
   - nuget.org'da `BMD.*` önek rezervasyonu (D-048 (1)).
   - İstersen bir `v0.1.0-preview.2` tag'i: yeni release akışı (onaylı `publish`, provenance, SBOM) ilk kez gerçekten koşar.
-- **Merge sonrası doğrulanacaklar:** Scorecard'ın ilk koşusu (yalnızca main); Dependabot'un ilk koşusu (`exclude-paths`'in NuGet'te uygulanması, lock dosyalarını güncelleyip güncellemediği, `docker-compose.keycloak.yml`).
+- **Merge sonrası doğrulandı (2026-10-21, `3e0dd8b`):**
+  - main'de CI, CodeQL ve Scorecard yeşil.
+  - Scorecard'ın açık uyarıları: CII-Best-Practices 0, Code-Review 0 (PR'sız akış), Maintained 0 (repo 90 günden yeni), Fuzzing 0, Security-Policy 0 (SECURITY.md yok), Branch-Protection 3. Pinned-Dependencies ve Token-Permissions uyarı vermedi.
+  - Dependabot'un ilk koşusu dört ekosistemde çalıştı.
+    - `docker-compose` iki compose dosyasını da okudu (#1 Keycloak 26.8.1, #2 Jaeger 2.22.0). mcr.microsoft.com ve quay.io yayın tarihi vermediği için bu imajlarda cooldown uygulanmıyor (log: "skipping cooldown").
+    - `dotnet-sdk`: #3 10.0.300 → 10.0.402. Merge edilirse herkes 10.0.402'yi kurmalı (`rollForward: disable`).
+    - `nuget`: #4 Microsoft grubu, 16 güncelleme. `Directory.Packages.props` ve dört lock dosyasını birlikte güncelledi; şablon içeriğine dokunmadı (`exclude-paths` NuGet'te çalışıyor).
+    - `github-actions`: PR yok (pin'ler güncel).
+  - PR'lar kullanıcının kararını bekliyor; hiçbiri merge edilmedi.
 - **Sonraki faz (6b) bilmeli:** CodeQL'in 4 uyarısı 6b'nin girdisi. Plan notlarına test değerlerini `anahtar=değer` biçiminde yazma. DECISIONS hâlâ hook korumasında değil (D-032, artık 6e sonu).
