@@ -981,12 +981,13 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - `codeql.yml` (csharp, manual build, locked restore) ve `scorecard.yml` yazıldı, lint temiz.
   - CodeQL faz branch'indeki ilk koşuda yeşil (CodeQL 2.27.2, 52 kural). 4 uyarı buldu, hepsi kimlik eklentisinde; `src/` 6a'nın kapsamı dışı, aşağıda "Sonraya bırakılanlar"a (6b girdisi) yazıldı.
   - Scorecard yalnızca main'de çalışıyor; merge sonrası doğrulanacak.
-- [x] F6a.7: Release tedarik zinciri (D-051 (6), R-098).
+- [x] F6a.7 (26c7d73): Release tedarik zinciri (D-051 (6), R-098).
   - `release.yml` iki job oldu. `build` (yalnızca `contents: read`): sürüm kontrolü, locked restore, build, test, pack, kütüphane başına CycloneDX SBOM. `publish` (`environment: release`, `packages`/`id-token`/`attestations: write`): yalnızca `global.json`'ı checkout eder, artifact'i indirir, `actions/attest` ile paket + SBOM provenance'ı imzalar, push eder.
   - `dotnet-tools.json`'a CycloneDX 6.3.1 (Apache-2.0).
   - Ölçüm: SBOM döngüsü yerelde yedi paketin hepsinde çalıştı (1–36 bileşen). `--include-project-references` sahte bileşen ürettiği için kullanılmadı.
   - Yan etki: yayın ayrı job'a taşınınca zizmor'un `use-trusted-publishing` bulgusu kalktı, F6a.2'deki satır içi ignore silindi; workflow'larda zizmor muafiyeti kalmadı.
   - Gerçek koşu bir sonraki `v*` tag'iyle olacak (environment F6a.11'de kurulur).
+- [x] F6a.8: docker-compose. Bütün portlar `127.0.0.1`'e bağlandı (SQL Server 1433, Seq 5341/8081, Jaeger 16686/4317/4318; Keycloak zaten öyleydi). İmajlar `tag@sha256:<digest>` ile sabitlendi: digest'ler `docker buildx imagetools inspect` ile okundu (Seq, Jaeger, Keycloak çok mimarili index; SQL Server tek manifest). `docker compose config` iki dosyayla geçerli.
 
 ## Açık sorular (Q)
 

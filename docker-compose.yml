@@ -3,7 +3,9 @@
 # By default NovaCore targets a LOCAL SQL Server via Windows auth (see appsettings.json), so you
 # typically don't need the sqlserver service below — it's here only if you prefer a container.
 # Seq (logs) and Jaeger (traces) are opt-in: set Seq:ServerUrl / OTEL_EXPORTER_OTLP_ENDPOINT.
-# Image versions are pinned; bump them deliberately. An optional Keycloak lives in docker-compose.keycloak.yml.
+# Images are pinned to a tag and its digest (the tag says which version, the digest that it can't change underneath);
+# Ports listen on 127.0.0.1 only: these are development services with development
+# credentials, not for the local network. An optional Keycloak lives in docker-compose.keycloak.yml.
 
 services:
   # Optional containerized SQL Server. The SA password is read from a git-ignored .env file next to
@@ -12,36 +14,36 @@ services:
   #   ConnectionStrings:Database =
   #   "Server=localhost,1433;Database=NovaCore;User Id=sa;Password=<MSSQL_SA_PASSWORD>;TrustServerCertificate=True;Encrypt=True;"
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
+    image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04@sha256:4402d880dd4c34bfa7d8705e56a86cd6c88da80a1f6bbbe741f999e76264a090
     container_name: novacore-sqlserver
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}"
       MSSQL_PID: "Developer"
     ports:
-      - "1433:1433"
+      - "127.0.0.1:1433:1433"
     volumes:
       - novacore-mssql:/var/opt/mssql
 
   # Structured log UI. Enable by setting Seq:ServerUrl=http://localhost:5341
   seq:
-    image: datalust/seq:2026.1.17182
+    image: datalust/seq:2026.1.17182@sha256:9e9cc9183c6efaa7c187407d16901506ab3bc0aed7522bfc3ad7b529be30d8d8
     container_name: novacore-seq
     environment:
       ACCEPT_EULA: "Y"
     ports:
-      - "5341:5341"   # ingestion
-      - "8081:80"     # web UI -> http://localhost:8081
+      - "127.0.0.1:5341:5341"   # ingestion
+      - "127.0.0.1:8081:80"     # web UI -> http://localhost:8081
 
   # Distributed tracing UI. Enable by setting OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
   # Jaeger v2 (the v1 all-in-one image is end of life); its default all-in-one config receives OTLP.
   jaeger:
-    image: jaegertracing/jaeger:2.21.0
+    image: jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3
     container_name: novacore-jaeger
     ports:
-      - "16686:16686" # web UI -> http://localhost:16686
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
+      - "127.0.0.1:16686:16686" # web UI -> http://localhost:16686
+      - "127.0.0.1:4317:4317"   # OTLP gRPC
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
 
 volumes:
   novacore-mssql:
