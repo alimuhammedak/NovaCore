@@ -988,12 +988,17 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - Yan etki: yayın ayrı job'a taşınınca zizmor'un `use-trusted-publishing` bulgusu kalktı, F6a.2'deki satır içi ignore silindi; workflow'larda zizmor muafiyeti kalmadı.
   - Gerçek koşu bir sonraki `v*` tag'iyle olacak (environment F6a.11'de kurulur).
 - [x] F6a.8 (3e22a09): docker-compose. Bütün portlar `127.0.0.1`'e bağlandı (SQL Server 1433, Seq 5341/8081, Jaeger 16686/4317/4318; Keycloak zaten öyleydi). İmajlar `tag@sha256:<digest>` ile sabitlendi: digest'ler `docker buildx imagetools inspect` ile okundu (Seq, Jaeger, Keycloak çok mimarili index; SQL Server tek manifest). `docker compose config` iki dosyayla geçerli.
-- [x] F6a.9: Dependabot (D-051 (7)).
+- [x] F6a.9 (5c9a684): Dependabot (D-051 (7)).
   - `.github/dependabot.yml`: `nuget` (şablon içeriği hariç, gruplar), `github-actions`, `dotnet-sdk`, `docker-compose`; haftalık, 7 gün cooldown. zizmor dosyayı denetliyor; cooldown 2 güne inince 4 `dependabot-cooldown` bulgusu verdi (deneme).
   - Şablona `.github/dependabot.yml` (`github-actions`); smoke testi ve üretilen projelerin lint'i yeşil.
   - Yeni `WorkflowPinTests` (Architecture): her action bütün workflow'larda, şablonun ham `ci.yml`'i dahil, tek ve tam bir SHA'ya sabit. Önce kırmızı görüldü (şablonda `checkout@v7`, commit'lenmedi), sonra yeşil.
   - Build 0 uyarı. İlk tam koşuda 1 test kırmızı oldu (277/278; testin adı yakalanamadı); iki tekrar koşu 278/278 yeşil. Aralıklı; R-055'teki bilinen başlangıç yarışıyla aynı sınıfta olabilir.
   - Merge sonrası doğrulanacak: Dependabot'un `exclude-paths`'i NuGet'te uygulayıp uygulamadığı, lock dosyalarını güncelleyip güncellemediği, `docker-compose.keycloak.yml`'yi görüp görmediği (belgede yazmıyor).
+- [x] F6a.10: Claude hook genişletmesi (D-051 (8), D-048 (3)).
+  - `package-guard.js`: SHA'ya sabitlenmemiş workflow `uses:`'u ve sır gibi görünen değerler için `ask`.
+  - `verify-on-stop.js`: `Directory.Build.targets` ve `*.txt` izleniyor.
+  - Taslak scratchpad'de yazılıp 16 senaryoyla denendi, sonra korumalı dosyalara kullanıcı onayıyla uygulandı; uygulanan dosyalar taslakla aynı, senaryolar yeniden yeşil. Senaryolar: tag'li/SHA'lı/yerel/digest'li/tag'li Docker `uses:`, şablon workflow'u, workflow olmayan YAML, GitHub token, özel anahtar, AWS anahtarı, bağlantı dizesi parolası ve yer tutucusu, C# test parolası, sıradan kod, korunan yol, yasaklı paket.
+  - İzlenen bütün repo dosyaları sır desenlerine karşı tarandı: eşleşme yok, yani mevcut dosyaları düzenlemek yanlış alarm vermiyor.
 
 ## Açık sorular (Q)
 
@@ -1077,7 +1082,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 1) ~~F2b.6'da yapılacak: `.editorconfig`'teki geçici CA1848/CA1873 satırları silinecek.~~ → F2b.6 Faz 2a'nın ilk adımı oldu (D-017), Faz 2a adım listesinde.
 - (Faz 1, F2a) `NovaCore.Modules.Catalog.Contracts` packable. ANALYSIS §4'teki paket haritasında yok. Örnek modülün sözleşmesi paket olmalı mı? 2a'da karar verilmeli. Packable kalırsa XML doc ve PublicAPI dosyaları da onunla gider.
 - ~~(Faz 1, F2a.2) **Yeni packable projeler PublicAPI takibini sessizce atlayabilir.**~~ → F2a.2a'da çözüldü: `Directory.Build.targets`'taki `NovaCoreRequirePublicApiTracking` hedefi, packable bir projede referans yoksa build'i durduruyor (D-020 (7)). Eski not: `AdditionalFiles` ve doc koruması `Directory.Build.targets`'ta, ama `Microsoft.CodeAnalysis.PublicApiAnalyzers` referansı her csproj'da ayrı (PLAN F1.4 böyle istiyordu). F2a.2'deki 3 yeni pakete referans eklenmeli. Alternatif: referansı targets'a taşımak ya da bir koruma eklemek; bu PLAN'dan farklı bir yaklaşım olduğu için sorulmalı (code review bulgusu).
-- (Faz 1) **Stop hook değişiklik algılaması eksik:** `verify-on-stop.js` kök `Directory.Build.targets`'ı ve `*.txt` dosyalarını (PublicAPI) izlemiyor. Yalnızca bunlar değişirse build/test doğrulaması çalışmaz. Dosya korunan bir yolda, düzeltmek kullanıcı onayı ister (code review bulgusu).
+- ~~(Faz 1) **Stop hook değişiklik algılaması eksik:** `verify-on-stop.js` kök `Directory.Build.targets`'ı ve `*.txt` dosyalarını (PublicAPI) izlemiyor. Yalnızca bunlar değişirse build/test doğrulaması çalışmaz. Dosya korunan bir yolda, düzeltmek kullanıcı onayı ister (code review bulgusu).~~ → F6a.10'da düzeltildi.
 - ~~(Faz 1, F5.1)~~ → F5.1b'de çözüldü. **Template paket kimliğini taşıyor:** `dotnet new novacore`, `Directory.Build.targets`'ı (Authors = Muhammed Ali AK), `src/PACKAGE.md`'yi, `release.yml`'i ve PublicAPI dosyalarını kopyalıyor. `sourceName` değişimi yüzünden RepositoryUrl `github.com/alimuhammedak/<YeniAd>` oluyor (code review bulgusu).
 - (Faz 1, F2a) CA1711 (`IDomainEventHandler<T>`) ve CA1716 (`Error`) gerekçeli bastırıldı. 2a'da namespace'ler değişirken bu isimler de yeniden düşünülebilir.
 - ~~(Faz 1, F2a.2) Serilog log kültürü:~~ → F2a.2a'da karar verildi: `null` korunuyor, 2a'da davranış değişmiyor (D-020 (8)). Eski not: `formatProvider: null` Serilog'un varsayılanı. Logların culture-invariant olup olmayacağına NovaCore.Serilog'da karar verilmeli.
