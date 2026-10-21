@@ -4,7 +4,7 @@
 # typically don't need the sqlserver service below — it's here only if you prefer a container.
 # Seq (logs) and Jaeger (traces) are opt-in: set Seq:ServerUrl / OTEL_EXPORTER_OTLP_ENDPOINT.
 # Images are pinned to a tag and its digest (the tag says which version, the digest that it can't change underneath);
-# Ports listen on 127.0.0.1 only: these are development services with development
+# Dependabot proposes updates. Ports listen on 127.0.0.1 only: these are development services with development
 # credentials, not for the local network. An optional Keycloak lives in docker-compose.keycloak.yml.
 
 services:

@@ -987,7 +987,13 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - Ölçüm: SBOM döngüsü yerelde yedi paketin hepsinde çalıştı (1–36 bileşen). `--include-project-references` sahte bileşen ürettiği için kullanılmadı.
   - Yan etki: yayın ayrı job'a taşınınca zizmor'un `use-trusted-publishing` bulgusu kalktı, F6a.2'deki satır içi ignore silindi; workflow'larda zizmor muafiyeti kalmadı.
   - Gerçek koşu bir sonraki `v*` tag'iyle olacak (environment F6a.11'de kurulur).
-- [x] F6a.8: docker-compose. Bütün portlar `127.0.0.1`'e bağlandı (SQL Server 1433, Seq 5341/8081, Jaeger 16686/4317/4318; Keycloak zaten öyleydi). İmajlar `tag@sha256:<digest>` ile sabitlendi: digest'ler `docker buildx imagetools inspect` ile okundu (Seq, Jaeger, Keycloak çok mimarili index; SQL Server tek manifest). `docker compose config` iki dosyayla geçerli.
+- [x] F6a.8 (3e22a09): docker-compose. Bütün portlar `127.0.0.1`'e bağlandı (SQL Server 1433, Seq 5341/8081, Jaeger 16686/4317/4318; Keycloak zaten öyleydi). İmajlar `tag@sha256:<digest>` ile sabitlendi: digest'ler `docker buildx imagetools inspect` ile okundu (Seq, Jaeger, Keycloak çok mimarili index; SQL Server tek manifest). `docker compose config` iki dosyayla geçerli.
+- [x] F6a.9: Dependabot (D-051 (7)).
+  - `.github/dependabot.yml`: `nuget` (şablon içeriği hariç, gruplar), `github-actions`, `dotnet-sdk`, `docker-compose`; haftalık, 7 gün cooldown. zizmor dosyayı denetliyor; cooldown 2 güne inince 4 `dependabot-cooldown` bulgusu verdi (deneme).
+  - Şablona `.github/dependabot.yml` (`github-actions`); smoke testi ve üretilen projelerin lint'i yeşil.
+  - Yeni `WorkflowPinTests` (Architecture): her action bütün workflow'larda, şablonun ham `ci.yml`'i dahil, tek ve tam bir SHA'ya sabit. Önce kırmızı görüldü (şablonda `checkout@v7`, commit'lenmedi), sonra yeşil.
+  - Build 0 uyarı. İlk tam koşuda 1 test kırmızı oldu (277/278; testin adı yakalanamadı); iki tekrar koşu 278/278 yeşil. Aralıklı; R-055'teki bilinen başlangıç yarışıyla aynı sınıfta olabilir.
+  - Merge sonrası doğrulanacak: Dependabot'un `exclude-paths`'i NuGet'te uygulayıp uygulamadığı, lock dosyalarını güncelleyip güncellemediği, `docker-compose.keycloak.yml`'yi görüp görmediği (belgede yazmıyor).
 
 ## Açık sorular (Q)
 
