@@ -19,7 +19,7 @@
 | 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20, kullanıcı isteği) |
 | 5 | ✅ tamam | `faz/5-sablon-yayin` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20; push'taki CI yeşil (`build-and-test`, `template-smoke`); `v0.1.0-preview.1` tag'i kullanıcı onayıyla, release.yml yeşil, 8 paket GitHub Packages'ta) |
-| 6a | 🔄 devam ediyor | `faz/6a-ci-sertlestirme` | 2026-10-21 | | |
+| 6a | ✅ tamam | `faz/6a-ci-sertlestirme` | 2026-10-21 | 2026-10-21 | |
 | 6b | ⏳ başlamadı | | | | |
 | 6c | ⏳ başlamadı | | | | |
 | 6d | ⏳ başlamadı | | | | |
@@ -1006,10 +1006,18 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - Ruleset `release tags` (id 25565185): `refs/tags/v*`, `creation` + `update` + `deletion`, bypass yalnızca repository admin (`always`).
   - Environment `release`: required reviewer `alimuhammedak`, `prevent_self_review: false`, `can_admins_bypass: false`; deployment policy yalnızca `v*` tag'leri.
   - Kullanıcıda kalanlar: 8 paketin görünürlüğü (D-050; paket sayfası → Package settings → Change visibility, geri alınamaz) ve nuget.org'da `BMD.*` önek rezervasyonu (D-048 (1)).
-- [x] F6a.12: Dokümanlar.
+- [x] F6a.12 (5327a4a): Dokümanlar.
   - README: tüketici kurulumunda token notu (D-050), şablonun `dependabot.yml`'i, tam SDK sürümü, yeni "CI, tedarik zinciri ve güvenlik taramaları" bölümü, `WorkflowPinTests`, yayın job'ları ve `gh attestation verify`, lisans tablosunda Polly ve araçlar.
   - Kök CLAUDE.md: komutlar (lock, lisans, lint, pre-commit), hook notu, "action'lar SHA'ya sabit" ve lock dosyası standartları. tests/CLAUDE.md ve src/Templates/CLAUDE.md da güncellendi.
   - CHANGELOG `[Unreleased]`: Security ve Changed. Memory `novacore-stack`.
+- Faz sonu code review (high), 7 bulgu (`133c604`'te düzeltildi, biri bırakıldı):
+  - CI concurrency'si, kuyruktaki push koşusunu daha yenisi gelince iptal ediyordu (`ebded6e`'de görüldü). Push'larda grup artık commit SHA'sı, yalnızca PR'lar birbirini iptal ediyor (ci.yml, codeql.yml, şablon).
+  - `Polly.*` muafiyeti doğrudan bir Polly referansını da geçiriyordu. Lisans kapısı artık önce doğrudan referansları muafiyetsiz denetliyor. Deneme (commit'lenmedi): Catalog'a doğrudan Polly.Core eklenince kapı exit 1 verdi.
+  - `WorkflowPinTests` `.yaml`'ı, tırnaklı `uses:`'u ve `docker://…@sha256`'yı ele almıyordu; düzeltildi.
+  - `lint-workflows.sh` workflow'u olmayan klasörde yanıltıcı bir actionlint hatası veriyordu; artık açık bir hata veriyor.
+  - Betterleaks `curl` satırı tek satıra düşmüştü; düzeltildi. `check-licenses.sh` tool restore çıktısını gizliyordu; artık gösteriyor.
+  - Bırakılan: CodeQL repo içi PR branch'lerinde iki kez koşar (push + PR). Bu repo PR akışı kullanmıyor; faz branch'lerinin taranması için push tetikleyicisi gerekli.
+- Faz doğrulaması (2026-10-21, `133c604` üzerinde): `restore --force` uyarısız, lock dosyaları değişmedi; `restore --locked-mode` geçti; Release build 0 uyarı 0 hata; test 278/278; açık paket 0; lisans kapısı geçti; Betterleaks tam geçmiş temiz; actionlint + zizmor temiz; `docker compose config` geçerli; şablon smoke testi ve üretilen projelerin lint'i yeşil. GitHub: CI (build-and-test, template-smoke, secret-scan, workflow-lint) ve CodeQL yeşil.
 
 ## Açık sorular (Q)
 
@@ -1115,7 +1123,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 2b, code review) DbContext health check'lerinde timeout yok. SQL Server'a erişilemezse `/health` bağlantı timeout'u kadar bekleyebilir. Uçlar yalnızca Development'ta olduğu için şimdi etkisi düşük. Production'da probe gerekince (D-022) `HealthCheckRegistration.Timeout` ile birlikte ele alınmalı.
 - (Faz 2b, code review) Test yardımcıları tekrar ediyor: `NoOpEmailSender` iki dosyada (`EmailSenderRegistrationTests`, `ConfigurationValidationTests`), kullanıcı seed'i iki dosyada (`AuthFlowTests`, `RefreshTokenExpiryTests`). Paylaşılan bir test yardımcısına taşınabilir; mevcut testleri değiştirmek gerektiği için yapılmadı.
 - (Faz 2b) `NovaCore.OpenTelemetry`, `OTEL_EXPORTER_OTLP_ENDPOINT`'i kayıt anında okuyor (`OpenTelemetryHostingExtensions.cs:35`). F2b.1'in kapsamı iki çekirdek paketti. Bu okuma `ConfigureAppConfiguration` ile ezilemiyor, ama MS ServiceDefaults da aynı kalıbı kullanıyor.
-- (Faz 2c, R-055) **Aralıklı test hatası (framework yarışı):** Açılışta hata bekleyen testler, test yükü altında ara sıra gerçek hata yerine `ObjectDisposedException ('IServiceProvider')` alıyor. ~45 tam koşuda 2 kez görüldü.
+- (Faz 2c, R-055; **Faz 6a'da yine görüldü**: CI `5327a4a`'da `ConfigurationValidationTests.Invalid_configuration_stops_the_host_at_startup(Development, Jwt:Authority, not-a-uri)` aynı `ObjectDisposedException`'la kırmızı; F6a.9'daki yerel kırmızı da büyük olasılıkla bu. Faz 6c'nin test altyapısı işiyle birlikte ele alınmalı) **Aralıklı test hatası (framework yarışı):** Açılışta hata bekleyen testler, test yükü altında ara sıra gerçek hata yerine `ObjectDisposedException ('IServiceProvider')` alıyor. ~45 tam koşuda 2 kez görüldü.
   - Etkilenebilecek testler: `ConfigurationValidationTests` Theory'si, `EmailSenderRegistrationTests` (Production, sender yok), `DatabaseMigrationServiceTests` (`yes`).
   - Kök neden: `Mvc.Testing` `DeferredHost.StartAsync`, dispose edilmiş host'tan servis çözüyor.
   - F2c'den önce de vardı. CI'da da aralıklı kırmızıya yol açabilir.
@@ -1204,24 +1212,23 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-20, Faz 5: Şablon, dağıtım, yayın hazırlığı (tamam, `main`'e merge ve push edildi, `v0.1.0-preview.1` yayımlandı).** Branch `faz/5-sablon-yayin`, 8 commit.
+**2026-10-21, Faz 6a: Public geçiş ve CI/tedarik zinciri sertleştirme (tamam, merge onayı bekliyor).** Branch `faz/6a-ci-sertlestirme`, push edildi; `main`'e dokunulmadı.
 
 - **Yapılanlar:**
-  - F5.4: kanal GitHub Packages (D-013 kalır), ilk sürüm `0.1.0-preview.1` (Q-32, Q-33 → D-039).
-  - F5.1a: tek log hattı OpenTelemetry; `AddCoreObservability` log'ları biçimlenmiş mesaj ve scope'larla taşıyor (R-089).
-  - F5.1b: template package `BMD.NovaCore.Templates` (`src/Templates/NovaCore.Templates`): Api host, `Todos` örnek modülü, test projesi, `nuget.config` (source mapping), kontrol listeli `appsettings`, probe örneği, `--auth BuiltIn|External`. Kökteki `.template.config` silindi. Bütün paket ID'leri `BMD.NovaCore.*` (Q-34 → D-041).
-  - F5.1c: üretilen projenin CI'ı (migration kontrolü, varsayılan dalda bundle'lar).
-  - F5.2: `eng/template-smoke.sh` ve CI'da `template-smoke` job'ı.
-  - F5.5: README'de tüketici rehberi, CHANGELOG `[0.1.0-preview.1]`, CLAUDE.md'ler (yeni `src/Templates/CLAUDE.md`), memory.
-  - Code review düzeltmeleri. Testler 276 → 277 (repo); üretilen projelerde BuiltIn 8, External 7. Kararlar D-039, D-040 (1)–(9), D-041; R-089…R-092.
+  - F6a.1: K1–K8 kararları D-042…D-050 olarak, Faz 6a–6e PLAN'a. Paketler public olacak, token gerekliliği sürüyor (D-050).
+  - F6a.2–F6a.7: action'lar SHA'ya sabit, en az izin, actionlint + zizmor, lock dosyaları + SDK sabit, lisans kapısı, Betterleaks, CodeQL, Scorecard, release'in build/publish ayrımı + SBOM + provenance.
+  - F6a.8–F6a.12: compose `127.0.0.1` + digest, Dependabot + `WorkflowPinTests`, hook genişletmesi, GitHub ayarları (secret scanning, push protection, Dependabot, ruleset'ler, `release` environment), dokümanlar.
+  - Kararlar: D-051 (1)–(8), D-052 (Q-39). Araştırma: R-093…R-098. Testler 277 → 278.
 - **Sürprizler:**
-  - `UseOtlpExporter` log'ları zaten açıyordu; eksik olan mesaj ve scope'lardı (R-089).
-  - nuget.org'da başka sahiplerin `NovaCore.Templates`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` paketleri var; `dotnet new`'in güncelleme kontrolü yabancı şablonu önerdi. Paket ID'leri `BMD.NovaCore.*` oldu (R-091).
-  - `ContentTargetFolders=content` içeriği `content/content` altına koydu (R-090).
-  - Bundle'lar context başına 82 MB (framework-dependent) / 180 MB (self-contained); varsayılan dalla sınırlandı (R-092).
+  - Lisans kapısı Polly'yi (BSD-3-Clause, Http.Resilience üzerinden) buldu → Q-39.
+  - CodeQL ilk koşuda kimlik eklentisinde 4 uyarı verdi → Sonraya bırakılanlar (6b girdisi).
+  - Plan notuna yazılan bir test değeri CI'ın secret taramasını kırdı.
+  - R-055'teki aralıklı test hatası CI'da da görüldü.
+  - zizmor-action bulguda başarısız olmuyor; doğrudan imaj kullanıldı.
 - **Kullanıcıya:**
-  - Merge ve push: kullanıcı onayıyla ("Merge + push, tag CI'dan sonra") `main`'e `--no-ff` merge edildi ve push'landı (2026-10-20). Push'taki CI (run 39477442933) iki job'da da yeşil: Linux'ta pack ve şablon smoke testi ilk kez doğrulandı. Kullanıcı onayıyla `v0.1.0-preview.1` tag'i atıldı; release.yml (run 39478498854) yeşil, sekiz paket (`BMD.NovaCore.*` yedi kütüphane + `BMD.NovaCore.Templates`) GitHub Packages'a yüklendi. Tag `release.yml`'i tetikler ve sekiz paketi GitHub Packages'a yükler; Linux'ta pack'in ilk doğrulaması da o zaman (ve push'taki `template-smoke` job'ında) olur.
-  - **D-032:** `docs/plan/DECISIONS.md`'yi `.claude/hooks/package-policy.json` `protectedPaths` listesine geri ekleyin (hook dosyasını model düzenleyemiyor). DECISIONS başlığındaki "hook onay ister" notu o zaman yeniden geçerli olur.
-  - Tüketen projeler için: GitHub'da `read:packages` yetkili bir token; yerelde `dotnet nuget add source ... -n novacore`, üretilen repoda `NOVACORE_PACKAGES_TOKEN` secret'ı.
-  - Çalışma ağacındaki izlenmeyen `AGENTS.md`, `.agents/` ve `.codex/` dosyalarına dokunulmadı.
-- **Sonrası:** plan bitti. İlk gerçek proje şablonla açılır; 1.0 kararı (PublicAPI.Shipped, package validation baseline) o proje bu sürümle çalıştıktan sonra ayrıca verilir (PLAN F5.4). "Sonraya bırakılanlar"da Faz 5'ten 9 madde var.
+  - Merge onayı. `main` artık ruleset'li (force push ve silme kapalı), `--no-ff` merge + push akışı değişmez.
+  - 8 paketi public yap (D-050): her paketin sayfası → Package settings → Change visibility. Geri alınamaz.
+  - nuget.org'da `BMD.*` önek rezervasyonu (D-048 (1)).
+  - İstersen bir `v0.1.0-preview.2` tag'i: yeni release akışı (onaylı `publish`, provenance, SBOM) ilk kez gerçekten koşar.
+- **Merge sonrası doğrulanacaklar:** Scorecard'ın ilk koşusu (yalnızca main); Dependabot'un ilk koşusu (`exclude-paths`'in NuGet'te uygulanması, lock dosyalarını güncelleyip güncellemediği, `docker-compose.keycloak.yml`).
+- **Sonraki faz (6b) bilmeli:** CodeQL'in 4 uyarısı 6b'nin girdisi. Plan notlarına test değerlerini `anahtar=değer` biçiminde yazma. DECISIONS hâlâ hook korumasında değil (D-032, artık 6e sonu).
