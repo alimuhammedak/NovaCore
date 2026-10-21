@@ -68,8 +68,8 @@
 
   <ItemGroup>
     <!-- OpenID Connect server for the NovaCore.Identity.OpenIddict add-on (OpenIddict, Apache-2.0; R-059). -->
-    <PackageVersion Include="OpenIddict.Server.AspNetCore" Version="7.7.1" />
-    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="7.7.1" />
+    <PackageVersion Include="OpenIddict.Server.AspNetCore" Version="7.7.2" />
+    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="7.7.2" />
   </ItemGroup>
 
   <ItemGroup>
