@@ -964,3 +964,15 @@ Biçim:
   - nuget.org'da `Microsoft.` ve `System.` önekleri Microsoft'a ayrılmış (ID prefix reservation).
 - Kaynak: https://github.com/sensslen/nuget-license · https://learn.microsoft.com/nuget/nuget-org/id-prefix-reservation · `dotnet nuget why NovaCore.slnx Polly.Core`
 - Sonuç: Q-39 → D-052. Kapı geçişlileri de denetler, Microsoft önekleri ve `Polly.*` geçer.
+
+### R-097: Betterleaks 1.9.0: tarama komutları, muafiyet ve yapılandırma (2026-10-21, faz 6a; kaynak + ölçüm)
+- Soru: Repo'nun geçmişi ve yeni commit'ler sır için nasıl taranır, test kimlik bilgileri nasıl muaf tutulur (D-048, F6a.5)?
+- Bulgu:
+  - Betterleaks (MIT, gitleaks'in yazarından). Son stabil v1.9.0 (2026-09-29); v2.0.0 RC'de ve SARIF raporunu, yer bazlı ignore'u kaldırıyor. Doğrulama (sağlayıcıya istek) varsayılan olarak kapalı.
+  - v1.9.0 komutları: bütün geçmiş `betterleaks git .`, staged değişiklik `betterleaks git . --pre-commit --staged`. Bulguda exit 1. `--redact` değeri loglamaz.
+  - Yapılandırma sırası (`--help`): `--config`, ortam değişkenleri, sonra hedef klasördeki `.betterleaks.toml`/`.gitleaks.toml`. Format gitleaks uyumlu: `[extend] useDefault = true` ve `[[allowlists]]` (`condition = "AND"`, `paths`, `regexTarget = "secret"`, `regexes`).
+  - Release arşivleri `checksums.txt` ile yayımlanıyor (cosign imzalı): linux_x64 `f8b185a3…6de7`, windows_x64 `b765daec…d3da`. İndirilen dosya bu değerlerle eşleşti.
+  - Ölçüm: tam geçmiş 31 bulgu, hepsi `tests/NovaCore.Api.Tests` altında (`generic-password` 28, `generic-api-key` 3), 14 farklı değer; hepsi test sabiti. `.betterleaksignore` parmak izi `commit:path:rule:line` biçiminde, yani commit'e bağlı.
+  - Ölçüm: değer listesiyle (`^…$`, `tests/` ile AND) geçmiş temiz. Aynı değer `src/` altında ve yeni bir test değeri yakalanıyor. Staged sahte `ghp_` token'ı hook'ta durdu.
+- Kaynak: https://github.com/betterleaks/betterleaks/tree/v1.9.0 (README, docs/scanning.md, docs/config.md, .pre-commit-hooks.yaml) · https://github.com/betterleaks/betterleaks/releases/tag/v1.9.0 · `betterleaks git --help`
+- Sonuç: D-051 (4). `.betterleaks.toml` (değer listesi), `.githooks/pre-commit`, `ci.yml` `secret-scan` job'u.

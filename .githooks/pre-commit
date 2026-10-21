@@ -1,0 +1,10 @@
+#!/bin/sh
+# Secret scan of the staged changes with Betterleaks (docs/plan/DECISIONS.md D-051 (4)); CI scans the whole history.
+# Opt in once per clone:  git config core.hooksPath .githooks
+# Needs Betterleaks 1.9.0 on PATH: https://github.com/betterleaks/betterleaks/releases/tag/v1.9.0
+# A reported test credential that is not a secret goes into .betterleaks.toml's allowlist.
+if ! command -v betterleaks > /dev/null 2>&1; then
+  echo "pre-commit: betterleaks is not on PATH. Install 1.9.0, or turn the hook off with: git config --unset core.hooksPath" >&2
+  exit 1
+fi
+exec betterleaks git . --pre-commit --staged --redact --no-banner
