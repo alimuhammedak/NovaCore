@@ -972,11 +972,12 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - Microsoft muafiyeti olmadan iki Microsoft paketi de düşüyordu (lisansı dosya olan `Microsoft.Data.SqlClient.SNI.runtime`, `Microsoft.Identity.Client.NativeInterop`); Y-06 gereği önekle geçiyorlar.
   - Deneme (commit'lenmedi): izin listesi yalnızca `MIT` olunca kapı 39 paketle (OpenIddict, OpenTelemetry, Serilog, Mapperly, SQLitePCLRaw, xunit) exit 39 verdi. Temizken exit 0.
   - Exit kodu belgede yoktu; ölçüldü: ihlalde sıfırdan farklı (ihlal sayısı), temizken 0.
-- [x] F6a.5: Secret taraması (D-051 (4), R-097).
+- [x] F6a.5 (17a1370): Secret taraması (D-051 (4), R-097).
   - `ci.yml`'de `secret-scan` job'u: `fetch-depth: 0`, Betterleaks 1.9.0 linux arşivi SHA-256 ile doğrulanıyor, `betterleaks git . --redact`. Opt-in `.githooks/pre-commit` (`--pre-commit --staged`).
   - Tam geçmiş taraması 31 bulgu verdi; hepsi `tests/NovaCore.Api.Tests` altında, 14 farklı test değeri (`"a long passphrase for tests"`, `token=bm90LWEtdG9rZW4` = "not-a-token" ...), tek tek incelendi.
   - **Plandan sapma:** Parmak izi listesi (`.betterleaksignore`) yerine `.betterleaks.toml`'da değer listesi: değer tam eşleşmeli VE `tests/` altında olmalı. Parmak izi commit'e bağlı; testlere her yeni değer, commit'ten sonra ikinci bir commit isterdi. SARIF de yüklenmiyor (D-051 (2) ile aynı gerekçe).
   - Denemeler: liste ile geçmiş temiz. Ayrı bir klasörde aynı değer `src/` altında yakalandı, `tests/` altındaki yeni bir değer de yakalandı. Hook, staged sahte bir `ghp_` token'ıyla commit'i durdurdu (exit 1, commit oluşmadı); temiz bir staged değişiklik geçti.
+- [~] F6a.6: CodeQL ve Scorecard (D-051 (5)). `codeql.yml` (csharp, manual build, locked restore) ve `scorecard.yml` yazıldı, lint temiz. CodeQL'in faz branch'indeki ilk koşusu bekleniyor; Scorecard yalnızca main'de çalıştığı için merge sonrası doğrulanacak.
 
 ## Açık sorular (Q)
 
