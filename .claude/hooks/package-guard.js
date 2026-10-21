@@ -3,6 +3,8 @@
 // - Yasaklı NuGet paketlerini reddeder (deny).
 // - Allowlist dışındaki yeni paketler için kullanıcı onayı ister (ask).
 // - Korunan dosyaların (PLAN, DECISIONS, hook'lar, settings) değiştirilmesi için kullanıcı onayı ister (ask).
+// - Workflow'a yazılan, tam commit SHA'sına sabitlenmemiş `uses:` için onay ister (ask; D-051 (1)).
+// - Bir dosyaya yazılan, sır gibi görünen değer için onay ister (ask; Y-35, D-048 (3)).
 // Politika: .claude/hooks/package-policy.json. Kaynak: docs/plan/DECISIONS.md.
 'use strict';
 
@@ -99,6 +101,32 @@ function checkPackages(ids, where) {
 }
 
 const projectFile = f => /\.(csproj|props|targets|fsproj|vbproj)$/i.test(f || '');
+const workflowFile = f => /(^|[\\/])\.github[\\/]workflows[\\/][^\\/]+\.ya?ml$/i.test(f || '');
+
+// D-051 (1): her action tam commit SHA'sına sabitlenir. Yerel action'lar (./) ve digest'li Docker imajları zaten sabittir.
+function unpinnedUses(text) {
+  const bad = [];
+  const re = /^\s*(?:-\s*)?uses:\s*['"]?([^'"\s#]+)/gm;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const ref = m[1];
+    if (ref.startsWith('./') || /^docker:\/\/[^@]+@sha256:[0-9a-f]{64}$/i.test(ref)) continue;
+    if (!/@[0-9a-f]{40}$/i.test(ref)) bad.push(ref);
+  }
+  return bad;
+}
+
+// Y-35: repoya sır girmez. Yalnızca biçimi belli, yanlış alarmı düşük desenler; bulunan değer mesaja yazılmaz.
+const secretPatterns = [
+  ['özel anahtar', /-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----/],
+  ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})/],
+  ['AWS erişim anahtarı', /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/],
+  ['Slack token', /\bxox[abprs]-[A-Za-z0-9-]{10,}/],
+  ['nuget.org API anahtarı', /\boy2[a-z0-9]{43}\b/],
+  ['bağlantı dizesinde parola', /\b(?:Password|Pwd)=(?![<$*{])[^;"'\s<>]{8,}/i]
+];
+
+const secretKinds = text => secretPatterns.filter(([, re]) => re.test(text)).map(([kind]) => kind);
 
 if (tool === 'Edit' || tool === 'Write' || tool === 'MultiEdit' || tool === 'NotebookEdit') {
   const filePath = ti.file_path || ti.notebook_path || '';
@@ -106,9 +134,19 @@ if (tool === 'Edit' || tool === 'Write' || tool === 'MultiEdit' || tool === 'Not
   if (prot) {
     respond('ask', `Korunan dosya değişikliği: ${prot.raw}. Bu dosya yalnızca kullanıcı onayıyla değişir (DECISIONS D-005, Y-11). Değişikliğin gerekçesini kullanıcıya açıkla.`);
   }
+  const text = [ti.new_string, ti.content, ...(Array.isArray(ti.edits) ? ti.edits.map(e => e.new_string) : [])]
+    .filter(Boolean).join('\n');
+  const secrets = secretKinds(text);
+  if (secrets.length) {
+    respond('ask', `Yazılan içerik sır gibi görünüyor (${secrets.join(', ')}; ${path.basename(filePath)}). DECISIONS Y-35: repoya sır girmez. Gerçek bir sırsa user-secrets ya da ortam değişkeni kullan; test değeriyse kullanıcıya göster ve .betterleaks.toml listesine ekle.`);
+  }
+  if (workflowFile(filePath)) {
+    const unpinned = unpinnedUses(text);
+    if (unpinned.length) {
+      respond('ask', `SHA'ya sabitlenmemiş action: ${unpinned.join(', ')} (${path.basename(filePath)}). DECISIONS D-051 (1): her action tam commit SHA'sına sabitlenir, yanına sürüm yorumu yazılır (uses: owner/repo@<40 haneli SHA> # vX.Y.Z). SHA'yı gh api repos/<owner>/<repo>/git/ref/tags/<tag> ile çöz.`);
+    }
+  }
   if (projectFile(filePath)) {
-    const text = [ti.new_string, ti.content, ...(Array.isArray(ti.edits) ? ti.edits.map(e => e.new_string) : [])]
-      .filter(Boolean).join('\n');
     checkPackages(packagesFromProjectText(text), path.basename(filePath));
     // Y-22: tam sürüm ([1.0]) veya aralık/üst sınır ([1.0,2.0), (,2.0]) içeren paket sürümleri.
     if (/<Package(?:Reference|Version)\b[^>]*\bVersion\s*=\s*"\s*[\[(]/i.test(text)) {

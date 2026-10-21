@@ -1,0 +1,58 @@
+# Dependabot version updates (docs/plan/DECISIONS.md D-048, D-051 (7)); security updates are a repository setting and
+# come regardless of these entries. Each update waits 7 days after its release (cooldown): a compromised release is
+# usually pulled within days. Security updates don't wait.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    # The template's content is a consumer project with its own Directory.Packages.props, whose BMD.NovaCore.* versions
+    # are stamped when the template is packed. Its other packages are updated by hand together with the repository's.
+    exclude-paths:
+      - src/Templates/**
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      # EF Core, ASP.NET Core and Microsoft.Extensions ship on one servicing version and are kept aligned (F0.2), so
+      # their minor and patch updates arrive in one pull request. Majors come one by one.
+      microsoft:
+        patterns: ["Microsoft.*", "System.*"]
+        update-types: [minor, patch]
+      opentelemetry:
+        patterns: ["OpenTelemetry*"]
+        update-types: [minor, patch]
+      openiddict:
+        patterns: ["OpenIddict*"]
+        update-types: [minor, patch]
+      serilog:
+        patterns: ["Serilog*"]
+        update-types: [minor, patch]
+      xunit:
+        patterns: ["xunit*"]
+        update-types: [minor, patch]
+
+  # The repository's workflows. The template's workflow pins the same commits; WorkflowPinTests fails an update until
+  # src/Templates/NovaCore.Templates/content/novacore/.github/workflows/ci.yml follows it.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+
+  # global.json pins the SDK exactly (rollForward: disable, R-094); after an update every developer installs that SDK.
+  - package-ecosystem: dotnet-sdk
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+
+  # The tag and digest of each image in the compose files.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7

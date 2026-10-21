@@ -1,0 +1,12 @@
+# Dependabot keeps the commit SHAs the workflows pin their actions to up to date. Each update waits 7 days after its
+# release (cooldown): a compromised release is usually pulled within days.
+# NuGet updates are not configured: the NovaCore packages come from GitHub Packages, which Dependabot reaches only with a
+# private registry entry and a Dependabot secret holding a token with read:packages.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7

@@ -18,7 +18,8 @@ try {
 } catch { /* girdi olmadan da çalışır */ }
 
 const SKIP_DIRS = new Set(['bin', 'obj', '.vs', '.git', 'node_modules', 'TestResults', 'artifacts']);
-const WATCHED_EXT = /\.(cs|csproj|props|targets|json|slnx|editorconfig)$/i;
+// .txt: PublicAPI.*.txt; a public API change without them fails the build (RS0016/RS0017).
+const WATCHED_EXT = /\.(cs|csproj|props|targets|json|slnx|editorconfig|txt)$/i;
 
 function newestMtime(dir) {
   let newest = 0;
@@ -40,7 +41,7 @@ function newestMtime(dir) {
 }
 
 function rootFilesMtime() {
-  const names = ['Directory.Build.props', 'Directory.Packages.props', 'NovaCore.slnx', 'global.json', '.editorconfig'];
+  const names = ['Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props', 'NovaCore.slnx', 'global.json', '.editorconfig'];
   return Math.max(0, ...names.map(n => {
     try { return fs.statSync(path.join(projectDir, n)).mtimeMs; } catch { return 0; }
   }));

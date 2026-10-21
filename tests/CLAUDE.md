@@ -24,7 +24,8 @@ Stack: **xUnit v3** (test projects are `OutputType=Exe`). Run a single test with
   and no extra per-module projects (Y-08/17), no `IRepository`/`IUnitOfWork` or `*Helper`/`*Util`/`*Manager` types
   (Y-15/29), no assembly scanning or `*FromAssembly*` service registration anywhere under `src/` (Y-20; EF's
   `ApplyConfigurationsFromAssembly` is allowed, D-023), scope + build validation on the test host (Y-26),
-  no `*.Domain` types in endpoint signatures via ApiExplorer (Y-31), no TODO/FIXME under `src/` (Y-38). `Solution`
+  no `*.Domain` types in endpoint signatures via ApiExplorer (Y-31), no TODO/FIXME under `src/` (Y-38), every GitHub
+  Action pinned to one full commit SHA across the workflows, the template's included (`WorkflowPinTests`, D-051). `Solution`
   locates the repo root and first-party assemblies.
 - **Host wiring** (`Integration/`) — `ModuleRegistrationTests` pin the module order and every module endpoint;
   `ValidationTests` pins the 400 validation ProblemDetails (type, instance, traceId, error keys) of every validated

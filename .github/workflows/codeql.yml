@@ -1,0 +1,56 @@
+name: CodeQL
+
+# Static analysis of the C# code; alerts go to the Security tab (docs/plan/DECISIONS.md D-042, D-051 (5)). Every branch
+# push runs it (phase branches too), pull requests run it, and a weekly run picks up new queries.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  schedule:
+    - cron: '23 4 * * 1'
+
+# Every job states what it needs; the workflow grants nothing by default.
+permissions: {}
+
+# Same grouping as ci.yml: pull-request runs supersede each other, every pushed commit is analyzed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      # Manual build mode: CodeQL watches the real compilation. The default setup's "none" mode reads the sources
+      # without building, so it misses the code the source generators produce (LoggerMessage, OptionsValidator,
+      # Mapperly, validation, OpenAPI).
+      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          languages: csharp
+          build-mode: manual
+
+      - name: Restore
+        run: dotnet restore NovaCore.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build NovaCore.slnx -c Release --no-restore
+
+      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          category: /language:csharp

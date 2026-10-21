@@ -20,6 +20,16 @@
   </PropertyGroup>
 
   <!--
+    Lock files (docs/plan/DECISIONS.md D-048, RESEARCH R-094): the host, the modules and the tests record their whole
+    package graph in packages.lock.json, and CI restores in locked mode. Packages get none: the projects that depend on a
+    library don't use its lock file (NuGet's guidance). Like the metadata above, it depends on IsPackable; restore reads
+    it after evaluation, so setting it here works.
+  -->
+  <PropertyGroup Condition="'$(IsPackable)' != 'true'">
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <!--
     Symbols, package validation, XML docs and the public API baseline concern assemblies. A template package
     (PackageType=Template, src/Templates) packs files only, so none of them applies to it.
   -->

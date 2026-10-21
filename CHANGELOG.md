@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- The repository is public. CI pins every GitHub Action to a full commit SHA, grants each job only the permissions it
+  needs, keeps the checkout token off disk, and lints the workflows with actionlint and zizmor. It scans the whole git
+  history for secrets (Betterleaks), runs CodeQL on the C# code and OpenSSF Scorecard on the repository, and checks
+  that every package in the dependency graph is MIT or Apache-2.0 licensed.
+- Releases build in a read-only job. A separate `publish` job in the `release` environment, which needs the owner's
+  approval, signs SLSA build provenance for every package and pushes it. Each library package gets a CycloneDX SBOM.
+- Restores use committed lock files in CI (`--locked-mode`), and the SDK is pinned exactly (`global.json`).
+  Dependabot proposes NuGet, action, SDK and compose image updates after a 7-day cooldown.
+- The compose services listen on 127.0.0.1 only and their images are pinned by digest.
+
+### Changed
+
+- Template: the generated CI workflow pins its actions to commit SHAs, narrows its permissions and doesn't persist the
+  checkout token. A `.github/dependabot.yml` keeps the pins up to date.
+
 ## [0.1.0-preview.1] - 2026-10-20
 
 The first published version (GitHub Packages, `BMD.NovaCore.*`). Everything below is relative to the code the

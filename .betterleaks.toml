@@ -1,0 +1,37 @@
+# Betterleaks configuration (docs/plan/DECISIONS.md D-051 (4), RESEARCH R-097), read from the repository root. The default
+# rules stay on. The allowlist names the literal test credentials of the test project, each one reviewed: a value is
+# skipped only when it is exactly one of these AND it sits under tests/. Any other value, or one of these anywhere else,
+# is still reported. A new test credential is added here, never hidden by a path rule.
+title = "NovaCore"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test credentials of tests/NovaCore.Api.Tests (reviewed 2026-10-21)"
+condition = "AND"
+paths = ['''^tests/''']
+regexTarget = "secret"
+regexes = [
+  '''^Admin!Passw0rd-2026$''',
+  '''^Clock!Passw0rd-2026$''',
+  '''^Passw0rd!-for-tests$''',
+  '''^Role!Change-Passw0rd$''',
+  '''^User!Passw0rd-2026$''',
+  '''^a brand new passphrase$''',
+  '''^a long passphrase for tests$''',
+  '''^another long passphrase$''',
+  '''^bm90LWEtdG9rZW4$''',
+  '''^not the current one$''',
+  '''^short$''',
+  '''^the administrator's passphrase$''',
+  '''^too-short$''',
+  '''^totally-wrong-password$''',
+]
+
+[[allowlists]]
+description = "The test token above, quoted in the plan notes (docs/plan/PROGRESS.md, F6a.5)"
+condition = "AND"
+paths = ['''^docs/plan/PROGRESS\.md$''']
+regexTarget = "secret"
+regexes = ['''^bm90LWEtdG9rZW4$''']

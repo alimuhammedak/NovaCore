@@ -920,3 +920,68 @@ Biçim:
   - Üretilen workflow'un adımları üretilen projede yerelde çalıştırıldı: restore, build (0 uyarı), test (8/8), iki context için `has-pending-model-changes`, iki bundle, `dotnet list package --vulnerable` (açık yok; `jq` adımı Python eşdeğeriyle). YAML iki kimlik seçeneğinde de ayrıştırılıyor.
 - Kaynak: https://learn.microsoft.com/ef/core/managing-schemas/migrations/applying#bundles · https://learn.microsoft.com/ef/core/cli/dotnet#dotnet-ef-migrations-bundle
 - Sonuç (D-040 (8)): bundle'lar context başına, framework-dependent (`--target-runtime linux-x64`), yalnızca varsayılan dala push'ta üretilir ve 7 gün saklanan bir artifact olarak yüklenir. Feed'e erişen adımlar (restore, bundle, açık kontrolü) `NuGetPackageSourceCredentials_novacore`'u secret'tan alır, diğerleri almaz.
+
+## Faz 6a araştırması (2026-10-21)
+
+### R-093: Public repo'da GitHub Packages paketlerinin görünürlüğü ve token gerekliliği (2026-10-21, faz 6a; kaynak + ölçüm)
+- Soru: Repo public olunca (D-042) paketler de public mi olur, tüketen projelerin token taşıması gerekir mi (D-039 (1))?
+- Bulgu:
+  - NuGet kaydı sayfası: "You need an access token to publish, install, and delete private, internal, and public packages." Kimlik doğrulama yalnızca classic PAT ile ("GitHub Packages only supports authentication using a personal access token (classic)").
+  - Aynı sayfa: "This registry supports granular permissions"; paketin izinleri repodan bağımsız ayarlanabilir. İlk yayında varsayılan görünürlük private.
+  - Erişim ve görünürlük sayfası: bağlı repodan "the access permissions (but not the visibility)" miras alınır. "Once you make a package public, you cannot make it private again."
+  - Ölçüm: `https://nuget.pkg.github.com/alimuhammedak/index.json` ve flat container anonim istekte 401. `gh` token'ında `read:packages` olmadığı için paket listesi okunamadı.
+- Kaynak: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry · https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility
+- Sonuç: Repo görünürlüğü paketleri değiştirmez, paket public olsa da tüketici token taşır. Kullanıcı paketleri public yapmayı seçti (Q-35) → D-050. Şablonun `nuget.config`'i ve CI'ı değişmez.
+
+### R-094: Lock dosyaları ve `global.json` `rollForward` (2026-10-21, faz 6a; kaynak)
+- Soru: Lock dosyası hangi projelere, locked mode SDK değişince neden kırılır (D-048 (2))?
+- Bulgu (MS Learn, "PackageReference in project files" → Locking dependencies):
+  - `RestorePackagesWithLockFile=true` proje kökünde `packages.lock.json` üretir; `dotnet restore --locked-mode` (`RestoreLockedMode`) lock dosyasıyla uyuşmayan restore'u durdurur. Lock dosyası bir kez varsa özellik kapalı olsa da kullanılır.
+  - "If you are building an application ... do check in the lock file". Paylaşılan kütüphane için "you **should not** check in the lock file": bağımlı projenin restore'u kütüphanenin kilidini kullanmaz.
+  - Not: SDK bazı projelere örtük `PackageReference` ekler; başka bir SDK sürümü bu paketlerin sürümünü değiştirip locked mode'u kırar. Önerilen azaltma `global.json` `rollForward: disable`; bütün geliştiriciler ve CI aynı SDK'yı kullanır.
+  - .NET 10'da package pruning varsayılan açık; lock dosyası pruning'i hesaba katıyor.
+- Kaynak: https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files#locking-dependencies · https://learn.microsoft.com/dotnet/core/tools/global-json#rollforward
+- Sonuç: Lock dosyası yalnızca packable olmayan projelerde (Api, modüller, Contracts, test); packable kütüphanelerde yok. `IsPackable` csproj'da tanımlı olduğu için ayar `Directory.Build.targets`'tadır (Q-14). Repo'nun `global.json`'ı `disable`; şablonun `global.json`'ı `latestFeature` kalır, çünkü `disable` tam 10.0.300 SDK'sı olmayan her tüketicide şablonu kırardı.
+
+### R-095: Workflow sertleştirme araçları, sürümleri ve pin'leri (2026-10-21, faz 6a; kaynak + ölçüm)
+- Soru: Action'lar neye sabitlenir, workflow'lar hangi araçla ve nasıl denetlenir (F6a.2)?
+- Bulgu:
+  - SHA'lar `gh api repos/<o>/<r>/git/ref/tags/<tag>` ile çözüldü (etiket nesnesiyse `git/tags/<sha>` ile commit'e inildi): `actions/checkout` v7.0.1 `3d3c42e5…`, `actions/setup-dotnet` v6.0.0 `a98b5685…`, `actions/upload-artifact` v7.0.2 `cf430e03…`. Mevcut `@v7`/`@v6`/`@v7` etiketleri aynı commit'leri gösteriyordu, davranış değişmedi.
+  - zizmor 1.31.1 (MIT): `unpinned-uses` varsayılan olarak her action'ın hash'e sabitlenmesini ister; `artipacked` `persist-credentials` eksikliğini yakalar. `--strict-collection` sözdizimi ve şema hatasında uyarı yerine hata verir. Girdi `.` verilince şablonun `content/novacore/.github/workflows/ci.yml`'ini de topluyor ve `#if` satırları yüzünden ayrıştıramıyor; girdi `.github` olunca yalnızca repo'nun dosyaları.
+  - zizmor-action (MIT, v0.7.1) varsayılan olarak SARIF yükler ve "the action will **not** fail when `zizmor` produces findings"; imajı etiketle çeker. Doğrudan imaj, digest'e sabitlenebiliyor ve bulguda sıfırdan farklı kodla çıkıyor.
+  - actionlint 1.7.12 (MIT): belgelenen indirme betiği `main`'i izliyor ve checksum doğrulamıyor; Docker imajı digest'e sabitlenebiliyor (shellcheck dahil).
+  - Ölçüm: digest'ler `docker buildx imagetools inspect` ile (index): actionlint `sha256:b1934ee5…`, zizmor `sha256:42d409db…`. Mevcut workflow'larda zizmor 7 `unpinned-uses` (high), 2 `artipacked`, 1 `use-trusted-publishing` (info) buldu; actionlint temizdi.
+  - `use-trusted-publishing`: NuGet'in trusted publishing'i nuget.org'a ait (OIDC token → kısa ömürlü API anahtarı). GitHub Packages'a push job'un kendi kısa ömürlü `GITHUB_TOKEN`'ıyla yapılıyor, uzun ömürlü anahtar yok.
+- Kaynak: https://docs.zizmor.sh/audits/ · https://docs.zizmor.sh/usage/ · https://github.com/zizmorcore/zizmor-action · https://github.com/rhysd/actionlint/blob/main/docs/usage.md · https://learn.microsoft.com/nuget/nuget-org/trusted-publishing · https://docs.github.com/en/actions/reference/security/secure-use
+- Sonuç (D-051 (1)–(3)): SHA + `# vX.Y.Z` yorumu; `eng/lint-workflows.sh` iki aracı digest'e sabit imajlarla çalıştırır, bulguda kırmızıdır; repo'da `workflow-lint` job'u, şablonun workflow'u smoke testinin ürettiği projelerde lint'lenir. `use-trusted-publishing` F6a.2'de push adımında satır içi `zizmor: ignore` ile kapatıldı; F6a.7'de push `id-token: write`'lı ayrı bir job'a taşınınca bulgu üretilmez oldu (ignore'suz kopyayla ölçüldü) ve ignore silindi.
+
+### R-096: Lisans kapısı: nuget-license'ın davranışı ve bugünkü grafik (2026-10-21, faz 6a; kaynak + ölçüm)
+- Soru: Y-06 (yalnızca MIT/Apache ya da Microsoft paketleri) CI'da nasıl zorlanır, bugünkü bağımlılık grafiği geçer mi (D-048, F6a.4)?
+- Bulgu:
+  - nuget-license 4.0.18 (Apache-2.0, net8–net11 tool): `--input` bir proje ya da çözüm alır, `.slnx` çalışıyor (ölçüldü). `--include-transitive` bütün ağacı izler. `--ignored-packages` joker kabul eder; yok sayılan paketin bağımlılıkları yine denetlenir. Restore yapmaz, son restore'un `project.assets.json`'ını okur.
+  - Exit kodu belgede yok. Ölçüm: temizken 0, ihlalde ihlal sayısı (3 ve 39 görüldü).
+  - Ölçüm (`MIT;Apache-2.0`, Microsoft muafiyetsiz): Polly.Core, Polly.Extensions, Polly.RateLimiting 8.4.2 (BSD-3-Clause; `dotnet nuget why`: NovaCore.AspNetCore → Microsoft.Extensions.Http.Resilience 10.0.0 → Microsoft.Extensions.Resilience → Polly). Ayrıca lisansı dosya olan `Microsoft.Data.SqlClient.SNI.runtime` 6.0.2 ve `Microsoft.Identity.Client.NativeInterop` 0.20.6.
+  - nuget.org'da `Microsoft.` ve `System.` önekleri Microsoft'a ayrılmış (ID prefix reservation).
+- Kaynak: https://github.com/sensslen/nuget-license · https://learn.microsoft.com/nuget/nuget-org/id-prefix-reservation · `dotnet nuget why NovaCore.slnx Polly.Core`
+- Sonuç: Q-39 → D-052. Kapı geçişlileri de denetler, Microsoft önekleri ve `Polly.*` geçer.
+
+### R-097: Betterleaks 1.9.0: tarama komutları, muafiyet ve yapılandırma (2026-10-21, faz 6a; kaynak + ölçüm)
+- Soru: Repo'nun geçmişi ve yeni commit'ler sır için nasıl taranır, test kimlik bilgileri nasıl muaf tutulur (D-048, F6a.5)?
+- Bulgu:
+  - Betterleaks (MIT, gitleaks'in yazarından). Son stabil v1.9.0 (2026-09-29); v2.0.0 RC'de ve SARIF raporunu, yer bazlı ignore'u kaldırıyor. Doğrulama (sağlayıcıya istek) varsayılan olarak kapalı.
+  - v1.9.0 komutları: bütün geçmiş `betterleaks git .`, staged değişiklik `betterleaks git . --pre-commit --staged`. Bulguda exit 1. `--redact` değeri loglamaz.
+  - Yapılandırma sırası (`--help`): `--config`, ortam değişkenleri, sonra hedef klasördeki `.betterleaks.toml`/`.gitleaks.toml`. Format gitleaks uyumlu: `[extend] useDefault = true` ve `[[allowlists]]` (`condition = "AND"`, `paths`, `regexTarget = "secret"`, `regexes`).
+  - Release arşivleri `checksums.txt` ile yayımlanıyor (cosign imzalı): linux_x64 `f8b185a3…6de7`, windows_x64 `b765daec…d3da`. İndirilen dosya bu değerlerle eşleşti.
+  - Ölçüm: tam geçmiş 31 bulgu, hepsi `tests/NovaCore.Api.Tests` altında (`generic-password` 28, `generic-api-key` 3), 14 farklı değer; hepsi test sabiti. `.betterleaksignore` parmak izi `commit:path:rule:line` biçiminde, yani commit'e bağlı.
+  - Ölçüm: değer listesiyle (`^…$`, `tests/` ile AND) geçmiş temiz. Aynı değer `src/` altında ve yeni bir test değeri yakalanıyor. Staged sahte `ghp_` token'ı hook'ta durdu.
+- Kaynak: https://github.com/betterleaks/betterleaks/tree/v1.9.0 (README, docs/scanning.md, docs/config.md, .pre-commit-hooks.yaml) · https://github.com/betterleaks/betterleaks/releases/tag/v1.9.0 · `betterleaks git --help`
+- Sonuç: D-051 (4). `.betterleaks.toml` (değer listesi), `.githooks/pre-commit`, `ci.yml` `secret-scan` job'u.
+
+### R-098: Yayın: SBOM ve build provenance (2026-10-21, faz 6a; kaynak + ölçüm)
+- Soru: Release paketleri için SBOM ve imzalı köken bilgisi nasıl üretilir (D-048, F6a.7)?
+- Bulgu:
+  - GitHub "Using artifact attestations": `actions/attest@v4`, `subject-path` ile (glob, en fazla 1024 subject); izinler `id-token: write`, `contents: read`, `attestations: write`. `predicate` ya da `sbom-path` verilmezse build provenance üretir (v4.2.2 `action.yml`). Doğrulama `gh attestation verify <dosya> --repo <owner>/<repo>`. Public repo'da ücretsiz (D-042).
+  - Environments: required reviewers ve deployment tag kuralları public repo'larda Free planda var.
+  - CycloneDX .NET 6.3.1 (Apache-2.0, `dotnet-CycloneDX`, net8–net10 tool): proje dosyası alır, `--disable-package-restore` ile mevcut restore'u kullanır, `--output-format Json`, `--set-type/--set-name/--set-version`. Ölçüm (`NovaCore.AspNetCore`): `--include-project-references` ile `BMD.NovaCore.Abstractions@0.1.0` (sürüm eki olmadan) ve sahte `NovaCore.Abstractions@1.0.0` bileşenleri çıktı; o seçenek olmadan 25 bileşen, hepsinde purl, `PublicApiAnalyzers` `scope: excluded`. `--recursive` bileşen sayısını değiştirmedi (assets dosyası geçişlileri zaten içeriyor).
+- Kaynak: https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations · https://github.com/actions/attest/blob/v4.2.2/action.yml · https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments · https://github.com/CycloneDX/cyclonedx-dotnet
+- Sonuç: D-051 (6). Gerçek koşu bir sonraki `v*` tag'iyle; o zamana kadar yalnızca lint ve yerel SBOM denemesiyle doğrulandı.
