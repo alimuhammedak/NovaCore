@@ -999,6 +999,7 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - `verify-on-stop.js`: `Directory.Build.targets` ve `*.txt` izleniyor.
   - Taslak scratchpad'de yazılıp 16 senaryoyla denendi, sonra korumalı dosyalara kullanıcı onayıyla uygulandı; uygulanan dosyalar taslakla aynı, senaryolar yeniden yeşil. Senaryolar: tag'li/SHA'lı/yerel/digest'li/tag'li Docker `uses:`, şablon workflow'u, workflow olmayan YAML, GitHub token, özel anahtar, AWS anahtarı, bağlantı dizesi parolası ve yer tutucusu, C# test parolası, sıradan kod, korunan yol, yasaklı paket.
   - İzlenen bütün repo dosyaları sır desenlerine karşı tarandı: eşleşme yok, yani mevcut dosyaları düzenlemek yanlış alarm vermiyor.
+- F6a.5 düzeltmesi: CI'daki `secret-scan` `5c9a684`'te kırmızıydı (1 bulgu). Bulgu yukarıdaki F6a.5 notundaki `token=` alıntısıydı (`docs/plan/PROGRESS.md`, commit `17a1370`), liste ise yalnızca `tests/` altını kapsıyordu. Geçmiş değiştirilemeyeceği için `.betterleaks.toml`'a aynı değer için yalnızca bu dosyayla sınırlı ikinci bir liste girdi. Yerel tam tarama temiz. Ders: plan notlarına test değerleri `anahtar=değer` biçiminde yazılmaz.
 
 ## Açık sorular (Q)
 
