@@ -954,12 +954,18 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - PLAN: faz sırası `… → 5 → 6a → 6b → 6c → 6d → 6e`; Faz 6a–6e adım tabloları belgenin §3'ünden.
   - PROGRESS: Q-35…Q-38, D-032 notu 6e sonuna kaydı. RESEARCH: R-093 (paket görünürlüğü ve token), R-094 (lock dosyası ve `rollForward`).
   - Başlangıç durumu: build 0 uyarı, 277/277 yeşil.
-- [x] F6a.2: Workflow sertleştirme (D-051 (1)–(3), R-095).
+- [x] F6a.2 (b0b158d): Workflow sertleştirme (D-051 (1)–(3), R-095).
   - `ci.yml`, `release.yml` ve şablonun `ci.yml`'i: action'lar SHA'ya sabit (`# vX.Y.Z`), `persist-credentials: false`, workflow düzeyinde `permissions: {}` ve job düzeyinde izinler, `timeout-minutes`, `concurrency`. `release.yml`'deki `${{ }}` interpolasyonu `env:`'e taşındı.
   - Yeni `eng/lint-workflows.sh`: actionlint 1.7.12 + zizmor 1.31.1, digest'e sabit imajlarla. `ci.yml`'de `workflow-lint` job'u; şablonun workflow'u `template-smoke` job'unda, üretilen projelerde lint'leniyor.
   - Önce: zizmor 7 `unpinned-uses` (high), 2 `artipacked`, 1 `use-trusted-publishing` buldu. Sonra: repo ve üretilen iki proje temiz (online denetimler dahil). Tek istisna push adımındaki satır içi `use-trusted-publishing` ignore'u (GitHub Packages'ta trusted publishing yok).
   - Sürprizler: zizmor `.` girdisinde şablonun ham workflow'unu da toplayıp ayrıştıramıyor (girdi `.github` oldu). actionlint `.github/workflows`'u yalnızca git repo'sunda buluyor (dosyalar açıkça veriliyor). zizmor-action SARIF modunda bulguda başarısız olmuyor (kullanılmadı).
   - Kod değişmedi; `bash eng/template-smoke.sh` yeşil.
+- [x] F6a.3: Lock dosyaları ve SDK sabitleme (R-094, D-048 (2)).
+  - `Directory.Build.targets`: `IsPackable != true` olan projelerde `RestorePackagesWithLockFile`. Altı lock dosyası: Api, Catalog, Catalog.Contracts, Payments, Payments.Contracts, test projesi. Packable paketlerde ve şablon projesinde yok.
+  - `global.json` `rollForward: disable` (SDK 10.0.300). Şablonun `global.json`'ı `latestFeature` kaldı.
+  - CI ve release restore'u `--locked-mode`.
+  - Deneme (commit'lenmedi): CPM'de `Riok.Mapperly` 4.3.1 → 4.3.0 yapılınca `restore --locked-mode` üç projede NU1004 ile kırıldı; geri alındı.
+  - Build 0 uyarı, 277/277 yeşil.
 
 ## Açık sorular (Q)
 

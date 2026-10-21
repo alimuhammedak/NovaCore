@@ -34,9 +34,10 @@ jobs:
           global-json-file: global.json
 
       # NuGet audit runs here: high/critical advisories (NU1903/NU1904), transitive included, are errors
-      # (Directory.Build.props).
+      # (Directory.Build.props). Locked mode: a package graph that differs from the committed packages.lock.json files
+      # fails instead of being resolved anew (docs/plan/RESEARCH.md R-094).
       - name: Restore
-        run: dotnet restore NovaCore.slnx
+        run: dotnet restore NovaCore.slnx --locked-mode
 
       - name: Build
         run: dotnet build NovaCore.slnx -c Release --no-restore

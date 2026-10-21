@@ -60,8 +60,9 @@ jobs:
           fi
           echo "suffix=$suffix" >> "$GITHUB_OUTPUT"
 
+      # Locked mode: the release is built from exactly the package graph in the committed lock files (R-094).
       - name: Restore
-        run: dotnet restore NovaCore.slnx
+        run: dotnet restore NovaCore.slnx --locked-mode
 
       # The suffix is passed to build too, so the assemblies' informational version matches the package version.
       # It reaches the shell through env, never through ${{ }} interpolation into the script.
