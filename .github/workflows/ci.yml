@@ -39,6 +39,10 @@ jobs:
       - name: Restore
         run: dotnet restore NovaCore.slnx --locked-mode
 
+      # Every package in the restored graph, transitive ones included, has an allowed license (Y-06, D-052).
+      - name: Package licenses
+        run: bash eng/check-licenses.sh
+
       - name: Build
         run: dotnet build NovaCore.slnx -c Release --no-restore
 

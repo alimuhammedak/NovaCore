@@ -960,12 +960,18 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - Önce: zizmor 7 `unpinned-uses` (high), 2 `artipacked`, 1 `use-trusted-publishing` buldu. Sonra: repo ve üretilen iki proje temiz (online denetimler dahil). Tek istisna push adımındaki satır içi `use-trusted-publishing` ignore'u (GitHub Packages'ta trusted publishing yok).
   - Sürprizler: zizmor `.` girdisinde şablonun ham workflow'unu da toplayıp ayrıştıramıyor (girdi `.github` oldu). actionlint `.github/workflows`'u yalnızca git repo'sunda buluyor (dosyalar açıkça veriliyor). zizmor-action SARIF modunda bulguda başarısız olmuyor (kullanılmadı).
   - Kod değişmedi; `bash eng/template-smoke.sh` yeşil.
-- [x] F6a.3: Lock dosyaları ve SDK sabitleme (R-094, D-048 (2)).
+- [x] F6a.3 (f6ac014): Lock dosyaları ve SDK sabitleme (R-094, D-048 (2)).
   - `Directory.Build.targets`: `IsPackable != true` olan projelerde `RestorePackagesWithLockFile`. Altı lock dosyası: Api, Catalog, Catalog.Contracts, Payments, Payments.Contracts, test projesi. Packable paketlerde ve şablon projesinde yok.
   - `global.json` `rollForward: disable` (SDK 10.0.300). Şablonun `global.json`'ı `latestFeature` kaldı.
   - CI ve release restore'u `--locked-mode`.
   - Deneme (commit'lenmedi): CPM'de `Riok.Mapperly` 4.3.1 → 4.3.0 yapılınca `restore --locked-mode` üç projede NU1004 ile kırıldı; geri alındı.
   - Build 0 uyarı, 277/277 yeşil.
+- [x] F6a.4: Lisans kapısı (D-052, R-096, Q-39).
+  - `dotnet-tools.json`'a `nuget-license` 4.0.18 (Apache-2.0); yeni `eng/check-licenses.sh`; CI'da restore'dan sonra "Package licenses" adımı.
+  - İlk koşu: tek ihlal Polly.Core/Extensions/RateLimiting 8.4.2 (BSD-3-Clause), zincir NovaCore.AspNetCore → Microsoft.Extensions.Http.Resilience → Microsoft.Extensions.Resilience → Polly. Kullanıcı adlı istisnayı seçti (Q-39).
+  - Microsoft muafiyeti olmadan iki Microsoft paketi de düşüyordu (lisansı dosya olan `Microsoft.Data.SqlClient.SNI.runtime`, `Microsoft.Identity.Client.NativeInterop`); Y-06 gereği önekle geçiyorlar.
+  - Deneme (commit'lenmedi): izin listesi yalnızca `MIT` olunca kapı 39 paketle (OpenIddict, OpenTelemetry, Serilog, Mapperly, SQLitePCLRaw, xunit) exit 39 verdi. Temizken exit 0.
+  - Exit kodu belgede yoktu; ölçüldü: ihlalde sıfırdan farklı (ihlal sayısı), temizken 0.
 
 ## Açık sorular (Q)
 
@@ -1011,6 +1017,7 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-36 | F6a.11: GitHub ayarlarını (secret scanning + push protection, Dependabot alerts/security updates, ruleset'ler, `release` environment'ı) kim yapsın? | F6a.11 | **Model, `gh api` ile**, her istek önce gösterilip onaylanarak, sonra API'den geri okunarak (2026-10-21, kullanıcı; önerilen seçenek) |
 | Q-37 | F6a.11: `main` ve `v*` ruleset'leri ne kadar sıkı olsun? (Fazlar yerelde `--no-ff` merge edilip main'e doğrudan push ediliyor.) | F6a.11 | **Koruma, akış aynı** (2026-10-21, kullanıcı; önerilen): main'de force push ve silme engellenir; `v*` tag'lerini yalnızca kullanıcı oluşturur, günceller, siler; `release` environment'ı yalnızca `v*` tag'lerinden ve kullanıcının onayıyla çalışır; status check'ler zorunlu değil |
 | Q-38 | Faz branch'i faz sırasında GitHub'a push edilsin mi? (Workflow'lar ancak GitHub'da koşunca doğrulanıyor.) | F6a.2 | **Evet, faz branch'i** (2026-10-21, kullanıcı; önerilen). main'e dokunulmaz |
+| Q-39 | F6a.4: Lisans kapısı bugünkü grafikte yalnızca Polly.Core/Extensions/RateLimiting 8.4.2'yi (BSD-3-Clause) buldu; `Microsoft.Extensions.Http.Resilience` üzerinden geliyor. Kapı nasıl davransın? (Polly'ye adlı istisna / BSD-3-Clause'a izin / yalnızca doğrudan paketler) | F6a.4 | **Polly'ye adlı istisna** (2026-10-21, kullanıcı; önerilen). Kapı geçişlileri de denetler, Y-06 değişmez → D-052, R-096 |
 
 ## Sonraya bırakılanlar
 

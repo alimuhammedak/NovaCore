@@ -954,3 +954,13 @@ Biçim:
   - `use-trusted-publishing`: NuGet'in trusted publishing'i nuget.org'a ait (OIDC token → kısa ömürlü API anahtarı). GitHub Packages'a push job'un kendi kısa ömürlü `GITHUB_TOKEN`'ıyla yapılıyor, uzun ömürlü anahtar yok.
 - Kaynak: https://docs.zizmor.sh/audits/ · https://docs.zizmor.sh/usage/ · https://github.com/zizmorcore/zizmor-action · https://github.com/rhysd/actionlint/blob/main/docs/usage.md · https://learn.microsoft.com/nuget/nuget-org/trusted-publishing · https://docs.github.com/en/actions/reference/security/secure-use
 - Sonuç (D-051 (1)–(3)): SHA + `# vX.Y.Z` yorumu; `eng/lint-workflows.sh` iki aracı digest'e sabit imajlarla çalıştırır, bulguda kırmızıdır; repo'da `workflow-lint` job'u, şablonun workflow'u smoke testinin ürettiği projelerde lint'lenir. `use-trusted-publishing` yalnızca push adımında satır içi `zizmor: ignore` yorumuyla, gerekçesi yanında.
+
+### R-096: Lisans kapısı: nuget-license'ın davranışı ve bugünkü grafik (2026-10-21, faz 6a; kaynak + ölçüm)
+- Soru: Y-06 (yalnızca MIT/Apache ya da Microsoft paketleri) CI'da nasıl zorlanır, bugünkü bağımlılık grafiği geçer mi (D-048, F6a.4)?
+- Bulgu:
+  - nuget-license 4.0.18 (Apache-2.0, net8–net11 tool): `--input` bir proje ya da çözüm alır, `.slnx` çalışıyor (ölçüldü). `--include-transitive` bütün ağacı izler. `--ignored-packages` joker kabul eder; yok sayılan paketin bağımlılıkları yine denetlenir. Restore yapmaz, son restore'un `project.assets.json`'ını okur.
+  - Exit kodu belgede yok. Ölçüm: temizken 0, ihlalde ihlal sayısı (3 ve 39 görüldü).
+  - Ölçüm (`MIT;Apache-2.0`, Microsoft muafiyetsiz): Polly.Core, Polly.Extensions, Polly.RateLimiting 8.4.2 (BSD-3-Clause; `dotnet nuget why`: NovaCore.AspNetCore → Microsoft.Extensions.Http.Resilience 10.0.0 → Microsoft.Extensions.Resilience → Polly). Ayrıca lisansı dosya olan `Microsoft.Data.SqlClient.SNI.runtime` 6.0.2 ve `Microsoft.Identity.Client.NativeInterop` 0.20.6.
+  - nuget.org'da `Microsoft.` ve `System.` önekleri Microsoft'a ayrılmış (ID prefix reservation).
+- Kaynak: https://github.com/sensslen/nuget-license · https://learn.microsoft.com/nuget/nuget-org/id-prefix-reservation · `dotnet nuget why NovaCore.slnx Polly.Core`
+- Sonuç: Q-39 → D-052. Kapı geçişlileri de denetler, Microsoft önekleri ve `Polly.*` geçer.
