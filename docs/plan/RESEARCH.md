@@ -920,3 +920,25 @@ Biçim:
   - Üretilen workflow'un adımları üretilen projede yerelde çalıştırıldı: restore, build (0 uyarı), test (8/8), iki context için `has-pending-model-changes`, iki bundle, `dotnet list package --vulnerable` (açık yok; `jq` adımı Python eşdeğeriyle). YAML iki kimlik seçeneğinde de ayrıştırılıyor.
 - Kaynak: https://learn.microsoft.com/ef/core/managing-schemas/migrations/applying#bundles · https://learn.microsoft.com/ef/core/cli/dotnet#dotnet-ef-migrations-bundle
 - Sonuç (D-040 (8)): bundle'lar context başına, framework-dependent (`--target-runtime linux-x64`), yalnızca varsayılan dala push'ta üretilir ve 7 gün saklanan bir artifact olarak yüklenir. Feed'e erişen adımlar (restore, bundle, açık kontrolü) `NuGetPackageSourceCredentials_novacore`'u secret'tan alır, diğerleri almaz.
+
+## Faz 6a araştırması (2026-10-21)
+
+### R-093: Public repo'da GitHub Packages paketlerinin görünürlüğü ve token gerekliliği (2026-10-21, faz 6a; kaynak + ölçüm)
+- Soru: Repo public olunca (D-042) paketler de public mi olur, tüketen projelerin token taşıması gerekir mi (D-039 (1))?
+- Bulgu:
+  - NuGet kaydı sayfası: "You need an access token to publish, install, and delete private, internal, and public packages." Kimlik doğrulama yalnızca classic PAT ile ("GitHub Packages only supports authentication using a personal access token (classic)").
+  - Aynı sayfa: "This registry supports granular permissions"; paketin izinleri repodan bağımsız ayarlanabilir. İlk yayında varsayılan görünürlük private.
+  - Erişim ve görünürlük sayfası: bağlı repodan "the access permissions (but not the visibility)" miras alınır. "Once you make a package public, you cannot make it private again."
+  - Ölçüm: `https://nuget.pkg.github.com/alimuhammedak/index.json` ve flat container anonim istekte 401. `gh` token'ında `read:packages` olmadığı için paket listesi okunamadı.
+- Kaynak: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry · https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility
+- Sonuç: Repo görünürlüğü paketleri değiştirmez, paket public olsa da tüketici token taşır. Kullanıcı paketleri public yapmayı seçti (Q-35) → D-050. Şablonun `nuget.config`'i ve CI'ı değişmez.
+
+### R-094: Lock dosyaları ve `global.json` `rollForward` (2026-10-21, faz 6a; kaynak)
+- Soru: Lock dosyası hangi projelere, locked mode SDK değişince neden kırılır (D-048 (2))?
+- Bulgu (MS Learn, "PackageReference in project files" → Locking dependencies):
+  - `RestorePackagesWithLockFile=true` proje kökünde `packages.lock.json` üretir; `dotnet restore --locked-mode` (`RestoreLockedMode`) lock dosyasıyla uyuşmayan restore'u durdurur. Lock dosyası bir kez varsa özellik kapalı olsa da kullanılır.
+  - "If you are building an application ... do check in the lock file". Paylaşılan kütüphane için "you **should not** check in the lock file": bağımlı projenin restore'u kütüphanenin kilidini kullanmaz.
+  - Not: SDK bazı projelere örtük `PackageReference` ekler; başka bir SDK sürümü bu paketlerin sürümünü değiştirip locked mode'u kırar. Önerilen azaltma `global.json` `rollForward: disable`; bütün geliştiriciler ve CI aynı SDK'yı kullanır.
+  - .NET 10'da package pruning varsayılan açık; lock dosyası pruning'i hesaba katıyor.
+- Kaynak: https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files#locking-dependencies · https://learn.microsoft.com/dotnet/core/tools/global-json#rollforward
+- Sonuç: Lock dosyası yalnızca packable olmayan projelerde (Api, modüller, Contracts, test); packable kütüphanelerde yok. `IsPackable` csproj'da tanımlı olduğu için ayar `Directory.Build.targets`'tadır (Q-14). Repo'nun `global.json`'ı `disable`; şablonun `global.json`'ı `latestFeature` kalır, çünkü `disable` tam 10.0.300 SDK'sı olmayan her tüketicide şablonu kırardı.

@@ -19,9 +19,9 @@
 ## Faz sırası ve bağımlılıklar
 
 ```
-0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 4c → 4d → 5
+0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 4c → 4d → 5 → 6a → 6b → 6c → 6d → 6e
 ```
-Bir faza başlamadan önce kendisinden önceki tüm fazlar PROGRESS.md'de "tamam" olarak işaretlenmiş olmalıdır. 4d koşulludur: F4d.1'deki karar fazı gereksiz kılarsa faz `✅ tamam (atlandı)` olarak işaretlenir. 4c ve 4d, 2026-09-28'de tüketici hazırlığı araştırmasıyla eklendi (D-033, [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md)).
+Bir faza başlamadan önce kendisinden önceki tüm fazlar PROGRESS.md'de "tamam" olarak işaretlenmiş olmalıdır. 4d koşulludur: F4d.1'deki karar fazı gereksiz kılarsa faz `✅ tamam (atlandı)` olarak işaretlenir. 4c ve 4d, 2026-09-28'de tüketici hazırlığı araştırmasıyla eklendi (D-033, [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md)). 6a–6e, 2026-10-21'de güvenlik ve kalite araştırmasıyla eklendi (D-042…D-049, [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-kararlari.md)).
 
 ---
 
@@ -224,3 +224,82 @@ Public API değişiklikleri ilk yayından önce burada toplanır. Gerekçe ve ka
 | F5.5 | **Final dokümanlar.** README tüketici odaklı olur ve şunları içerir:<br>• Sorumluluk modeli ve yeni proje kontrol listesi ([proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md) §2).<br>• Projenin `PostConfigure` ile ezebileceği ayarlar tablosu.<br>• Tarayıcı uygulamaları için BFF önerisi.<br>• Nesne düzeyi yetki (resource-based authorization) rehberi.<br>• Migration dağıtımı (bundle ya da script).<br>CHANGELOG, CLAUDE.md dosyaları ve memory güncellenir. Kullanıcı DECISIONS.md'yi hook korumasına geri ekler (D-032). | dokümanlar | — |
 
 **Bu fazda yapılmayacaklar:** BFF şablonu ya da paketi (Y-14), yeni çekirdek özelliği.
+
+---
+
+## Faz 6: Güvenlik ve kod kalitesi (6a–6e)
+
+Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-kararlari.md) (kullanıcı kararları K1–K8 → D-042…D-049) ve [proposals/guvenlik-kalite-arastirmasi.md](proposals/guvenlik-kalite-arastirmasi.md) (bulgular, konumlar, birincil kaynaklar). Sıranın gerekçesi (belge §3):
+- 6a ucuzdur ve CodeQL ile secret scanning'i açar; 6b'nin değişiklikleri de taranır.
+- 6b, public kodda görünen doğrulanmış açıkları kapatır.
+- 6c gerçek SQL Server'ı getirir; 6b'deki migration'ı ve eski kör noktaları sınar.
+- 6d analizörleri, 6c'nin ölçüm araçları devredeyken sıkılaştırır.
+- 6e en pahalı ve en gürültülü katmanı en son ekler.
+
+## Faz 6a: Public geçiş ve CI/tedarik zinciri sertleştirme
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F6a.1 | **Plan kayıtları.** K1–K8 DECISIONS'a (D-042…D-050), Faz 6a–6e PLAN'a, durum PROGRESS'e işlenir. D-035 (7) ve D-039 (1) revizyon kuralıyla işaretlenir. | `docs/plan/*` | Belgeler tutarlı |
+| F6a.2 | **Workflow sertleştirme.** Action'lar tam commit SHA'sına sabitlenir (`# vX.Y.Z` yorumuyla). `persist-credentials: false`. `run:` içindeki `${{ }}` `env:`'e taşınır. İzinler job düzeyindedir. `timeout-minutes` ve `concurrency` eklenir. actionlint + zizmor CI job'u. | `ci.yml`, `release.yml`, şablonun `ci.yml`'i | actionlint ve zizmor temiz; CI yeşil; şablon smoke testi yeşil |
+| F6a.3 | **Lock dosyaları ve SDK.** Packable olmayan projelerde `RestorePackagesWithLockFile`. CI ve release'te `--locked-mode`. `global.json` `rollForward: disable`. | `Directory.Build.targets`, `global.json`, `packages.lock.json`, workflow'lar | `restore --locked-mode` geçer; lock'suz bir sürüm değişikliği locked restore'u kırar (yerelde denenir) |
+| F6a.4 | **Lisans kapısı.** `nuget-license`; izin listesi MIT/Apache-2.0, Microsoft önekleri Y-06 gereği serbest. | `dotnet-tools.json`, `ci.yml` | Kapı bugünkü grafikte yeşil, izin dışı lisansta kırmızı (yerelde denenir) |
+| F6a.5 | **Secret taraması.** Betterleaks: CI'da tam geçmiş taraması (SARIF), opt-in pre-commit (`core.hooksPath`), incelenmiş parmak izleriyle `.betterleaksignore`. | `ci.yml`, `.githooks/`, `.betterleaksignore` | Tam geçmiş temiz; staged sahte token commit'i durdurur |
+| F6a.6 | **CodeQL ve Scorecard.** CodeQL `csharp`, `build-mode: manual` (source generator'lar yüzünden `none` değil). Scorecard action. | `codeql.yml`, `scorecard.yml` | CodeQL yeşil; Scorecard main'de ilk koşuda yeşil |
+| F6a.7 | **Release tedarik zinciri.** Build ve yayın job'ları ayrılır. Yayın job'u `environment: release`'tedir; `id-token`/`attestations`/`packages: write` yalnızca orada. CycloneDX SBOM + `actions/attest` build provenance. | `release.yml`, `dotnet-tools.json` | actionlint ve zizmor temiz; gerçek koşu sonraki `v*` tag'iyle |
+| F6a.8 | **docker-compose.** Portlar `127.0.0.1`'e bağlanır, image'lar digest ile sabitlenir. | `docker-compose*.yml` | `docker compose config` geçerli |
+| F6a.9 | **Dependabot.** `nuget`, `github-actions`, `dotnet-sdk`, `docker-compose` ekosistemleri; cooldown 7 gün; şablon CPM dosyası hariç. | `.github/dependabot.yml`, şablon | Lint temiz; ilk koşu merge'den sonra doğrulanır |
+| F6a.10 | **Claude hook genişletmesi (K7).** SHA'ya sabitlenmemiş `uses:` ve sır desenleri için onay. | `.claude/hooks/` (korumalı) | Her kural için tetikleyen/tetiklemeyen girdi denenir |
+| F6a.11 | **GitHub ayarları.** Secret scanning + push protection, Dependabot alerts ve security updates, `main` ve `v*` ruleset'leri, `release` environment'ı. Paket görünürlüğü (D-050) kullanıcıda. | repo ayarları (kullanıcı onayıyla) | Ayarlar API'de görünür |
+| F6a.12 | **Dokümanlar.** README (CI/güvenlik, lock dosyası, pre-commit, attestation doğrulama), CLAUDE.md'ler, CHANGELOG, memory. | dokümanlar | — |
+
+**Bu fazda yapılmayacaklar:** 6b–6e'nin işleri; `src/` altındaki uygulama kodu; yeni NuGet `PackageReference`.
+
+**Faz doğrulaması:** `dotnet restore NovaCore.slnx --force`, `dotnet restore NovaCore.slnx --locked-mode`, `dotnet build NovaCore.slnx -c Release`, `dotnet test NovaCore.slnx`, `dotnet list NovaCore.slnx package --vulnerable --include-transitive`, lisans kapısı, Betterleaks tam geçmiş taraması, actionlint + zizmor, `docker compose config`, `bash eng/template-smoke.sh`, faz branch'inde CI.
+
+## Faz 6b: Kimlik güvenlik sınırı (K5, K6)
+
+**Kural:** Her madde önce kırmızı testle başlar.
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F6b.1 | **MFA.** TOTP tekrar kullanımı engellenir: son kabul edilen zaman adımı saklanır (ASVS 6.5.1). Kurtarma kodları hash'lenir (ASVS 6.5.2). `/2fa/setup`, `/enable`, `/disable` ve kurtarma kodu yenileme yeniden kimlik doğrulama ister (ASVS 7.5.1). Administrator için 2FA zorunludur. | `NovaCore.Identity.OpenIddict` | Her biri için önce kırmızı, sonra yeşil test |
+| F6b.2 | **Yetki yükseltme.** Administrator'ı yalnızca Administrator verebilir (`identity:roles:manage`). Son admin korunur. Rol değişikliği izin önbelleğini siler ve refresh token'ları iptal eder. | eklenti, `NovaCore.AspNetCore` Authorization | Test |
+| F6b.3 | **Seeding ve Payments (K6).** Rol izinleri açık listeye döner. `Payment.OwnerId` + migration. `GetPayments` çağıranın kendi ödemelerine filtrelenir; bütün liste ayrı bir izinle. | eklenti seeding, Payments modülü | Test; `has-pending-model-changes` temiz |
+| F6b.4 | **Token/protokol.** `ValidTypes = ["at+jwt"]`. `/connect/authorize` ve `/account/*` CORS dışında (RFC 9700 §2.6). Development dışında `http` redirect URI reddi. Client secret minimum gücü. Mutlak refresh ömrü: önce `FakeTimeProvider` testiyle ölçülür; açık çıkarsa `DisableSlidingRefreshTokenExpiration`. | `NovaCore.AspNetCore` Authentication, eklenti | Test |
+| F6b.5 | **Şifre politikası.** En az 15 karakter ve yerel blocklist; dış çağrı yok (NIST SP 800-63B-4). | eklenti | Test |
+| F6b.6 | **Doğrulanacaklar.** register/forgot-password/resend zamanlama farkı, 2FA ve antiforgery cookie bayrakları, `/connect/revoke` üzerinde strict rate limit. Ölçülür; açık çıkarsa aynı fazda kapanır. | eklenti | Ölçüm raporu; açık varsa test |
+| F6b.7 | **Eksik negatif protokol testleri.** Kapsam: `redirect_uri` varyantları, kod yeniden kullanımı, başka client'la kod kullanımı, PKCE düşürme, `response_type=token` / `grant_type=password`, `/connect/revoke`, `iss` parametresi, JWKS'te özel parça olmaması, `/account/*` clickjacking başlıkları. | tests | Yeşil |
+
+## Faz 6c: Test altyapısı (K2)
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F6c.1 | **MTP ve xUnit 4.** `global.json` `test.runner`. `--filter "FullyQualifiedName~"` örnekleri xUnit bayraklarına güncellenir. | test projesi, `global.json`, CLAUDE.md, tests/CLAUDE.md | Bütün testler yeşil |
+| F6c.2 | **SQL Server katmanı (D-043).** Testcontainers + Respawn. Gerçek migration'lar `MigrateAsync` ile uygulanır (EXEC'li `*_OutboxConsumersByMessage` dahil). Kapsam: `GET /payments`, şema izolasyonu, `EF.Functions.Like` collation, `decimal(18,2)`. | tests | Yeşil; SQLite katmanı hızlı varsayılan olarak kalır |
+| F6c.3 | **Outbox karşılaştırması.** `OutboxDispatcher.cs:178`'deki SQLite yüzünden bellekte yapılan karşılaştırma gözden geçirilir: test aracı üretim kodunu şekillendirmemeli. | `NovaCore.EntityFrameworkCore/Messaging` | Karar ve test |
+| F6c.4 | **Coverage.** coverlet.MTP + ReportGenerator. main'e göre düşüşü engelleyen ratchet. | CI | CI kapısı çalışır |
+| F6c.5 | **API sözleşmesi.** OpenAPI belgesi build'de üretilip commit'lenir. `oasdiff breaking` (`review: false`). OpenAPI 3.1 kapsamı fazda ölçülür. | Api, CI | Kırıcı değişiklik CI'da yakalanır |
+| F6c.6 | **Property testleri (CsCheck).** `Result`, sayfalama, Payment/Product durum kuralları, outbox handler idempotency. | tests | Yeşil |
+| F6c.7 | **Mutation testi.** Stryker.NET haftalık; Abstractions + modül domain kodu; ilk aşamada `break-at: 0` (yalnızca rapor). | CI | Rapor üretilir |
+
+## Faz 6d: Analizör ve platform sıkılaştırma (K4)
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F6d.1 | **Kategori bazlı `AnalysisMode<Kategori>=All`.** Sıra: Security (CA3001–CA3012, CA2100, CA5394, CA5404 vb.), sonra Reliability, Performance, Usage. Her kategori ayrı commit; önce çıkan hata sayısı ölçülür. | `Directory.Build.props`, kaynak | Build 0 uyarı; bastırma yalnızca Y-44 istisnasıyla |
+| F6d.2 | **IDE kuralları ve metrikler.** IDE0051/52/59/60 ve IDE0005 warning'e çekilir (IDE0005 için bastırmasız kapsam seçimi). CA1502/CA1505/CA1506 + `CodeMetricsConfig.txt`. CI'da `dotnet format --verify-no-changes`. | `.editorconfig`, CI | Build ve format kontrolü yeşil |
+| F6d.3 | **Ek analizörler.** BannedApiAnalyzers (saat, `Console`, `Environment.Exit` vb.). Meziantou.Analyzer kademeli. Roslynator CLI `find-symbol --unused` periyodik. | props, CI | Yeşil |
+| F6d.4 | **SaaS analizi.** SonarQube Cloud (scanner CI'da, NuGet paketi yok: Y-06), Qodana Community deneme koşusu (.NET 10 desteği ölçülür), CodeRabbit PR incelemesi. | CI, repo ayarları | İlk koşular raporlanır |
+| F6d.5 | **Package validation baseline.** `PackageValidationBaselineVersion` ilk kararlı sürümden sonra (D-039 (2)). | `Directory.Build.targets` | Koşul gerçekleşmediyse atlanır |
+| F6d.6 | **Claude Code araçları.** csharp-lsp; Ponytail'dan 2–3 kural CLAUDE.md'ye (D-048 (4)). | CLAUDE.md | — |
+
+## Faz 6e: Dinamik ve ajan tabanlı denetim (K3)
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F6e.1 | **DAST test client'ı.** İzinleri sınırlı bir test OIDC client'ı yalnızca DAST ortamı yapılandırmasında bulunur. | config, tests | Test: üretim yapılandırmasında client yok |
+| F6e.2 | **DAST job'u.** Zamanlanmış + `workflow_dispatch`. Atılabilir instance + SQL Server container. Schemathesis (birincil), ZAP API scan (ikincil). `/connect/*` ve `/account/*` spec dışında olduğu için ayrı hedeflenir. | CI | İlk koşu raporlanır |
+| F6e.3 | **OpenID conformance suite.** Yerel Docker, sürüm öncesi. | — | Rapor |
+| F6e.4 | **Ajan koşuları.** Cloudflare `security-audit-skill` + Claude Security plugin: önce auth çekirdeği, sonra bütün repo, her kapsam en az iki kez. Girdi: Faz 6b listesi ve araştırmanın OIDC kontrol listesi. | — | Bulgu listesi |
+| F6e.5 | **Triage kuralı.** Ajan bulgusu ancak başarısız bir xUnit testine dönüşebiliyorsa düzeltilir; test regresyon testi olarak kalır. Dönüşmeyen bulgu `needs_validation` olarak PROGRESS'e yazılır. | tests, PROGRESS | Her bulgu ya testli düzeltme ya `needs_validation` |

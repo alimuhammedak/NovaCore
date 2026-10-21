@@ -19,6 +19,11 @@
 | 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20, kullanıcı isteği) |
 | 5 | ✅ tamam | `faz/5-sablon-yayin` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20; push'taki CI yeşil (`build-and-test`, `template-smoke`); `v0.1.0-preview.1` tag'i kullanıcı onayıyla, release.yml yeşil, 8 paket GitHub Packages'ta) |
+| 6a | 🔄 devam ediyor | `faz/6a-ci-sertlestirme` | 2026-10-21 | | |
+| 6b | ⏳ başlamadı | | | | |
+| 6c | ⏳ başlamadı | | | | |
+| 6d | ⏳ başlamadı | | | | |
+| 6e | ⏳ başlamadı | | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
 
@@ -941,6 +946,15 @@ Plan onayı 2026-10-20. Uygulama sırası F5.4 → F5.1a → F5.1b → F5.1c →
     - (#7) Script, varsayılan `mktemp -d` çalışma klasörünü çıkışta siliyor.
   - "Sonraya bırakılanlar"a yazılanlar: #4 (örnek `CompleteTodo`'da eşzamanlı iki tamamlama ikisi de 204), #5 (fork ve Dependabot PR'larında secret olmadığı için üretilen CI'ın restore'u 401), #6 (`template-smoke` job'ı çözümü bir kez daha derliyor).
 
+### Faz 6a
+Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-kararlari.md) (`oneri/guvenlik-kalite`, `afbb879`; faz branch'ine `--no-ff` merge edildi). Repo 2026-10-21'de public oldu (API'de `public`). Faz başında secret scanning, push protection ve Dependabot security updates kapalıydı; ruleset ve environment yoktu, CodeQL default setup kurulmamıştı. Faz branch'i faz sırasında push ediliyor (Q-38).
+
+- [x] F6a.1: Öneri branch'i merge edildi (`d1ddee9`).
+  - DECISIONS: D-042…D-049 (K1–K8) ve D-050 (D-039 (1)'in yerine: paketler public, token gerekliliği sürüyor). D-035 (7) ve D-039 (1) revizyon kuralıyla işaretlendi.
+  - PLAN: faz sırası `… → 5 → 6a → 6b → 6c → 6d → 6e`; Faz 6a–6e adım tabloları belgenin §3'ünden.
+  - PROGRESS: Q-35…Q-38, D-032 notu 6e sonuna kaydı. RESEARCH: R-093 (paket görünürlüğü ve token), R-094 (lock dosyası ve `rollForward`).
+  - Başlangıç durumu: build 0 uyarı, 277/277 yeşil.
+
 ## Açık sorular (Q)
 
 Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa DECISIONS'a D-kaydı olarak eklenir.
@@ -981,6 +995,10 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-32 | F5.4 (1): NovaCore paketleri ve şablon paketi hangi kanaldan tüketilsin? (GitHub Packages, nuget.org, yalnızca yerel klasör feed'i) | F5.4 (şablonun `nuget.config`'i ve CI'ı buna bağlı, bu yüzden plan aşamasında) | **GitHub Packages** (2026-10-20, kullanıcı; önerilen seçenek). D-013 olduğu gibi kalır → D-039 |
 | Q-33 | F5.4 (2): İlk sürüm `0.1.0-preview.1` mi, `0.1.0` mı? | F5.4 | **`0.1.0-preview.1`** (2026-10-20, kullanıcı; önerilen seçenek). Tag ve push faz sonunda ayrıca sorulur → D-039 |
 | Q-34 | F5.1b: nuget.org'da başka sahiplerin `NovaCore.Templates`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` paketleri var (R-091). Bizim paket ID'lerimiz ne olsun? (yalnızca şablonun ID'si değişsin / hiçbiri değişmesin / hepsine sahip öneki) | F5.1b | Kullanıcı: "hiçbir sorun yaşamayacak şekilde ilerleyelim, benim ismimi koyma"; önek sorusuna: **"BMD ile başlasın"** (2026-10-20). Bütün ID'ler `BMD.NovaCore.*`, assembly ve namespace'ler aynı → D-041 |
+| Q-35 | F6a.1: Repo public oldu. GitHub Packages'taki 8 paket private mı kalsın, public mi olsun? (Anonim istek 401; public paket de token istiyor; public yapılan paket private'a dönemez.) | F6a.1 (D-039 (1) yeniden açıldı) | **Public yap** (2026-10-21, kullanıcı; önerilen "private kalsın"dı). Ayarı kullanıcı paket sayfalarından yapar; token gerekliliği sürer → D-050, R-093 |
+| Q-36 | F6a.11: GitHub ayarlarını (secret scanning + push protection, Dependabot alerts/security updates, ruleset'ler, `release` environment'ı) kim yapsın? | F6a.11 | **Model, `gh api` ile**, her istek önce gösterilip onaylanarak, sonra API'den geri okunarak (2026-10-21, kullanıcı; önerilen seçenek) |
+| Q-37 | F6a.11: `main` ve `v*` ruleset'leri ne kadar sıkı olsun? (Fazlar yerelde `--no-ff` merge edilip main'e doğrudan push ediliyor.) | F6a.11 | **Koruma, akış aynı** (2026-10-21, kullanıcı; önerilen): main'de force push ve silme engellenir; `v*` tag'lerini yalnızca kullanıcı oluşturur, günceller, siler; `release` environment'ı yalnızca `v*` tag'lerinden ve kullanıcının onayıyla çalışır; status check'ler zorunlu değil |
+| Q-38 | Faz branch'i faz sırasında GitHub'a push edilsin mi? (Workflow'lar ancak GitHub'da koşunca doğrulanıyor.) | F6a.2 | **Evet, faz branch'i** (2026-10-21, kullanıcı; önerilen). main'e dokunulmaz |
 
 ## Sonraya bırakılanlar
 
@@ -1090,7 +1108,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - (Faz 4a, code review #5) Başarısız bir tur her tick'te (5 sn) modül başına Error logluyor ve geri çekilmiyor. Örnek: migration uygulanmamış bir geliştirme veritabanında dakikada 24 hata logu. Context başına artan bekleme ya da seri başına tek log düşünülebilir.
 - (Faz 4a, code review #8) Generic bir event'in saklanan tip adı, tip argümanlarının sürümlü assembly-qualified adlarını taşıyor. Sürümü düşüren bir dağıtımdan sonra `Type.GetType` bağlanamayabilir. Çok uzun bir ad 512 karakteri geçerse iş kaydının kendisi SQL Server'da düşer. Belgelendi; sürümsüz ad üretmek `TypeName` ile ayrıştırma gerektirir.
 - (Faz 4a, code review #9) Modül outbox'ları bir turda sırayla işleniyor. Erişilemeyen bir modül veritabanı (`EnableRetryOnFailure` geri çekilmesiyle) diğer modüllerin teslimini dakikalarca bekletebilir. Modüller aynı SQL Server'ı kullandığı sürece etkisi yok.
-- (Faz 4a → **Faz 5 sonu, unutulmamalı**) D-032: `docs/plan/DECISIONS.md` `.claude/hooks/package-policy.json` `protectedPaths` listesinden kullanıcı tarafından geçici olarak çıkarıldı. Bütün fazlar bitince satır geri eklenir (hook dosyası olduğu için kullanıcı ekler ya da onaylar); DECISIONS başlığındaki "hook onay ister" notu o zaman yeniden geçerli olur.
+- (Faz 4a → ~~Faz 5 sonu~~ → **Faz 6e sonu, unutulmamalı**; plan 6e'ye uzadığı için D-032'nin "bütün fazlar bitince" koşulu oraya kaydı, F6a.1) D-032: `docs/plan/DECISIONS.md` `.claude/hooks/package-policy.json` `protectedPaths` listesinden kullanıcı tarafından geçici olarak çıkarıldı. Bütün fazlar bitince satır geri eklenir (hook dosyası olduğu için kullanıcı ekler ya da onaylar); DECISIONS başlığındaki "hook onay ister" notu o zaman yeniden geçerli olur.
 - ~~(Faz 4a, code review #12) `outbox_consumers`'ın clustered anahtarı (uniqueidentifier, nvarchar(256)) geniş ve SQL Server sırasında rastgele.~~ → F4c.7'de çözüldü (D-036 (7)). Outbox tablosu için R-068'de kullanılan gerekçenin aynısı geçerli. Mesaj satırının `bigint Id`'si + Handler (FK ve cascade delete ile, temizlik için de uygun) daha iyi olur. D-031 (5)'i değiştirir; tablo boşken, ilk kullanımdan önce yapmak ucuz.
 
 - (Faz 4b, F4b.2b) `GET /api/v1/payments` SQLite test veritabanında 500 dönüyor: liste `CreatedAtUtc`'ye (DateTimeOffset) göre sıralıyor, SQLite bunu çeviremiyor (R-068). SQL Server'da sorun yok, ama listenin başarı yolu testlenmiyor. Çözüm yolları: test context'lerinde DateTimeOffset'i sıralanabilir bir türe çeviren bir dönüştürücü ya da gerçek SQL Server'la test (Testcontainers, paket onayı gerekir).
