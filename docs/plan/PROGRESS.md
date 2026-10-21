@@ -19,7 +19,7 @@
 | 4c | ✅ tamam | `faz/4c-tuketici-hazirligi` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push edilmedi) |
 | 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20, kullanıcı isteği) |
 | 5 | ✅ tamam | `faz/5-sablon-yayin` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20; push'taki CI yeşil (`build-and-test`, `template-smoke`); `v0.1.0-preview.1` tag'i kullanıcı onayıyla, release.yml yeşil, 8 paket GitHub Packages'ta) |
-| 6a | ✅ tamam | `faz/6a-ci-sertlestirme` | 2026-10-21 | 2026-10-21 | |
+| 6a | ✅ tamam | `faz/6a-ci-sertlestirme` | 2026-10-21 | 2026-10-21 | 2026-10-21 (kullanıcı onayı, `--no-ff`; push 2026-10-21, kullanıcı isteği) |
 | 6b | ⏳ başlamadı | | | | |
 | 6c | ⏳ başlamadı | | | | |
 | 6d | ⏳ başlamadı | | | | |
@@ -1212,7 +1212,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-21, Faz 6a: Public geçiş ve CI/tedarik zinciri sertleştirme (tamam, merge onayı bekliyor).** Branch `faz/6a-ci-sertlestirme`, push edildi; `main`'e dokunulmadı.
+**2026-10-21, Faz 6a: Public geçiş ve CI/tedarik zinciri sertleştirme (tamam, `main`'e merge ve push edildi).** Branch `faz/6a-ci-sertlestirme`; kullanıcı onayıyla `--no-ff` merge (`49d341d`) ve push.
 
 - **Yapılanlar:**
   - F6a.1: K1–K8 kararları D-042…D-050 olarak, Faz 6a–6e PLAN'a. Paketler public olacak, token gerekliliği sürüyor (D-050).
@@ -1226,7 +1226,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - R-055'teki aralıklı test hatası CI'da da görüldü.
   - zizmor-action bulguda başarısız olmuyor; doğrudan imaj kullanıldı.
 - **Kullanıcıya:**
-  - Merge onayı. `main` artık ruleset'li (force push ve silme kapalı), `--no-ff` merge + push akışı değişmez.
+  - Merge ve push yapıldı (kullanıcı onayı: "faz/6a-ci-sertlestirme'yi main'e --no-ff merge et ve push et"). `main` artık ruleset'li (force push ve silme kapalı); `--no-ff` merge + push akışı değişmedi.
   - 8 paketi public yap (D-050): her paketin sayfası → Package settings → Change visibility. Geri alınamaz.
   - nuget.org'da `BMD.*` önek rezervasyonu (D-048 (1)).
   - İstersen bir `v0.1.0-preview.2` tag'i: yeni release akışı (onaylı `publish`, provenance, SBOM) ilk kez gerçekten koşar.
