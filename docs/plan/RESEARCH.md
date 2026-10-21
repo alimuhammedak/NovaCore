@@ -942,3 +942,15 @@ Biçim:
   - .NET 10'da package pruning varsayılan açık; lock dosyası pruning'i hesaba katıyor.
 - Kaynak: https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files#locking-dependencies · https://learn.microsoft.com/dotnet/core/tools/global-json#rollforward
 - Sonuç: Lock dosyası yalnızca packable olmayan projelerde (Api, modüller, Contracts, test); packable kütüphanelerde yok. `IsPackable` csproj'da tanımlı olduğu için ayar `Directory.Build.targets`'tadır (Q-14). Repo'nun `global.json`'ı `disable`; şablonun `global.json`'ı `latestFeature` kalır, çünkü `disable` tam 10.0.300 SDK'sı olmayan her tüketicide şablonu kırardı.
+
+### R-095: Workflow sertleştirme araçları, sürümleri ve pin'leri (2026-10-21, faz 6a; kaynak + ölçüm)
+- Soru: Action'lar neye sabitlenir, workflow'lar hangi araçla ve nasıl denetlenir (F6a.2)?
+- Bulgu:
+  - SHA'lar `gh api repos/<o>/<r>/git/ref/tags/<tag>` ile çözüldü (etiket nesnesiyse `git/tags/<sha>` ile commit'e inildi): `actions/checkout` v7.0.1 `3d3c42e5…`, `actions/setup-dotnet` v6.0.0 `a98b5685…`, `actions/upload-artifact` v7.0.2 `cf430e03…`. Mevcut `@v7`/`@v6`/`@v7` etiketleri aynı commit'leri gösteriyordu, davranış değişmedi.
+  - zizmor 1.31.1 (MIT): `unpinned-uses` varsayılan olarak her action'ın hash'e sabitlenmesini ister; `artipacked` `persist-credentials` eksikliğini yakalar. `--strict-collection` sözdizimi ve şema hatasında uyarı yerine hata verir. Girdi `.` verilince şablonun `content/novacore/.github/workflows/ci.yml`'ini de topluyor ve `#if` satırları yüzünden ayrıştıramıyor; girdi `.github` olunca yalnızca repo'nun dosyaları.
+  - zizmor-action (MIT, v0.7.1) varsayılan olarak SARIF yükler ve "the action will **not** fail when `zizmor` produces findings"; imajı etiketle çeker. Doğrudan imaj, digest'e sabitlenebiliyor ve bulguda sıfırdan farklı kodla çıkıyor.
+  - actionlint 1.7.12 (MIT): belgelenen indirme betiği `main`'i izliyor ve checksum doğrulamıyor; Docker imajı digest'e sabitlenebiliyor (shellcheck dahil).
+  - Ölçüm: digest'ler `docker buildx imagetools inspect` ile (index): actionlint `sha256:b1934ee5…`, zizmor `sha256:42d409db…`. Mevcut workflow'larda zizmor 7 `unpinned-uses` (high), 2 `artipacked`, 1 `use-trusted-publishing` (info) buldu; actionlint temizdi.
+  - `use-trusted-publishing`: NuGet'in trusted publishing'i nuget.org'a ait (OIDC token → kısa ömürlü API anahtarı). GitHub Packages'a push job'un kendi kısa ömürlü `GITHUB_TOKEN`'ıyla yapılıyor, uzun ömürlü anahtar yok.
+- Kaynak: https://docs.zizmor.sh/audits/ · https://docs.zizmor.sh/usage/ · https://github.com/zizmorcore/zizmor-action · https://github.com/rhysd/actionlint/blob/main/docs/usage.md · https://learn.microsoft.com/nuget/nuget-org/trusted-publishing · https://docs.github.com/en/actions/reference/security/secure-use
+- Sonuç (D-051 (1)–(3)): SHA + `# vX.Y.Z` yorumu; `eng/lint-workflows.sh` iki aracı digest'e sabit imajlarla çalıştırır, bulguda kırmızıdır; repo'da `workflow-lint` job'u, şablonun workflow'u smoke testinin ürettiği projelerde lint'lenir. `use-trusted-publishing` yalnızca push adımında satır içi `zizmor: ignore` yorumuyla, gerekçesi yanında.

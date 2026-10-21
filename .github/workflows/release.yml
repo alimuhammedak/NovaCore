@@ -7,24 +7,33 @@ on:
   push:
     tags: ['v*']
 
-permissions:
-  contents: read
-  packages: write
+# Every job states what it needs; the workflow grants nothing by default.
+permissions: {}
 
+# Releases run one at a time and are never cancelled halfway through a push.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+# Actions are pinned to a full commit SHA, with the release it was resolved from in the comment (D-051).
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
 
     steps:
       # The token isn't left in .git/config while restore, build and tests run; the push step passes it explicitly.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
 
@@ -69,7 +78,7 @@ jobs:
           VERSION_SUFFIX: ${{ steps.version.outputs.suffix }}
         run: dotnet pack NovaCore.slnx -c Release --no-build -o artifacts "-p:VersionSuffix=$VERSION_SUFFIX"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages
           path: |
@@ -78,11 +87,15 @@ jobs:
 
       # Only .nupkg: GitHub Packages rejects .snupkg symbol packages (R-039), which stay in the workflow artifact above.
       # The feed is passed here instead of through setup-dotnet's source-url, which would add it to the restore sources
-      # too (R-043).
+      # too (R-043). Trusted publishing (OIDC) is a nuget.org feature; GitHub Packages takes the job's own short-lived
+      # GITHUB_TOKEN, so zizmor's use-trusted-publishing doesn't apply here (R-095).
       - name: Push to GitHub Packages
-        run: >
+        env:
+          FEED_OWNER: ${{ github.repository_owner }}
+          NUGET_API_KEY: ${{ secrets.GITHUB_TOKEN }}
+        run: > # zizmor: ignore[use-trusted-publishing]
           dotnet nuget push "artifacts/*.nupkg"
-          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
-          --api-key "${{ secrets.GITHUB_TOKEN }}"
+          --source "https://nuget.pkg.github.com/$FEED_OWNER/index.json"
+          --api-key "$NUGET_API_KEY"
           --skip-duplicate
           --no-symbols

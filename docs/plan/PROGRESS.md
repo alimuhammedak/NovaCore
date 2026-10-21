@@ -949,11 +949,17 @@ Plan onayı 2026-10-20. Uygulama sırası F5.4 → F5.1a → F5.1b → F5.1c →
 ### Faz 6a
 Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-kararlari.md) (`oneri/guvenlik-kalite`, `afbb879`; faz branch'ine `--no-ff` merge edildi). Repo 2026-10-21'de public oldu (API'de `public`). Faz başında secret scanning, push protection ve Dependabot security updates kapalıydı; ruleset ve environment yoktu, CodeQL default setup kurulmamıştı. Faz branch'i faz sırasında push ediliyor (Q-38).
 
-- [x] F6a.1: Öneri branch'i merge edildi (`d1ddee9`).
+- [x] F6a.1 (d164b33): Öneri branch'i merge edildi (`d1ddee9`).
   - DECISIONS: D-042…D-049 (K1–K8) ve D-050 (D-039 (1)'in yerine: paketler public, token gerekliliği sürüyor). D-035 (7) ve D-039 (1) revizyon kuralıyla işaretlendi.
   - PLAN: faz sırası `… → 5 → 6a → 6b → 6c → 6d → 6e`; Faz 6a–6e adım tabloları belgenin §3'ünden.
   - PROGRESS: Q-35…Q-38, D-032 notu 6e sonuna kaydı. RESEARCH: R-093 (paket görünürlüğü ve token), R-094 (lock dosyası ve `rollForward`).
   - Başlangıç durumu: build 0 uyarı, 277/277 yeşil.
+- [x] F6a.2: Workflow sertleştirme (D-051 (1)–(3), R-095).
+  - `ci.yml`, `release.yml` ve şablonun `ci.yml`'i: action'lar SHA'ya sabit (`# vX.Y.Z`), `persist-credentials: false`, workflow düzeyinde `permissions: {}` ve job düzeyinde izinler, `timeout-minutes`, `concurrency`. `release.yml`'deki `${{ }}` interpolasyonu `env:`'e taşındı.
+  - Yeni `eng/lint-workflows.sh`: actionlint 1.7.12 + zizmor 1.31.1, digest'e sabit imajlarla. `ci.yml`'de `workflow-lint` job'u; şablonun workflow'u `template-smoke` job'unda, üretilen projelerde lint'leniyor.
+  - Önce: zizmor 7 `unpinned-uses` (high), 2 `artipacked`, 1 `use-trusted-publishing` buldu. Sonra: repo ve üretilen iki proje temiz (online denetimler dahil). Tek istisna push adımındaki satır içi `use-trusted-publishing` ignore'u (GitHub Packages'ta trusted publishing yok).
+  - Sürprizler: zizmor `.` girdisinde şablonun ham workflow'unu da toplayıp ayrıştıramıyor (girdi `.github` oldu). actionlint `.github/workflows`'u yalnızca git repo'sunda buluyor (dosyalar açıkça veriliyor). zizmor-action SARIF modunda bulguda başarısız olmuyor (kullanılmadı).
+  - Kod değişmedi; `bash eng/template-smoke.sh` yeşil.
 
 ## Açık sorular (Q)
 

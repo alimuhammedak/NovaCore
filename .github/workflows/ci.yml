@@ -4,20 +4,32 @@ on:
   push:
   pull_request:
 
-permissions:
-  contents: read
+# Every job states what it needs; the workflow grants nothing by default.
+permissions: {}
 
+# A newer push to the same ref supersedes a running pull-request build; pushes to a branch or tag each finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Actions are pinned to a full commit SHA, with the release it was resolved from in the comment (docs/plan/DECISIONS.md
+# D-051).
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
 
@@ -60,16 +72,46 @@ jobs:
   # restores the packages from that feed, never from this repository's projects.
   template-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
 
       - name: Template smoke test
         run: bash eng/template-smoke.sh "$RUNNER_TEMP/template-smoke"
+
+      # The template's workflow only becomes YAML once the template engine has removed its #if lines, so it is linted
+      # in the projects the smoke test generated.
+      - name: Lint the generated projects' workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash eng/lint-workflows.sh "$RUNNER_TEMP"/template-smoke/projects/*
+
+  # The repository's own workflows and Dependabot configuration: actionlint for syntax and expressions, zizmor for
+  # security. Any finding fails the job.
+  workflow-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: actionlint and zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash eng/lint-workflows.sh
