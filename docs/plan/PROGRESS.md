@@ -994,12 +994,18 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
   - Yeni `WorkflowPinTests` (Architecture): her action bütün workflow'larda, şablonun ham `ci.yml`'i dahil, tek ve tam bir SHA'ya sabit. Önce kırmızı görüldü (şablonda `checkout@v7`, commit'lenmedi), sonra yeşil.
   - Build 0 uyarı. İlk tam koşuda 1 test kırmızı oldu (277/278; testin adı yakalanamadı); iki tekrar koşu 278/278 yeşil. Aralıklı; R-055'teki bilinen başlangıç yarışıyla aynı sınıfta olabilir.
   - Merge sonrası doğrulanacak: Dependabot'un `exclude-paths`'i NuGet'te uygulayıp uygulamadığı, lock dosyalarını güncelleyip güncellemediği, `docker-compose.keycloak.yml`'yi görüp görmediği (belgede yazmıyor).
-- [x] F6a.10: Claude hook genişletmesi (D-051 (8), D-048 (3)).
+- [x] F6a.10 (e0ced40): Claude hook genişletmesi (D-051 (8), D-048 (3)).
   - `package-guard.js`: SHA'ya sabitlenmemiş workflow `uses:`'u ve sır gibi görünen değerler için `ask`.
   - `verify-on-stop.js`: `Directory.Build.targets` ve `*.txt` izleniyor.
   - Taslak scratchpad'de yazılıp 16 senaryoyla denendi, sonra korumalı dosyalara kullanıcı onayıyla uygulandı; uygulanan dosyalar taslakla aynı, senaryolar yeniden yeşil. Senaryolar: tag'li/SHA'lı/yerel/digest'li/tag'li Docker `uses:`, şablon workflow'u, workflow olmayan YAML, GitHub token, özel anahtar, AWS anahtarı, bağlantı dizesi parolası ve yer tutucusu, C# test parolası, sıradan kod, korunan yol, yasaklı paket.
   - İzlenen bütün repo dosyaları sır desenlerine karşı tarandı: eşleşme yok, yani mevcut dosyaları düzenlemek yanlış alarm vermiyor.
 - F6a.5 düzeltmesi: CI'daki `secret-scan` `5c9a684`'te kırmızıydı (1 bulgu). Bulgu yukarıdaki F6a.5 notundaki `token=` alıntısıydı (`docs/plan/PROGRESS.md`, commit `17a1370`), liste ise yalnızca `tests/` altını kapsıyordu. Geçmiş değiştirilemeyeceği için `.betterleaks.toml`'a aynı değer için yalnızca bu dosyayla sınırlı ikinci bir liste girdi. Yerel tam tarama temiz. Ders: plan notlarına test değerleri `anahtar=değer` biçiminde yazılmaz.
+- [x] F6a.11: GitHub ayarları (Q-36, Q-37; her biri kullanıcı onayıyla, `gh api`, 2026-10-21). Hepsi API'den geri okundu:
+  - `security_and_analysis`: `secret_scanning` ve `secret_scanning_push_protection` açık, `dependabot_security_updates` açık; Dependabot uyarıları açık (`vulnerability-alerts` 204).
+  - Ruleset `main` (id 25565183): `~DEFAULT_BRANCH`, `deletion` + `non_fast_forward`, bypass yok. Plandaki "admin bypass"tan sapma, kullanıcı onayıyla: koruma kazalara karşı, gerekirse ruleset geçici kapatılır.
+  - Ruleset `release tags` (id 25565185): `refs/tags/v*`, `creation` + `update` + `deletion`, bypass yalnızca repository admin (`always`).
+  - Environment `release`: required reviewer `alimuhammedak`, `prevent_self_review: false`, `can_admins_bypass: false`; deployment policy yalnızca `v*` tag'leri.
+  - Kullanıcıda kalanlar: 8 paketin görünürlüğü (D-050; paket sayfası → Package settings → Change visibility, geri alınamaz) ve nuget.org'da `BMD.*` önek rezervasyonu (D-048 (1)).
 
 ## Açık sorular (Q)
 
