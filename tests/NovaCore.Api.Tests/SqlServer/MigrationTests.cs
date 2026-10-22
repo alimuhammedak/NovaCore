@@ -15,7 +15,7 @@ namespace NovaCore.Api.Tests.SqlServer;
 /// migration applies to an empty database through the host's own startup migration, and the data steps carry existing
 /// rows over (their raw SQL, in <c>EXEC</c>, both ways).
 /// </summary>
-public class MigrationTests(SqlServerApiFactory factory) : IClassFixture<SqlServerApiFactory>
+public sealed class MigrationTests(SqlServerApiFactory factory) : IClassFixture<SqlServerApiFactory>
 {
     private const string Handler = "Sample.Handler";
 

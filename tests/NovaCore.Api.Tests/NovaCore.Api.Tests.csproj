@@ -15,6 +15,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Testcontainers.MsSql" />
+    <PackageReference Include="Respawn" />
   </ItemGroup>
 
   <ItemGroup>

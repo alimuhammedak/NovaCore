@@ -23,6 +23,10 @@ public class ValidationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCor
     {
         { "POST", "/api/v1/products", Json(new { name = "", description = new string('x', 2001), price = 0, stock = -1 }), ["Description", "Name", "Price", "Stock"] },
         { "PUT", $"/api/v1/products/{SomeId}", Json(new { name = " ", description = new string('x', 2001), price = -1, stock = -1 }), ["Description", "Name", "Price", "Stock"] },
+        // decimal(18,2) would round these (0.001 to 0.00, past the "greater than 0" rule) or not hold them (17 digits before the point).
+        { "POST", "/api/v1/products", Json(new { name = "Widget", price = 0.001m, stock = 1 }), ["Price"] },
+        { "POST", "/api/v1/products", Json(new { name = "Widget", price = 10.005m, stock = 1 }), ["Price"] },
+        { "PUT", $"/api/v1/products/{SomeId}", Json(new { name = "Widget", price = 10_000_000_000_000_000m, stock = 1 }), ["Price"] },
         { "POST", "/api/v1/payments", Json(new { productId = Guid.Empty, quantity = 1 }), ["ProductId"] },
         { "POST", "/api/v1/payments", Json(new { productId = SomeId, quantity = 0 }), ["Quantity"] },
         { "POST", "/api/v1/auth/register", Json(new { email = "not-an-email", password = "too-short", displayName = new string('x', 129) }), ["DisplayName", "Email", "Password"] },

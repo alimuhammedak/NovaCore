@@ -105,8 +105,8 @@ advances in the same class fixture. So:
 - a test that needs several requests past `CreatePayment`'s check saves them with `AddPaymentAsync` instead of racing
   POSTs against that pass.
 
-`GET /api/v1/payments` orders by a `DateTimeOffset`, which SQLite can't translate (R-068), so tests read payments from
-the database (`PaymentStatusAsync`).
+`GET /api/v1/payments` orders by a `DateTimeOffset`, which SQLite can't translate (R-068), so the SQLite tests read
+payments from the database (`PaymentStatusAsync`); `SqlServerQueryTests` tests the list itself.
 
 `StockRaceApiFactory` (a `FakeClockApiFactory`) plays a concurrent writer for `StockConcurrencyTests`.
 `ChangeStockBeforeNextSave(productId, stock)` makes the next Catalog save that modifies or deletes the product first
