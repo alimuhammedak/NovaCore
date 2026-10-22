@@ -41,6 +41,39 @@ public sealed class TwoFactorRaceTests(TwoFactorRaceTests.Fixture fixture) : ICl
         Assert.True(await TwoFactorEnabledAsync("mfa-race-enable@novacore.test"));
     }
 
+    [Fact]
+    public async Task Two_sign_ins_racing_with_one_code_let_one_in()
+    {
+        await _host.CreateUserAsync("mfa-race@novacore.test", Password);
+        using var setupFlow = new OidcFlow(_host);
+        var accessToken = (await setupFlow.SignInAsync("mfa-race@novacore.test", Password)).AccessToken;
+        var key = await SetUpAsync(setupFlow, accessToken);
+        Assert.Equal(HttpStatusCode.OK, (await EnableAsync(setupFlow, accessToken, AuthenticatorCode.For(key))).StatusCode);
+        var code = AuthenticatorCode.For(key, stepsAhead: 1);
+
+        using var first = new OidcFlow(_host);
+        using var second = new OidcFlow(_host);
+        var firstCodePage = await CodeStepAsync(first, "mfa-race@novacore.test");
+        var secondCodePage = await CodeStepAsync(second, "mfa-race@novacore.test");
+
+        HttpResponseMessage? competing = null;
+        fixture.Race.Arm(async () => competing = await second.SubmitCodeAsync(secondCodePage, code));
+        var response = await first.SubmitCodeAsync(firstCodePage, code);
+
+        // The competing browser records the code first and goes back to the authorization endpoint; this one gets the
+        // code form again, its save stopped by the user's concurrency stamp.
+        Assert.Equal(HttpStatusCode.Redirect, competing!.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // Passes the password step of an account with two-factor authentication; returns the code page.
+    private static async Task<HttpResponseMessage> CodeStepAsync(OidcFlow flow, string email)
+    {
+        var (_, afterPassword) = await flow.BeginSignInAsync(email, Password);
+        Assert.StartsWith("/account/login/2fa", afterPassword.Headers.Location!.OriginalString, StringComparison.Ordinal);
+        return await flow.Browser.GetAsync(afterPassword.Headers.Location);
+    }
+
     private static Task<HttpResponseMessage> EnableAsync(OidcFlow flow, string accessToken, string code) =>
         flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { password = Password, code });
 
