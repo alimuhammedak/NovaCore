@@ -171,6 +171,18 @@ public sealed class IdentityServerConfigurationTests
         Assert.Contains("needs a ClientSecret", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("nobody:declares:this", "must list permissions a module declares")]
+    [InlineData("identity:users:manage", "can't hold the identity provider's own permissions")]
+    public async Task A_User_role_permission_outside_the_modules_declarations_stops_the_host(string permission, string expectedInMessage)
+    {
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
+            configure: builder => builder.Configuration.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Identity:Seed:UserPermissions:0"] = permission })));
+
+        Assert.Contains(expectedInMessage, exception.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task The_host_does_not_start_without_an_authority()
     {

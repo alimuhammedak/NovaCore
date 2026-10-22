@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Identity provider: the `Administrator` role counts only for an account with two-factor authentication on. **Upgrade:**
   administrators sign in with their password and turn it on (`/api/v1/auth/2fa/setup`, then `/2fa/enable`) before the
   admin API answers them again.
+- Identity provider: the User role's permissions come from `Identity:Seed:UserPermissions` instead of "every declared
+  `:read` permission". The host doesn't start when the list names a permission no module declares or one of the
+  provider's own (`identity:*`). **Upgrade:** list the permissions every registered account should get; seeding still
+  adds missing ones and never removes one.
 
 ### Added
 

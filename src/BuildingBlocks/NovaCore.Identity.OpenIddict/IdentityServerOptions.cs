@@ -61,6 +61,13 @@ internal sealed class IdentitySeedOptions
 
     /// <summary>The initial administrator's password, from user secrets or the environment, never from appsettings.</summary>
     public string? AdminPassword { get; set; }
+
+    /// <summary>
+    /// The permissions of the User role, which every registered account gets, e.g. <c>catalog:products:read</c>: each
+    /// one declared by a module, none of the provider's own (checked on start). Seeding adds the missing ones and never
+    /// removes one.
+    /// </summary>
+    public List<string> UserPermissions { get; set; } = [];
 }
 
 /// <summary>Source-generated validator for the data-annotation rules (docs/plan/RESEARCH.md R-048).</summary>

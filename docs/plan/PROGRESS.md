@@ -1034,6 +1034,7 @@ Plan onayı (2026-10-21). Kullanıcı kararları: Q-40 (izlenmeyen `.agents/`, `
   - Testler: `IdentityServerRoleChangeTests` admin API yerine store'da rol değiştirir (API artık önbelleği hemen sildiği için "önbellek süresi içinde" yolunu yalnız store değişikliği gösteriyor). 7 yeni test; 298/298 yeşil.
   - Bilinen sınır: iki admin'in eşzamanlı kaldırılması son admin'i bırakmayabilir → Sonraya bırakılanlar.
 - [ ] F6b.3 Seeding ve Payments
+  - [x] F6b.3a: Açık rol izinleri (D-047, D-053 (7), Q-41). Seeder'ın "`:read` ile biten her izin `User`'a" kuralı kalktı; `User` rolü `Identity:Seed:UserPermissions` listesini alır (eksikleri ekler, hiçbirini silmez). Açılışta iki kontrol: listedeki her izin bir modülce tanımlı olmalı (`Validate<IEnumerable<IPermissionDefinitionProvider>>`), `identity:*` izni olamaz (her kayıtlı hesap admin API'sine erişirdi). Api `appsettings.json`: `catalog:products:read`, `payments:read`, `payments:create` (Q-41); şablon: `todos:items:read` (bugünkü davranış). Test altyapısı kararı: `IdentityServerTestHost` artık JSON yapılandırma kaynaklarını düşürüyor; test çıktısındaki Api `appsettings` dosyalarını yanlışlıkla okuyordu (Api'nin listesi bu host'ta tanımsız izinler içerdiği için açılmıyordu; Development'taki `scalar` client'ının `DisplayName`'i de sızıyordu). Seçenekler varsayılanlarla aynı, davranış değişmedi. 3 yeni test; 302/302 yeşil.
 - [ ] F6b.4 Token/protokol
 - [ ] F6b.5 Şifre politikası
 - [ ] F6b.6 Doğrulanacaklar

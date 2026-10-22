@@ -45,7 +45,8 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Identity:Seed:AdminEmail"] = AdminEmail,
-                ["Identity:Seed:AdminPassword"] = AdminPassword
+                ["Identity:Seed:AdminPassword"] = AdminPassword,
+                ["Identity:Seed:UserPermissions:0"] = IdentityServerTestHost.ProbePermission
             });
             builder.Services.AddPermissionDefinitions<ProbePermissions>();
         }
@@ -81,8 +82,10 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
         var user = await PermissionsOfAsync(roles, "User");
 
         Assert.Equal(
-            ["identity:roles:manage", "identity:roles:read", "identity:users:manage", "identity:users:read", IdentityServerTestHost.ProbePermission],
+            ["identity:roles:manage", "identity:roles:read", "identity:users:manage", "identity:users:read", "probe:audit:read", IdentityServerTestHost.ProbePermission],
             administrator);
+
+        // Identity:Seed:UserPermissions, not every ":read" permission (DECISIONS D-047).
         Assert.Equal([IdentityServerTestHost.ProbePermission], user);
     }
 
@@ -261,7 +264,10 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
     public sealed class ProbePermissions : IPermissionDefinitionProvider
     {
         public IReadOnlyCollection<PermissionDefinition> GetPermissions() =>
-            [new(IdentityServerTestHost.ProbePermission, "Read the probe", "Probe")];
+        [
+            new(IdentityServerTestHost.ProbePermission, "Read the probe", "Probe"),
+            new("probe:audit:read", "Read the probe's audit trail", "Probe")
+        ];
     }
 }
 

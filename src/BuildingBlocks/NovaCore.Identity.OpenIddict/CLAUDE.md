@@ -73,7 +73,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   (`HybridCache.RemovePermissionsAsync`, a tag: the stamp in the cache key is unknown here) and revokes their refresh
   tokens and authorizations on every grant or removal. Granting or removing `Administrator` (compared normalized, so
   `administrator` is the same role) also needs `identity:roles:manage`: `identity:users:manage` alone would let its
-  holder make themselves an administrator. The last member keeps the role (409). Anything else that changes what the
+  holder make themselves an administrator. The last member keeps the role (409). The seed gives the User role the
+  `Identity:Seed:UserPermissions` list (D-047, D-053 (7)), never a naming rule; the list is checked on start: declared
+  by a module, no `identity:*`. Anything else that changes what the
   resolver returns for a user must drop the cache the same way (the 2FA endpoints do).
 - **The store is pruned:** `ExpiredTokenPruner` (a `BackgroundService`, a pass at startup, then hourly) calls
   OpenIddict's `PruneAsync` for tokens, then authorizations, with a 14-day minimum lifespan (OpenIddict.Quartz's defaults,

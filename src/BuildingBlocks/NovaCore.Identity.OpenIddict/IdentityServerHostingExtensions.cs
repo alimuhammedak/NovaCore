@@ -193,6 +193,17 @@ public static class IdentityServerHostingExtensions
                 identity => identity.Clients.TrueForAll(client => !client.SignsInUsers || client.Permissions.Count == 0),
                 "Identity:Clients:n:Permissions apply to service clients only: a client with RedirectUris acts for its users, "
                 + "who get their own permissions.")
+            // Every registered account gets the User role, so a typo would grant nothing and an admin permission would
+            // make every self-registered account an administrator of accounts.
+            .Validate<IEnumerable<IPermissionDefinitionProvider>>(
+                (identity, providers) => identity.Seed.UserPermissions.TrueForAll(
+                    providers.SelectMany(provider => provider.GetPermissions()).Select(permission => permission.Name).Contains),
+                "Identity:Seed:UserPermissions must list permissions a module declares.")
+            .Validate(
+                identity => !identity.Seed.UserPermissions.Exists(
+                    permission => permission.StartsWith(IdentityPermissions.Prefix, StringComparison.Ordinal)),
+                "Identity:Seed:UserPermissions can't hold the identity provider's own permissions (identity:*): every "
+                + "registered account gets them.")
             .ValidateOnStart();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<IdentityServerOptions>, IdentityServerOptionsValidator>());
         services.AddHostedService<IdentityServerSeeder>();

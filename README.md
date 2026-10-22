@@ -686,8 +686,9 @@ modüllerin tanımladığı bütün izinleri sunucuda alır (seed o izni role ya
 rolünden çıkarılan bir admin de izinlerini önbellek süresi dolunca kaybeder. `Administrator` rolünü vermek ya da almak
 `identity:users:manage`'e ek olarak `identity:roles:manage` ister (yalnızca admin'de var); son admin rolünü kaybedemez
 (409).
-- **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder hepsini toplayıp
-  rollere bağlar (`User` rolü = iş modüllerinin yalnızca `:read` izinleri — least privilege).
+- **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder `Administrator` rolüne hepsini,
+  `User` rolüne `Identity:Seed:UserPermissions` listesindekileri bağlar (least privilege: isimlendirme kuralı değil,
+  host'un seçtiği liste). Listede tanımsız ya da `identity:*` bir izin varsa uygulama açılmaz.
 
 ### Endpoint'ler
 | Endpoint | Açıklama |
@@ -717,8 +718,8 @@ rolünden çıkarılan bir admin de izinlerini önbellek süresi dolunca kaybede
 - **Audit logging:** giriş (başarılı/başarısız), lockout, 2FA, refresh, çıkış, parola değişimi ve sıfırlama, oturum
   iptali, rol atama; `SECURITY` önekli, e-posta maskeli, parola/kod/token loglanmaz. Refresh token tekrar kullanımını OpenIddict
   kendisi loglar.
-- **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü iş modüllerinin
-  `:read` izinlerini alır; opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.
+- **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü
+  `Identity:Seed:UserPermissions` listesini alır (Api: `catalog:products:read`, `payments:read`, `payments:create`); opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.
 - **Admin için 2FA zorunlu:** `Administrator` rolü yalnızca 2FA'sı açık hesapta sayılır (çözümleyicide; rolün kendi
   izinleri dahil). Seed admin parolayla girer, 2FA'yı API'den açar; açma ve kapama izin önbelleğini hemen düşürür.
 
