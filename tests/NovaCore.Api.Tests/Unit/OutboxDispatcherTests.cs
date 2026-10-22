@@ -157,7 +157,8 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
         using var host = await CreateHostAsync(services =>
             services.AddScoped<IDomainEventHandler<OrderPlaced>, RecordingHandler>());
         var now = _clock.GetUtcNow();
-        // The lowest Id, processed just now (as after retries): it shares the first batch with 49 of the 50 expired ones.
+        // The lowest Id, processed just now (as after retries). The sweep goes by processing time, so it neither stops at this
+        // message nor keeps the 50 expired ones after it, one full batch and an empty one.
         var late = await AddProcessedMessageAsync(now - TimeSpan.FromMinutes(1), "LateHandler");
         for (var i = 0; i < 50; i++)
             await AddProcessedMessageAsync(now - Retention - TimeSpan.FromDays(1), "ExpiredHandler");
@@ -308,6 +309,7 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
         builder.AddCorePersistence();
         builder.Services.AddModuleDbContext<ShopDbContext>((_, options) => options
             .UseSqlite(_database.ConnectionString, sqlite)
+            .ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>()
             .AddInterceptors(interceptors));
         registerHandlers(builder.Services);
         builder.ConfigureContainer(new DefaultServiceProviderFactory(new ServiceProviderOptions { ValidateScopes = true }));
@@ -332,7 +334,10 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
     }
 
     private ShopDbContext CreateContext() =>
-        new(new DbContextOptionsBuilder<ShopDbContext>().UseSqlite(_database.ConnectionString).Options);
+        new(new DbContextOptionsBuilder<ShopDbContext>()
+            .UseSqlite(_database.ConnectionString)
+            .ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>()
+            .Options);
 
     private async Task<OutboxRow> MessageAsync(Guid eventId)
     {
@@ -350,11 +355,11 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
         await using var context = CreateContext();
         await context.Database.ExecuteSqlRawAsync(
             "INSERT INTO outbox_messages (EventId, Type, Content, OccurredOnUtc, ProcessedOnUtc, Attempts) VALUES ({0}, {1}, {2}, {3}, {3}, 0)",
-            [eventId, "System.String, System.Private.CoreLib", "\"text\"", processedOnUtc],
+            [eventId, "System.String, System.Private.CoreLib", "\"text\"", processedOnUtc.UtcTicks],
             TestContext.Current.CancellationToken);
         await context.Database.ExecuteSqlRawAsync(
             "INSERT INTO outbox_consumers (MessageId, Handler, ProcessedOnUtc) SELECT Id, {1}, {2} FROM outbox_messages WHERE EventId = {0}",
-            [eventId, handler, processedOnUtc],
+            [eventId, handler, processedOnUtc.UtcTicks],
             TestContext.Current.CancellationToken);
         return eventId;
     }
@@ -397,7 +402,8 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
 
     private sealed record OrderPlaced(Guid OrderId) : DomainEvent;
 
-    private sealed record OutboxRow(Guid EventId, int Attempts, string? Error, DateTimeOffset? ProcessedOnUtc);
+    // ProcessedOnUtc in UTC ticks, as the test databases store it (UtcTicksModelCustomizer).
+    private sealed record OutboxRow(Guid EventId, int Attempts, string? Error, long? ProcessedOnUtc);
 
     private sealed class Order : Entity<Guid>
     {

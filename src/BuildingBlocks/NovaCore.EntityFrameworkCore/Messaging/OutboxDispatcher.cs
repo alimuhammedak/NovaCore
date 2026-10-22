@@ -175,37 +175,22 @@ internal sealed partial class OutboxDispatcher(
         }
     }
 
-    // SQLite can't compare DateTimeOffset values in SQL (docs/plan/RESEARCH.md R-068), so the age is checked here, on the
-    // oldest processed messages in Id order, a batch at a time. Messages are processed roughly in that order, so the
-    // first batch without an expired one ends the sweep. A batch that still holds a message processed late (a retried
-    // one, a low Id) doesn't: the expired ones after it would otherwise wait for it, 49 deletions a pass.
+    // The processed messages older than the retention, a batch per statement until a short one: the (ProcessedOnUtc, Id)
+    // index finds them, and a message left for inspection was never processed, so it stays. The records go with their
+    // message (cascade).
     private async Task DeleteExpiredAsync(DbContext outbox, CancellationToken cancellationToken)
     {
         var cutoff = timeProvider.GetUtcNow() - ProcessedRetention;
-        var after = 0L;
-        while (true)
+        int deleted;
+        do
         {
-            var batch = await outbox.Set<OutboxMessage>()
-                .AsNoTracking()
-                .Where(message => message.ProcessedOnUtc != null && message.Id > after)
-                .OrderBy(message => message.Id)
+            deleted = await outbox.Set<OutboxMessage>()
+                .Where(message => message.ProcessedOnUtc < cutoff)
+                .OrderBy(message => message.ProcessedOnUtc)
                 .Take(BatchSize)
-                .Select(message => new { message.Id, message.ProcessedOnUtc })
-                .ToListAsync(cancellationToken);
-
-            var expired = batch.Where(message => message.ProcessedOnUtc < cutoff).Select(message => message.Id).ToList();
-            if (expired.Count > 0)
-            {
-                await outbox.Set<OutboxMessage>()
-                    .Where(message => expired.Contains(message.Id))
-                    .ExecuteDeleteAsync(cancellationToken);
-            }
-
-            if (batch.Count < BatchSize || expired.Count == 0)
-                return;
-
-            after = batch[^1].Id;
+                .ExecuteDeleteAsync(cancellationToken);
         }
+        while (deleted == BatchSize);
     }
 
     private static IDomainEvent Deserialize(OutboxMessage message)

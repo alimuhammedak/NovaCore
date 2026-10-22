@@ -105,8 +105,11 @@ advances in the same class fixture. So:
 - a test that needs several requests past `CreatePayment`'s check saves them with `AddPaymentAsync` instead of racing
   POSTs against that pass.
 
-`GET /api/v1/payments` orders by a `DateTimeOffset`, which SQLite can't translate (R-068), so the SQLite tests read
-payments from the database (`PaymentStatusAsync`); `SqlServerQueryTests` tests the list itself.
+SQLite keeps `DateTimeOffset` as text and EF Core can't compare or order it there (R-068), so every SQLite test context
+stores it as UTC ticks instead (`UtcTicksModelCustomizer`: in `NovaCoreApiFactory`'s EF service provider, and through
+`ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>()` on the small hosts): production code compares and orders
+`DateTimeOffset` in SQL, as it should on SQL Server (the outbox retention, the payment list). Raw SQL against those
+columns writes and reads ticks (`OutboxDispatcherTests`). `SqlServerQueryTests` tests the payment list on SQL Server.
 
 `StockRaceApiFactory` (a `FakeClockApiFactory`) plays a concurrent writer for `StockConcurrencyTests`.
 `ChangeStockBeforeNextSave(productId, stock)` makes the next Catalog save that modifies or deletes the product first

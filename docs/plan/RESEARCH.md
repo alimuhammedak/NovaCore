@@ -1098,3 +1098,15 @@ Biçim:
   - `POST /api/v1/products` 201 döndü ama fiyat yuvarlanarak kaydedildi: 0.001 → 0.00, 10.004 → 10.00, 10.005 → 10.01, 10.999 → 11.00. Yani "0'dan büyük" kuralını geçen 0.001 bedava bir ürün olarak kaydediliyordu ve API'nin kabul ettiği değer okunan değerden farklıydı. SQLite `decimal`'ı metin olarak birebir sakladığı için bunu hiç göstermedi. 16'dan fazla tam basamak `decimal(18,2)`'ye sığmıyor.
 - Kaynak: ölçüm; https://learn.microsoft.com/ef/core/providers/sqlite/limitations (SQLite'ta `decimal` karşılaştırması ve saklanması)
 - Sonuç: Kullanıcı reddetmeyi seçti (Q-47). Ürün isteklerinin `Price`'ı `DecimalColumnAttribute(18, 2)` taşıyor: en fazla 2 ondalık ve 16 tam basamak, yoksa 400. Hassasiyet `ProductConfiguration`'daki sabitlerden geliyor (sütun ve kural tek yerden). Sütunun sınır değerleri (0.01, 9999999999999999.99) SQL Server'da birebir dönüyor. Collation davranışı testle sabitlendi; `LIKE` aramasında `%`, `_` ve `[` joker olarak yorumlanıyor (kaçırılmıyor) → Sonraya bırakılanlar.
+
+### R-112: Outbox saklama silmesi SQL'de ve SQLite test katmanında `DateTimeOffset` (2026-10-23, faz 6c; kaynak + ölçüm)
+- Soru: `OutboxDispatcher.DeleteExpiredAsync`'teki "SQLite karşılaştıramıyor" diye bellekte yapılan yaş karşılaştırması (`OutboxDispatcher.cs:178`) üretim kodunu test aracına göre şekillendiriyor mu, doğrusu ne (F6c.3)?
+- Bulgu (kaynak + kod):
+  - MS: SQLite `DateTimeOffset`'i yerel olarak desteklemiyor; eşitlik dışındaki karşılaştırma ve sıralama istemcide yapılmak zorunda. Değer dönüştürücü (value conversion) sağlayıcı tipini değiştirmenin belgelenmiş yolu.
+  - `AddOutbox()` `outbox_messages`'a `(ProcessedOnUtc, Id)` index'ini zaten koyuyor (`OutboxDispatch` migration'ı). Yani `ProcessedOnUtc < cutoff` index üzerinde bir aralık araması; `Id` sıralı parçalar ve "geç işlenmiş mesaj ilk parçayı tutmasın" mantığı yalnızca SQLite yüzünden vardı.
+- Ölçüm:
+  - Yeni sorgu (`Where(ProcessedOnUtc < cutoff).OrderBy(ProcessedOnUtc).Take(50).ExecuteDeleteAsync()`, kısa parçaya kadar döngü) SQL Server'da çalıştı: Api host'unun kendi dispatcher'ı süresi dolan mesajı kayıtlarıyla (cascade) sildi, dolmayanı bıraktı (`OutboxRetentionTests`).
+  - SQLite test bağlamları `DateTimeOffset`'i UTC tick (`long`) olarak saklayınca (`UtcTicksModelCustomizer`, yalnız test kodu) aynı sorgu SQLite'ta da çevrildi; `OutboxDispatcherTests`'in saklama testleri (geç işlenmiş mesaj dahil) yeşil. Ham SQL bu sütunlara tick yazıp okuyor.
+  - Ek gözlem: Docker Desktop yeniden başladıktan sonraki ilk koşuda Testcontainers'ın Ryuk container'ı hazırlık kontrolünde kayboldu ("Could not find resource 'DockerContainer'"), fixture düştü; ikinci koşu yeşil. Ortamdan kaynaklı, kalıcı değil.
+- Kaynak: https://learn.microsoft.com/ef/core/providers/sqlite/limitations · https://learn.microsoft.com/ef/core/modeling/value-conversions · `OutboxModelBuilderExtensions.cs` (index)
+- Sonuç: Karşılaştırma SQL'de, mevcut index üzerinde; SQLite katmanı kendini uyarlar (D-059). Modelde ve migration'larda değişiklik yok.

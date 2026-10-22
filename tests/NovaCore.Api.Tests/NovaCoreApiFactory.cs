@@ -1,6 +1,8 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NovaCore.EntityFrameworkCore.Messaging;
 using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Identity.OpenIddict;
@@ -26,19 +28,20 @@ public class NovaCoreApiFactory : ApiFactory
     private readonly SqliteConnection _paymentsDatabase = OpenSharedInMemoryDatabase();
 
     // The SQLite contexts get their own EF internal provider: the app still registers SQL Server, and EF forbids two
-    // providers in one container.
+    // providers in one container. It stores DateTimeOffset as UTC ticks, which SQLite can compare and order.
     private readonly ServiceProvider _sqliteServices = new ServiceCollection()
         .AddEntityFrameworkSqlite()
+        .Replace(ServiceDescriptor.Singleton<IModelCustomizer, UtcTicksModelCustomizer>())
         .BuildServiceProvider();
 
     public NovaCoreApiFactory()
     {
-        using var catalog = new CatalogDbContext(
-            new DbContextOptionsBuilder<CatalogDbContext>().UseSqlite(_catalogDatabase).Options);
+        using var catalog = new CatalogDbContext(new DbContextOptionsBuilder<CatalogDbContext>()
+            .UseSqlite(_catalogDatabase).UseInternalServiceProvider(_sqliteServices).Options);
         catalog.Database.EnsureCreated();
 
-        using var payments = new PaymentsDbContext(
-            new DbContextOptionsBuilder<PaymentsDbContext>().UseSqlite(_paymentsDatabase).Options);
+        using var payments = new PaymentsDbContext(new DbContextOptionsBuilder<PaymentsDbContext>()
+            .UseSqlite(_paymentsDatabase).UseInternalServiceProvider(_sqliteServices).Options);
         payments.Database.EnsureCreated();
     }
 

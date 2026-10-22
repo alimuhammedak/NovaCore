@@ -86,7 +86,7 @@ internal static class ModuleTestData
             .SingleAsync(reservation => reservation.Id == paymentId);
     }
 
-    // From the database: the payment list orders by a DateTimeOffset, and the SQLite test database can't order by one.
+    // From the database, not through the API: no caller or permission needed.
     public static async Task<PaymentStatus> PaymentStatusAsync(this ApiFactory factory, Guid paymentId)
     {
         await using var scope = factory.Services.CreateAsyncScope();
