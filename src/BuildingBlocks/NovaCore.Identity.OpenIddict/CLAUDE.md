@@ -102,7 +102,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   `EmailLinks`, which starts them from `Jwt:Authority`, not the Host header.
 - **Validated request bodies are public records** (`AccountRequests.cs`): .NET 10's validation generator skips internal
   types (R-062). Endpoint classes stay internal.
-- **Audit, don't print secrets.** Security events go through `SecurityAuditLogger` (masked emails, `SECURITY` prefix).
+- **Audit, don't print secrets.** Security events go through `SecurityAuditLogger` (`SECURITY` prefix), naming the
+  account by its id: no email address, not even masked (Y-35, CodeQL `cs/exposure-of-sensitive-information`, F6b.6d).
   Never log passwords, codes, raw tokens or full JWTs.
 - **Password change and "sign out everywhere"** revoke every token and authorization of the user and renew the security
   stamp; the cookie's stamp is checked on every use (`ValidationInterval = 0`), so the provider session ends at once.

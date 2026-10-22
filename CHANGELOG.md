@@ -54,6 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a session ends at the latest a week after the password was entered.
 - Identity provider: the two-factor cookies are always `Secure`, and the antiforgery cookie is `Secure` outside
   Development (it never was) and over https in Development.
+- Identity provider: the security audit log names accounts by id only; `user_registered` and `login_failed` no longer
+  carry a masked email address (`login_failed` has `User=` instead of `Email=`).
 
 ### Added
 

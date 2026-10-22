@@ -115,7 +115,7 @@ internal static class AccountEndpoints
 
         await SendConfirmationAsync(users, emailSender, jwt.Value, user, cancellationToken);
 
-        audit.UserRegistered(user.Id, request.Email);
+        audit.UserRegistered(user.Id);
         return TypedResults.Ok(GenericAccepted);
     }
 
