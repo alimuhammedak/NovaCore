@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Claims;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -33,6 +34,30 @@ public sealed class ProtocolHardeningTests(IdentityServerFixture fixture) : ICla
         var response = await flow.CallApiAsync("/api/v1/auth/me", SignedByTheProvider(user.Id.ToString(), type));
 
         Assert.Equal(expected, response.StatusCode);
+    }
+
+    // RFC 9700 §2.6: the authorization endpoint and the sign-in pages are for browsers navigating, not for scripts on
+    // other origins. With configured origins the core's policy allows credentials, so a script there could read the
+    // pages with the user's cookies. The token endpoint keeps CORS: a single-page app redeems its code there.
+    [Theory]
+    [InlineData("/connect/authorize", false)]
+    [InlineData("/account/login", false)]
+    [InlineData("/account/forgot-password", false)]
+    [InlineData("/connect/token", true)]
+    [InlineData("/api/v1/auth/me", true)]
+    public async Task The_sign_in_endpoints_answer_no_cross_origin_request(string path, bool allowed)
+    {
+        const string origin = "https://app.novacore.test";
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Cors:AllowedOrigins:0"] = origin }));
+        using var client = host.CreateClient();
+        using var preflight = new HttpRequestMessage(HttpMethod.Options, path);
+        preflight.Headers.Add("Origin", origin);
+        preflight.Headers.Add("Access-Control-Request-Method", path.StartsWith("/account", StringComparison.Ordinal) ? "GET" : "POST");
+
+        var response = await client.SendAsync(preflight, TestContext.Current.CancellationToken);
+
+        Assert.Equal(allowed, response.Headers.Contains("Access-Control-Allow-Origin"));
     }
 
     private string SignedByTheProvider(string subject, string type)

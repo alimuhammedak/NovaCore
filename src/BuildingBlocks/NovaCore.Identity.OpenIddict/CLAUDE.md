@@ -40,7 +40,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   redeemed one reused after OpenIddict's 30 s leeway revokes every token of its authorization; access tokens 15 minutes,
   refresh tokens 7 days. The token endpoint re-checks the account on every refresh (exists, can sign in, not locked out)
   and rewrites the roles. The API takes only `typ: at+jwt` (RFC 9068 §4): the add-on post-configures JwtBearer's
-  `ValidTypes`, the core doesn't (other providers, e.g. Entra, say `JWT`; D-053 (8)).
+  `ValidTypes`, the core doesn't (other providers, e.g. Entra, say `JWT`; D-053 (8)). `/connect/authorize` and the
+  `/account` group carry `DisableCorsAttribute` (RFC 9700 §2.6): the core's policy allows credentials for configured
+  origins. The token endpoint keeps CORS for single-page apps.
 - **Anti-enumeration:** the sign-in page shows one message for an unknown account, a wrong password and a locked
   account; the "confirm your email" message comes only after the right password. `SignInManager` answers `NotAllowed`
   before it looks at the password, so `LoginPage` checks the password itself and counts a wrong one (D-030 (1)).

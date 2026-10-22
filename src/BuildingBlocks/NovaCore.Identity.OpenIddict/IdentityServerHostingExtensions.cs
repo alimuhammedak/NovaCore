@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -245,8 +246,11 @@ public static class IdentityServerHostingExtensions
     {
         ConnectEndpoints.Map(endpoints);
 
-        // The pages a signed-out browser uses; the handlers read the sign-in session themselves.
-        var account = endpoints.MapGroup("/account").ExcludeFromDescription().AllowAnonymous().RequireRateLimiting("strict");
+        // The pages a signed-out browser uses; the handlers read the sign-in session themselves. No cross-origin access:
+        // the core's policy allows credentials for configured origins, and a script there mustn't read the pages with
+        // the user's cookies (RFC 9700 §2.6, docs/plan/RESEARCH.md R-102).
+        var account = endpoints.MapGroup("/account").ExcludeFromDescription().AllowAnonymous().RequireRateLimiting("strict")
+            .WithMetadata(new DisableCorsAttribute());
         LoginPage.Map(account);
         PasswordResetPage.Map(account);
 

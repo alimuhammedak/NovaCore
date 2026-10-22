@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Upgrade:** payments made before have no owner and are listed with `payments:read-all` only.
 - Identity provider: the API accepts only `at+jwt` tokens from it (RFC 9068 §4), so no other JWT signed with its key
   passes for an access token. The core alone still accepts other providers' `JWT` tokens.
+- Identity provider: `/connect/authorize` and the `/account` pages answer no cross-origin request (RFC 9700 §2.6); the
+  token endpoint keeps CORS for single-page apps.
 
 ### Added
 

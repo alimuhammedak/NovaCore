@@ -5,6 +5,7 @@ using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
@@ -33,8 +34,9 @@ internal static class ConnectEndpoints
     // reads the sign-in session itself.
     public static void Map(IEndpointRouteBuilder endpoints)
     {
+        // A browser navigates here; no script on another origin calls it (RFC 9700 §2.6, docs/plan/RESEARCH.md R-102).
         endpoints.MapMethods("/connect/authorize", [HttpMethods.Get, HttpMethods.Post], Authorize)
-            .ExcludeFromDescription().AllowAnonymous();
+            .ExcludeFromDescription().AllowAnonymous().WithMetadata(new DisableCorsAttribute());
         endpoints.MapPost("/connect/token", Exchange)
             .ExcludeFromDescription().AllowAnonymous().RequireRateLimiting("strict");
         endpoints.MapMethods(EndSessionPath, [HttpMethods.Get, HttpMethods.Post], EndSession)
