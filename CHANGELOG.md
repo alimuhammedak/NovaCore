@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   passes for an access token. The core alone still accepts other providers' `JWT` tokens.
 - Identity provider: `/connect/authorize` and the `/account` pages answer no cross-origin request (RFC 9700 §2.6); the
   token endpoint keeps CORS for single-page apps.
+- Identity provider: outside Development the host doesn't start with a plain-http redirect or post-logout URI, except
+  on a loopback IP address (`127.0.0.1`, `[::1]`) for a native app (RFC 8252 §7.3).
 
 ### Added
 

@@ -161,6 +161,40 @@ public sealed class IdentityServerConfigurationTests
         Assert.Contains(expectedInMessage, exception.Message, StringComparison.Ordinal);
     }
 
+    // RFC 8252 §7.3: outside Development, plain http is only a native app's loopback listener, named by its IP address
+    // ("localhost" can resolve elsewhere, §8.3). Anything else would send the code over the network unencrypted.
+    [Theory]
+    [InlineData("RedirectUris:0", "http://client.novacore.test/callback", false)]
+    [InlineData("RedirectUris:0", "http://localhost:5000/callback", false)]
+    [InlineData("PostLogoutRedirectUris:0", "http://client.novacore.test/signed-out", false)]
+    [InlineData("RedirectUris:0", "http://127.0.0.1:5000/callback", true)]
+    [InlineData("RedirectUris:0", "http://[::1]:5000/callback", true)]
+    public async Task Outside_Development_an_http_redirect_must_be_a_loopback_address(string key, string uri, bool starts)
+    {
+        Task<IdentityServerTestHost> StartAsync() => IdentityServerTestHost.StartAsync(Environments.Production, builder =>
+        {
+            AddProductionServices(builder, keyStore: true);
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Identity:Clients:0:" + key] = uri });
+        });
+
+        if (starts)
+        {
+            await using var host = await StartAsync();
+            return;
+        }
+
+        var exception = await Assert.ThrowsAnyAsync<Exception>(StartAsync);
+        Assert.Contains("must use https outside Development", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task In_Development_an_http_redirect_is_allowed()
+    {
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+            builder.Configuration.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Identity:Clients:0:RedirectUris:0"] = "http://client.novacore.test/callback" }));
+    }
+
     [Fact]
     public async Task A_service_client_without_a_secret_stops_the_host()
     {

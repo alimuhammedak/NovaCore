@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors;
@@ -195,6 +196,11 @@ public static class IdentityServerHostingExtensions
                 identity => identity.Clients.TrueForAll(client =>
                     client.RedirectUris.Concat(client.PostLogoutRedirectUris).All(uri => uri.IsAbsoluteUri)),
                 "Identity:Clients:n:RedirectUris and PostLogoutRedirectUris must be absolute URIs.")
+            .Validate<IHostEnvironment>(
+                (identity, environment) => environment.IsDevelopment() || identity.Clients.TrueForAll(client =>
+                    client.RedirectUris.Concat(client.PostLogoutRedirectUris).All(IsSecureRedirect)),
+                "Identity:Clients:n:RedirectUris and PostLogoutRedirectUris must use https outside Development; plain http "
+                + "only on a loopback IP address (127.0.0.1, [::1]) for a native app (RFC 8252 §7.3).")
             .Validate(
                 identity => identity.Clients.TrueForAll(client => client.SignsInUsers || !string.IsNullOrEmpty(client.ClientSecret)),
                 "Identity:Clients:n without RedirectUris is a service client (client credentials) and needs a ClientSecret.")
@@ -230,6 +236,16 @@ public static class IdentityServerHostingExtensions
 
         return builder;
     }
+
+    // An authorization code sent over plain http can be read on the way, except to a native app's own loopback listener,
+    // named by its IP address: "localhost" may resolve to another interface (RFC 8252 §7.3, §8.3). A relative URI is
+    // the absolute-URI rule's to report.
+    private static bool IsSecureRedirect(Uri uri) =>
+        !uri.IsAbsoluteUri
+        || uri.Scheme != Uri.UriSchemeHttp
+        || (uri.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6
+            && IPAddress.TryParse(uri.DnsSafeHost, out var address)
+            && IPAddress.IsLoopback(address));
 
     /// <summary>
     /// Maps the provider's endpoints: the authorization, token and end-session endpoints under <c>/connect</c> (OpenIddict

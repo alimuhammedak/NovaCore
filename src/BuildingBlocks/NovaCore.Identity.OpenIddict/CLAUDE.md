@@ -127,4 +127,6 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   cookies, antiforgery tokens and confirmation links depend on it. Outside Development `ValidateOnStart` stops the host
   without one (D-036 (6)); the framework's fallback (user profile or memory) doesn't survive a replaced container.
 - Client secrets and the seed administrator's password come from user secrets or the environment, never appsettings.
+- Redirect and post-logout URIs use https; outside Development the host doesn't start with a plain-http one, except on
+  a loopback IP address for a native app (RFC 8252 §7.3; `localhost` is refused, §8.3).
 - TLS at the edge; OpenIddict refuses plain HTTP.
