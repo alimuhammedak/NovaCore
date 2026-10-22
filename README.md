@@ -676,10 +676,15 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   claim'lerini atar ve `IPermissionResolver`'ın döndürdüklerini ekler. Kimlik sağlayıcı eklentisi bunları kullanıcının
   rollerinden ve doğrudan izinlerinden, servis client'ları için `Identity:Clients`'tan okur. Sonuç HybridCache'te `sub` + security stamp anahtarıyla
   `Cache:PermissionExpiration` (varsayılan 5 dk) boyunca tutulur: bir rol değişikliği oturum açmış kullanıcıya en geç bu
-  sürede yansır, yeni bir security stamp'li token cache'i atlar. Host'ta bir `IPermissionResolver` kayıtlı değilse
+  sürede yansır, yeni bir security stamp'li token cache'i atlar. Girdiler `sub`'a göre tag'lidir: izni değiştiren kod
+  `HybridCache.RemovePermissionsAsync(sub)` ile onları hemen düşürür (bu sunucunun belleği ve dağıtık cache; başka
+  sunucuların belleği süre dolunca). Kimlik eklentisinin admin API'si her rol değişikliğinde bunu yapar ve kullanıcının
+  refresh token'larını iptal eder. Host'ta bir `IPermissionResolver` kayıtlı değilse
   uygulama açılmaz. Token'daki hiçbir rol izin kontrolünü atlatmaz. Kimlik eklentisinde `Administrator` rolünün üyesi,
-modüllerin tanımladığı bütün izinleri sunucuda alır (seed o izni role yazmamış olsa da). Rolünden çıkarılan bir admin
-de izinlerini önbellek süresi dolunca kaybeder.
+modüllerin tanımladığı bütün izinleri sunucuda alır (seed o izni role yazmamış olsa da). Veritabanında doğrudan
+rolünden çıkarılan bir admin de izinlerini önbellek süresi dolunca kaybeder. `Administrator` rolünü vermek ya da almak
+`identity:users:manage`'e ek olarak `identity:roles:manage` ister (yalnızca admin'de var); son admin rolünü kaybedemez
+(409).
 - **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder hepsini toplayıp
   rollere bağlar (`User` rolü = iş modüllerinin yalnızca `:read` izinleri — least privilege).
 
@@ -698,7 +703,7 @@ de izinlerini önbellek süresi dolunca kaybeder.
 | `POST /api/v1/auth/change-password` | Parola değiştir (tüm oturumları iptal eder) |
 | `POST /api/v1/auth/2fa/setup` · `enable` · `disable` | TOTP iki-faktör; üçü de mevcut parolayı ister (`enable`/`disable` ayrıca kodu). 2FA açıkken `setup` 409 döner (anahtar gizli kalır), `enable` yeni kurtarma kodları verir. Açma ve kapama bütün oturumları bitirir |
 | `GET /api/v1/admin/users` · `roles` · `permissions` | Listeleme (permission korumalı) |
-| `POST·DELETE /api/v1/admin/users/{id}/roles` | Rol ata/kaldır (`identity:users:manage`) |
+| `POST·DELETE /api/v1/admin/users/{id}/roles` | Rol ata/kaldır (`identity:users:manage`; `Administrator` için ayrıca `identity:roles:manage`, son admin korunur). İzinler hemen yeniden çözülür, kullanıcının oturumları biter |
 
 ### Ek sertleştirme
 - **Reverse proxy arkasında:** `UseCoreWeb` pipeline'ın başında `UseForwardedHeaders`'ı çalıştırır. Yalnızca

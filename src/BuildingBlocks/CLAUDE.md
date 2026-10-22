@@ -92,6 +92,9 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
   (`IAuthorizationRequirementData`, R-053), which `PermissionAuthorizationHandler` checks. There is no custom policy
   provider and no named policy per permission. Use `RequirePermission(...)` / `[RequirePermission]` rather than
   hand-rolled `[Authorize(Roles=)]`; `PermissionAuthorizationTests` pins 200/403.
+- The permission cache's entries are tagged by subject (`PermissionCacheExtensions.SubjectTag`); code that changes what
+  the resolver returns calls `HybridCache.RemovePermissionsAsync(sub)`, which reaches this server's memory and the
+  distributed cache, not another server's memory (R-100). Keep the key's format and the tag's escaping together.
 - Package IDs are `BMD.` + the project name (`Directory.Build.targets`, D-041); the project, assembly and namespace
   names don't change. A dependency between two packages is a `ProjectReference`; pack turns it into the `BMD.` ID.
 - The packages are `IsPackable=true`; avoid leaking app-specific assumptions (connection strings,

@@ -1026,8 +1026,13 @@ Plan onayı (2026-10-21). Kullanıcı kararları: Q-40 (izlenmeyen `.agents/`, `
   - 2026-10-22, yeni oturum: önceki oturumdan kalan commit'lenmemiş F6b.1a testleri kullanıcının isteğiyle atıldı ("At, baştan yaz"), testler yeniden yazıldı.
   - [x] F6b.1a (cf96566): TOTP tek kullanım (D-053 (2), R-099). `SingleUseAuthenticatorTokenProvider` Identity'nin `Authenticator` sağlayıcısının yerine geçer: Identity'nin ±2 adımlık kontrolünden sonra son beş adımda kabul edilmiş kodları reddeder, yeni kodu `[NovaCore]/UsedAuthenticatorCodes` kullanıcı token'ına yazar; kayıt `ConcurrencyStamp`'la yapıldığı için yarışan iki istekten biri girer. Kodlar sayı olarak karşılaştırılır (Identity `int.TryParse` ile karşılaştırıyor; `0` önekli kod aynı koddur, testi var). Etkilenen iki mevcut test (2FA'yı açan kodla giriş, aynı kodla kapatma) bir sonraki adımın koduna geçti. 4 yeni test; 282/282 yeşil.
   - [x] F6b.1b (3591766): Kurtarma kodu hash'i (D-053 (3), R-099). `HashedRecoveryCodesUserStore` (Identity'nin EF user store'u, `AddEntityFrameworkStores`'tan önce kaydedilir; o yalnızca `TryAdd` yapıyor) kodları `PasswordHasher` varsayılanıyla (V3, PBKDF2-HMAC-SHA512, 100.000) `[NovaCore]/RecoveryCodeHashes` token'ında tutar; `Replace`/`Redeem`/`Count` ezilir. Identity'nin düz metin yuvası (`[AspNetUserStore]/RecoveryCodes`) okunmaz: eski kodlar çalışmaz, CHANGELOG silme komutunu veriyor. Eski kodlar için uyumluluk kodu yazılmadı (Y-45; 0.x önizleme). README'nin 2FA maddesi 1a ve 1b için güncellendi. 2 yeni test; 284/284 yeşil.
-  - [ ] F6b.1c: yeniden kimlik doğrulama (devam ediyor)
-- [ ] F6b.2 Yetki yükseltme
+  - [x] F6b.1c (7a0c78f): Yeniden kimlik doğrulama (D-053 (4), ASVS 7.5.1). `/2fa/setup` `{ password }`, `/2fa/enable` ve `/2fa/disable` `{ password, code }` alır (kırıcı değişiklik, CHANGELOG). Kilitli hesap reddedilir; yanlış parola ya da kod lockout'a sayılır, sayaç yalnızca tam başarıda sıfırlanır (giriş sayfasıyla aynı kural; önceden API'deki yanlış kod sayılmıyordu). `/2fa/enable` 2FA açıkken yeni kurtarma kodları verir (`recovery_codes_renewed` audit olayı, EventId 28). 2FA'yı açmak ya da kapamak kullanıcının refresh token'larını ve authorization'larını iptal eder. `ValidationTests`'e `/2fa/setup` eklendi, enable/disable anahtarlarına `Password` girdi. 7 yeni test; 291/291 yeşil.
+  - [ ] F6b.1d: Administrator için 2FA (F6b.2'den sonra, D-053 (1))
+- [x] F6b.2: Yetki yükseltme (D-053 (6), R-100).
+  - Çekirdek: izin önbelleği girdileri `novacore:permissions:{sub}` tag'iyle yazılır; yeni public `HybridCache.RemovePermissionsAsync(subject)` (`PermissionCacheExtensions`) `RemoveByTagAsync` çağırır. Anahtar security stamp'i de içerdiği için silen taraf anahtarı bilemez; eklentinin token'larında stamp yok, yani anahtar fiilen `sub` başına.
+  - Eklenti: admin API'sinde `Administrator` rolünü vermek ya da almak ayrıca `identity:roles:manage` ister (403); rol adı normalize edilerek karşılaştırılır (`administrator` aynı rol, testi var). Son üye rolü kaybedemez (409). Her rol değişikliği kullanıcının önbelleğini siler ve refresh token'larını + authorization'larını iptal eder.
+  - Testler: `IdentityServerRoleChangeTests` admin API yerine store'da rol değiştirir (API artık önbelleği hemen sildiği için "önbellek süresi içinde" yolunu yalnız store değişikliği gösteriyor). 7 yeni test; 298/298 yeşil.
+  - Bilinen sınır: iki admin'in eşzamanlı kaldırılması son admin'i bırakmayabilir → Sonraya bırakılanlar.
 - [ ] F6b.3 Seeding ve Payments
 - [ ] F6b.4 Token/protokol
 - [ ] F6b.5 Şifre politikası
@@ -1227,6 +1232,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - `cs/user-controlled-bypass` (high) ×2: `NovaCore.Identity.OpenIddict/LoginPage.cs:53` ve `:125`. "Hassas bir işlemi koruyan koşulu kullanıcının verdiği bir değer belirliyor."
   - `cs/exposure-of-sensitive-information` (medium) ×2: `SecurityAuditLogger.cs:14` ve `:25`. E-posta adresi loga yazılıyor.
   - Hiçbiri henüz doğrulanmadı. *Koşul:* Faz 6b'de her biri ya kırmızı bir testle doğrulanıp düzeltilir ya da gerekçesiyle "false positive" olarak kapatılır (D-044'ün triage kuralı).
+- (Faz 6b, F6b.2) Son admin koruması sayım + kaldırmadır, kilitsiz: iki admin'i aynı anda kaldıran iki istek ikisinin de "başka admin var" görmesiyle rolü boş bırakabilir. *Koşul:* birden çok yöneticinin aynı anda rol yönettiği bir proje; çözüm serializable transaction ya da rol üyeliği üzerinde bir kilit.
 
 ## Son devir notu
 

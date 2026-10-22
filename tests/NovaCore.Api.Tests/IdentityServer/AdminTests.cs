@@ -106,6 +106,87 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
         Assert.False(await IsInRoleAsync(user.Id, "User"));
     }
 
+    // identity:users:manage alone would let its holder make themselves an administrator, who holds every permission.
+    [Theory]
+    [InlineData("Administrator")]
+    [InlineData("administrator")]
+    public async Task Granting_the_administrator_role_needs_roles_manage(string role)
+    {
+        var (flow, accessToken) = await SignedInUserManagerAsync();
+        using var ownedFlow = flow;
+        var target = await _host.CreateUserAsync($"would-be-admin-{Guid.NewGuid():N}@novacore.test", Password);
+        var path = $"/api/v1/admin/users/{target.Id}/roles";
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync(HttpMethod.Post, path, accessToken, new { role })).StatusCode);
+        Assert.False(await IsInRoleAsync(target.Id, "Administrator"));
+
+        // Any other role is identity:users:manage's to grant.
+        Assert.Equal(HttpStatusCode.NoContent, (await flow.CallApiAsync(HttpMethod.Post, path, accessToken, new { role = "User" })).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("Administrator")]
+    [InlineData("administrator")]
+    public async Task Removing_the_administrator_role_needs_roles_manage(string role)
+    {
+        var (flow, accessToken) = await SignedInUserManagerAsync();
+        using var ownedFlow = flow;
+        var target = await CreateUserInRoleAsync($"kept-admin-{Guid.NewGuid():N}@novacore.test", "Administrator");
+
+        var response = await flow.CallApiAsync(HttpMethod.Delete, $"/api/v1/admin/users/{target.Id}/roles/{role}", accessToken, body: null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.True(await IsInRoleAsync(target.Id, "Administrator"));
+    }
+
+    [Fact]
+    public async Task The_last_administrator_keeps_the_role()
+    {
+        // A host of its own: here the seeded administrator is the only one.
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Identity:Seed:AdminEmail"] = AdminEmail,
+                ["Identity:Seed:AdminPassword"] = AdminPassword
+            }));
+        using var flow = new OidcFlow(host);
+        var tokens = await flow.SignInAsync(AdminEmail, AdminPassword);
+        Guid adminId;
+        await using (var scope = host.Services.CreateAsyncScope())
+            adminId = (await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>().FindByEmailAsync(AdminEmail))!.Id;
+
+        var response = await flow.CallApiAsync(HttpMethod.Delete, $"/api/v1/admin/users/{adminId}/roles/Administrator", tokens.AccessToken, body: null);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await using var check = host.Services.CreateAsyncScope();
+        var users = check.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        Assert.True(await users.IsInRoleAsync((await users.FindByIdAsync(adminId.ToString()))!, "Administrator"));
+    }
+
+    [Fact]
+    public async Task A_role_change_takes_effect_at_once_and_ends_the_users_sessions()
+    {
+        var user = await _host.CreateUserAsync("role-change-now@novacore.test", Password);
+        using var flow = new OidcFlow(_host);
+        var userTokens = await flow.SignInAsync("role-change-now@novacore.test", Password);
+        using var adminFlow = new OidcFlow(_host);
+        var adminToken = (await adminFlow.SignInAsync(AdminEmail, AdminPassword)).AccessToken;
+        Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/probe", userTokens.AccessToken)).StatusCode);
+
+        // The User role holds the probe permission (seeded from the declared permissions).
+        var path = $"/api/v1/admin/users/{user.Id}/roles";
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await adminFlow.CallApiAsync(HttpMethod.Post, path, adminToken, new { role = "User" })).StatusCode);
+
+        // The same access token, at once: the cached permissions were dropped. The refresh token is revoked.
+        Assert.Equal(HttpStatusCode.OK, (await flow.CallApiAsync("/probe", userTokens.AccessToken)).StatusCode);
+        Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(await flow.RefreshAsync(userTokens.RefreshToken)));
+
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await adminFlow.CallApiAsync(HttpMethod.Delete, path + "/User", adminToken, body: null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/probe", userTokens.AccessToken)).StatusCode);
+    }
+
     [Fact]
     public async Task A_new_registration_is_a_User()
     {
@@ -116,6 +197,15 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
         await using var scope = _host.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         Assert.Equal(["User"], await users.GetRolesAsync((await users.FindByEmailAsync("joined@novacore.test"))!));
+    }
+
+    // A signed-in user who manages users (identity:users:manage, a direct grant) but not roles.
+    private async Task<(OidcFlow Flow, string AccessToken)> SignedInUserManagerAsync()
+    {
+        var email = $"users-manager-{Guid.NewGuid():N}@novacore.test";
+        await _host.CreateUserAsync(email, Password, "identity:users:manage");
+        var flow = new OidcFlow(_host);
+        return (flow, (await flow.SignInAsync(email, Password)).AccessToken);
     }
 
     private async Task<ApplicationUser> CreateUserInRoleAsync(string email, string role)
@@ -173,8 +263,9 @@ public sealed class FakeClockIdentityServerFixture : AdminTests.Fixture
 }
 
 /// <summary>
-/// PLAN F3a.2's acceptance on a token of this provider: a role change reaches a signed-in user within
-/// <c>Cache:PermissionExpiration</c>, without waiting (fake clock).
+/// PLAN F3a.2's acceptance on a token of this provider: a role change made in the store, outside the admin API (which
+/// drops the cached permissions at once), reaches a signed-in user within <c>Cache:PermissionExpiration</c>, without
+/// waiting (fake clock).
 /// </summary>
 [Collection(IdentityServerTestGroup.Name)]
 public sealed class IdentityServerRoleChangeTests(FakeClockIdentityServerFixture fixture)
@@ -193,13 +284,14 @@ public sealed class IdentityServerRoleChangeTests(FakeClockIdentityServerFixture
         var user = await _host.CreateUserAsync("role-change@novacore.test", Password);
         using var flow = new OidcFlow(_host);
         var userToken = (await flow.SignInAsync("role-change@novacore.test", Password)).AccessToken;
-        using var adminFlow = new OidcFlow(_host);
-        var adminToken = (await adminFlow.SignInAsync(AdminTests.AdminEmail, AdminTests.AdminPassword)).AccessToken;
         Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/probe", userToken)).StatusCode);
 
         // The User role holds the probe permission (seeded from the declared permissions).
-        var assign = await adminFlow.CallApiAsync(HttpMethod.Post, $"/api/v1/admin/users/{user.Id}/roles", adminToken, new { role = "User" });
-        Assert.Equal(HttpStatusCode.NoContent, assign.StatusCode);
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            Assert.True((await users.AddToRoleAsync((await users.FindByIdAsync(user.Id.ToString()))!, "User")).Succeeded);
+        }
 
         // Same token, still inside the cache lifetime: the old permissions stand...
         Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/probe", userToken)).StatusCode);

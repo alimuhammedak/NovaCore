@@ -11,6 +11,8 @@ namespace NovaCore.AspNetCore.Authorization;
 /// Replaces whatever permissions an access token claims with those <see cref="IPermissionResolver"/> resolves on the
 /// server, cached in <see cref="HybridCache"/> per subject and security stamp for <c>Cache:PermissionExpiration</c>. A
 /// role change therefore reaches a signed-in caller within that lifetime, and a token with a new stamp skips the cache.
+/// The entries carry the subject's tag, so whoever changes the permissions drops them at once
+/// (<see cref="PermissionCacheExtensions.RemovePermissionsAsync"/>).
 /// </summary>
 internal sealed class PermissionClaimsTransformation(
     IPermissionResolver resolver,
@@ -45,6 +47,7 @@ internal sealed class PermissionClaimsTransformation(
             static async (state, cancellationToken) =>
                 (await state.resolver.GetPermissionsAsync(state.transformed, cancellationToken)).ToArray(),
             _entryOptions,
+            [PermissionCacheExtensions.SubjectTag(subject)],
             // No caller token: the lookup runs on the first caller's scoped resolver and concurrent callers share it
             // (stampede protection), so that caller waits for it to finish instead of leaving and disposing its scope.
             cancellationToken: CancellationToken.None);

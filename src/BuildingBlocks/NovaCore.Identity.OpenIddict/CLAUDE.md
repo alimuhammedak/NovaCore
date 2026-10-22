@@ -68,6 +68,12 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   claim is informational and never passes a permission check (D-036 (2)). The core's
   claims transformation runs on OpenIddict's scheme too, so a principal copied into a token drops `permission` claims
   (D-029 (3)).
+- **Role changes (F6b.2, D-053 (6)):** the admin API drops the user's cached permissions
+  (`HybridCache.RemovePermissionsAsync`, a tag: the stamp in the cache key is unknown here) and revokes their refresh
+  tokens and authorizations on every grant or removal. Granting or removing `Administrator` (compared normalized, so
+  `administrator` is the same role) also needs `identity:roles:manage`: `identity:users:manage` alone would let its
+  holder make themselves an administrator. The last member keeps the role (409). Anything else that changes what the
+  resolver returns for a user must drop the cache the same way.
 - **The store is pruned:** `ExpiredTokenPruner` (a `BackgroundService`, a pass at startup, then hourly) calls
   OpenIddict's `PruneAsync` for tokens, then authorizations, with a 14-day minimum lifespan (OpenIddict.Quartz's defaults,
   R-088). Keep the lifespan longer than the refresh token lifetime, so a reused refresh token is still found and revokes

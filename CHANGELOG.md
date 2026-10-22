@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `POST /api/v1/auth/2fa/setup` takes `{ password }`, `/2fa/enable` and `/2fa/disable` take `{ password, code }`. A wrong
   password or code counts toward lockout. `/2fa/enable` while two-factor authentication is on returns new recovery
   codes. Turning it on or off ends every session of the user (refresh tokens and authorizations).
+- Identity provider: granting or removing the `Administrator` role needs `identity:roles:manage` on top of
+  `identity:users:manage` (whose holder could otherwise make themselves an administrator), and the last administrator
+  keeps the role (409). A role change through the admin API takes effect on the user's next request and revokes their
+  refresh tokens and authorizations.
+
+### Added
+
+- `HybridCache.RemovePermissionsAsync(subject)` (`NovaCore.AspNetCore`): drops the permissions cached for a subject, so
+  a change takes effect on its next request instead of after `Cache:PermissionExpiration`.
 
 ### Changed
 
