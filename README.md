@@ -144,7 +144,7 @@ sonra, `services.PostConfigure<T>` bütün `Configure`'lardan sonra çalışır.
 | `ExceptionHandlerOptions`, `ProblemDetailsOptions` | Exception → durum kodu ve ProblemDetails (`traceId`, `instance`) | Bir exception'ı kendiniz eşlemek için `IExceptionHandler` kaydedin: paketin eşlemesi middleware'in yedek yolunda olduğu için sizinki her zaman önce çalışır |
 | `HybridCacheOptions` | Varsayılan süre `Cache:DefaultExpiration` | L2 için bir `IDistributedCache` (Redis) kaydetmek yeter |
 | `OpenApiOptions` (belge `v1`) | Bearer security scheme | Kendi transformer'larınızı ekleyin |
-| Kimlik eklentisi: `IdentityOptions`, `PasswordHasherOptions`, `DataProtectionTokenProviderOptions`, uygulama cookie'si, `OpenIddictServerOptions` | Parola en az 12, lockout 5 deneme / 15 dk, onaylı e-posta, PBKDF2 600.000, onay token'ı 6 saat, cookie 30 dk kayan, access token 15 dk, refresh 7 gün | Değerleri yükseltmek serbest; düşürmek eklentinin güvenlik varsayımlarını bozar (bkz. [Güvenlik](#güvenlik--yetkilendirme)) |
+| Kimlik eklentisi: `IdentityOptions`, `PasswordHasherOptions`, `DataProtectionTokenProviderOptions`, uygulama cookie'si, `OpenIddictServerOptions` | Parola en az 15 (yaygın parola listesiyle), lockout 5 deneme / 15 dk, onaylı e-posta, PBKDF2 600.000, onay token'ı 6 saat, cookie 30 dk kayan, access token 15 dk, refresh 7 gün | Değerleri yükseltmek serbest; düşürmek eklentinin güvenlik varsayımlarını bozar (bkz. [Güvenlik](#güvenlik--yetkilendirme)) |
 
 ```csharp
 // Program.cs: AddCoreWeb'den sonra
@@ -238,7 +238,8 @@ dotnet ef database update --project src/Modules/Catalog/NovaCore.Modules.Catalog
 dotnet ef database update --project src/Modules/Payments/NovaCore.Modules.Payments  --context PaymentsDbContext  --startup-project src/Modules/Payments/NovaCore.Modules.Payments
 dotnet ef database update --project src/Api/NovaCore.Api  --context IdentityServerDbContext  --startup-project src/Api/NovaCore.Api
 
-# 3) İlk admin + roller + izinler için seed (parolayı user-secrets ile ver — repoya YAZMA)
+# 3) İlk admin + roller + izinler için seed (parolayı user-secrets ile ver — repoya YAZMA). Admin izinleri, admin
+#    parolayla girip 2FA'yı açınca gelir: POST /api/v1/auth/2fa/setup, sonra /2fa/enable (parola + authenticator kodu)
 dotnet user-secrets --project src/Api/NovaCore.Api set "Identity:Seed:AdminPassword" "Admin!Passw0rd-2026"
 
 # 4) Çalıştır: https profili. Host kendi kimlik sağlayıcısıdır; Development'ta Jwt:Authority = https://localhost:5443
@@ -260,7 +261,7 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 | `/api/v1/auth/2fa/*` | TOTP iki-faktör (setup/enable/disable) |
 | `/api/v1/admin/*` | Kullanıcı/rol/izin yönetimi (permission korumalı) |
 | `/api/v1/products` | Catalog modülü (CRUD, permission korumalı) |
-| `/api/v1/payments` | Payments modülü (Catalog'a contract ve event'lerle bağlı) |
+| `/api/v1/payments` | Payments modülü (Catalog'a contract ve event'lerle bağlı). Ödeme oluşturanındır (`OwnerId` = token'ın `sub`'ı); `GET` çağıranın kendi ödemelerini, `payments:read-all` ile hepsini listeler |
 
 > SQL Server olmadan da uygulama açılır ve `/openapi`, validation/401 kapıları çalışır. `/health` bu durumda
 > `Unhealthy` (503) döner, çünkü modül veritabanlarına ulaşamaz. DB'ye dokunan endpoint'ler düzgün bir
@@ -638,23 +639,34 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
 
 ### Hesaplar (authentication)
 - **Parola saklama:** Identity PBKDF2-HMAC-SHA256, **600.000 iterasyon** (OWASP Password Storage).
-- **Parola politikası:** uzunluk öncelikli — **min 12**, max 128, zorunlu kompozisyon kuralı yok
-  (OWASP Authentication: "no composition rules").
+- **Parola politikası:** uzunluk öncelikli — **min 15**, max 128, zorunlu kompozisyon kuralı yok, yaygın parolalar
+  reddedilir (NIST SP 800-63B-4; OWASP Authentication: "no composition rules"). Yaygın parola listesi pakette gömülüdür
+  (`CommonPasswords.txt`: SecLists xato 1M'in 15–128 karakterlik ilk 3000 parolası, MIT, büyük/küçük harf duyarsız);
+  parola hiçbir dış servise gitmez.
 - **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**, hatalı 2FA ya da kurtarma kodu da sayılır), giriş sayfası, token ucu ve
   hesap API'sinde rate limiting (`strict`), bilinmeyen hesap / yanlış parola / kilitli hesap için **tek hata mesajı**.
   Bilinmeyen e-posta da bir parola hash'i doğrular (host'un hasher'ıyla bir kez üretilen sahte hash), böylece yanıt
-  süresi hesabın varlığını ele vermez. `change-password`'da yanlış mevcut parola da lockout sayacını artırır; kilitli
+  süresi hesabın varlığını ele vermez. Kayıt, parola sıfırlama formu ve onay e-postasını yeniden gönderme e-postayı
+  kuyruğa koyup hemen yanıt verir; bir arka plan servisi (`EmailQueue`) host'un `IEmailSender`'ıyla sırayla gönderir.
+  Yanıt e-posta sunucusunu beklemediği için süresi de hesabın varlığını ele vermez (OWASP Forgot Password, ASVS 6.3.8).
+  Kuyruk bellek içindedir: süreç dururken kuyrukta kalan e-posta kaybolur, kullanıcı linki yeniden ister; gönderim
+  hatası loglanır, istek etkilenmez. Kuyruk doluysa (1000, posta sunucusu takıldığında) istek beklemez: e-posta düşer
+  ve loglanır. `change-password`'da yanlış mevcut parola da lockout sayacını artırır; kilitli
   hesapta parola değişmez.
 - **E-posta onayı** zorunlu (dev'de link loglanır; link `Jwt:Authority`'den üretilir, Host başlığından değil),
-  **TOTP 2FA** (authenticator app). 2FA adımı `/2fa/enable`'ın verdiği 10 kurtarma kodundan birini de kabul eder: her
-  kod bir kez kullanılır, kilitli hesap kodla da giremez, kullanılan kod `SECURITY recovery_code_used` (Warning) olarak
-  loglanır. Onay linki `resend-confirmation-email` ile yeniden istenir; yalnızca onaylanmamış
+  **TOTP 2FA** (authenticator app). Her authenticator kodu bir kez geçer (ASVS 6.5.1): 2FA'yı açan kod girişte
+  kullanılamaz, aynı kodla yarışan iki istekten biri girer. 2FA adımı `/2fa/enable`'ın verdiği 10 kurtarma kodundan
+  birini de kabul eder: her kod bir kez kullanılır, kilitli hesap kodla da giremez, kullanılan kod
+  `SECURITY recovery_code_used` (Warning) olarak loglanır. Kurtarma kodları veritabanında düz metin değil, PBKDF2
+  hash'i olarak durur (ASVS 6.5.2). Onay linki `resend-confirmation-email` ile yeniden istenir; yalnızca onaylanmamış
   hesaba gider, yanıt her adres için aynıdır.
 - **Parola sıfırlama:** giriş sayfasındaki "Forgot your password?" linki bir e-posta formu açar. Onaylı hesaba
   `/account/reset-password` linki gider (Identity token'ı, 6 saat, tek kullanımlık: sıfırlama security stamp'i
   yeniler). Bilinmeyen ya da onaysız adres aynı sayfayı alır, e-posta gitmez. Yeni parola iki kez girilir; sıfırlama
   bütün refresh token'ları ve authorization'ları iptal eder, otomatik giriş yapmaz (OWASP Forgot Password).
 - **Seed'siz kayıt:** `User` rolü yoksa (seed kapalı) hesap rolsüz oluşur; admin API'si rolü sonradan atar.
+- **Refresh ömrü mutlaktır:** refresh token girişten 7 gün sonra biter; her yenileme yeni 7 gün başlatmaz
+  (`DisableSlidingRefreshTokenExpiration`).
 - **Oturumlar:** parola değişikliği ve "her yerden çıkış" bütün refresh token'ları ve authorization'ları iptal eder ve
   sağlayıcıdaki giriş oturumunu hemen bitirir. Verilmiş access token'lar süreleri dolana kadar (15 dk) geçerlidir.
 
@@ -674,12 +686,18 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   claim'lerini atar ve `IPermissionResolver`'ın döndürdüklerini ekler. Kimlik sağlayıcı eklentisi bunları kullanıcının
   rollerinden ve doğrudan izinlerinden, servis client'ları için `Identity:Clients`'tan okur. Sonuç HybridCache'te `sub` + security stamp anahtarıyla
   `Cache:PermissionExpiration` (varsayılan 5 dk) boyunca tutulur: bir rol değişikliği oturum açmış kullanıcıya en geç bu
-  sürede yansır, yeni bir security stamp'li token cache'i atlar. Host'ta bir `IPermissionResolver` kayıtlı değilse
+  sürede yansır, yeni bir security stamp'li token cache'i atlar. Girdiler `sub`'a göre tag'lidir: izni değiştiren kod
+  `HybridCache.RemovePermissionsAsync(sub)` ile onları hemen düşürür (bu sunucunun belleği ve dağıtık cache; başka
+  sunucuların belleği süre dolunca). Kimlik eklentisinin admin API'si her rol değişikliğinde bunu yapar ve kullanıcının
+  refresh token'larını iptal eder. Host'ta bir `IPermissionResolver` kayıtlı değilse
   uygulama açılmaz. Token'daki hiçbir rol izin kontrolünü atlatmaz. Kimlik eklentisinde `Administrator` rolünün üyesi,
-modüllerin tanımladığı bütün izinleri sunucuda alır (seed o izni role yazmamış olsa da). Rolünden çıkarılan bir admin
-de izinlerini önbellek süresi dolunca kaybeder.
-- **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder hepsini toplayıp
-  rollere bağlar (`User` rolü = iş modüllerinin yalnızca `:read` izinleri — least privilege).
+modüllerin tanımladığı bütün izinleri sunucuda alır (seed o izni role yazmamış olsa da), 2FA'sı açıksa. Veritabanında doğrudan
+rolünden çıkarılan bir admin de izinlerini önbellek süresi dolunca kaybeder. `Administrator` rolünü vermek ya da almak
+`identity:users:manage`'e ek olarak `identity:roles:manage` ister (yalnızca admin'de var); 2FA'sı açık son admin rolünü
+kaybedemez (409).
+- **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder `Administrator` rolüne hepsini,
+  `User` rolüne `Identity:Seed:UserPermissions` listesindekileri bağlar (least privilege: isimlendirme kuralı değil,
+  host'un seçtiği liste). Listede tanımsız ya da `identity:*` bir izin varsa uygulama açılmaz.
 
 ### Endpoint'ler
 | Endpoint | Açıklama |
@@ -694,9 +712,9 @@ de izinlerini önbellek süresi dolunca kaybeder.
 | `POST /api/v1/auth/logout-all` | Tüm oturumları kapat |
 | `GET /api/v1/auth/me` | Mevcut principal (id, email, roller, izinler) |
 | `POST /api/v1/auth/change-password` | Parola değiştir (tüm oturumları iptal eder) |
-| `POST /api/v1/auth/2fa/setup` · `enable` · `disable` | TOTP iki-faktör (2FA açıkken `setup` 409 döner, anahtar gizli kalır) |
+| `POST /api/v1/auth/2fa/setup` · `enable` · `disable` | TOTP iki-faktör; üçü de mevcut parolayı ister (`enable`/`disable` ayrıca kodu). 2FA açıkken `setup` 409 döner (anahtar gizli kalır), `enable` yeni kurtarma kodları verir. Açma ve kapama bütün oturumları bitirir |
 | `GET /api/v1/admin/users` · `roles` · `permissions` | Listeleme (permission korumalı) |
-| `POST·DELETE /api/v1/admin/users/{id}/roles` | Rol ata/kaldır (`identity:users:manage`) |
+| `POST·DELETE /api/v1/admin/users/{id}/roles` | Rol ata/kaldır (`identity:users:manage`; `Administrator` için ayrıca `identity:roles:manage`, son admin korunur). İzinler hemen yeniden çözülür, kullanıcının oturumları biter |
 
 ### Ek sertleştirme
 - **Reverse proxy arkasında:** `UseCoreWeb` pipeline'ın başında `UseForwardedHeaders`'ı çalıştırır. Yalnızca
@@ -707,10 +725,13 @@ de izinlerini önbellek süresi dolunca kaybeder.
 - **Security headers** (her yanıtta): `X-Content-Type-Options`, `X-Frame-Options: DENY`,
   `Referrer-Policy`, `Content-Security-Policy: default-src 'none'`, `Server` başlığı kaldırılır; prod'da **HSTS**.
 - **Audit logging:** giriş (başarılı/başarısız), lockout, 2FA, refresh, çıkış, parola değişimi ve sıfırlama, oturum
-  iptali, rol atama; `SECURITY` önekli, e-posta maskeli, parola/kod/token loglanmaz. Refresh token tekrar kullanımını OpenIddict
+  iptali, rol atama; `SECURITY` önekli, hesap id'siyle; e-posta (maskeli bile) ve parola/kod/token loglanmaz. Refresh token tekrar kullanımını OpenIddict
   kendisi loglar.
-- **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü iş modüllerinin
-  `:read` izinlerini alır; opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.
+- **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü
+  `Identity:Seed:UserPermissions` listesini alır (Api: `catalog:products:read`, `payments:read`, `payments:create`);
+  opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.
+- **Admin için 2FA zorunlu:** `Administrator` rolü yalnızca 2FA'sı açık hesapta sayılır (çözümleyicide; rolün kendi
+  izinleri dahil). Seed admin parolayla girer, 2FA'yı API'den açar; açma ve kapama izin önbelleğini hemen düşürür.
 
 > **Üretimde mutlaka:** `Jwt:Authority`'yi host'un public https adresine (ya da harici sağlayıcıya) ayarla, imza ve
 > şifreleme sertifikalarını host'ta ekle, TLS/HTTPS'i edge'de zorla, gerçek bir `IEmailSender` (SMTP/SendGrid) tak,

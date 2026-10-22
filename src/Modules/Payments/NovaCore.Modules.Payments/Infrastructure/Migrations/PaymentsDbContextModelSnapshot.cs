@@ -107,6 +107,11 @@ namespace NovaCore.Modules.Payments.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<string>("OwnerId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uniqueidentifier");
 
@@ -132,6 +137,8 @@ namespace NovaCore.Modules.Payments.Infrastructure.Migrations
                     b.HasIndex("ProductId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("OwnerId", "CreatedAtUtc");
 
                     b.ToTable("payments", "payments");
                 });

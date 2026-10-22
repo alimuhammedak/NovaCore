@@ -3,10 +3,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NovaCore.Abstractions.Identity;
 using NovaCore.AspNetCore.Auth;
+using NovaCore.AspNetCore.Authorization;
 using OpenIddict.Abstractions;
 
 namespace NovaCore.Identity.OpenIddict;
@@ -63,15 +65,16 @@ internal static class AccountEndpoints
             .RequireAuthorization();
 
         auth.MapPost("/2fa/setup", SetUpTwoFactor)
-            .WithName("TwoFactorSetup").WithSummary("Get the authenticator shared key + otpauth URI (409 once 2FA is enabled)")
+            .WithName("TwoFactorSetup").WithSummary("Get the authenticator shared key + otpauth URI (needs the password; 409 once 2FA is enabled)")
             .RequireAuthorization();
 
         auth.MapPost("/2fa/enable", EnableTwoFactor)
-            .WithName("TwoFactorEnable").WithSummary("Enable 2FA by verifying a TOTP code (returns recovery codes)")
+            .WithName("TwoFactorEnable")
+            .WithSummary("Enable 2FA with the password and a TOTP code; returns new recovery codes, also when 2FA is already on (ends every session when it turns 2FA on)")
             .RequireAuthorization();
 
         auth.MapPost("/2fa/disable", DisableTwoFactor)
-            .WithName("TwoFactorDisable").WithSummary("Disable 2FA after verifying a TOTP code")
+            .WithName("TwoFactorDisable").WithSummary("Disable 2FA with the password and a TOTP code (ends every session)")
             .RequireAuthorization();
 
         return auth;
@@ -81,11 +84,10 @@ internal static class AccountEndpoints
         RegisterRequest request,
         UserManager<ApplicationUser> users,
         RoleManager<ApplicationRole> roles,
-        IEmailSender emailSender,
+        EmailQueue emails,
         SecurityAuditLogger audit,
         IOptions<JwtOptions> jwt,
-        TimeProvider timeProvider,
-        CancellationToken cancellationToken)
+        TimeProvider timeProvider)
     {
         var user = new ApplicationUser
         {
@@ -110,9 +112,9 @@ internal static class AccountEndpoints
         if (await roles.RoleExistsAsync(IdentityRoles.User))
             await users.AddToRoleAsync(user, IdentityRoles.User);
 
-        await SendConfirmationAsync(users, emailSender, jwt.Value, user, cancellationToken);
+        await SendConfirmationAsync(users, emails, jwt.Value, user);
 
-        audit.UserRegistered(user.Id, request.Email);
+        audit.UserRegistered(user.Id);
         return TypedResults.Ok(GenericAccepted);
     }
 
@@ -121,24 +123,23 @@ internal static class AccountEndpoints
     private static async Task<Ok<MessageResponse>> ResendConfirmationEmail(
         ResendConfirmationEmailRequest request,
         UserManager<ApplicationUser> users,
-        IEmailSender emailSender,
-        IOptions<JwtOptions> jwt,
-        CancellationToken cancellationToken)
+        EmailQueue emails,
+        IOptions<JwtOptions> jwt)
     {
         var user = await users.FindByEmailAsync(request.Email);
         if (user is not null && !await users.IsEmailConfirmedAsync(user))
-            await SendConfirmationAsync(users, emailSender, jwt.Value, user, cancellationToken);
+            await SendConfirmationAsync(users, emails, jwt.Value, user);
 
         return TypedResults.Ok(ConfirmationResent);
     }
 
-    private static async Task SendConfirmationAsync(
-        UserManager<ApplicationUser> users, IEmailSender emailSender, JwtOptions jwt, ApplicationUser user, CancellationToken cancellationToken)
+    private static async Task SendConfirmationAsync(UserManager<ApplicationUser> users, EmailQueue emails, JwtOptions jwt, ApplicationUser user)
     {
         var link = EmailLinks.Create(jwt, ConfirmEmailPath, user.Id, await users.GenerateEmailConfirmationTokenAsync(user));
 
-        await emailSender.SendAsync(user.Email!, "Confirm your account",
-            $"Welcome! Confirm your email address: <a href=\"{link}\">Confirm</a>", cancellationToken);
+        // Queued, not sent here: the answer mustn't wait for the mail server, or its timing would reveal the account.
+        emails.Enqueue(user.Email!, "Confirm your account",
+            $"Welcome! Confirm your email address: <a href=\"{link}\">Confirm</a>");
     }
 
     internal sealed record MeResponse(
@@ -228,12 +229,20 @@ internal static class AccountEndpoints
 
     internal sealed record RecoveryCodesResponse(string[] RecoveryCodes);
 
-    private static async Task<Results<Ok<TwoFactorSetupResponse>, Conflict<MessageResponse>, UnauthorizedHttpResult>> SetUpTwoFactor(
-        UserManager<ApplicationUser> users, ICurrentUser currentUser, IHostEnvironment environment)
+    private static async Task<Results<Ok<TwoFactorSetupResponse>, Conflict<MessageResponse>, ValidationProblem, UnauthorizedHttpResult>> SetUpTwoFactor(
+        TwoFactorSetupRequest request,
+        UserManager<ApplicationUser> users,
+        ICurrentUser currentUser,
+        IHostEnvironment environment,
+        SecurityAuditLogger audit,
+        HttpContext context)
     {
         var user = await FindAsync(users, currentUser);
         if (user is null)
             return TypedResults.Unauthorized();
+
+        if (await ReauthenticateAsync(users, user, request.Password, audit, context) is { } wrongPassword)
+            return wrongPassword;
 
         // An enabled authenticator's key stays secret: with it, any holder of an access token could compute codes and
         // turn two-factor authentication off. A new authenticator starts after disabling (which takes a code).
@@ -255,38 +264,111 @@ internal static class AccountEndpoints
         return TypedResults.Ok(new TwoFactorSetupResponse(key!, uri));
     }
 
+    // Also the way to new recovery codes while two-factor authentication is on: the same proof, no endpoint of its own.
     private static async Task<Results<Ok<RecoveryCodesResponse>, ValidationProblem, UnauthorizedHttpResult>> EnableTwoFactor(
-        TwoFactorCodeRequest request, UserManager<ApplicationUser> users, ICurrentUser currentUser, SecurityAuditLogger audit)
+        TwoFactorCodeRequest request,
+        UserManager<ApplicationUser> users,
+        ICurrentUser currentUser,
+        HybridCache cache,
+        IOpenIddictTokenManager tokens,
+        IOpenIddictAuthorizationManager authorizations,
+        SecurityAuditLogger audit,
+        HttpContext context,
+        CancellationToken cancellationToken)
     {
         var user = await FindAsync(users, currentUser);
         if (user is null)
             return TypedResults.Unauthorized();
 
-        if (!await users.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider, request.Code))
-            return InvalidCode();
+        if (await VerifyPasswordAndCodeAsync(users, user, request, audit, context) is { } problem)
+            return problem;
 
-        await users.SetTwoFactorEnabledAsync(user, true);
+        if (await users.GetTwoFactorEnabledAsync(user))
+        {
+            audit.RecoveryCodesRenewed(user.Id);
+        }
+        else
+        {
+            // The sessions so far began without the second factor (a stolen refresh token among them), so they end.
+            await users.SetTwoFactorEnabledAsync(user, true);
+            await RevokeSessionsAsync(user, tokens, authorizations, cancellationToken);
+
+            // An administrator's permissions depend on it (IdentityPermissionResolver).
+            await cache.RemovePermissionsAsync(user.Id.ToString(), cancellationToken);
+            audit.TwoFactorEnabled(user.Id);
+            audit.SessionsRevoked(user.Id, "two-factor-enabled");
+        }
+
         var recoveryCodes = await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
-        audit.TwoFactorEnabled(user.Id);
-
         return TypedResults.Ok(new RecoveryCodesResponse(recoveryCodes?.ToArray() ?? []));
     }
 
     private static async Task<Results<NoContent, ValidationProblem, UnauthorizedHttpResult>> DisableTwoFactor(
-        TwoFactorCodeRequest request, UserManager<ApplicationUser> users, ICurrentUser currentUser, SecurityAuditLogger audit)
+        TwoFactorCodeRequest request,
+        UserManager<ApplicationUser> users,
+        ICurrentUser currentUser,
+        HybridCache cache,
+        IOpenIddictTokenManager tokens,
+        IOpenIddictAuthorizationManager authorizations,
+        SecurityAuditLogger audit,
+        HttpContext context,
+        CancellationToken cancellationToken)
     {
         var user = await FindAsync(users, currentUser);
         if (user is null)
             return TypedResults.Unauthorized();
 
-        if (!await users.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider, request.Code))
-            return InvalidCode();
+        if (await VerifyPasswordAndCodeAsync(users, user, request, audit, context) is { } problem)
+            return problem;
 
         await users.SetTwoFactorEnabledAsync(user, false);
         await users.ResetAuthenticatorKeyAsync(user);
+        await RevokeSessionsAsync(user, tokens, authorizations, cancellationToken);
+        await cache.RemovePermissionsAsync(user.Id.ToString(), cancellationToken);
         audit.TwoFactorDisabled(user.Id);
+        audit.SessionsRevoked(user.Id, "two-factor-disabled");
 
         return TypedResults.NoContent();
+    }
+
+    // Re-authentication for the two-factor endpoints (ASVS 7.5.1): with an access token alone, nobody sets up, replaces
+    // or removes the second factor. As on the sign-in page, a locked account is refused and a wrong password counts
+    // toward lockout, so a stolen access token can't guess the password more often there.
+    private static async Task<ValidationProblem?> ReauthenticateAsync(
+        UserManager<ApplicationUser> users, ApplicationUser user, string password, SecurityAuditLogger audit, HttpContext context)
+    {
+        if (await users.IsLockedOutAsync(user))
+            return PasswordProblem(["The account is locked. Try again later."]);
+
+        if (await users.CheckPasswordAsync(user, password))
+            return null;
+
+        await CountFailureAsync(users, user, audit, context);
+        return PasswordProblem(["The password is incorrect."]);
+    }
+
+    // The sign-in page's rules for the code too: a wrong one counts toward lockout, and only full success resets the count.
+    private static async Task<ValidationProblem?> VerifyPasswordAndCodeAsync(
+        UserManager<ApplicationUser> users, ApplicationUser user, TwoFactorCodeRequest request, SecurityAuditLogger audit, HttpContext context)
+    {
+        if (await ReauthenticateAsync(users, user, request.Password, audit, context) is { } wrongPassword)
+            return wrongPassword;
+
+        if (!await users.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider, request.Code))
+        {
+            await CountFailureAsync(users, user, audit, context);
+            return InvalidCode();
+        }
+
+        await users.ResetAccessFailedCountAsync(user);
+        return null;
+    }
+
+    private static async Task CountFailureAsync(UserManager<ApplicationUser> users, ApplicationUser user, SecurityAuditLogger audit, HttpContext context)
+    {
+        await users.AccessFailedAsync(user);
+        if (await users.IsLockedOutAsync(user))
+            audit.AccountLockedOut(user.Id, context.Connection.RemoteIpAddress?.ToString());
     }
 
     private static Task<ApplicationUser?> FindAsync(UserManager<ApplicationUser> users, ICurrentUser currentUser) =>

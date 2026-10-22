@@ -48,6 +48,8 @@ public sealed class TestIdentityProvider : IDisposable
 
         return Tokens.CreateToken(new SecurityTokenDescriptor
         {
+            // An RFC 9068 access token: with the built-in identity provider the API accepts no other type.
+            TokenType = "at+jwt",
             Issuer = Issuer,
             Audience = Audience,
             Subject = new ClaimsIdentity(claims),

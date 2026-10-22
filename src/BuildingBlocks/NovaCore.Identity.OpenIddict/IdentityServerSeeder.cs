@@ -14,9 +14,10 @@ namespace NovaCore.Identity.OpenIddict;
 /// <summary>
 /// When <c>Identity:Seed:SeedOnStartup</c> is true, seeds the store on startup. Idempotent:
 /// <list type="bullet">
-///   <item>the Administrator role gets every permission the modules declare, the User role their <c>:read</c> ones
-///   except the provider's own admin permissions (least privilege);</item>
-///   <item>the initial administrator is created when <c>Identity:Seed:AdminEmail</c> and <c>AdminPassword</c> are set;</item>
+///   <item>the Administrator role gets every permission the modules declare, the User role the ones
+///   <c>Identity:Seed:UserPermissions</c> lists (least privilege: a list the host chose, not a naming rule);</item>
+///   <item>the initial administrator is created when <c>Identity:Seed:AdminEmail</c> and <c>AdminPassword</c> are set
+///   (the role counts once they turn two-factor authentication on);</item>
 ///   <item>the configured clients are created or updated to match; clients no longer configured are left alone.</item>
 /// </list>
 /// </summary>
@@ -69,10 +70,7 @@ internal sealed partial class IdentityServerSeeder(
         await EnsureRoleAsync(roles, IdentityRoles.Administrator, "Full administrative access",
             permissions.Select(permission => permission.Name));
 
-        await EnsureRoleAsync(roles, IdentityRoles.User, "Standard authenticated user", permissions
-            .Where(permission => permission.Name.EndsWith(":read", StringComparison.Ordinal)
-                                 && !string.Equals(permission.Group, IdentityPermissions.Group, StringComparison.OrdinalIgnoreCase))
-            .Select(permission => permission.Name));
+        await EnsureRoleAsync(roles, IdentityRoles.User, "Standard authenticated user", options.Value.Seed.UserPermissions);
     }
 
     // Adds missing permissions to the role; never removes one an administrator granted.

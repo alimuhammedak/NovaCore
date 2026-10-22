@@ -1,4 +1,7 @@
+using System.Net;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -52,8 +55,9 @@ public static class IdentityServerHostingExtensions
                 options.User.RequireUniqueEmail = true;
                 options.SignIn.RequireConfirmedEmail = true;
 
-                // OWASP Authentication Cheat Sheet: length first, no character-composition rules.
-                options.Password.RequiredLength = 12;
+                // Length first, no character-composition rules (OWASP Authentication Cheat Sheet); 15 characters for a
+                // password that can be the only factor (NIST SP 800-63B-4). CommonPasswordValidator adds the blocklist.
+                options.Password.RequiredLength = 15;
                 options.Password.RequiredUniqueChars = 1;
                 options.Password.RequireDigit = false;
                 options.Password.RequireLowercase = false;
@@ -66,9 +70,16 @@ public static class IdentityServerHostingExtensions
                 options.Lockout.AllowedForNewUsers = true;
             })
             .AddRoles<ApplicationRole>()
+            // Before the EF stores, which add their user store only when none is registered.
+            .AddUserStore<HashedRecoveryCodesUserStore>()
             .AddEntityFrameworkStores<IdentityServerDbContext>()
             .AddSignInManager()
-            .AddDefaultTokenProviders();
+            .AddDefaultTokenProviders()
+            .AddTokenProvider<SingleUseAuthenticatorTokenProvider>(TokenOptions.DefaultAuthenticatorProvider);
+
+        // NIST SP 800-63B-4: refuse commonly used passwords. Checked against a list in the package, never an outside
+        // service. Next to Identity's own validator, which every password still passes first.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IPasswordValidator<ApplicationUser>, CommonPasswordValidator>());
 
         // OWASP Password Storage Cheat Sheet: at least 600,000 iterations for PBKDF2-HMAC-SHA256.
         services.Configure<PasswordHasherOptions>(options => options.IterationCount = 600_000);
@@ -98,6 +109,11 @@ public static class IdentityServerHostingExtensions
         if (builder.Environment.IsDevelopment())
             services.TryAddSingleton<IEmailSender, LoggingEmailSender>();
         services.AddHostedService<EmailSenderStartupCheck>();
+
+        // The endpoints queue their emails and answer at once; EmailQueue sends them through the host's IEmailSender in
+        // the background, so the response time doesn't reveal whether an address has an account (R-105).
+        services.AddSingleton<EmailQueue>();
+        services.AddHostedService(provider => provider.GetRequiredService<EmailQueue>());
 
         // Built-in validation is generated per assembly, so the add-on registers it for its own requests (R-052).
         services.AddValidation();
@@ -132,6 +148,10 @@ public static class IdentityServerHostingExtensions
                     .SetAccessTokenLifetime(TimeSpan.FromMinutes(15))
                     .SetRefreshTokenLifetime(TimeSpan.FromDays(7));
 
+                // Seven days from the sign-in, not from the last refresh: by default each new refresh token gets a full
+                // lifetime, so one used before every expiry never ran out (measured, PLAN F6b.4e; R-103).
+                server.DisableSlidingRefreshTokenExpiration();
+
                 if (builder.Environment.IsDevelopment())
                     server.AddEphemeralEncryptionKey().AddEphemeralSigningKey();
 
@@ -148,24 +168,43 @@ public static class IdentityServerHostingExtensions
             .Configure<IOptions<JwtOptions>>((server, jwt) => server.Issuer = new Uri(jwt.Value.Authority, UriKind.Absolute))
             .ValidateOnStart();
 
+        // This provider's access tokens are RFC 9068 JWTs ("typ": "at+jwt"), and §4 has the resource server check the
+        // type, so no other JWT signed with the same key (an identity token) passes for one. Here, not in the core: the
+        // core validates other providers too, and Microsoft Entra's access tokens say "JWT" (docs/plan/RESEARCH.md
+        // R-101). PostConfigure, because the core's Configure replaces the validation parameters whatever the order.
+        services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
+            options => options.TokenValidationParameters.ValidTypes = [JsonWebTokenTypes.AccessToken]);
+
         // The sign-in session at the provider: Identity's cookies, alongside the API's bearer default (the parameterless
         // AddAuthentication doesn't change the default scheme, docs/plan/RESEARCH.md R-061). Only /connect/* and
         // /account/* read it.
-        services.AddAuthentication().AddIdentityCookies(cookies => cookies.ApplicationCookie!.Configure(cookie =>
+        services.AddAuthentication().AddIdentityCookies(cookies =>
         {
-            cookie.LoginPath = LoginPage.Path;
-            cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-            cookie.ExpireTimeSpan = TimeSpan.FromMinutes(30);
-            cookie.SlidingExpiration = true;
-
-            // Only a sign-in raises this event, not a renewal, so the time stays the sign-in's for auth_time and max_age.
-            cookie.Events.OnSigningIn = context =>
+            cookies.ApplicationCookie!.Configure(cookie =>
             {
-                ConnectEndpoints.RecordAuthenticationTime(context.Properties);
-                return Task.CompletedTask;
-            };
-        }));
-        services.AddAntiforgery();
+                cookie.LoginPath = LoginPage.Path;
+                cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                cookie.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+                cookie.SlidingExpiration = true;
+
+                // Only a sign-in raises this event, not a renewal, so the time stays the sign-in's for auth_time and max_age.
+                cookie.Events.OnSigningIn = context =>
+                {
+                    ConnectEndpoints.RecordAuthenticationTime(context.Properties);
+                    return Task.CompletedTask;
+                };
+            });
+
+            // The other sign-in cookies too: by default they follow the request's scheme, which behind a TLS proxy without
+            // forwarded headers is http (docs/plan/RESEARCH.md R-104). OpenIddict needs https anyway.
+            cookies.TwoFactorUserIdCookie!.Configure(cookie => cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always);
+            cookies.TwoFactorRememberMeCookie!.Configure(cookie => cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always);
+        });
+
+        // Antiforgery's cookie has no Secure flag by default, not even over https. Microsoft's guidance: Always outside
+        // Development (R-104). In Development it follows the request, since Always fails a plain-http page outright.
+        services.AddAntiforgery(antiforgery => antiforgery.Cookie.SecurePolicy =
+            builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always);
 
         // The cookie is read only at /connect/* and /account/*, so checking its security stamp on every read is cheap, and
         // a password change or "sign out everywhere" ends the provider session at once instead of within 30 minutes.
@@ -183,6 +222,16 @@ public static class IdentityServerHostingExtensions
                 identity => identity.Clients.TrueForAll(client =>
                     client.RedirectUris.Concat(client.PostLogoutRedirectUris).All(uri => uri.IsAbsoluteUri)),
                 "Identity:Clients:n:RedirectUris and PostLogoutRedirectUris must be absolute URIs.")
+            .Validate<IHostEnvironment>(
+                (identity, environment) => environment.IsDevelopment() || identity.Clients.TrueForAll(client =>
+                    client.RedirectUris.Concat(client.PostLogoutRedirectUris).All(IsSecureRedirect)),
+                "Identity:Clients:n:RedirectUris and PostLogoutRedirectUris must use https outside Development; plain http "
+                + "only on a loopback IP address (127.0.0.1, [::1]) for a native app (RFC 8252 §7.3).")
+            // RFC 6749 §10.10: a guessable secret is none. 32 characters hold 128 bits or more when they are generated.
+            .Validate(
+                identity => identity.Clients.TrueForAll(client =>
+                    string.IsNullOrEmpty(client.ClientSecret) || client.ClientSecret.Length >= IdentityClientOptions.MinimumSecretLength),
+                "Identity:Clients:n:ClientSecret must be at least 32 characters: generate it, e.g. 32 random bytes in base64.")
             .Validate(
                 identity => identity.Clients.TrueForAll(client => client.SignsInUsers || !string.IsNullOrEmpty(client.ClientSecret)),
                 "Identity:Clients:n without RedirectUris is a service client (client credentials) and needs a ClientSecret.")
@@ -190,6 +239,17 @@ public static class IdentityServerHostingExtensions
                 identity => identity.Clients.TrueForAll(client => !client.SignsInUsers || client.Permissions.Count == 0),
                 "Identity:Clients:n:Permissions apply to service clients only: a client with RedirectUris acts for its users, "
                 + "who get their own permissions.")
+            // Every registered account gets the User role, so a typo would grant nothing and an admin permission would
+            // make every self-registered account an administrator of accounts.
+            .Validate<IEnumerable<IPermissionDefinitionProvider>>(
+                (identity, providers) => identity.Seed.UserPermissions.TrueForAll(
+                    providers.SelectMany(provider => provider.GetPermissions()).Select(permission => permission.Name).Contains),
+                "Identity:Seed:UserPermissions must list permissions a module declares.")
+            .Validate(
+                identity => !identity.Seed.UserPermissions.Exists(
+                    permission => permission.StartsWith(IdentityPermissions.Prefix, StringComparison.Ordinal)),
+                "Identity:Seed:UserPermissions can't hold the identity provider's own permissions (identity:*): every "
+                + "registered account gets them.")
             .ValidateOnStart();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<IdentityServerOptions>, IdentityServerOptionsValidator>());
         services.AddHostedService<IdentityServerSeeder>();
@@ -208,6 +268,16 @@ public static class IdentityServerHostingExtensions
         return builder;
     }
 
+    // An authorization code sent over plain http can be read on the way, except to a native app's own loopback listener,
+    // named by its IP address: "localhost" may resolve to another interface (RFC 8252 §7.3, §8.3). A relative URI is
+    // the absolute-URI rule's to report.
+    private static bool IsSecureRedirect(Uri uri) =>
+        !uri.IsAbsoluteUri
+        || uri.Scheme != Uri.UriSchemeHttp
+        || (uri.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6
+            && IPAddress.TryParse(uri.DnsSafeHost, out var address)
+            && IPAddress.IsLoopback(address));
+
     /// <summary>
     /// Maps the provider's endpoints: the authorization, token and end-session endpoints under <c>/connect</c> (OpenIddict
     /// validates the requests first) and the browser pages under <c>/account</c> (sign-in at <c>/account/login</c>,
@@ -223,8 +293,11 @@ public static class IdentityServerHostingExtensions
     {
         ConnectEndpoints.Map(endpoints);
 
-        // The pages a signed-out browser uses; the handlers read the sign-in session themselves.
-        var account = endpoints.MapGroup("/account").ExcludeFromDescription().AllowAnonymous().RequireRateLimiting("strict");
+        // The pages a signed-out browser uses; the handlers read the sign-in session themselves. No cross-origin access:
+        // the core's policy allows credentials for configured origins, and a script there mustn't read the pages with
+        // the user's cookies (RFC 9700 §2.6, docs/plan/RESEARCH.md R-102).
+        var account = endpoints.MapGroup("/account").ExcludeFromDescription().AllowAnonymous().RequireRateLimiting("strict")
+            .WithMetadata(new DisableCorsAttribute());
         LoginPage.Map(account);
         PasswordResetPage.Map(account);
 

@@ -26,4 +26,9 @@
     <ProjectReference Include="..\NovaCore.AspNetCore\NovaCore.AspNetCore.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Read by CommonPasswordValidator: a password blocklist from SecLists (MIT), its notice in the file's header. -->
+    <EmbeddedResource Include="CommonPasswords.txt" LogicalName="NovaCore.Identity.OpenIddict.CommonPasswords.txt" />
+  </ItemGroup>
+
 </Project>

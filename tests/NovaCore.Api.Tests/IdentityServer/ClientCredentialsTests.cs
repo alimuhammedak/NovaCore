@@ -25,17 +25,17 @@ public sealed class ClientCredentialsTests(ClientCredentialsTests.Fixture fixtur
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Identity:Clients:1:ClientId"] = "worker",
-                ["Identity:Clients:1:ClientSecret"] = "worker-secret-for-tests",
+                ["Identity:Clients:1:ClientSecret"] = "worker-secret-for-tests-at-least-32-chars",
                 ["Identity:Clients:1:Permissions:0"] = IdentityServerTestHost.ProbePermission,
                 ["Identity:Clients:2:ClientId"] = "reporter",
-                ["Identity:Clients:2:ClientSecret"] = "reporter-secret-for-tests"
+                ["Identity:Clients:2:ClientSecret"] = "reporter-secret-for-tests-at-least-32-chars"
             });
     }
 
     [Fact]
     public async Task A_service_client_holds_the_permissions_configured_for_it()
     {
-        var token = await TokenAsync("worker", "worker-secret-for-tests");
+        var token = await TokenAsync("worker", "worker-secret-for-tests-at-least-32-chars");
 
         Assert.Equal("worker", new JsonWebToken(token).Subject);
         Assert.Equal(HttpStatusCode.OK, (await CallProbeAsync(token)).StatusCode);
@@ -44,7 +44,7 @@ public sealed class ClientCredentialsTests(ClientCredentialsTests.Fixture fixtur
     [Fact]
     public async Task A_service_client_without_the_permission_is_forbidden()
     {
-        var token = await TokenAsync("reporter", "reporter-secret-for-tests");
+        var token = await TokenAsync("reporter", "reporter-secret-for-tests-at-least-32-chars");
 
         Assert.Equal(HttpStatusCode.Forbidden, (await CallProbeAsync(token)).StatusCode);
     }

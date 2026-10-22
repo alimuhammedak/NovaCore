@@ -11,16 +11,19 @@ public enum PaymentStatus
 }
 
 /// <summary>
-/// A payment for a quantity of a catalog product. Aggregate root of the Payments module. It starts pending and asks for its
-/// stock (<see cref="PaymentCreated"/>); the Catalog module's answer settles it, once.
+/// A payment for a quantity of a catalog product, made by <see cref="OwnerId"/>. Aggregate root of the Payments module. It
+/// starts pending and asks for its stock (<see cref="PaymentCreated"/>); the Catalog module's answer settles it, once.
 /// </summary>
 public sealed class Payment : AuditableEntity<Guid>
 {
     private Payment() { }
 
-    public Payment(Guid productId, string productName, int quantity, decimal unitPrice)
+    public Payment(string ownerId, Guid productId, string productName, int quantity, decimal unitPrice)
         : base(Guid.CreateVersion7())
     {
+        ArgumentException.ThrowIfNullOrEmpty(ownerId);
+
+        OwnerId = ownerId;
         ProductId = productId;
         ProductName = productName;
         Quantity = quantity;
@@ -29,6 +32,9 @@ public sealed class Payment : AuditableEntity<Guid>
         Status = PaymentStatus.Pending;
         Raise(new PaymentCreated(Id, productId, quantity));
     }
+
+    /// <summary>The <c>sub</c> of the caller who made the payment: a user, or a service client's id.</summary>
+    public string OwnerId { get; private set; } = string.Empty;
 
     public Guid ProductId { get; private set; }
 

@@ -1,6 +1,8 @@
 using System.Net;
 using System.Security.Claims;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
+using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
 using NovaCore.Modules.Catalog.Authorization;
 using NovaCore.Modules.Catalog.Infrastructure;
@@ -60,6 +62,27 @@ public sealed class PermissionResolutionTests(FakeClockApiFactory factory)
         using var newStamp = ClientFor(subject, stamp: "stamp-2");
         Assert.Equal(HttpStatusCode.OK, (await sameStamp.GetAsync("/api/v1/products")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await newStamp.GetAsync("/api/v1/products")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Removing_a_subjects_permissions_takes_effect_at_once()
+    {
+        var subject = Guid.NewGuid().ToString();
+        var other = Guid.NewGuid().ToString();
+        factory.GrantPermissions(subject, CatalogPermissions.ProductsRead);
+        factory.GrantPermissions(other, CatalogPermissions.ProductsRead);
+        using var client = ClientFor(subject, stamp: "stamp-1");
+        using var otherClient = factory.CreateClientWithClaims(new Claim(NovaClaims.Subject, other));
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await otherClient.GetAsync("/api/v1/products")).StatusCode);
+
+        factory.GrantPermissions(subject);
+        factory.GrantPermissions(other);
+        await factory.Services.GetRequiredService<HybridCache>().RemovePermissionsAsync(subject, TestContext.Current.CancellationToken);
+
+        // Whatever the stamp it was cached under; another subject's entry stays until it expires.
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await otherClient.GetAsync("/api/v1/products")).StatusCode);
     }
 
     private HttpClient ClientFor(string subject, string stamp) =>

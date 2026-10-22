@@ -18,6 +18,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restores use committed lock files in CI (`--locked-mode`), and the SDK is pinned exactly (`global.json`).
   Dependabot proposes NuGet, action, SDK and compose image updates after a 7-day cooldown.
 - The compose services listen on 127.0.0.1 only and their images are pinned by digest.
+- Identity provider: an authenticator code signs in (or enables or disables two-factor authentication) once. The code
+  that enabled two-factor authentication no longer signs in, and two requests racing with one code let one in.
+- Identity provider: two-factor recovery codes are stored as password hashes (PBKDF2), no longer as plain text.
+  **Upgrade:** codes issued by an earlier version stop working; users get new ones from `POST /api/v1/auth/2fa/enable`,
+  which also deletes the old plain-text ones.
+  Delete the old plain-text codes with
+  `DELETE FROM identity.AspNetUserTokens WHERE LoginProvider = '[AspNetUserStore]' AND Name = 'RecoveryCodes'`.
+- Identity provider: the two-factor endpoints ask for the current password (ASVS 7.5.1). **Breaking:**
+  `POST /api/v1/auth/2fa/setup` takes `{ password }`, `/2fa/enable` and `/2fa/disable` take `{ password, code }`. A wrong
+  password or code counts toward lockout. `/2fa/enable` while two-factor authentication is on returns new recovery
+  codes. Turning it on or off ends every session of the user (refresh tokens and authorizations).
+- Identity provider: granting or removing the `Administrator` role needs `identity:roles:manage` on top of
+  `identity:users:manage` (whose holder could otherwise make themselves an administrator), and the last administrator
+  keeps the role (409); since two-factor authentication is required for the role, the last member with it does. A role
+  change through the admin API takes effect on the user's next request and revokes their refresh tokens and
+  authorizations.
+- Identity provider: the `Administrator` role counts only for an account with two-factor authentication on. **Upgrade:**
+  administrators sign in with their password and turn it on (`/api/v1/auth/2fa/setup`, then `/2fa/enable`) before the
+  admin API answers them again.
+- Identity provider: the User role's permissions come from `Identity:Seed:UserPermissions` instead of "every declared
+  `:read` permission". The host doesn't start when the list names a permission no module declares or one of the
+  provider's own (`identity:*`). **Upgrade:** list the permissions every registered account should get; seeding still
+  adds missing ones and never removes one.
+- Payments: a payment belongs to the caller who made it (`OwnerId`, the token's `sub`; migration `PaymentOwner`).
+  `GET /api/v1/payments` lists the caller's own payments; the new `payments:read-all` permission lists everyone's.
+  **Upgrade:** payments made before have no owner and are listed with `payments:read-all` only.
+- Identity provider: the API accepts only `at+jwt` tokens from it (RFC 9068 §4), so no other JWT signed with its key
+  passes for an access token. The core alone still accepts other providers' `JWT` tokens.
+- Identity provider: `/connect/authorize` and the `/account` pages answer no cross-origin request (RFC 9700 §2.6); the
+  token endpoint keeps CORS for single-page apps.
+- Identity provider: outside Development the host doesn't start with a plain-http redirect or post-logout URI, except
+  on a loopback IP address (`127.0.0.1`, `[::1]`) for a native app (RFC 8252 §7.3).
+- Identity provider: a client secret (`Identity:Clients:n:ClientSecret`) has at least 32 characters, or the host doesn't
+  start (RFC 6749 §10.10).
+- Identity provider: refresh tokens expire seven days after the sign-in; a refresh no longer starts a new seven days, so
+  a session ends at the latest a week after the password was entered.
+- Identity provider: the two-factor cookies are always `Secure`, and the antiforgery cookie is `Secure` outside
+  Development (it never was) and over https in Development.
+- Identity provider: the security audit log names accounts by id only; `user_registered` and `login_failed` no longer
+  carry a masked email address (`login_failed` has `User=` instead of `Email=`).
+- Identity provider: passwords have at least 15 characters (was 12) and can't be one of 3,000 common ones (a list from
+  SecLists, MIT, shipped in the package; compared ignoring case; NIST SP 800-63B-4). **Breaking** for registration, password
+  change and reset; existing passwords keep working until they change.
+- Identity provider: registration, the password reset form and resending the confirmation answer before the email is
+  sent; a background service sends the queued emails through the host's `IEmailSender`. A slow mail server no longer
+  shows in the response time, which revealed whether an address had an account (ASVS 6.3.8). A failed send is logged
+  and no longer fails the request. Queued emails are kept in memory: one still queued when the process stops is lost,
+  and when the queue is full (a stuck mail server) a new email is dropped and logged instead of holding the request.
+
+### Added
+
+- `HybridCache.RemovePermissionsAsync(subject)` (`NovaCore.AspNetCore`): drops the permissions cached for a subject, so
+  a change takes effect on its next request instead of after `Cache:PermissionExpiration`.
 
 ### Changed
 

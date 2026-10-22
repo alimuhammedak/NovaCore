@@ -15,6 +15,9 @@ namespace NovaCore.Api.Tests;
 /// </summary>
 internal static class ModuleTestData
 {
+    /// <summary>The <c>sub</c> the payments saved here belong to.</summary>
+    public const string TestOwner = "test-owner";
+
     public static async Task<Guid> AddProductAsync(this NovaCoreApiFactory factory, int stock, bool active = true)
     {
         await using var scope = factory.Services.CreateAsyncScope();
@@ -35,7 +38,7 @@ internal static class ModuleTestData
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var payments = scope.ServiceProvider.GetRequiredService<PaymentsDbContext>();
-        var payment = new Payment(productId, "Widget", quantity, 10m);
+        var payment = new Payment(TestOwner, productId, "Widget", quantity, 10m);
         payments.Payments.Add(payment);
         await payments.SaveChangesAsync();
         return payment.Id;
@@ -50,7 +53,7 @@ internal static class ModuleTestData
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var payments = scope.ServiceProvider.GetRequiredService<PaymentsDbContext>();
-        var payment = new Payment(productId, "Widget", quantity, 10m);
+        var payment = new Payment(TestOwner, productId, "Widget", quantity, 10m);
         var request = (PaymentCreated)payment.DomainEvents.Single();
         payment.ClearDomainEvents();
         payments.Payments.Add(payment);

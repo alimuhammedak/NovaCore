@@ -23,21 +23,41 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   sign-in session uses Identity's cookies added with the parameterless `AddAuthentication()` (R-061); only `/connect/*`
   and `/account/*` read them.
 - **Hardening (keep these values or stronger):** PBKDF2 `IterationCount = 600_000`; password length-first
-  (`RequiredLength = 12`, no composition rules); lockout 5 attempts / 15 min, new accounts included; a wrong 2FA code
+  (`RequiredLength = 15`, no composition rules, NIST SP 800-63B-4) and no common password (`CommonPasswordValidator`, a
+  singleton over the embedded `CommonPasswords.txt` from SecLists, MIT notice in its header; no outside call); lockout 5 attempts / 15 min, new accounts included; a wrong 2FA code
   counts as a failed access, a recovery code included (`SignInManager` neither checks lockout nor counts a wrong
   recovery code, so `LoginPage` does both before and after redeeming it, R-085); `RequireConfirmedEmail = true`;
-  `RequireUniqueEmail = true`.
+  `RequireUniqueEmail = true`. Cookies: the application and two-factor cookies are `Secure` always; antiforgery's is
+  `Always` outside Development and `SameAsRequest` in it (its default is never Secure; `Always` fails a plain-http page,
+  R-104).
+- **An authenticator code works once** (ASVS 6.5.1): `SingleUseAuthenticatorTokenProvider` replaces Identity's
+  `Authenticator` provider, lets Identity verify the code (±2 steps), then refuses a code accepted in the last five
+  steps and records the new one in a user token. The save carries the user's concurrency stamp, so two requests racing
+  with one code let one in. The codes are compared as numbers, like Identity does (`012345` is `12345`). Every TOTP
+  check (sign-in, enable, disable) goes through `UserManager.VerifyTwoFactorTokenAsync`, never around it (D-053 (2)).
+- **Recovery codes are stored hashed** (ASVS 6.5.2): `HashedRecoveryCodesUserStore` (Identity's EF user store, registered
+  before `AddEntityFrameworkStores`) keeps them as `PasswordHasher` hashes with its defaults (PBKDF2-HMAC-SHA512,
+  100,000 iterations; not the host's 600,000, since a sign-in tries up to ten) under its own token name. Identity's
+  plain-text slot is never read (D-053 (3)).
 - **Protocol:** Authorization Code with PKCE **S256 only** (`plain` removed, D-029 (1)); refresh tokens rotate, and a
   redeemed one reused after OpenIddict's 30 s leeway revokes every token of its authorization; access tokens 15 minutes,
-  refresh tokens 7 days. The token endpoint re-checks the account on every refresh (exists, can sign in, not locked out)
-  and rewrites the roles.
+  refresh tokens 7 days from the sign-in, not from the last refresh (`DisableSlidingRefreshTokenExpiration`, F6b.4e). The token endpoint re-checks the account on every refresh (exists, can sign in, not locked out)
+  and rewrites the roles. The API takes only `typ: at+jwt` (RFC 9068 §4): the add-on post-configures JwtBearer's
+  `ValidTypes`, the core doesn't (other providers, e.g. Entra, say `JWT`; D-053 (8)). `/connect/authorize` and the
+  `/account` group carry `DisableCorsAttribute` (RFC 9700 §2.6): the core's policy allows credentials for configured
+  origins. The token endpoint keeps CORS for single-page apps.
 - **Anti-enumeration:** the sign-in page shows one message for an unknown account, a wrong password and a locked
   account; the "confirm your email" message comes only after the right password. `SignInManager` answers `NotAllowed`
   before it looks at the password, so `LoginPage` checks the password itself and counts a wrong one (D-030 (1)).
   An unknown email costs a password hash like a known one (`DummyPasswordHash`, made once by the host's hasher), so the
-  answer's timing doesn't reveal accounts either (R-087). Registration answers an existing address like a new one. Resending the confirmation answers every address alike and
-  emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
-  account; the reset page answers an unknown or unconfirmed account like a bad token (R-084).
+  answer's timing doesn't reveal accounts either (R-087). Registration answers an existing address like a new one.
+  Resending the confirmation answers every address alike and emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
+  account; the reset page answers an unknown or unconfirmed account like a bad token (R-084). Those three never wait
+  for the mail server: they queue the email (`EmailQueue`, a bounded in-memory channel read by a `BackgroundService`
+  that sends through the host's `IEmailSender`, one at a time), so the response time doesn't reveal the account either
+  (F6b.6a, R-105, ASVS 6.3.8). A queued email is lost if the process stops; a failed send is logged without the address
+  or the body. A full queue never makes the request wait (that would reveal the account again): the email is dropped
+  and logged (D-055 (1)). Send new emails the same way, never by awaiting `IEmailSender` in a handler.
 - **Password reset:** the link carries an Identity token that `ResetPasswordAsync` uses up (it renews the security
   stamp), the new password is typed twice, and a reset revokes every token and authorization of the user like a
   password change. It never signs the user in. A missing `User` role (seeding off) leaves a new account without a role
@@ -47,13 +67,28 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   check; D-030 (2), R-067).
 - **Two-factor keys stay secret once enabled:** `/2fa/setup` answers 409 while 2FA is on; a new authenticator starts
   after `/2fa/disable`, which takes a code (D-030 (3)).
+- **The second factor changes only with the password** (ASVS 7.5.1, D-053 (4)): `/2fa/setup` takes `{ password }`,
+  `/2fa/enable` and `/2fa/disable` take `{ password, code }`. A locked account is refused; a wrong password or code counts
+  toward lockout and only full success resets the count, as on the sign-in page. `/2fa/enable` while 2FA is on returns
+  new recovery codes (no endpoint of its own). Turning 2FA on or off revokes every refresh token and authorization of
+  the user. No `amr`/`acr` or step-up in the token: permissions follow the person on the server, not the token.
 - **Claims contract:** access tokens carry `sub`, `name`, `email`, `role` (the names in `NovaClaims`). **Never
   permissions, never the security stamp:** the core resolves permissions per request (`IdentityPermissionResolver`: role
-  + direct `permission` claims for a Guid `sub`, every declared permission for an `Administrator` member,
+  + direct `permission` claims for a Guid `sub`, every declared permission for an `Administrator` member with
+  two-factor authentication on (without it the role gives nothing, D-053 (5); turning 2FA on or off drops the cache),
   `Identity:Clients:n:Permissions` for a service client's id). The core has no super-admin role: the token's `role`
   claim is informational and never passes a permission check (D-036 (2)). The core's
   claims transformation runs on OpenIddict's scheme too, so a principal copied into a token drops `permission` claims
   (D-029 (3)).
+- **Role changes (F6b.2, D-053 (6)):** the admin API drops the user's cached permissions
+  (`HybridCache.RemovePermissionsAsync`, a tag: the stamp in the cache key is unknown here) and revokes their refresh
+  tokens and authorizations on every grant or removal. Granting or removing `Administrator` (compared normalized, so
+  `administrator` is the same role) also needs `identity:roles:manage`: `identity:users:manage` alone would let its
+  holder make themselves an administrator. The last member with two-factor authentication (the only kind the role
+  counts for) keeps the role (409). The seed gives the User role the
+  `Identity:Seed:UserPermissions` list (D-047, D-053 (7)), never a naming rule; the list is checked on start: declared
+  by a module, no `identity:*`. Anything else that changes what the
+  resolver returns for a user must drop the cache the same way (the 2FA endpoints do).
 - **The store is pruned:** `ExpiredTokenPruner` (a `BackgroundService`, a pass at startup, then hourly) calls
   OpenIddict's `PruneAsync` for tokens, then authorizations, with a 14-day minimum lifespan (OpenIddict.Quartz's defaults,
   R-088). Keep the lifespan longer than the refresh token lifetime, so a reused refresh token is still found and revokes
@@ -74,7 +109,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   `EmailLinks`, which starts them from `Jwt:Authority`, not the Host header.
 - **Validated request bodies are public records** (`AccountRequests.cs`): .NET 10's validation generator skips internal
   types (R-062). Endpoint classes stay internal.
-- **Audit, don't print secrets.** Security events go through `SecurityAuditLogger` (masked emails, `SECURITY` prefix).
+- **Audit, don't print secrets.** Security events go through `SecurityAuditLogger` (`SECURITY` prefix), naming the
+  account by its id: no email address, not even masked (Y-35, CodeQL `cs/exposure-of-sensitive-information`, F6b.6d).
   Never log passwords, codes, raw tokens or full JWTs.
 - **Password change and "sign out everywhere"** revoke every token and authorization of the user and renew the security
   stamp; the cookie's stamp is checked on every use (`ValidationInterval = 0`), so the provider session ends at once.
@@ -101,4 +137,7 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   cookies, antiforgery tokens and confirmation links depend on it. Outside Development `ValidateOnStart` stops the host
   without one (D-036 (6)); the framework's fallback (user profile or memory) doesn't survive a replaced container.
 - Client secrets and the seed administrator's password come from user secrets or the environment, never appsettings.
+  A client secret has at least 32 characters (generated; RFC 6749 §10.10), or the host doesn't start.
+- Redirect and post-logout URIs use https; outside Development the host doesn't start with a plain-http one, except on
+  a loopback IP address for a native app (RFC 8252 §7.3; `localhost` is refused, §8.3).
 - TLS at the edge; OpenIddict refuses plain HTTP.

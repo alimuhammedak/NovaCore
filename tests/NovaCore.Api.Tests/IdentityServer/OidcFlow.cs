@@ -201,7 +201,7 @@ internal sealed partial class OidcFlow : IDisposable
 
     public void Dispose() => Browser.Dispose();
 
-    private static string HiddenValue(string html, string name)
+    public static string HiddenValue(string html, string name)
     {
         var match = HiddenInput().Matches(html).FirstOrDefault(m => m.Groups["name"].Value == name);
         Assert.NotNull(match);

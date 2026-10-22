@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -102,6 +104,16 @@ public sealed class IdentityServerConfigurationTests
         Assert.IsType<InMemoryKeyStore>(host.Services.GetRequiredService<IOptions<KeyManagementOptions>>().Value.XmlRepository);
     }
 
+    // Microsoft's antiforgery guidance (R-104). Development keeps plain-http pages working.
+    [Fact]
+    public async Task Outside_Development_the_antiforgery_cookie_is_always_secure()
+    {
+        await using var host = await IdentityServerTestHost.StartAsync(
+            Environments.Production, builder => AddProductionServices(builder, keyStore: true));
+
+        Assert.Equal(CookieSecurePolicy.Always, host.Services.GetRequiredService<IOptions<AntiforgeryOptions>>().Value.Cookie.SecurePolicy);
+    }
+
     [Fact]
     public async Task In_Development_the_framework_default_key_store_is_enough()
     {
@@ -123,7 +135,7 @@ public sealed class IdentityServerConfigurationTests
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Identity:Clients:1:ClientId"] = "worker",
-                ["Identity:Clients:1:ClientSecret"] = "worker-secret-for-tests",
+                ["Identity:Clients:1:ClientSecret"] = "worker-secret-for-tests-at-least-32-chars",
                 ["Identity:Clients:1:Permissions:0"] = IdentityServerTestHost.ProbePermission
             });
         });
@@ -138,7 +150,7 @@ public sealed class IdentityServerConfigurationTests
         {
             ["grant_type"] = "client_credentials",
             ["client_id"] = "worker",
-            ["client_secret"] = "worker-secret-for-tests"
+            ["client_secret"] = "worker-secret-for-tests-at-least-32-chars"
         }));
         var accessToken = (await token.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("access_token").GetString()!;
         Assert.Equal(SecurityAlgorithms.EcdsaSha256, new JsonWebToken(accessToken).Alg);
@@ -161,6 +173,56 @@ public sealed class IdentityServerConfigurationTests
         Assert.Contains(expectedInMessage, exception.Message, StringComparison.Ordinal);
     }
 
+    // RFC 8252 §7.3: outside Development, plain http is only a native app's loopback listener, named by its IP address
+    // ("localhost" can resolve elsewhere, §8.3). Anything else would send the code over the network unencrypted.
+    [Theory]
+    [InlineData("RedirectUris:0", "http://client.novacore.test/callback", false)]
+    [InlineData("RedirectUris:0", "http://localhost:5000/callback", false)]
+    [InlineData("PostLogoutRedirectUris:0", "http://client.novacore.test/signed-out", false)]
+    [InlineData("RedirectUris:0", "http://127.0.0.1:5000/callback", true)]
+    [InlineData("RedirectUris:0", "http://[::1]:5000/callback", true)]
+    public async Task Outside_Development_an_http_redirect_must_be_a_loopback_address(string key, string uri, bool starts)
+    {
+        Task<IdentityServerTestHost> StartAsync() => IdentityServerTestHost.StartAsync(Environments.Production, builder =>
+        {
+            AddProductionServices(builder, keyStore: true);
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Identity:Clients:0:" + key] = uri });
+        });
+
+        if (starts)
+        {
+            await using var host = await StartAsync();
+            return;
+        }
+
+        var exception = await Assert.ThrowsAnyAsync<Exception>(StartAsync);
+        Assert.Contains("must use https outside Development", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task In_Development_an_http_redirect_is_allowed()
+    {
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+            builder.Configuration.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Identity:Clients:0:RedirectUris:0"] = "http://client.novacore.test/callback" }));
+    }
+
+    // RFC 6749 §10.10: a secret that can be guessed is no secret; 32 characters hold 128 bits or more when generated.
+    [Theory]
+    [InlineData("1", "worker", "a-secret-of-31-characters-xxxxx")]
+    [InlineData("0", IdentityServerTestHost.ClientId, "short")]
+    public async Task A_client_secret_shorter_than_32_characters_stops_the_host(string index, string clientId, string secret)
+    {
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
+            configure: builder => builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"Identity:Clients:{index}:ClientId"] = clientId,
+                [$"Identity:Clients:{index}:ClientSecret"] = secret
+            })));
+
+        Assert.Contains("ClientSecret must be at least 32 characters", exception.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task A_service_client_without_a_secret_stops_the_host()
     {
@@ -169,6 +231,18 @@ public sealed class IdentityServerConfigurationTests
                 new Dictionary<string, string?> { ["Identity:Clients:1:ClientId"] = "worker" })));
 
         Assert.Contains("needs a ClientSecret", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("nobody:declares:this", "must list permissions a module declares")]
+    [InlineData("identity:users:manage", "can't hold the identity provider's own permissions")]
+    public async Task A_User_role_permission_outside_the_modules_declarations_stops_the_host(string permission, string expectedInMessage)
+    {
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
+            configure: builder => builder.Configuration.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Identity:Seed:UserPermissions:0"] = permission })));
+
+        Assert.Contains(expectedInMessage, exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

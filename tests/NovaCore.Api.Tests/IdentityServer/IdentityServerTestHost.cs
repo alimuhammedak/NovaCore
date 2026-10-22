@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -71,6 +72,13 @@ public sealed class IdentityServerTestHost : IAsyncDisposable
         try
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
+
+            // This host's own configuration only. The test project's output also holds the Api project's appsettings
+            // files, which a host of the core and the add-on wouldn't have: their Identity section names the Api's
+            // modules and clients. The options' defaults stand in for the rest.
+            foreach (var file in builder.Configuration.Sources.OfType<JsonConfigurationSource>().ToList())
+                builder.Configuration.Sources.Remove(file);
+
             builder.Logging.ClearProviders();
             builder.WebHost.UseTestServer(options => options.BaseAddress = new Uri(Authority));
             builder.Host.UseDefaultServiceProvider(options =>

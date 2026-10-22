@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Net;
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,8 +50,11 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
         Assert.Equal(600_000u, BinaryPrimitives.ReadUInt32BigEndian(hash.AsSpan(5, 4)));
     }
 
+    // NIST SP 800-63B-4: at least 15 characters for a password that can be a single factor, no composition rules.
     [Theory]
     [InlineData("short-pass1", false)]            // 11 characters
+    [InlineData("fourteen-chars", false)]         // 14 characters
+    [InlineData("fifteen-letters", true)]         // 15 characters
     [InlineData("onlylowercaseletters", true)]    // long enough, no composition rules
     public async Task The_password_policy_asks_for_length_not_composition(string password, bool accepted)
     {
@@ -61,6 +65,33 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
         var result = await users.CreateAsync(NewUser(email), password);
 
         Assert.Equal(accepted, result.Succeeded);
+    }
+
+    // NIST SP 800-63B-4: a password from a list of common ones is refused, whatever its length; compared ignoring case.
+    [Theory]
+    [InlineData("1qaz2wsx3edc4rfv")]
+    [InlineData("123456789qwerty")]
+    [InlineData("QAZWSXEDCRFVTGB")]
+    public async Task A_common_password_is_refused(string password)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+        var result = await users.CreateAsync(NewUser($"{Guid.NewGuid():N}@novacore.test"), password);
+
+        Assert.Contains(result.Errors, error => error.Code == "CommonPassword");
+    }
+
+    [Fact]
+    public async Task Registration_refuses_a_common_password()
+    {
+        using var client = _host.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/v1/auth/register",
+            new { email = "common-password@novacore.test", password = "iloveyouforever" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("too common", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -183,20 +214,66 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
             message.StartsWith($"SECURITY account_locked_out User={user.Id}", StringComparison.Ordinal));
     }
 
+    // Y-35 and CodeQL cs/exposure-of-sensitive-information (F6b.6d): the audit names the account by its id, never by its
+    // address, not even a masked one; an unknown address leaves no trace of itself.
     [Fact]
-    public async Task A_failed_sign_in_is_audited_with_a_masked_email_and_no_password()
+    public async Task A_failed_sign_in_is_audited_by_account_id_without_the_email_or_the_password()
     {
-        await _host.CreateUserAsync("audit@novacore.test", Password);
+        var user = await _host.CreateUserAsync("audit@novacore.test", Password);
         using var flow = new OidcFlow(_host);
+        // The class's other tests fail sign-ins for unknown addresses too.
+        var unknownBefore = AuditMessages().Count(message => message.Contains("Reason=unknown-user", StringComparison.Ordinal));
 
         await SignInPageAsync(flow, "audit@novacore.test", "a secret wrong password");
+        using var unknown = new OidcFlow(_host);
+        await SignInPageAsync(unknown, "nobody-audit@novacore.test", "a secret wrong password");
 
         var entry = Assert.Single(fixture.Log.Messages, message =>
-            message.StartsWith("SECURITY login_failed Email=a***@novacore.test", StringComparison.Ordinal));
+            message.StartsWith($"SECURITY login_failed User={user.Id}", StringComparison.Ordinal));
         Assert.Contains("Reason=bad-password", entry, StringComparison.Ordinal);
-        Assert.DoesNotContain(fixture.Log.Messages, message =>
-            message.Contains("a secret wrong password", StringComparison.Ordinal)
-            || message.Contains("audit@novacore.test", StringComparison.Ordinal));
+        Assert.Equal(unknownBefore + 1, AuditMessages().Count(message => message.Contains("Reason=unknown-user", StringComparison.Ordinal)));
+        Assert.DoesNotContain(fixture.Log.Messages, message => message.Contains("a secret wrong password", StringComparison.Ordinal));
+        Assert.DoesNotContain(AuditMessages(), message =>
+            message.Contains("@novacore.test", StringComparison.Ordinal) || message.Contains("***", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_registration_is_audited_without_the_email()
+    {
+        using var client = _host.CreateClient();
+
+        await client.PostAsJsonAsync("/api/v1/auth/register", new { email = "registered-audit@novacore.test", password = Password });
+
+        Assert.Single(fixture.Log.Messages, message => message.StartsWith("SECURITY user_registered", StringComparison.Ordinal));
+        // The Development email sender logs the address on purpose (it stands in for the mail server); the audit doesn't.
+        Assert.DoesNotContain(AuditMessages(), message =>
+            message.Contains("registered-audit", StringComparison.Ordinal) || message.Contains("r***@", StringComparison.Ordinal));
+    }
+
+    private IEnumerable<string> AuditMessages() =>
+        fixture.Log.Messages.Where(message => message.StartsWith("SECURITY ", StringComparison.Ordinal));
+
+    // CodeQL cs/user-controlled-bypass on LoginPage (F6b.6d, a false positive): the request's content type, which the
+    // caller controls, can only turn a form post away. A valid antiforgery token sent in the header with another content
+    // type is still a bad request, neither a sign-in nor a 500 from reading a form that isn't one.
+    [Theory]
+    [InlineData("/account/login")]
+    [InlineData("/account/login/2fa")]
+    public async Task A_post_that_is_not_a_form_is_a_bad_request_even_with_a_valid_antiforgery_token(string path)
+    {
+        await _host.CreateUserAsync($"not-a-form-{Guid.NewGuid():N}@novacore.test", Password);
+        using var flow = new OidcFlow(_host);
+        var page = await flow.Browser.GetAsync("/account/login");
+        var token = OidcFlow.HiddenValue(await page.Content.ReadAsStringAsync(), "__RequestVerificationToken");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = JsonContent.Create(new { Email = "x@novacore.test", Password, Code = "123456" })
+        };
+        request.Headers.Add("RequestVerificationToken", token);
+        var response = await flow.Browser.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     private static async Task<HttpResponseMessage> SignInPageAsync(OidcFlow flow, string email, string password) =>

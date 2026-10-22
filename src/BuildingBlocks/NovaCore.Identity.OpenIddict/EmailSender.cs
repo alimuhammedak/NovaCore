@@ -6,7 +6,9 @@ namespace NovaCore.Identity.OpenIddict;
 
 /// <summary>
 /// Sends the provider's transactional emails, such as the email confirmation link. Outside Development the host must
-/// register one (SMTP, a mail API, ...): the host does not start without it.
+/// register one (SMTP, a mail API, ...): the host does not start without it. The provider calls it in the background,
+/// one email at a time, after the request has been answered, so a slow mail server doesn't show in the response time;
+/// an exception is logged and the next email goes on.
 /// </summary>
 public interface IEmailSender
 {

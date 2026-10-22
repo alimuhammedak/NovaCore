@@ -64,7 +64,7 @@ internal static class LoginPage
             if (user is null && !string.IsNullOrEmpty(password))
                 dummyHash.Check(hasher, password);
 
-            audit.LoginFailed(email, ip, "unknown-user");
+            audit.LoginFailed(null, ip, "unknown-user");
             return PasswordForm(context, antiforgery, returnUrl, email, InvalidCredentials);
         }
 
@@ -89,7 +89,7 @@ internal static class LoginPage
         if (result.IsLockedOut)
             audit.AccountLockedOut(user.Id, ip);
         else
-            audit.LoginFailed(email, ip, result.IsNotAllowed ? "email-not-confirmed" : "bad-password");
+            audit.LoginFailed(user.Id, ip, result.IsNotAllowed ? "email-not-confirmed" : "bad-password");
 
         return PasswordForm(context, antiforgery, returnUrl, email, result.IsNotAllowed ? EmailNotConfirmed : InvalidCredentials);
     }
@@ -154,7 +154,7 @@ internal static class LoginPage
         if (result.IsLockedOut)
             audit.AccountLockedOut(user.Id, ip);
         else
-            audit.LoginFailed(user.Email, ip, isRecoveryCode ? "bad-recovery-code" : "bad-2fa-code");
+            audit.LoginFailed(user.Id, ip, isRecoveryCode ? "bad-recovery-code" : "bad-2fa-code");
 
         return CodeForm(context, antiforgery, returnUrl, isRecoveryCode ? InvalidRecoveryCode : InvalidCode);
     }

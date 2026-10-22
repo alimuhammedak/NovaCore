@@ -47,7 +47,7 @@ internal static class PasswordResetPage
         HttpContext context,
         IAntiforgery antiforgery,
         UserManager<ApplicationUser> users,
-        IEmailSender emailSender,
+        EmailQueue emails,
         IOptions<JwtOptions> jwt,
         SecurityAuditLogger audit)
     {
@@ -64,10 +64,10 @@ internal static class PasswordResetPage
         if (user is not null && await users.IsEmailConfirmedAsync(user))
         {
             var link = EmailLinks.Create(jwt.Value, ResetPath, user.Id, await users.GeneratePasswordResetTokenAsync(user));
-            await emailSender.SendAsync(user.Email!, "Reset your password",
+            // Queued, not sent here: the answer mustn't wait for the mail server, or its timing would reveal the account.
+            emails.Enqueue(user.Email!, "Reset your password",
                 $"Set a new password: <a href=\"{HtmlEncoder.Default.Encode(link)}\">Reset your password</a>. "
-                + "If you didn't ask for this, ignore this email; your password stays the same.",
-                context.RequestAborted);
+                + "If you didn't ask for this, ignore this email; your password stays the same.");
             audit.PasswordResetRequested(user.Id);
         }
 

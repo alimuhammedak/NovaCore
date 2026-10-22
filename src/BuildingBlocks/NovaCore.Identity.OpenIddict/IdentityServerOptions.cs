@@ -23,13 +23,19 @@ internal sealed class IdentityServerOptions
 /// <summary>A client application of the provider (<c>Identity:Clients:n</c>).</summary>
 internal sealed class IdentityClientOptions
 {
+    /// <summary>The shortest <see cref="ClientSecret"/>: 32 characters hold 128 bits or more when generated (RFC 6749 §10.10).</summary>
+    public const int MinimumSecretLength = 32;
+
     /// <summary>The OAuth <c>client_id</c>. Not a Guid: a Guid <c>sub</c> is a user (the permission resolver relies on it).</summary>
     [Required]
     public string ClientId { get; set; } = string.Empty;
 
     public string? DisplayName { get; set; }
 
-    /// <summary>The secret of a confidential client, from user secrets or the environment, never from appsettings.</summary>
+    /// <summary>
+    /// The secret of a confidential client, at least <see cref="MinimumSecretLength"/> characters, from user secrets or the
+    /// environment, never from appsettings.
+    /// </summary>
     public string? ClientSecret { get; set; }
 
     /// <summary>Where the authorization code is sent. Set for a client that signs users in.</summary>
@@ -61,6 +67,13 @@ internal sealed class IdentitySeedOptions
 
     /// <summary>The initial administrator's password, from user secrets or the environment, never from appsettings.</summary>
     public string? AdminPassword { get; set; }
+
+    /// <summary>
+    /// The permissions of the User role, which every registered account gets, e.g. <c>catalog:products:read</c>: each
+    /// one declared by a module, none of the provider's own (checked on start). Seeding adds the missing ones and never
+    /// removes one.
+    /// </summary>
+    public List<string> UserPermissions { get; set; } = [];
 }
 
 /// <summary>Source-generated validator for the data-annotation rules (docs/plan/RESEARCH.md R-048).</summary>

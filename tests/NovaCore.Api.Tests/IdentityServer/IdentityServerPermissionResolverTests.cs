@@ -11,7 +11,7 @@ namespace NovaCore.Api.Tests.IdentityServer;
 /// <summary>
 /// The add-on's <see cref="IPermissionResolver"/>: a user's permissions are the <c>permission</c> claims of every role
 /// they hold plus their own direct grants, read from the store by the token's <c>sub</c>. A member of the Administrator
-/// role holds every declared permission (F4c.2).
+/// role holds every declared permission (F4c.2), once two-factor authentication is on (F6b.1d).
 /// </summary>
 [Collection(IdentityServerTestGroup.Name)]
 public sealed class IdentityServerPermissionResolverTests(IdentityServerFixture fixture) : IClassFixture<IdentityServerFixture>
@@ -54,12 +54,28 @@ public sealed class IdentityServerPermissionResolverTests(IdentityServerFixture 
         var user = new ApplicationUser { UserName = "admin-resolve@novacore.test", Email = "admin-resolve@novacore.test", CreatedAtUtc = TimeProvider.System.GetUtcNow() };
         Assert.True((await users.CreateAsync(user)).Succeeded);
         await users.AddToRoleAsync(user, "Administrator");
+        await users.SetTwoFactorEnabledAsync(user, true);
 
         var declared = scope.ServiceProvider.GetServices<IPermissionDefinitionProvider>()
             .SelectMany(provider => provider.GetPermissions())
             .Select(permission => permission.Name);
 
         Assert.Equal(declared.Order(StringComparer.Ordinal), (await ResolveAsync(scope.ServiceProvider, user.Id.ToString())).Order(StringComparer.Ordinal));
+    }
+
+    // F6b.1d: the role that holds every permission needs the second factor. Other roles and direct grants don't.
+    [Fact]
+    public async Task An_administrator_without_two_factor_authentication_gets_nothing_from_the_role()
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+        var user = new ApplicationUser { UserName = "admin-no-2fa@novacore.test", Email = "admin-no-2fa@novacore.test", CreatedAtUtc = TimeProvider.System.GetUtcNow() };
+        Assert.True((await users.CreateAsync(user)).Succeeded);
+        await users.AddToRoleAsync(user, "Administrator");
+        await users.AddClaimAsync(user, new Claim(NovaClaims.Permission, "payments:payments:read"));
+
+        Assert.Equal(["payments:payments:read"], await ResolveAsync(scope.ServiceProvider, user.Id.ToString()));
     }
 
     [Theory]

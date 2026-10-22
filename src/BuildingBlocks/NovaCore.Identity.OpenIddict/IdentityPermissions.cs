@@ -7,6 +7,9 @@ internal static class IdentityPermissions
 {
     public const string Group = "Identity";
 
+    /// <summary>Every permission of the provider starts with it.</summary>
+    public const string Prefix = "identity:";
+
     public const string UsersRead = "identity:users:read";
     public const string UsersManage = "identity:users:manage";
     public const string RolesRead = "identity:roles:read";
@@ -22,7 +25,7 @@ internal static class IdentityRoles
     /// </summary>
     public const string Administrator = "Administrator";
 
-    /// <summary>Every registered user: the business modules' read permissions, none of the admin ones.</summary>
+    /// <summary>Every registered user: the permissions <c>Identity:Seed:UserPermissions</c> lists, none of the admin ones.</summary>
     public const string User = "User";
 }
 
