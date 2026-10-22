@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restores use committed lock files in CI (`--locked-mode`), and the SDK is pinned exactly (`global.json`).
   Dependabot proposes NuGet, action, SDK and compose image updates after a 7-day cooldown.
 - The compose services listen on 127.0.0.1 only and their images are pinned by digest.
+- Identity provider: an authenticator code signs in (or enables or disables two-factor authentication) once. The code
+  that enabled two-factor authentication no longer signs in, and two requests racing with one code let one in.
 
 ### Changed
 

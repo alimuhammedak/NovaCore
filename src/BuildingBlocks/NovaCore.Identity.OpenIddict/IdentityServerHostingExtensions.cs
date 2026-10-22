@@ -68,7 +68,8 @@ public static class IdentityServerHostingExtensions
             .AddRoles<ApplicationRole>()
             .AddEntityFrameworkStores<IdentityServerDbContext>()
             .AddSignInManager()
-            .AddDefaultTokenProviders();
+            .AddDefaultTokenProviders()
+            .AddTokenProvider<SingleUseAuthenticatorTokenProvider>(TokenOptions.DefaultAuthenticatorProvider);
 
         // OWASP Password Storage Cheat Sheet: at least 600,000 iterations for PBKDF2-HMAC-SHA256.
         services.Configure<PasswordHasherOptions>(options => options.IterationCount = 600_000);

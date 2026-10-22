@@ -15,9 +15,11 @@ internal static class AuthenticatorCode
     // needs no security guarantee: the case CA5350's documentation allows suppressing (docs/plan/RESEARCH.md R-063).
     [SuppressMessage("Security", "CA5350:Do Not Use Weak Cryptographic Algorithms",
         Justification = "TOTP (RFC 6238) is defined over HMAC-SHA1; test-only stand-in for an authenticator app.")]
-    public static string For(string sharedKey)
+    public static string For(string sharedKey, int stepsAhead = 0)
     {
-        var step = TimeProvider.System.GetUtcNow().ToUnixTimeSeconds() / 30;
+        // Identity accepts the codes of two steps either side of now, so a later step's code is another valid code: what
+        // a test needs once a code has been used.
+        var step = TimeProvider.System.GetUtcNow().ToUnixTimeSeconds() / 30 + stepsAhead;
         Span<byte> counter = stackalloc byte[8];
         BinaryPrimitives.WriteInt64BigEndian(counter, step);
 

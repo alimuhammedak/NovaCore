@@ -27,6 +27,11 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   counts as a failed access, a recovery code included (`SignInManager` neither checks lockout nor counts a wrong
   recovery code, so `LoginPage` does both before and after redeeming it, R-085); `RequireConfirmedEmail = true`;
   `RequireUniqueEmail = true`.
+- **An authenticator code works once** (ASVS 6.5.1): `SingleUseAuthenticatorTokenProvider` replaces Identity's
+  `Authenticator` provider, lets Identity verify the code (±2 steps), then refuses a code accepted in the last five
+  steps and records the new one in a user token. The save carries the user's concurrency stamp, so two requests racing
+  with one code let one in. The codes are compared as numbers, like Identity does (`012345` is `12345`). Every TOTP
+  check (sign-in, enable, disable) goes through `UserManager.VerifyTwoFactorTokenAsync`, never around it (D-053 (2)).
 - **Protocol:** Authorization Code with PKCE **S256 only** (`plain` removed, D-029 (1)); refresh tokens rotate, and a
   redeemed one reused after OpenIddict's 30 s leeway revokes every token of its authorization; access tokens 15 minutes,
   refresh tokens 7 days. The token endpoint re-checks the account on every refresh (exists, can sign in, not locked out)

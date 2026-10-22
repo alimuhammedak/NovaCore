@@ -32,9 +32,86 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
         Assert.Equal(HttpStatusCode.Redirect, afterPassword.StatusCode);
         Assert.StartsWith("/account/login/2fa", afterPassword.Headers.Location!.OriginalString, StringComparison.Ordinal);
 
-        var afterCode = await flow.SubmitCodeAsync(await flow.Browser.GetAsync(afterPassword.Headers.Location), AuthenticatorCode.For(key));
+        // The next step's code: the current one enabled two-factor authentication and is used up.
+        var afterCode = await flow.SubmitCodeAsync(await flow.Browser.GetAsync(afterPassword.Headers.Location), AuthenticatorCode.For(key, stepsAhead: 1));
         var tokens = await flow.FinishSignInAsync(afterCode, verifier);
         Assert.False(string.IsNullOrEmpty(tokens.AccessToken));
+    }
+
+    [Fact]
+    public async Task An_authenticator_code_signs_in_once()
+    {
+        await _host.CreateUserAsync("mfa-once@novacore.test", Password);
+        var (key, _) = await EnableAsync("mfa-once@novacore.test");
+        var code = AuthenticatorCode.For(key, stepsAhead: 1);
+
+        using var first = new OidcFlow(_host);
+        var (verifier, firstCodePage) = await CodeStepAsync(first, "mfa-once@novacore.test");
+        Assert.False(string.IsNullOrEmpty((await first.FinishSignInAsync(await first.SubmitCodeAsync(firstCodePage, code), verifier)).AccessToken));
+
+        // Still inside the authenticator's time window (ASVS 6.5.1).
+        using var second = new OidcFlow(_host);
+        var (_, secondCodePage) = await CodeStepAsync(second, "mfa-once@novacore.test");
+        var replayed = await second.SubmitCodeAsync(secondCodePage, code);
+
+        Assert.Equal(HttpStatusCode.OK, replayed.StatusCode);
+        Assert.Contains("Invalid authenticator code.", await replayed.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_code_that_enabled_two_factor_authentication_does_not_sign_in()
+    {
+        await _host.CreateUserAsync("mfa-enabling-code@novacore.test", Password);
+        var (flow, accessToken) = await SignedInAsync("mfa-enabling-code@novacore.test");
+        using var ownedFlow = flow;
+        var key = await SetUpAsync(flow, accessToken);
+        var code = AuthenticatorCode.For(key);
+        Assert.Equal(HttpStatusCode.OK,
+            (await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { code })).StatusCode);
+
+        using var signIn = new OidcFlow(_host);
+        var (_, codePage) = await CodeStepAsync(signIn, "mfa-enabling-code@novacore.test");
+        var response = await signIn.SubmitCodeAsync(codePage, code);
+
+        Assert.Contains("Invalid authenticator code.", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_used_code_written_with_a_leading_zero_is_still_used()
+    {
+        await _host.CreateUserAsync("mfa-zero@novacore.test", Password);
+        var (key, _) = await EnableAsync("mfa-zero@novacore.test");
+        var code = AuthenticatorCode.For(key, stepsAhead: 1);
+
+        using var first = new OidcFlow(_host);
+        var (verifier, firstCodePage) = await CodeStepAsync(first, "mfa-zero@novacore.test");
+        Assert.False(string.IsNullOrEmpty((await first.FinishSignInAsync(await first.SubmitCodeAsync(firstCodePage, code), verifier)).AccessToken));
+
+        // Identity compares the codes as numbers, so "0" + code is the same code.
+        using var second = new OidcFlow(_host);
+        var (_, secondCodePage) = await CodeStepAsync(second, "mfa-zero@novacore.test");
+        var replayed = await second.SubmitCodeAsync(secondCodePage, "0" + code);
+
+        Assert.Contains("Invalid authenticator code.", await replayed.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Two_sign_ins_racing_with_one_code_let_one_in()
+    {
+        await _host.CreateUserAsync("mfa-race@novacore.test", Password);
+        var (key, _) = await EnableAsync("mfa-race@novacore.test");
+        var code = AuthenticatorCode.For(key, stepsAhead: 1);
+
+        using var first = new OidcFlow(_host);
+        using var second = new OidcFlow(_host);
+        var (_, firstCodePage) = await CodeStepAsync(first, "mfa-race@novacore.test");
+        var (_, secondCodePage) = await CodeStepAsync(second, "mfa-race@novacore.test");
+
+        var responses = await Task.WhenAll(first.SubmitCodeAsync(firstCodePage, code), second.SubmitCodeAsync(secondCodePage, code));
+
+        // The signed-in browser goes back to the authorization endpoint; the other one gets the code form again.
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Redirect);
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.OK);
     }
 
     [Fact]
@@ -95,7 +172,7 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
         var key = await SetUpAsync(flow, accessToken);
         await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { code = AuthenticatorCode.For(key) });
 
-        var disable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/disable", accessToken, new { code = AuthenticatorCode.For(key) });
+        var disable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/disable", accessToken, new { code = AuthenticatorCode.For(key, stepsAhead: 1) });
 
         Assert.Equal(HttpStatusCode.NoContent, disable.StatusCode);
         Assert.False(await TwoFactorEnabledAsync(user.Id));
