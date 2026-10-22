@@ -395,3 +395,29 @@ public sealed class RefreshTokenLifetimeTests(FakeClockIdentityServerFixture fix
         Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(await flow.RefreshAsync(tokens.RefreshToken)));
     }
 }
+
+/// <summary>
+/// PLAN F6b.4e: a refresh keeps the session going, but not past seven days from the sign-in. A stolen refresh token used
+/// before each expiry would otherwise last forever.
+/// </summary>
+[Collection(IdentityServerTestGroup.Name)]
+public sealed class RefreshTokenAbsoluteLifetimeTests(FakeClockIdentityServerFixture fixture) : IClassFixture<FakeClockIdentityServerFixture>
+{
+    [Fact]
+    public async Task A_refreshed_token_expires_with_the_first_one()
+    {
+        await fixture.Host.CreateUserAsync("absolute@novacore.test", "a long passphrase for tests");
+        using var flow = new OidcFlow(fixture.Host);
+        var tokens = await flow.SignInAsync("absolute@novacore.test", "a long passphrase for tests");
+
+        fixture.Clock.Advance(TimeSpan.FromDays(6));
+        var refreshed = await OidcFlow.TokensFrom(await flow.RefreshAsync(tokens.RefreshToken));
+
+        // Seven days and a second after the sign-in, one day after the refresh.
+        fixture.Clock.Advance(TimeSpan.FromDays(1) + TimeSpan.FromSeconds(1));
+        var response = await flow.RefreshAsync(refreshed.RefreshToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(response));
+    }
+}

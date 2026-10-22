@@ -38,7 +38,7 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   plain-text slot is never read (D-053 (3)).
 - **Protocol:** Authorization Code with PKCE **S256 only** (`plain` removed, D-029 (1)); refresh tokens rotate, and a
   redeemed one reused after OpenIddict's 30 s leeway revokes every token of its authorization; access tokens 15 minutes,
-  refresh tokens 7 days. The token endpoint re-checks the account on every refresh (exists, can sign in, not locked out)
+  refresh tokens 7 days from the sign-in, not from the last refresh (`DisableSlidingRefreshTokenExpiration`, F6b.4e). The token endpoint re-checks the account on every refresh (exists, can sign in, not locked out)
   and rewrites the roles. The API takes only `typ: at+jwt` (RFC 9068 §4): the add-on post-configures JwtBearer's
   `ValidTypes`, the core doesn't (other providers, e.g. Entra, say `JWT`; D-053 (8)). `/connect/authorize` and the
   `/account` group carry `DisableCorsAttribute` (RFC 9700 §2.6): the core's policy allows credentials for configured

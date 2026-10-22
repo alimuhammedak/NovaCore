@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on a loopback IP address (`127.0.0.1`, `[::1]`) for a native app (RFC 8252 §7.3).
 - Identity provider: a client secret (`Identity:Clients:n:ClientSecret`) has at least 32 characters, or the host doesn't
   start (RFC 6749 §10.10).
+- Identity provider: refresh tokens expire seven days after the sign-in; a refresh no longer starts a new seven days, so
+  a session ends at the latest a week after the password was entered.
 
 ### Added
 

@@ -138,6 +138,10 @@ public static class IdentityServerHostingExtensions
                     .SetAccessTokenLifetime(TimeSpan.FromMinutes(15))
                     .SetRefreshTokenLifetime(TimeSpan.FromDays(7));
 
+                // Seven days from the sign-in, not from the last refresh: by default each new refresh token gets a full
+                // lifetime, so one used before every expiry never ran out (measured, PLAN F6b.4e; R-103).
+                server.DisableSlidingRefreshTokenExpiration();
+
                 if (builder.Environment.IsDevelopment())
                     server.AddEphemeralEncryptionKey().AddEphemeralSigningKey();
 
