@@ -21,7 +21,7 @@
 | 5 | ✅ tamam | `faz/5-sablon-yayin` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20; push'taki CI yeşil (`build-and-test`, `template-smoke`); `v0.1.0-preview.1` tag'i kullanıcı onayıyla, release.yml yeşil, 8 paket GitHub Packages'ta) |
 | 6a | ✅ tamam | `faz/6a-ci-sertlestirme` | 2026-10-21 | 2026-10-21 | 2026-10-21 (kullanıcı onayı, `--no-ff`; push 2026-10-21, kullanıcı isteği) |
 | 6b | ✅ tamam | `faz/6b-kimlik-guvenlik-siniri` | 2026-10-21 | 2026-10-22 | 2026-10-22 (kullanıcı onayı, `--no-ff`, `4909fe4`; push 2026-10-22, kullanıcı isteği) |
-| 6c | ⏳ başlamadı | | | | |
+| 6c | 🔄 devam ediyor | `faz/6c-test-altyapisi` | 2026-10-22 | | |
 | 6d | ⏳ başlamadı | | | | |
 | 6e | ⏳ başlamadı | | | | |
 
@@ -1060,6 +1060,11 @@ Plan onayı (2026-10-21). Kullanıcı kararları: Q-40 (izlenmeyen `.agents/`, `
   - Ertelenen (Sonraya bırakılanlar): #2 ilk TOTP kaydında INSERT yarışı, #5 eşzamanlı son-admin kaldırma (zaten kayıtlı), #6 `/connect/endsession`'ın CORS'u, #8 yarışı zorlamayan test.
   - Değişiklik yapılmayan: #10 `ChangePassword`'ün sayma kodu yeni yardımcının kopyası (önceden var olan kod, Y-09), #11 her istekte tag dizisi ayrılması (ihmal edilebilir; HybridCache tag'leri çağrıda istiyor), #12 iki sınıfta aynı `[NovaCore]` sabiti (önemsiz).
 
+### Faz 6c
+Plan onayı (2026-10-22). Başlangıç: `main` @ `37c8086`, 361 test. Kullanıcı kararları: Q-44 (faz branch'i her adımdan sonra push edilir), Q-45 (şablon da MTP + xUnit 4'e geçer, F6c.1b), Q-46 (önceki fazlardan devredilen üç madde bu fazda: R-055 → F6c.1c, ilk TOTP kaydındaki INSERT yarışı → F6c.2c, yarışı zorlamayan 2FA testi → F6c.2d). Q-40 sürüyor (izlenmeyen `.agents/`, `.codex/`, `AGENTS.md`'ye dokunulmaz). Sıra PLAN'daki gibi; alt adımlar: F6c.1a repo, 1b şablon, 1c R-055; F6c.2a altyapı ve gerçek migration'lar, 2b SQLite'ın gizledikleri, 2c TOTP INSERT yarışı, 2d deterministik 2FA yarış testi. Faz kararları D-056'ya, araştırmalar R-108'den başlayarak yazılır.
+
+- [ ] F6c.1a: MTP + xUnit 4 (repo) — devam ediyor.
+
 ## Açık sorular (Q)
 
 Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa DECISIONS'a D-kaydı olarak eklenir.
@@ -1109,6 +1114,9 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-41 | F6b.3a: `:read` kuralı kalkınca User rolü hangi izinleri alsın? (okuma + ödeme / bugünkü gibi / yalnız katalog) | F6b.3a | **Okuma + ödeme** (2026-10-21, kullanıcı; önerilen): `catalog:products:read`, `payments:read`, `payments:create`. Kullanıcılar ödeme oluşturur ve kendi ödemelerini görür (D-047) |
 | Q-42 | F6b.5: Yerel blocklist için kaynak dosya indirilsin mi, hangisi? (SecLists xato 1M / SecLists Pwdb 1M / indirme yok, yalnız algoritmik kontrol) | F6b.5 | **SecLists `xato-net-10-million-passwords-1000000.txt`** (2026-10-21, kullanıcı; önerilen). MIT, 8.5 MB, scratchpad'e; repo'ya yalnız ilk 3000 tane 15–128 karakterlik satır atıfla girer |
 | Q-43 | Faz 6b branch'i faz sırasında GitHub'a push edilsin mi? (CodeQL push'ta koşuyor) | Faz 6b başı | **Evet, faz branch'i** (2026-10-21, kullanıcı; önerilen). main'e dokunulmaz |
+| Q-44 | Faz 6c branch'i faz boyunca push edilsin mi? (SQL Server katmanı, coverage kapısı, oasdiff ve mutation workflow'u ancak GitHub'da koşunca doğrulanıyor) | Faz 6c başı | **Evet, faz branch'i** (2026-10-22, kullanıcı; önerilen). main'e dokunulmaz |
+| Q-45 | F6c.1 yalnız repo'nun test projesini sayıyor. Şablonun ürettiği proje de MTP + xUnit 4'e geçsin mi? | Faz 6c başı | **Evet, F6c.1b olarak** (2026-10-22, kullanıcı; önerilen). `bash eng/template-smoke.sh` ile doğrulanır |
+| Q-46 | Önceki fazların 6c'ye devrettiği maddeler (R-055 aralıklı açılış hatası, ilk TOTP kaydındaki INSERT yarışı, yarışı zorlamayan 2FA testi) bu fazda yapılsın mı? | Faz 6c başı | **Üçü de** (2026-10-22, kullanıcı; önerilen): F6c.1c, F6c.2c, F6c.2d |
 
 ## Sonraya bırakılanlar
 
