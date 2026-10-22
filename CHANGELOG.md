@@ -80,6 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `xunit.runner.visualstudio` are gone. Run one test with `dotnet test -- --filter-method "*.Class.Method"`.
 - Template: the generated test project runs on Microsoft.Testing.Platform with xUnit v3 4.0.2 too (`global.json`
   `test.runner`), without the VSTest packages.
+- Identity provider: of two requests verifying a user's first authenticator code at the same time (enabling two-factor
+  authentication twice at once), the one that loses is refused like a used code instead of failing with a 500.
 - Catalog: a product's price must fit its `decimal(18,2)` column: at most 2 decimal places and 16 digits before the
   point, else 400. SQL Server rounded the rest away, so a price of 0.001 was stored as 0.00 and 10.005 as 10.01 while
   the API answered 201.

@@ -150,6 +150,9 @@ and waits for that first (they go out in the order queued). `OidcFlow` plays the
 redirects) and the public client: authorize → sign-in form (antiforgery token) → code → token endpoint. Other forms
 (password reset, the sign-out question) go through `OidcFlow.SubmitFormAsync`, which posts a page's hidden fields with
 the given ones. `TokenPruningTests` moves a fake clock by an hour to run a pruning pass; it signs nobody in.
+`TwoFactorRaceTests` makes two requests verifying one authenticator code interleave on every run: its host's store
+contexts carry `UsedCodeRace`, which runs the competing request to its end just before the next save that records a
+used code, so both read the user before either writes.
 `IdentityServerFixture` shares one host per class; tests that need a different host start their own
 (`IdentityServerTestHost.StartAsync(environment, configure)`). These classes run in the `IdentityServerTestGroup`
 collection, apart from the parallel tests: their CPU load made the `WebApplicationFactory` startup race (R-055) hit

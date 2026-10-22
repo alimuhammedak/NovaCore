@@ -33,7 +33,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **An authenticator code works once** (ASVS 6.5.1): `SingleUseAuthenticatorTokenProvider` replaces Identity's
   `Authenticator` provider, lets Identity verify the code (±2 steps), then refuses a code accepted in the last five
   steps and records the new one in a user token. The save carries the user's concurrency stamp, so two requests racing
-  with one code let one in. The codes are compared as numbers, like Identity does (`012345` is `12345`). Every TOTP
+  with one code let one in. A user's first code adds the token, so the loser of that race fails on the token's key
+  instead; the user store (`HashedRecoveryCodesUserStore.UpdateAsync`) reports that as a concurrency failure too, so the
+  code is refused, never a 500 (D-058). The codes are compared as numbers, like Identity does (`012345` is `12345`). Every TOTP
   check (sign-in, enable, disable) goes through `UserManager.VerifyTwoFactorTokenAsync`, never around it (D-053 (2)).
 - **Recovery codes are stored hashed** (ASVS 6.5.2): `HashedRecoveryCodesUserStore` (Identity's EF user store, registered
   before `AddEntityFrameworkStores`) keeps them as `PasswordHasher` hashes with its defaults (PBKDF2-HMAC-SHA512,
