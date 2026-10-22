@@ -37,7 +37,9 @@ start or end). xUnit's options go after `--`; a solution goes through `--solutio
 
 ## How the test host works (and why)
 
-`NovaCoreApiFactory` swaps **every DbContext** (Catalog, Payments and the identity provider's) from SQL Server to its own
+`ApiFactory` boots the real Program host with what every test host shares (the test issuer, server-side grants,
+environment, scope validation, production extras) and lets a subclass choose the databases. `NovaCoreApiFactory`, the
+default, swaps **every DbContext** (Catalog, Payments and the identity provider's) from SQL Server to its own
 **in-memory SQLite** connection (`ReplaceWithSqlite<TContext>`), so the full auth flow and the `/health` database
 checks run without a database. Two non-obvious requirements, both load-bearing:
 
@@ -60,6 +62,22 @@ Protection key store (`InMemoryKeyStore.AddTo(services)`). A test that expects a
 Development adds the key store too, or the missing store is what stops the host. A subclass can
 call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsTests` points one at a missing file with
 `Mode=ReadWrite`: the dispatcher opens it too, and the default mode would create the file.
+
+## The SQL Server layer (`SqlServer/`)
+
+SQLite hides what only SQL Server does: migrations (the SQLite databases come from `EnsureCreated`) and their raw SQL,
+schemas, collations, `decimal` precision, `DateTimeOffset` ordering (docs/plan/DECISIONS.md D-043, D-056). The tests
+under `SqlServer/` run on a real SQL Server instead:
+- `TestSqlServer` starts one container for the whole run (Testcontainers, the image `docker-compose.yml` pins, which
+  `SqlServerImageTests` keeps equal), when the first test needs it. Fixtures can't depend on each other, so it is a
+  static `Lazy`; Testcontainers' resource reaper removes the container when the test process ends.
+- `SqlServerApiFactory` is the Api host (`ApiFactory`, like `NovaCoreApiFactory`) with Program's SQL Server
+  registrations kept, in a database of its own (`TestSqlServer.CreateDatabaseAsync`), and `Database:ApplyMigrations` on:
+  the host migrates the three contexts when it starts, the way production does. A test that needs an empty or a
+  half-migrated database creates its own (`MigrationTests` migrates step by step with `IMigrator`).
+- Without Docker these tests skip (`TestDatabase.SkipIfUnavailable()` first in each test). CI and release run
+  `dotnet test ... -- --fail-skips on`, so there a skip fails the run.
+- Raw SQL names the schema (`[payments].[payments]`); SQL Server has no default schema for these tables.
 
 ## Background work: the outbox dispatcher
 

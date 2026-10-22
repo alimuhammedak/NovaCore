@@ -1075,3 +1075,17 @@ Biçim:
 - Repo'da etkilenen tek test: `ConfigurationValidationTests.Invalid_configuration_stops_the_host_at_startup` (12 vaka). Diğer açılış hatası testleri zaten kendi host'larında (`CoreWebTestHost`, `IdentityServerTestHost`) `StartAsync` ile koşuyor.
 - Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Mvc/Mvc.Testing/src/DeferredHostBuilder.cs · https://github.com/dotnet/aspnetcore/issues/69684 · https://github.com/dotnet/aspnetcore/pull/69685
 - Sonuç: Teori `CoreWebTestHost` + `AddCorePersistence` üzerinde, `StartAsync`'in kendi exception'ıyla koşuyor: ayarlar çekirdek paketlerin, Program'ın değil. 12 vakanın hepsi beklenen mesajla düştü; aynı host geçerli yapılandırmayla Development ve Production'da açıldı (deneme, commit'lenmedi). "Sonradan eklenen yapılandırma" davranışını gösteren iki test Api factory'sinde kaldı (host açılıyor, yarış yok). #69685 yayımlanınca bir şey yapmak gerekmez.
+
+### R-110: SQL Server test katmanı: Testcontainers 4.16, xUnit v3 fixture'ları ve gerçek migration'lar (2026-10-22, faz 6c; kaynak + ölçüm)
+- Soru: Gerçek SQL Server'da test için container nasıl açılır, test sınıfları nasıl paylaşır, Docker yokken ne olur, migration'lar nasıl sınanır (F6c.2a, D-043)?
+- Bulgu (kaynak):
+  - `Testcontainers.MsSql` 4.16.0 (MIT): `new MsSqlBuilder(image).Build()` + `StartAsync()`, `GetConnectionString()`. Geçişliler (Docker.DotNet.Enhanced*, SSH.NET 2026.0.0, SharpZipLib, BouncyCastle.Cryptography) MIT; lisans kapısı geçti. Ryuk (resource reaper, `testcontainers/ryuk:0.14.0`) container'ı test süreci bitince siler; Testcontainers onu kapatmamayı öneriyor.
+  - `DockerUnavailableException` (`DotNet.Testcontainers.Builders`): "thrown when a connection to the Docker endpoint cannot be established".
+  - xUnit v3: fixture'lar birbirine bağımlı olamaz ("fixtures cannot take dependencies on other fixtures"); assembly fixture'ları her testten önce, hevesle oluşturuluyor. `Assert.Skip/SkipWhen/SkipUnless` testi çalışma anında atlatıyor; MTP'de `--fail-skips on` atlanan testi başarısız sayıyor.
+  - Respawn 7.0.0 bağımlılıksız (Apache-2.0); veriyi sıfırlamak gereken ilk test F6c.2b'de geldiği için paket orada eklenir.
+- Ölçüm (yerel, Docker Desktop 29.2.1):
+  - İlk koşu imaj indirmesiyle ~2 dk, sonrakiler ~40 sn (4 test: container, Api host'unun açılıştaki migration'ı ve üç ayrı veritabanı).
+  - `DOCKER_HOST=tcp://127.0.0.1:1` Docker'sız durumu taklit etmedi: Testcontainers sıradaki uç noktaya (Docker Desktop'ın named pipe'ı) geçip testleri koşturdu. Docker'sız skip yolu yerelde denenemedi; Docker gerçekten yoksa `DockerUnavailableException` beklenir, başka bir exception gelirse testler atlanmaz, kırmızı olur (sessiz değil).
+  - Tam takım 366/366 (`--fail-skips on`), ~5,5 dk.
+- Kaynak: https://dotnet.testcontainers.org/modules/mssql/ · https://dotnet.testcontainers.org/api/resource_reaper/ · https://xunit.net/docs/shared-context · https://xunit.net/docs/getting-started/v3/whats-new · https://www.nuget.org/packages/Testcontainers.MsSql/4.16.0 · Testcontainers 4.16.0 XML belgeleri (NuGet paketi)
+- Sonuç: Statik `Lazy` ile koşu başına tek container (`TestSqlServer`), sınıf başına veritabanı, `SqlServerApiFactory` üretimdeki `DatabaseMigrationService` yolunu kullanır. Docker yoksa yerelde skip; CI ve release `--fail-skips on`. D-056.

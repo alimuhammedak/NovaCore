@@ -228,7 +228,7 @@ Gereksinim: **.NET 10 SDK**, tam olarak `global.json`'daki sürüm (10.0.300; `r
 **SQL Server** (yerel instance, Windows auth — bkz. `appsettings.json`).
 
 ```bash
-# 1) Bağımlılıkları derle + test et (veritabanı GEREKMEZ — testler SQLite kullanır)
+# 1) Bağımlılıkları derle + test et (SQL Server kurulumu GEREKMEZ: testler SQLite kullanır, SQL Server katmanı Docker'da koşar)
 dotnet build
 dotnet test
 
@@ -823,6 +823,10 @@ dotnet test -- --filter-class "*.CatalogEndpointsTests"    # tek sınıf (--filt
 ```
 Testler xUnit v3 (4.x) ile **Microsoft.Testing.Platform** üzerinde koşar: `global.json`'daki `test.runner`, `dotnet test`'i
 MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri `--`'dan sonra gelir.
+- **SQL Server katmanı (`SqlServer/`):** SQLite'ın gizlediklerini (migration'lar ve içlerindeki SQL, şemalar, collation,
+  `decimal`, `DateTimeOffset` sıralaması) gerçek bir SQL Server'da sınar. Testcontainers, `docker-compose.yml`'deki imajla
+  koşu başına bir container açar; Api host'u migration'ları açılışta üretimdeki gibi uygular. Docker yoksa bu testler
+  atlanır; CI `--fail-skips on` ile koşar, orada atlanan test koşuyu kırar.
 - **Unit:** `Result<T>`, `PaginationRequest`/`PagedList<T>` davranışları.
 - **Integration:** gerçek host'u `WebApplicationFactory` ile ayağa kaldırır; her DbContext testte **in-memory
   SQLite**'a takılır. Token'ları bellek içi bir OpenID Connect issuer'ı (`TestIdentityProvider`) üretir.

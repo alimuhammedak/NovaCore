@@ -61,7 +61,7 @@ bash eng/check-licenses.sh                    # license gate: every package MIT/
 bash eng/lint-workflows.sh [dir ...]          # actionlint + zizmor on .github (Docker; GH_TOKEN enables online audits)
 git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release
-dotnet test                                   # all tests (no SQL Server needed — every DbContext runs on SQLite)
+dotnet test                                   # all tests: SQLite, plus the SQL Server layer in a Docker container (skips without Docker)
 dotnet test -- --filter-method "*.AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"   # single test (--filter-class for a class)
 #   `dotnet test` runs on Microsoft.Testing.Platform (global.json): the solution goes through --solution, xUnit's own
 #   options come after `--`, and -nologo isn't accepted before .NET 11 (exit code 5).

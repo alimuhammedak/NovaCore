@@ -47,8 +47,10 @@ jobs:
       - name: Build
         run: dotnet build NovaCore.slnx -c Release --no-restore
 
+      # The SQL Server tests run in a container (Docker is on the runner); without Docker they would skip, and
+      # --fail-skips makes a skipped test fail the run (docs/plan/DECISIONS.md D-056).
       - name: Test
-        run: dotnet test --solution NovaCore.slnx -c Release --no-build
+        run: dotnet test --solution NovaCore.slnx -c Release --no-build -- --fail-skips on
 
       # Each module owns a DbContext, and the host owns the identity provider's; a model change without a migration
       # fails here.
