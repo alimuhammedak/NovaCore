@@ -59,6 +59,7 @@ dotnet restore NovaCore.slnx --force-evaluate # after changing a package version
 dotnet restore NovaCore.slnx --locked-mode    # what CI runs: fails if the package graph differs from the lock files
 bash eng/check-licenses.sh                    # license gate: every package MIT/Apache-2.0 (Microsoft and Polly.*: D-052)
 bash eng/check-coverage.sh [Debug] [--update] # tests with coverage, held to eng/coverage-baseline.txt (D-060); build first
+bash eng/check-openapi.sh [base-revision]     # breaking changes in docs/openapi/v1.json since main (oasdiff, Docker; D-061)
 bash eng/lint-workflows.sh [dir ...]          # actionlint + zizmor on .github (Docker; GH_TOKEN enables online audits)
 git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release

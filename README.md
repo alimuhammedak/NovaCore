@@ -283,6 +283,7 @@ Repo public'tir (DECISIONS D-042). Kararlar D-048, D-051 ve D-052'de; kaynaklar 
 | Ne | Nerede | Not |
 |---|---|---|
 | Build, test, migration kontrolü, açık paket kontrolü | `ci.yml` → `build-and-test` | Restore `--locked-mode` ile; ardından lisans kapısı (`eng/check-licenses.sh`). Testler coverage'la koşar: satır ve dal kapsamı `eng/coverage-baseline.txt`'in altına düşerse kırmızı (`eng/check-coverage.sh`, D-060); mimari testler ayrı adımda, coverage'sız |
+| API sözleşmesi | `ci.yml` → `api-contract` | Commit'li `docs/openapi/v1.json` main'dekiyle karşılaştırılır; kırıcı değişiklik `eng/openapi-breaking-accepted.txt`'te kabul edilmediyse kırmızı (oasdiff, `eng/check-openapi.sh`); belgeyi `OpenApiContractTests` güncel tutar |
 | Şablonun tüketici smoke testi | `ci.yml` → `template-smoke` | Üretilen projelerin workflow'ları da lint'lenir |
 | Secret taraması | `ci.yml` → `secret-scan` | Betterleaks 1.9.0, bütün geçmiş, `.betterleaks.toml` |
 | Workflow denetimi | `ci.yml` → `workflow-lint` | actionlint + zizmor, digest'e sabit imajlarla (`eng/lint-workflows.sh`) |
@@ -298,6 +299,7 @@ dotnet restore NovaCore.slnx --locked-mode          # CI'ın yaptığı kontrol
 
 bash eng/check-licenses.sh                           # her paket MIT/Apache-2.0 (Microsoft ve Polly istisnası: D-052)
 bash eng/check-coverage.sh [--update]                # testler coverage'la, baseline'a karşı (önce Release build; Docker gerekir)
+bash eng/check-openapi.sh                            # docs/openapi/v1.json'da main'e göre kırıcı değişiklik (oasdiff, Docker)
 bash eng/lint-workflows.sh                           # Docker gerekir; GH_TOKEN varsa zizmor online denetimleri de yapar
 
 # Opt-in: staged değişiklikler commit'ten önce taranır (Betterleaks 1.9.0 PATH'te olmalı)

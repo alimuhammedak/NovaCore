@@ -1123,3 +1123,16 @@ Biçim:
   - Kapı denemesi: baseline %99 iken betik exit 1 verdi (karşılaştırma ve `--update`'in yalnız yukarı yazan aritmetiği ayrıca denendi).
 - Kaynak: https://github.com/coverlet-coverage/coverlet/blob/master/Documentation/Coverlet.MTP.Integration.md · https://github.com/danielpalme/ReportGenerator · https://www.nuget.org/packages/coverlet.MTP/10.1.0 · ölçüm
 - Sonuç: `eng/check-coverage.sh`: testleri coverage'la koşar, satır ve dal kapsamı `eng/coverage-baseline.txt`'in 0,3 puandan fazla altına düşerse kırmızı; `--update` baseline'ı yalnız yukarı yazar. CI'da "Test with coverage" + "Architecture tests" adımları. D-060.
+
+### R-114: API sözleşmesi: build sırasında belge üretimi ve oasdiff'in OpenAPI 3.1 kapsamı (2026-10-23, faz 6c; kaynak + ölçüm)
+- Soru: OpenAPI belgesi build'de üretilip commit'lenebilir mi (PLAN F6c.5), oasdiff .NET 10'un 3.1 belgesindeki kırıcı değişiklikleri yakalıyor mu?
+- Bulgu (kaynak):
+  - MS: `Microsoft.Extensions.ApiDescription.Server` belgeyi build'de, uygulamanın giriş noktasını sahte bir sunucuyla çalıştırarak üretir; "any logic in the apps startup is invoked". Ortamı seçen `OpenApiGenerationEnvironment` ".NET 11'den itibaren"; .NET 10'da tek yol, giriş assembly'sine (`GetDocument.Insider`) bakan bir dal.
+  - oasdiff: OpenAPI 3.1 desteği v1.15.0'dan beri genel kullanımda (`$dynamicRef` ve bileşenlerdeki path item'lar hariç). `--err-ignore` dosyası oasdiff'in mesaj satırlarıyla eşleşir. GitHub Action'ın `review` girdisi varsayılan olarak karşılaştırmayı oasdiff.com'a yükler; action kullanılmadı.
+- Ölçüm:
+  - `Microsoft.Extensions.ApiDescription.Server` 10.0.12 ile Api build'i GetDocument adımında düştü: Program Production'da açıldı ve `No Data Protection key store is configured. Outside Development ...` (D-036 (6)) ile durdu. Deneme geri alındı.
+  - Test host'unun (Development) `/openapi/v1.json`'u iki koşuda birebir aynı (OpenAPI 3.1.1, 1637 satır).
+  - oasdiff v1.33.0 (`tufin/oasdiff@sha256:6263a96d…`, 7 günlük cooldown'a uyan en yeni; v1.34.1'in güvenlik düzeltmesi yalnız `--open` ve action için) bu belgenin kopyalarında: işlem silme (`api-removed-without-deprecation`), yanıttan zorunlu alan silme (`response-required-property-removed`), istekte yeni zorunlu alan (`new-required-request-property`) ve yanıt alanı tip değişikliği (`response-property-type-changed`, 3.1'in `["integer","string"]` birleşimi dahil) exit 1; yeni opsiyonel yanıt alanı ve aynı belge exit 0. Kabul dosyasındaki bir satır ilgili kırılımı susturdu; `#` yorum satırı zararsız.
+  - Yan gözlem: `CreateProduct.Request` ve `CreatePayment.Request` belgede `Request`/`Request2` gibi sıralı adlar alıyor; kayıt sırası değişirse şema adları kayar (oasdiff `$ref`'i çözdüğü için kırıcı sayılmaz).
+- Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/openapi/aspnetcore-openapi?view=aspnetcore-10.0#generate-openapi-documents-at-build-time · https://github.com/oasdiff/oasdiff/blob/main/docs/OPENAPI-31.md · https://github.com/oasdiff/oasdiff/blob/main/docs/BREAKING-CHANGES.md · https://github.com/oasdiff/oasdiff-action · ölçüm
+- Sonuç: Belge build'de değil test host'unda üretilir ve commit'lenir (`docs/openapi/v1.json`, `OpenApiContractTests`); CI'ın `api-contract` job'u `eng/check-openapi.sh` ile main'e göre kırıcı değişikliği yakalar. D-061.

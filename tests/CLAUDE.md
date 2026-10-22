@@ -63,6 +63,14 @@ Development adds the key store too, or the missing store is what stops the host.
 call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsTests` points one at a missing file with
 `Mode=ReadWrite`: the dispatcher opens it too, and the default mode would create the file.
 
+## The API contract
+
+`OpenApiContractTests` compares the document the host serves (`/openapi/v1.json`) with the committed
+`docs/openapi/v1.json`; when they differ it writes the new document there and fails, so an endpoint change brings its
+contract change into the same commit (run the tests again, then commit the file). CI's `api-contract` job compares that
+file with the base revision's (`eng/check-openapi.sh`, oasdiff): a breaking change fails unless a line of
+`eng/openapi-breaking-accepted.txt` accepts it.
+
 ## Coverage
 
 `bash eng/check-coverage.sh` (CI's "Test with coverage" step) runs the tests with coverlet.MTP over the `NovaCore.*`

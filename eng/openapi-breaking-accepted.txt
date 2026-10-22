@@ -1,0 +1,1 @@
+# Breaking API changes made on purpose: one line per change, oasdiff's message for it (eng/check-openapi.sh).

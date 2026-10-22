@@ -80,6 +80,24 @@ jobs:
           jq -e '[.projects[].frameworks[]? | (.topLevelPackages // [])[], (.transitivePackages // [])[]] | length == 0' vulnerable.json \
             || { cat vulnerable.json; exit 1; }
 
+  # The committed OpenAPI document (docs/openapi/v1.json, kept current by OpenApiContractTests) against the base
+  # revision's: a breaking change fails unless eng/openapi-breaking-accepted.txt accepts it (oasdiff from an image pinned
+  # by digest, docs/plan/DECISIONS.md D-061). The full history gives the branch point from main.
+  api-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Breaking changes
+        run: bash eng/check-openapi.sh
+
   # The template as a consumer gets it (docs/plan/PLAN.md F5.2): every package packed into a local feed, a project created
   # with each --auth option, then built with warnings as errors, tested and checked against its migrations. The project
   # restores the packages from that feed, never from this repository's projects.
