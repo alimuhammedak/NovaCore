@@ -152,10 +152,12 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
   OpenID Connect provider, `Jwt:Authority` (issuer + JWKS discovered, asymmetric algorithms only), required in every
   environment (D-028). Permission-based authorization lives in
   `NovaCore.AspNetCore` too: permissions are resolved on the server through `IPermissionResolver` (never read from the
-  token) and cached per `sub` + security stamp for `Cache:PermissionExpiration`. The tokens come from the
+  token) and cached per `sub` + security stamp for `Cache:PermissionExpiration`; code that changes what the resolver
+  returns drops the entries at once with `HybridCache.RemovePermissionsAsync(sub)` (a tag). The tokens come from the
   `NovaCore.Identity.OpenIddict` add-on (ASP.NET Core Identity + OpenIddict: Authorization Code + PKCE, refresh
-  rotation, client credentials, 2FA with recovery codes, password reset, token pruning, admin), which the Api host
-  runs as its own authority (DECISIONS D-037). See `src/BuildingBlocks/NovaCore.Identity.OpenIddict/CLAUDE.md` before
+  rotation with an absolute 7-day lifetime, client credentials, single-use TOTP 2FA with hashed recovery codes,
+  password reset, token pruning, admin; the API accepts only its `at+jwt` tokens), which the Api host runs as its own
+  authority (DECISIONS D-037, Faz 6b: D-053…D-055). See `src/BuildingBlocks/NovaCore.Identity.OpenIddict/CLAUDE.md` before
   touching auth.
 
 ---
