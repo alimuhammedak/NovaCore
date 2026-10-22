@@ -10,7 +10,9 @@ start or end). xUnit's options go after `--`; a solution goes through `--solutio
 ## Three flavors, one project
 
 - **Unit** (`Unit/`) — pure logic (`Result<T>`, pagination), and building blocks on a small generic host of their own
-  (`Host.CreateApplicationBuilder`, never the Api): startup migrations and the outbox.
+  (`Host.CreateApplicationBuilder`, never the Api): startup migrations and the outbox. `*PropertyTests` check rules over
+  generated inputs and operation sequences with CsCheck (a failure prints the seed that reproduces it:
+  `Sample(..., seed: "...")`); a property test that goes to a database limits its own samples (`iter`, `threads: 1`).
 - **Integration** (`Integration/`) — boot the real host via `NovaCoreApiFactory` (`WebApplicationFactory`).
   DB-free tests (health, OpenAPI, security headers, 401/validation gates) need no seeding. A caller with specific roles
   comes from `factory.CreateClientWithClaims(...)`: the factory's in-memory issuer (`factory.IdentityProvider`, see

@@ -1136,3 +1136,12 @@ Biçim:
   - Yan gözlem: `CreateProduct.Request` ve `CreatePayment.Request` belgede `Request`/`Request2` gibi sıralı adlar alıyor; kayıt sırası değişirse şema adları kayar (oasdiff `$ref`'i çözdüğü için kırıcı sayılmaz).
 - Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/openapi/aspnetcore-openapi?view=aspnetcore-10.0#generate-openapi-documents-at-build-time · https://github.com/oasdiff/oasdiff/blob/main/docs/OPENAPI-31.md · https://github.com/oasdiff/oasdiff/blob/main/docs/BREAKING-CHANGES.md · https://github.com/oasdiff/oasdiff-action · ölçüm
 - Sonuç: Belge build'de değil test host'unda üretilir ve commit'lenir (`docs/openapi/v1.json`, `OpenApiContractTests`); CI'ın `api-contract` job'u `eng/check-openapi.sh` ile main'e göre kırıcı değişikliği yakalar. D-061.
+
+### R-115: CsCheck property testleri (2026-10-23, faz 6c; kaynak + ölçüm)
+- Soru: Property-based testler için CsCheck nasıl kullanılır, hangi kuralları sınamaya değer (F6c.6)?
+- Bulgu (kaynak): CsCheck (Apache-2.0, bağımlılıksız) test çatısından bağımsızdır, başarısızlıkta exception atar ve yeniden üretmek için seed basar ("Set seed: ... to reproduce"); varsayılan 100 iterasyon, işlemci sayısı kadar iş parçacığı. Üreteçler: `Gen.Int[a, b]`, `Gen.Long[a, b]`, `Gen.String[Gen.Char.AlphaNumeric, min, max]`, `Gen.Enum<T>()`, `gen.Array[min, max]`, `Gen.Select(...)`; `Sample` / `SampleAsync(..., iter, threads)`. Model tabanlı denetim (`SampleModelBased`) var; birkaç işlem için işlem listesi üretip küçük bir modelle karşılaştırmak yeterli. Belgeler 5.x'i anlatıyor; kullanılan API 4.9.1'de derlendi.
+- Ölçüm:
+  - `PaginationRequest.Skip` her `int` sayfa için denendiğinde taştı: `(Page - 1) * PageSize` büyük sayfada `int` sarıyordu (ör. `page=2147483647` başka bir sayfanın ofsetini veriyordu). Shrink'ten sonra seed `e_6U6vth8ZA3`.
+  - `Result<T>`, `ToHttpResult` (her `ErrorType` için durum, `detail`, `code`), `PagedList` sayıları, `Payment` durum geçişleri, `Product` stok dizileri ve Catalog rezervasyon handler'ının tekrar teslimi (25 örnek, tek iş parçacığı, paylaşılan SQLite host'u) yeşil. Tam takım 388/388, ~5 dk.
+- Kaynak: https://github.com/AnthonyLloyd/CsCheck · https://www.nuget.org/packages/CsCheck/4.9.1 · ölçüm
+- Sonuç: Property testleri `Unit/*PropertyTests` ve `Integration/StockReservationPropertyTests`. `Skip` `long`'da hesaplanıp `int.MaxValue`'da kesiliyor (D-062).

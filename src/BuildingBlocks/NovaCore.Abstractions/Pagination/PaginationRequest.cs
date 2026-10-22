@@ -33,6 +33,9 @@ public readonly record struct PaginationRequest
     /// <summary>The page size, as clamped by the constructor.</summary>
     public int PageSize { get; }
 
-    /// <summary>Number of rows to skip for the current page.</summary>
-    public int Skip => (Page - 1) * PageSize;
+    /// <summary>
+    /// Number of rows to skip for the current page. A page past <see cref="int.MaxValue"/> rows skips
+    /// <see cref="int.MaxValue"/> (an empty page) instead of overflowing.
+    /// </summary>
+    public int Skip => (int)Math.Min((Page - 1L) * PageSize, int.MaxValue);
 }

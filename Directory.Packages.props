@@ -91,6 +91,8 @@
     <PackageVersion Include="Respawn" Version="7.0.0" />
     <!-- Code coverage for Microsoft.Testing.Platform (MIT), gated by eng/check-coverage.sh. -->
     <PackageVersion Include="coverlet.MTP" Version="10.1.0" />
+    <!-- Property-based tests (Apache-2.0, no dependencies). -->
+    <PackageVersion Include="CsCheck" Version="4.9.1" />
   </ItemGroup>
 
 </Project>

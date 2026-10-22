@@ -17,6 +17,7 @@
     <PackageReference Include="Testcontainers.MsSql" />
     <PackageReference Include="Respawn" />
     <PackageReference Include="coverlet.MTP" />
+    <PackageReference Include="CsCheck" />
   </ItemGroup>
 
   <ItemGroup>
