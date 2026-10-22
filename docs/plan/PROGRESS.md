@@ -1023,6 +1023,9 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
 Plan onayı (2026-10-21). Kullanıcı kararları: Q-40 (izlenmeyen `.agents/`, `.codex/`, `AGENTS.md`'ye dokunulmaz), Q-41 (User rolü: `catalog:products:read`, `payments:read`, `payments:create`), Q-42 (blocklist kaynağı SecLists xato 1M), Q-43 (faz branch'i faz boyunca push edilir). Model kararları D-053, araştırmalar R-099…R-104. Uygulama sırası F6b.1a → 1b → 1c → F6b.2 → F6b.1d → F6b.3 → F6b.4 → F6b.5 → F6b.6 → F6b.7 (D-053 (1)). Alt adımlar: F6b.1a TOTP tek kullanım, 1b kurtarma kodu hash'i, 1c yeniden kimlik doğrulama, 1d Administrator 2FA; F6b.3a açık rol izinleri, 3b ödeme sahibi; F6b.4a `at+jwt`, 4b CORS, 4c `http` redirect, 4d client secret, 4e mutlak refresh ömrü; F6b.6a zamanlama, 6b cookie bayrakları, 6c revoke rate limit, 6d CodeQL uyarıları.
 
 - [ ] F6b.1 MFA
+  - 2026-10-22, yeni oturum: önceki oturumdan kalan commit'lenmemiş F6b.1a testleri kullanıcının isteğiyle atıldı ("At, baştan yaz"), testler yeniden yazıldı.
+  - [x] F6b.1a (cf96566): TOTP tek kullanım (D-053 (2), R-099). `SingleUseAuthenticatorTokenProvider` Identity'nin `Authenticator` sağlayıcısının yerine geçer: Identity'nin ±2 adımlık kontrolünden sonra son beş adımda kabul edilmiş kodları reddeder, yeni kodu `[NovaCore]/UsedAuthenticatorCodes` kullanıcı token'ına yazar; kayıt `ConcurrencyStamp`'la yapıldığı için yarışan iki istekten biri girer. Kodlar sayı olarak karşılaştırılır (Identity `int.TryParse` ile karşılaştırıyor; `0` önekli kod aynı koddur, testi var). Etkilenen iki mevcut test (2FA'yı açan kodla giriş, aynı kodla kapatma) bir sonraki adımın koduna geçti. 4 yeni test; 282/282 yeşil.
+  - [ ] F6b.1b: kurtarma kodu hash'i (devam ediyor)
 - [ ] F6b.2 Yetki yükseltme
 - [ ] F6b.3 Seeding ve Payments
 - [ ] F6b.4 Token/protokol

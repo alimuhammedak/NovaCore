@@ -646,9 +646,11 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   süresi hesabın varlığını ele vermez. `change-password`'da yanlış mevcut parola da lockout sayacını artırır; kilitli
   hesapta parola değişmez.
 - **E-posta onayı** zorunlu (dev'de link loglanır; link `Jwt:Authority`'den üretilir, Host başlığından değil),
-  **TOTP 2FA** (authenticator app). 2FA adımı `/2fa/enable`'ın verdiği 10 kurtarma kodundan birini de kabul eder: her
-  kod bir kez kullanılır, kilitli hesap kodla da giremez, kullanılan kod `SECURITY recovery_code_used` (Warning) olarak
-  loglanır. Onay linki `resend-confirmation-email` ile yeniden istenir; yalnızca onaylanmamış
+  **TOTP 2FA** (authenticator app). Her authenticator kodu bir kez geçer (ASVS 6.5.1): 2FA'yı açan kod girişte
+  kullanılamaz, aynı kodla yarışan iki istekten biri girer. 2FA adımı `/2fa/enable`'ın verdiği 10 kurtarma kodundan
+  birini de kabul eder: her kod bir kez kullanılır, kilitli hesap kodla da giremez, kullanılan kod
+  `SECURITY recovery_code_used` (Warning) olarak loglanır. Kurtarma kodları veritabanında düz metin değil, PBKDF2
+  hash'i olarak durur (ASVS 6.5.2). Onay linki `resend-confirmation-email` ile yeniden istenir; yalnızca onaylanmamış
   hesaba gider, yanıt her adres için aynıdır.
 - **Parola sıfırlama:** giriş sayfasındaki "Forgot your password?" linki bir e-posta formu açar. Onaylı hesaba
   `/account/reset-password` linki gider (Identity token'ı, 6 saat, tek kullanımlık: sıfırlama security stamp'i

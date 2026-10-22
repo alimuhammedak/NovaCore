@@ -32,6 +32,10 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   steps and records the new one in a user token. The save carries the user's concurrency stamp, so two requests racing
   with one code let one in. The codes are compared as numbers, like Identity does (`012345` is `12345`). Every TOTP
   check (sign-in, enable, disable) goes through `UserManager.VerifyTwoFactorTokenAsync`, never around it (D-053 (2)).
+- **Recovery codes are stored hashed** (ASVS 6.5.2): `HashedRecoveryCodesUserStore` (Identity's EF user store, registered
+  before `AddEntityFrameworkStores`) keeps them as `PasswordHasher` hashes with its defaults (PBKDF2-HMAC-SHA512,
+  100,000 iterations; not the host's 600,000, since a sign-in tries up to ten) under its own token name. Identity's
+  plain-text slot is never read (D-053 (3)).
 - **Protocol:** Authorization Code with PKCE **S256 only** (`plain` removed, D-029 (1)); refresh tokens rotate, and a
   redeemed one reused after OpenIddict's 30 s leeway revokes every token of its authorization; access tokens 15 minutes,
   refresh tokens 7 days. The token endpoint re-checks the account on every refresh (exists, can sign in, not locked out)

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Identity.OpenIddict;
 using Xunit;
@@ -216,6 +217,39 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
 
         Assert.Equal(HttpStatusCode.OK, reused.StatusCode);
         Assert.Contains("Invalid recovery code.", await reused.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Recovery_codes_are_stored_hashed()
+    {
+        var user = await _host.CreateUserAsync("recovery-hashed@novacore.test", Password);
+        var (_, recoveryCodes) = await EnableAsync("recovery-hashed@novacore.test");
+
+        await using var scope = _host.Services.CreateAsyncScope();
+        var tokens = await scope.ServiceProvider.GetRequiredService<IdentityServerDbContext>().UserTokens
+            .Where(token => token.UserId == user.Id)
+            .Select(token => token.Value)
+            .ToListAsync(TestContext.Current.CancellationToken);
+
+        // ASVS 6.5.2: a code read from the store doesn't sign in.
+        Assert.All(recoveryCodes, code => Assert.DoesNotContain(tokens, value => value != null && value.Contains(code, StringComparison.Ordinal)));
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        Assert.Equal(10, await users.CountRecoveryCodesAsync((await users.FindByIdAsync(user.Id.ToString()))!));
+    }
+
+    [Fact]
+    public async Task A_redeemed_recovery_code_is_no_longer_counted()
+    {
+        var user = await _host.CreateUserAsync("recovery-count@novacore.test", Password);
+        var (_, recoveryCodes) = await EnableAsync("recovery-count@novacore.test");
+
+        using var flow = new OidcFlow(_host);
+        var (verifier, codePage) = await CodeStepAsync(flow, "recovery-count@novacore.test");
+        await flow.FinishSignInAsync(await flow.SubmitCodeAsync(codePage, recoveryCodes[3]), verifier);
+
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        Assert.Equal(9, await users.CountRecoveryCodesAsync((await users.FindByIdAsync(user.Id.ToString()))!));
     }
 
     [Fact]

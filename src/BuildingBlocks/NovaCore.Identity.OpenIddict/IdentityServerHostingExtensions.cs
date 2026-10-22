@@ -66,6 +66,8 @@ public static class IdentityServerHostingExtensions
                 options.Lockout.AllowedForNewUsers = true;
             })
             .AddRoles<ApplicationRole>()
+            // Before the EF stores, which add their user store only when none is registered.
+            .AddUserStore<HashedRecoveryCodesUserStore>()
             .AddEntityFrameworkStores<IdentityServerDbContext>()
             .AddSignInManager()
             .AddDefaultTokenProviders()

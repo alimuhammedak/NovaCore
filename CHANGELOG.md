@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The compose services listen on 127.0.0.1 only and their images are pinned by digest.
 - Identity provider: an authenticator code signs in (or enables or disables two-factor authentication) once. The code
   that enabled two-factor authentication no longer signs in, and two requests racing with one code let one in.
+- Identity provider: two-factor recovery codes are stored as password hashes (PBKDF2), no longer as plain text.
+  **Upgrade:** codes issued by an earlier version stop working; users get new ones from `POST /api/v1/auth/2fa/enable`.
+  Delete the old plain-text codes with
+  `DELETE FROM identity.AspNetUserTokens WHERE LoginProvider = '[AspNetUserStore]' AND Name = 'RecoveryCodes'`.
 
 ### Changed
 
