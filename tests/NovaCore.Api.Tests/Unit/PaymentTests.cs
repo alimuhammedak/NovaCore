@@ -16,12 +16,20 @@ public class PaymentTests
     [Fact]
     public void A_new_payment_is_pending_and_asks_for_its_stock()
     {
-        var payment = new Payment(ProductId, "Widget", 2, 9.99m);
+        var payment = new Payment("owner", ProductId, "Widget", 2, 9.99m);
 
         Assert.Equal(PaymentStatus.Pending, payment.Status);
         Assert.Equal(19.98m, payment.Amount);
         var created = Assert.IsType<PaymentCreated>(Assert.Single(payment.DomainEvents));
         Assert.Equal((payment.Id, ProductId, 2), (created.PaymentId, created.ProductId, created.Quantity));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void A_payment_needs_an_owner(string? ownerId)
+    {
+        Assert.ThrowsAny<ArgumentException>(() => new Payment(ownerId!, ProductId, "Widget", 1, 5m));
     }
 
     [Fact]
@@ -73,5 +81,5 @@ public class PaymentTests
         Assert.Equal(PaymentStatus.Failed, failed.Status);
     }
 
-    private static Payment NewPayment() => new(ProductId, "Widget", 1, 5m);
+    private static Payment NewPayment() => new("owner", ProductId, "Widget", 1, 5m);
 }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
+using NovaCore.Abstractions.Identity;
 using NovaCore.Abstractions.Results;
 using NovaCore.AspNetCore.Http;
 using NovaCore.AspNetCore.Authorization;
@@ -47,15 +48,18 @@ public static class CreatePayment
         Request request,
         IProductCatalog catalog,
         PaymentsDbContext dbContext,
+        ICurrentUser currentUser,
         CancellationToken cancellationToken)
     {
-        var result = await CreateAsync(request, catalog, dbContext, cancellationToken);
+        // The permission check passed, so the token has a subject: permissions are resolved per subject.
+        var result = await CreateAsync(request, currentUser.UserId!, catalog, dbContext, cancellationToken);
         return result.ToHttpResult(success =>
             TypedResults.Created($"/api/v1/payments/{success.PaymentId}", success));
     }
 
     private static async Task<Result<Response>> CreateAsync(
         Request request,
+        string ownerId,
         IProductCatalog catalog,
         PaymentsDbContext dbContext,
         CancellationToken cancellationToken)
@@ -72,7 +76,7 @@ public static class CreatePayment
             return Error.Conflict("payment.insufficient_stock",
                 $"Only {product.Stock} unit(s) of '{product.Name}' are in stock.");
 
-        var payment = new Payment(product.Id, product.Name, request.Quantity, product.Price);
+        var payment = new Payment(ownerId, product.Id, product.Name, request.Quantity, product.Price);
         dbContext.Payments.Add(payment);
         await dbContext.SaveChangesAsync(cancellationToken);
 

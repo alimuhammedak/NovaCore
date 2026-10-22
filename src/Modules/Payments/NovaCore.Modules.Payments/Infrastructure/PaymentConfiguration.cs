@@ -11,6 +11,7 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.ToTable("payments");
         builder.HasKey(p => p.Id);
 
+        builder.Property(p => p.OwnerId).HasMaxLength(256).IsRequired();
         builder.Property(p => p.ProductName).HasMaxLength(200).IsRequired();
         builder.Property(p => p.UnitPrice).HasPrecision(18, 2);
         builder.Property(p => p.Amount).HasPrecision(18, 2);
@@ -23,6 +24,8 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(p => p.CreatedBy).HasMaxLength(256);
         builder.Property(p => p.ModifiedBy).HasMaxLength(256);
 
+        // The list a caller sees: their own payments, newest first.
+        builder.HasIndex(p => new { p.OwnerId, p.CreatedAtUtc });
         builder.HasIndex(p => p.ProductId);
         builder.HasIndex(p => p.Status);
 

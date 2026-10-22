@@ -261,7 +261,7 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 | `/api/v1/auth/2fa/*` | TOTP iki-faktör (setup/enable/disable) |
 | `/api/v1/admin/*` | Kullanıcı/rol/izin yönetimi (permission korumalı) |
 | `/api/v1/products` | Catalog modülü (CRUD, permission korumalı) |
-| `/api/v1/payments` | Payments modülü (Catalog'a contract ve event'lerle bağlı) |
+| `/api/v1/payments` | Payments modülü (Catalog'a contract ve event'lerle bağlı). Ödeme oluşturanındır (`OwnerId` = token'ın `sub`'ı); `GET` çağıranın kendi ödemelerini, `payments:read-all` ile hepsini listeler |
 
 > SQL Server olmadan da uygulama açılır ve `/openapi`, validation/401 kapıları çalışır. `/health` bu durumda
 > `Unhealthy` (503) döner, çünkü modül veritabanlarına ulaşamaz. DB'ye dokunan endpoint'ler düzgün bir
@@ -719,7 +719,8 @@ rolünden çıkarılan bir admin de izinlerini önbellek süresi dolunca kaybede
   iptali, rol atama; `SECURITY` önekli, e-posta maskeli, parola/kod/token loglanmaz. Refresh token tekrar kullanımını OpenIddict
   kendisi loglar.
 - **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü
-  `Identity:Seed:UserPermissions` listesini alır (Api: `catalog:products:read`, `payments:read`, `payments:create`); opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.
+  `Identity:Seed:UserPermissions` listesini alır (Api: `catalog:products:read`, `payments:read`, `payments:create`);
+  opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.
 - **Admin için 2FA zorunlu:** `Administrator` rolü yalnızca 2FA'sı açık hesapta sayılır (çözümleyicide; rolün kendi
   izinleri dahil). Seed admin parolayla girer, 2FA'yı API'den açar; açma ve kapama izin önbelleğini hemen düşürür.
 

@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `:read` permission". The host doesn't start when the list names a permission no module declares or one of the
   provider's own (`identity:*`). **Upgrade:** list the permissions every registered account should get; seeding still
   adds missing ones and never removes one.
+- Payments: a payment belongs to the caller who made it (`OwnerId`, the token's `sub`; migration `PaymentOwner`).
+  `GET /api/v1/payments` lists the caller's own payments; the new `payments:read-all` permission lists everyone's.
+  **Upgrade:** payments made before have no owner and are listed with `payments:read-all` only.
 
 ### Added
 
