@@ -80,6 +80,30 @@ public sealed class ProtocolHardeningTests(IdentityServerFixture fixture) : ICla
         Assert.Contains("secure", antiforgery, StringComparison.OrdinalIgnoreCase);
     }
 
+    // F6b.6c: OpenIddict answers revocation in its authentication handler, so no endpoint carries the "strict" policy
+    // (R-103). The per-IP global window still counts it: the rate limiter runs before authentication.
+    [Fact]
+    public async Task Revocation_counts_toward_the_global_rate_limit()
+    {
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["RateLimiting:PermitLimit"] = "3" }));
+        using var client = host.CreateClient();
+
+        var statuses = new List<HttpStatusCode>();
+        for (var request = 0; request < 4; request++)
+        {
+            using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["client_id"] = IdentityServerTestHost.ClientId,
+                ["token"] = "not-a-token"
+            });
+            statuses.Add((await client.PostAsync("/connect/revoke", form, TestContext.Current.CancellationToken)).StatusCode);
+        }
+
+        // RFC 7009 §2.2: an unknown token is answered like a revoked one, so the answers reveal nothing until the limit.
+        Assert.Equal([HttpStatusCode.OK, HttpStatusCode.OK, HttpStatusCode.OK, HttpStatusCode.TooManyRequests], statuses);
+    }
+
     private string SignedByTheProvider(string subject, string type)
     {
         var server = _host.Services.GetRequiredService<IOptions<OpenIddictServerOptions>>().Value;
