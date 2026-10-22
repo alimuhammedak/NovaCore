@@ -19,14 +19,20 @@ internal sealed class HashedRecoveryCodesUserStore(IdentityServerDbContext conte
     private const string LoginProvider = "[NovaCore]";
     private const string TokenName = "RecoveryCodeHashes";
 
+    // Where Identity's own store keeps the codes as plain text (UserStoreBase, private there). Versions before the hashing
+    // wrote them; new codes take their place, so the plain-text ones don't stay at rest.
+    private const string PlainTextLoginProvider = "[AspNetUserStore]";
+    private const string PlainTextTokenName = "RecoveryCodes";
+
     private readonly PasswordHasher<ApplicationUser> _hasher = new();
 
-    public override Task ReplaceCodesAsync(ApplicationUser user, IEnumerable<string> recoveryCodes, CancellationToken cancellationToken)
+    public override async Task ReplaceCodesAsync(ApplicationUser user, IEnumerable<string> recoveryCodes, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(recoveryCodes);
 
-        return SetTokenAsync(user, LoginProvider, TokenName,
+        await RemoveTokenAsync(user, PlainTextLoginProvider, PlainTextTokenName, cancellationToken);
+        await SetTokenAsync(user, LoginProvider, TokenName,
             string.Join(';', recoveryCodes.Select(code => _hasher.HashPassword(user, code))), cancellationToken);
     }
 

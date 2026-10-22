@@ -376,6 +376,25 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
         Assert.Equal(10, await users.CountRecoveryCodesAsync((await users.FindByIdAsync(user.Id.ToString()))!));
     }
 
+    // Codes from 0.1.0-preview.1 sit in Identity's own plain-text slot; new codes take their place there too.
+    [Fact]
+    public async Task New_recovery_codes_remove_the_plain_text_ones_of_an_earlier_version()
+    {
+        var user = await _host.CreateUserAsync("recovery-legacy@novacore.test", Password);
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var account = (await users.FindByIdAsync(user.Id.ToString()))!;
+            Assert.True((await users.SetAuthenticationTokenAsync(account, "[AspNetUserStore]", "RecoveryCodes", "ABCDE-FGHJK;BCDFG-HJKMN")).Succeeded);
+        }
+
+        await EnableAsync("recovery-legacy@novacore.test");
+
+        await using var check = _host.Services.CreateAsyncScope();
+        var store = check.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        Assert.Null(await store.GetAuthenticationTokenAsync((await store.FindByIdAsync(user.Id.ToString()))!, "[AspNetUserStore]", "RecoveryCodes"));
+    }
+
     [Fact]
     public async Task A_redeemed_recovery_code_is_no_longer_counted()
     {

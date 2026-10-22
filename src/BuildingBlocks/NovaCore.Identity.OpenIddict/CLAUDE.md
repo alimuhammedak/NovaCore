@@ -56,7 +56,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   for the mail server: they queue the email (`EmailQueue`, a bounded in-memory channel read by a `BackgroundService`
   that sends through the host's `IEmailSender`, one at a time), so the response time doesn't reveal the account either
   (F6b.6a, R-105, ASVS 6.3.8). A queued email is lost if the process stops; a failed send is logged without the address
-  or the body. Send new emails the same way, never by awaiting `IEmailSender` in a handler.
+  or the body. A full queue never makes the request wait (that would reveal the account again): the email is dropped
+  and logged (D-055 (1)). Send new emails the same way, never by awaiting `IEmailSender` in a handler.
 - **Password reset:** the link carries an Identity token that `ResetPasswordAsync` uses up (it renews the security
   stamp), the new password is typed twice, and a reset revokes every token and authorization of the user like a
   password change. It never signs the user in. A missing `User` role (seeding off) leaves a new account without a role
@@ -83,7 +84,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   (`HybridCache.RemovePermissionsAsync`, a tag: the stamp in the cache key is unknown here) and revokes their refresh
   tokens and authorizations on every grant or removal. Granting or removing `Administrator` (compared normalized, so
   `administrator` is the same role) also needs `identity:roles:manage`: `identity:users:manage` alone would let its
-  holder make themselves an administrator. The last member keeps the role (409). The seed gives the User role the
+  holder make themselves an administrator. The last member with two-factor authentication (the only kind the role
+  counts for) keeps the role (409). The seed gives the User role the
   `Identity:Seed:UserPermissions` list (D-047, D-053 (7)), never a naming rule; the list is checked on start: declared
   by a module, no `identity:*`. Anything else that changes what the
   resolver returns for a user must drop the cache the same way (the 2FA endpoints do).

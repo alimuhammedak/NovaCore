@@ -192,6 +192,33 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
         Assert.True(await users.IsInRoleAsync((await users.FindByIdAsync(adminId.ToString()))!, "Administrator"));
     }
 
+    // A member without two-factor authentication gets nothing from the role (F6b.1d), so the last member who has it in
+    // effect keeps it too, even with other members left.
+    [Fact]
+    public async Task The_last_administrator_with_two_factor_authentication_keeps_the_role()
+    {
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Identity:Seed:AdminEmail"] = AdminEmail,
+                ["Identity:Seed:AdminPassword"] = AdminPassword
+            }));
+        var adminToken = await SignInAdministratorAsync(host);
+        Guid adminId;
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            adminId = (await users.FindByEmailAsync(AdminEmail))!.Id;
+            var other = await host.CreateUserAsync("admin-without-2fa@novacore.test", Password);
+            Assert.True((await users.AddToRoleAsync((await users.FindByIdAsync(other.Id.ToString()))!, "Administrator")).Succeeded);
+        }
+        using var flow = new OidcFlow(host);
+
+        var response = await flow.CallApiAsync(HttpMethod.Delete, $"/api/v1/admin/users/{adminId}/roles/Administrator", adminToken, body: null);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
     [Fact]
     public async Task A_role_change_takes_effect_at_once_and_ends_the_users_sessions()
     {

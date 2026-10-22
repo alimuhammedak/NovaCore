@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Identity provider: an authenticator code signs in (or enables or disables two-factor authentication) once. The code
   that enabled two-factor authentication no longer signs in, and two requests racing with one code let one in.
 - Identity provider: two-factor recovery codes are stored as password hashes (PBKDF2), no longer as plain text.
-  **Upgrade:** codes issued by an earlier version stop working; users get new ones from `POST /api/v1/auth/2fa/enable`.
+  **Upgrade:** codes issued by an earlier version stop working; users get new ones from `POST /api/v1/auth/2fa/enable`,
+  which also deletes the old plain-text ones.
   Delete the old plain-text codes with
   `DELETE FROM identity.AspNetUserTokens WHERE LoginProvider = '[AspNetUserStore]' AND Name = 'RecoveryCodes'`.
 - Identity provider: the two-factor endpoints ask for the current password (ASVS 7.5.1). **Breaking:**
@@ -30,8 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   codes. Turning it on or off ends every session of the user (refresh tokens and authorizations).
 - Identity provider: granting or removing the `Administrator` role needs `identity:roles:manage` on top of
   `identity:users:manage` (whose holder could otherwise make themselves an administrator), and the last administrator
-  keeps the role (409). A role change through the admin API takes effect on the user's next request and revokes their
-  refresh tokens and authorizations.
+  keeps the role (409); since two-factor authentication is required for the role, the last member with it does. A role
+  change through the admin API takes effect on the user's next request and revokes their refresh tokens and
+  authorizations.
 - Identity provider: the `Administrator` role counts only for an account with two-factor authentication on. **Upgrade:**
   administrators sign in with their password and turn it on (`/api/v1/auth/2fa/setup`, then `/2fa/enable`) before the
   admin API answers them again.
@@ -62,7 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Identity provider: registration, the password reset form and resending the confirmation answer before the email is
   sent; a background service sends the queued emails through the host's `IEmailSender`. A slow mail server no longer
   shows in the response time, which revealed whether an address had an account (ASVS 6.3.8). A failed send is logged
-  and no longer fails the request. Queued emails are kept in memory: one still queued when the process stops is lost.
+  and no longer fails the request. Queued emails are kept in memory: one still queued when the process stops is lost,
+  and when the queue is full (a stuck mail server) a new email is dropped and logged instead of holding the request.
 
 ### Added
 

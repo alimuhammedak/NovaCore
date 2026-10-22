@@ -13,17 +13,15 @@ internal sealed class CommonPasswordValidator : IPasswordValidator<ApplicationUs
 {
     private const string ResourceName = "NovaCore.Identity.OpenIddict.CommonPasswords.txt";
 
-    private static readonly IdentityError TooCommon = new()
-    {
-        Code = "CommonPassword",
-        Description = "This password is too common. Choose another one."
-    };
-
     private readonly HashSet<string> _passwords = Load();
 
     public Task<IdentityResult> ValidateAsync(UserManager<ApplicationUser> manager, ApplicationUser user, string? password) =>
         Task.FromResult(password is not null && _passwords.Contains(password)
-            ? IdentityResult.Failed(TooCommon)
+            ? IdentityResult.Failed(new IdentityError
+            {
+                Code = "CommonPassword",
+                Description = "This password is too common. Choose another one."
+            })
             : IdentityResult.Success);
 
     private static HashSet<string> Load()

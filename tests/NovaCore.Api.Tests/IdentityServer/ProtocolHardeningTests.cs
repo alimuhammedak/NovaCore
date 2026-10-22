@@ -107,7 +107,8 @@ public sealed class ProtocolHardeningTests(IdentityServerFixture fixture) : ICla
     private string SignedByTheProvider(string subject, string type)
     {
         var server = _host.Services.GetRequiredService<IOptions<OpenIddictServerOptions>>().Value;
-        var now = DateTime.UtcNow;
+        // JWT validation reads the real clock (docs/plan/RESEARCH.md R-058).
+        var now = TimeProvider.System.GetUtcNow().UtcDateTime;
 
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {

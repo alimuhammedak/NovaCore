@@ -92,6 +92,34 @@ public sealed class EmailQueueTests
         Assert.DoesNotContain("fails-first", failure, StringComparison.Ordinal);
     }
 
+    // A queue that waited for room when full would hold up exactly the requests that send an email, and its timing would
+    // reveal accounts again: with the mail server stuck, the email that doesn't fit is dropped and logged instead.
+    [Fact]
+    public async Task A_full_queue_drops_the_email_instead_of_holding_the_response()
+    {
+        var sender = new HeldEmailSender();
+        var log = new LogCapture();
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+        {
+            builder.Services.AddSingleton<IEmailSender>(sender);
+            builder.Logging.AddProvider(log);
+        });
+        await host.CreateUserAsync("queue-full@novacore.test", Password);
+        using var browser = new OidcFlow(host);
+        var page = await browser.Browser.GetAsync("/account/forgot-password", TestContext.Current.CancellationToken);
+
+        // One email held by the sender, a thousand waiting: the queue is full.
+        for (var request = 0; request < 1001; request++)
+            await browser.SubmitFormAsync(page, "/account/forgot-password", new() { ["Email"] = "queue-full@novacore.test" });
+
+        var response = await browser.SubmitFormAsync(page, "/account/forgot-password", new() { ["Email"] = "queue-full@novacore.test" })
+            .WaitAsync(ResponseTimeout, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(log.Messages, message => message.StartsWith("The email queue is full", StringComparison.Ordinal));
+        sender.Release();
+    }
+
     private static Task<IdentityServerTestHost> StartAsync(IEmailSender sender) =>
         IdentityServerTestHost.StartAsync(configure: builder => builder.Services.AddSingleton(sender));
 

@@ -153,8 +153,10 @@ internal static class AdminEndpoints
 
         if (await users.IsInRoleAsync(user, role))
         {
-            // Without an administrator nobody could grant the role again, short of editing the database.
-            if (administrator && (await users.GetUsersInRoleAsync(IdentityRoles.Administrator)).Count <= 1)
+            // Without an administrator nobody could grant the role again, short of editing the database. Only a member with
+            // two-factor authentication has the role in effect (IdentityPermissionResolver), so one of them must remain.
+            if (administrator && !(await users.GetUsersInRoleAsync(IdentityRoles.Administrator))
+                    .Any(member => member.Id != user.Id && member.TwoFactorEnabled))
                 return TypedResults.Conflict(new AccountEndpoints.MessageResponse("The last administrator keeps the role."));
 
             await users.RemoveFromRoleAsync(user, role);

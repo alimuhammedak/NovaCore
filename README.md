@@ -650,7 +650,8 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   kuyruğa koyup hemen yanıt verir; bir arka plan servisi (`EmailQueue`) host'un `IEmailSender`'ıyla sırayla gönderir.
   Yanıt e-posta sunucusunu beklemediği için süresi de hesabın varlığını ele vermez (OWASP Forgot Password, ASVS 6.3.8).
   Kuyruk bellek içindedir: süreç dururken kuyrukta kalan e-posta kaybolur, kullanıcı linki yeniden ister; gönderim
-  hatası loglanır, istek etkilenmez. `change-password`'da yanlış mevcut parola da lockout sayacını artırır; kilitli
+  hatası loglanır, istek etkilenmez. Kuyruk doluysa (1000, posta sunucusu takıldığında) istek beklemez: e-posta düşer
+  ve loglanır. `change-password`'da yanlış mevcut parola da lockout sayacını artırır; kilitli
   hesapta parola değişmez.
 - **E-posta onayı** zorunlu (dev'de link loglanır; link `Jwt:Authority`'den üretilir, Host başlığından değil),
   **TOTP 2FA** (authenticator app). Her authenticator kodu bir kez geçer (ASVS 6.5.1): 2FA'yı açan kod girişte
@@ -692,8 +693,8 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   uygulama açılmaz. Token'daki hiçbir rol izin kontrolünü atlatmaz. Kimlik eklentisinde `Administrator` rolünün üyesi,
 modüllerin tanımladığı bütün izinleri sunucuda alır (seed o izni role yazmamış olsa da), 2FA'sı açıksa. Veritabanında doğrudan
 rolünden çıkarılan bir admin de izinlerini önbellek süresi dolunca kaybeder. `Administrator` rolünü vermek ya da almak
-`identity:users:manage`'e ek olarak `identity:roles:manage` ister (yalnızca admin'de var); son admin rolünü kaybedemez
-(409).
+`identity:users:manage`'e ek olarak `identity:roles:manage` ister (yalnızca admin'de var); 2FA'sı açık son admin rolünü
+kaybedemez (409).
 - **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder `Administrator` rolüne hepsini,
   `User` rolüne `Identity:Seed:UserPermissions` listesindekileri bağlar (least privilege: isimlendirme kuralı değil,
   host'un seçtiği liste). Listede tanımsız ya da `identity:*` bir izin varsa uygulama açılmaz.
