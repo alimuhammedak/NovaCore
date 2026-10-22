@@ -47,10 +47,15 @@ jobs:
       - name: Build
         run: dotnet build NovaCore.slnx -c Release --no-restore
 
-      # The SQL Server tests run in a container (Docker is on the runner); without Docker they would skip, and
-      # --fail-skips makes a skipped test fail the run (docs/plan/DECISIONS.md D-056).
-      - name: Test
-        run: dotnet test --solution NovaCore.slnx -c Release --no-build -- --fail-skips on
+      # The tests, with the line and branch coverage held to eng/coverage-baseline.txt (docs/plan/DECISIONS.md D-060). The
+      # SQL Server tests run in a container (Docker is on the runner); without Docker they would skip, and --fail-skips
+      # makes a skipped test fail the run (D-056).
+      - name: Test with coverage
+        run: bash eng/check-coverage.sh Release
+
+      # Without coverage: coverlet instruments the built assemblies, and these tests inspect their references.
+      - name: Architecture tests
+        run: dotnet test --solution NovaCore.slnx -c Release --no-build -- --filter-namespace NovaCore.Api.Tests.Architecture
 
       # Each module owns a DbContext, and the host owns the identity provider's; a model change without a migration
       # fails here.

@@ -1110,3 +1110,16 @@ Biçim:
   - Ek gözlem: Docker Desktop yeniden başladıktan sonraki ilk koşuda Testcontainers'ın Ryuk container'ı hazırlık kontrolünde kayboldu ("Could not find resource 'DockerContainer'"), fixture düştü; ikinci koşu yeşil. Ortamdan kaynaklı, kalıcı değil.
 - Kaynak: https://learn.microsoft.com/ef/core/providers/sqlite/limitations · https://learn.microsoft.com/ef/core/modeling/value-conversions · `OutboxModelBuilderExtensions.cs` (index)
 - Sonuç: Karşılaştırma SQL'de, mevcut index üzerinde; SQLite katmanı kendini uyarlar (D-059). Modelde ve migration'larda değişiklik yok.
+
+### R-113: Coverage: coverlet.MTP, ReportGenerator ve ratchet (2026-10-23, faz 6c; kaynak + ölçüm)
+- Soru: MTP'de coverage nasıl toplanır, main'e göre düşüşü engelleyen kapı nasıl kurulur (F6c.4)?
+- Bulgu (kaynak):
+  - coverlet.MTP 10.1.0 (MIT) MTP ≥ 2.4.1 ister (repo 2.5.1); seçenekler test uygulamasına `--` sonrası gider: `--coverlet`, `--coverlet-output-format cobertura`, `--coverlet-include/exclude "[Assembly]Type"`, `--coverlet-exclude-by-file`. Kendi eşiği (`--coverlet-threshold`) belgede "henüz desteklenmiyor" diye de geçtiği için kullanılmadı.
+  - ReportGenerator 5.5.11 (Apache-2.0, dotnet tool) Cobertura'dan `TextSummary`, `JsonSummary`, `MarkdownSummaryGithub` üretir.
+- Ölçüm:
+  - Coverlet derlenmiş DLL'leri yerinde enstrümante ediyor; enstrümante edilmiş `NovaCore.Abstractions` bir `netstandard` referansı kazandı ve `PackageDependencyTests` ("yalnız BCL") kırmızı oldu. Mimari testler bu yüzden coverage'sız, ayrı bir `dotnet test` adımında (`--filter-namespace`) koşuyor; coverage koşusu onları `--filter-not-namespace` ile dışarıda bırakıyor.
+  - Çıktı dosyası `coverage.cobertura.<zaman damgası>.xml`; desen `coverage.cobertura.*.xml`. Git Bash'te `-reports:/c/...` Windows yoluna çevrilmiyor, betik göreli yol kullanıyor. Bu makinede `jq` yok; betik ReportGenerator'ın metin özetini `sed` ile okuyor.
+  - Release'te iki tam koşu (mimari testler hariç 356 test, SQL Server dahil, ~4,5 dk) birebir aynı sonucu verdi: satır %95,5 (2088/2186), dal %82,0 (548/668). Debug'ta (mimari testler dahil) %95,2 / %81,6; baseline Release (CI) değeri.
+  - Kapı denemesi: baseline %99 iken betik exit 1 verdi (karşılaştırma ve `--update`'in yalnız yukarı yazan aritmetiği ayrıca denendi).
+- Kaynak: https://github.com/coverlet-coverage/coverlet/blob/master/Documentation/Coverlet.MTP.Integration.md · https://github.com/danielpalme/ReportGenerator · https://www.nuget.org/packages/coverlet.MTP/10.1.0 · ölçüm
+- Sonuç: `eng/check-coverage.sh`: testleri coverage'la koşar, satır ve dal kapsamı `eng/coverage-baseline.txt`'in 0,3 puandan fazla altına düşerse kırmızı; `--update` baseline'ı yalnız yukarı yazar. CI'da "Test with coverage" + "Architecture tests" adımları. D-060.

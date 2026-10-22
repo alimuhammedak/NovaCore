@@ -89,6 +89,8 @@
     <!-- The SQL Server test layer (DECISIONS D-043): a real SQL Server in a container (MIT), reset between tests (Apache-2.0). -->
     <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
+    <!-- Code coverage for Microsoft.Testing.Platform (MIT), gated by eng/check-coverage.sh. -->
+    <PackageVersion Include="coverlet.MTP" Version="10.1.0" />
   </ItemGroup>
 
 </Project>

@@ -63,6 +63,15 @@ Development adds the key store too, or the missing store is what stops the host.
 call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsTests` points one at a missing file with
 `Mode=ReadWrite`: the dispatcher opens it too, and the default mode would create the file.
 
+## Coverage
+
+`bash eng/check-coverage.sh` (CI's "Test with coverage" step) runs the tests with coverlet.MTP over the `NovaCore.*`
+assemblies (not the tests, not the migrations) and fails when line or branch coverage falls more than its tolerance below
+`eng/coverage-baseline.txt`, the coverage main reached. Raise the baseline with `--update` when a change raises the
+coverage, and commit it with the change. The architecture tests run in a step of their own, without coverage: coverlet
+instruments the built assemblies in place (an instrumented assembly references `netstandard`), and those tests read the
+built assemblies' references.
+
 ## The SQL Server layer (`SqlServer/`)
 
 SQLite hides what only SQL Server does: migrations (the SQLite databases come from `EnsureCreated`) and their raw SQL,

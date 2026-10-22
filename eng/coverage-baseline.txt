@@ -1,0 +1,3 @@
+# The coverage main reached, in percent (eng/check-coverage.sh).
+line=95.5
+branch=82.0
