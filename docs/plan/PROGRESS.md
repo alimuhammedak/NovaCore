@@ -1277,6 +1277,10 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - **Kullanıcıya:**
   - Kırıcı değişiklikler CHANGELOG'da (2FA uçlarının gövdesi, 15 karakter, eski kurtarma kodları, `User` rol listesi, admin için 2FA). Seed admin'in izinleri 2FA açılınca gelir.
   - 6a'dan kalanlar hâlâ açık: Dependabot PR'ları, paketleri public yapmak, `BMD.*` önek rezervasyonu.
+- **Merge sonrası doğrulandı (2026-10-22, `4909fe4` ve `0c651bc`):**
+  - main'de CI (build-and-test, template-smoke, secret-scan, workflow-lint) ve CodeQL yeşil.
+  - Scorecard iki push'ta da GitHub'ın GraphQL API'sindeki bir iç hatayla düştü (`ListCommits ... Something went wrong while executing your query`, kodla ilgisiz); `0c651bc`'nin koşusu yeniden başlatıldı ve yeşil.
+  - CodeQL: #1 ve #2 (`cs/exposure-of-sensitive-information`) main taramasında `fixed`, #3 ve #4 `dismissed` (false positive). main'de açık CodeQL uyarısı yok.
 - **Sonraki faz (6c) bilmeli:** Sonraya bırakılanlar'da 6c'ye işaretli üç madde var: `GET /api/v1/payments`'in uçtan uca testi (SQLite sıralaması), ilk TOTP kaydındaki INSERT yarışı, yarışı zorlamayan 2FA testi. `PaymentOwner` migration'ı gerçek SQL Server'da sınanmalı. DECISIONS hâlâ hook korumasında değil (D-032, 6e sonu).
 
 **2026-10-21, Faz 6a: Public geçiş ve CI/tedarik zinciri sertleştirme (tamam, `main`'e merge ve push edildi).** Branch `faz/6a-ci-sertlestirme`; kullanıcı onayıyla `--no-ff` merge (`49d341d`) ve push.
