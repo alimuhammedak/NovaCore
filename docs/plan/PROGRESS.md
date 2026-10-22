@@ -20,7 +20,7 @@
 | 4d | ✅ tamam | `faz/4d-kimlik-uretim` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20, kullanıcı isteği) |
 | 5 | ✅ tamam | `faz/5-sablon-yayin` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20; push'taki CI yeşil (`build-and-test`, `template-smoke`); `v0.1.0-preview.1` tag'i kullanıcı onayıyla, release.yml yeşil, 8 paket GitHub Packages'ta) |
 | 6a | ✅ tamam | `faz/6a-ci-sertlestirme` | 2026-10-21 | 2026-10-21 | 2026-10-21 (kullanıcı onayı, `--no-ff`; push 2026-10-21, kullanıcı isteği) |
-| 6b | ✅ tamam | `faz/6b-kimlik-guvenlik-siniri` | 2026-10-21 | 2026-10-22 | |
+| 6b | ✅ tamam | `faz/6b-kimlik-guvenlik-siniri` | 2026-10-21 | 2026-10-22 | 2026-10-22 (kullanıcı onayı, `--no-ff`, `4909fe4`; push 2026-10-22, kullanıcı isteği) |
 | 6c | ⏳ başlamadı | | | | |
 | 6d | ⏳ başlamadı | | | | |
 | 6e | ⏳ başlamadı | | | | |
@@ -1263,7 +1263,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-22, Faz 6b: Kimlik güvenlik sınırı (tamam, merge onayı bekleniyor).** Branch `faz/6b-kimlik-guvenlik-siniri`, her adımdan sonra push edildi (Q-43). Son kod commit'i `15520c1`; 361/361 yeşil; branch'te CI (build-and-test, template-smoke, secret-scan, workflow-lint) ve CodeQL yeşil, branch'te açık CodeQL uyarısı yok.
+**2026-10-22, Faz 6b: Kimlik güvenlik sınırı (tamam, `main`'e merge ve push edildi).** Kullanıcı onayı: "faz/6b-kimlik-guvenlik-siniri'yi main'e --no-ff merge et ve push et"; merge `4909fe4`. Branch `faz/6b-kimlik-guvenlik-siniri`, her adımdan sonra push edildi (Q-43). Son kod commit'i `15520c1`; 361/361 yeşil; branch'te CI (build-and-test, template-smoke, secret-scan, workflow-lint) ve CodeQL yeşil, branch'te açık CodeQL uyarısı yok.
 
 - **Yapılanlar:** F6b.1a–1d (tek kullanımlık TOTP, hash'li kurtarma kodları, 2FA uçlarında parola, Administrator için 2FA), F6b.2 (Administrator'ı yalnız `identity:roles:manage`, son 2FA'lı admin korunur, rol değişikliği önbelleği hemen düşürür), F6b.3a–3b (`Identity:Seed:UserPermissions`, ödeme sahibi + `payments:read-all`), F6b.4a–4e (`at+jwt`, CORS dışı authorize/`/account`, `http` redirect, 32 karakterlik secret, mutlak refresh ömrü), F6b.5 (15 karakter + SecLists blocklist), F6b.6a–6d (e-posta kuyruğu, Secure cookie'ler, revoke limiti ölçüldü, CodeQL), F6b.7 (18 negatif protokol testi). Kararlar D-053 (plan), D-054 (uygulama), D-055 (code review); araştırma R-099…R-107. Testler 278 → 361.
 - **Sürprizler:**
@@ -1275,7 +1275,6 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
   - CI secret taraması bir test parolasını yakaladı (`1f018a0`).
 - **Kullanıcıyla alınan kararlar:** önceki oturumun commit'lenmemiş F6b.1a testleri atıldı ("At, baştan yaz"); blocklist indirmesi onaylandı; F6b.6a için asenkron gönderim; CodeQL #3 ve #4 GitHub'da false positive olarak kapatıldı.
 - **Kullanıcıya:**
-  - Merge onayı: `faz/6b-kimlik-guvenlik-siniri` → `main` (`--no-ff`) ve push.
   - Kırıcı değişiklikler CHANGELOG'da (2FA uçlarının gövdesi, 15 karakter, eski kurtarma kodları, `User` rol listesi, admin için 2FA). Seed admin'in izinleri 2FA açılınca gelir.
   - 6a'dan kalanlar hâlâ açık: Dependabot PR'ları, paketleri public yapmak, `BMD.*` önek rezervasyonu.
 - **Sonraki faz (6c) bilmeli:** Sonraya bırakılanlar'da 6c'ye işaretli üç madde var: `GET /api/v1/payments`'in uçtan uca testi (SQLite sıralaması), ilk TOTP kaydındaki INSERT yarışı, yarışı zorlamayan 2FA testi. `PaymentOwner` migration'ı gerçek SQL Server'da sınanmalı. DECISIONS hâlâ hook korumasında değil (D-032, 6e sonu).
