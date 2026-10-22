@@ -123,7 +123,7 @@ public sealed class IdentityServerConfigurationTests
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Identity:Clients:1:ClientId"] = "worker",
-                ["Identity:Clients:1:ClientSecret"] = "worker-secret-for-tests",
+                ["Identity:Clients:1:ClientSecret"] = "worker-secret-for-tests-at-least-32-chars",
                 ["Identity:Clients:1:Permissions:0"] = IdentityServerTestHost.ProbePermission
             });
         });
@@ -138,7 +138,7 @@ public sealed class IdentityServerConfigurationTests
         {
             ["grant_type"] = "client_credentials",
             ["client_id"] = "worker",
-            ["client_secret"] = "worker-secret-for-tests"
+            ["client_secret"] = "worker-secret-for-tests-at-least-32-chars"
         }));
         var accessToken = (await token.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("access_token").GetString()!;
         Assert.Equal(SecurityAlgorithms.EcdsaSha256, new JsonWebToken(accessToken).Alg);
@@ -193,6 +193,22 @@ public sealed class IdentityServerConfigurationTests
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
             builder.Configuration.AddInMemoryCollection(
                 new Dictionary<string, string?> { ["Identity:Clients:0:RedirectUris:0"] = "http://client.novacore.test/callback" }));
+    }
+
+    // RFC 6749 §10.10: a secret that can be guessed is no secret; 32 characters hold 128 bits or more when generated.
+    [Theory]
+    [InlineData("1", "worker", "a-secret-of-31-characters-xxxxx")]
+    [InlineData("0", IdentityServerTestHost.ClientId, "short")]
+    public async Task A_client_secret_shorter_than_32_characters_stops_the_host(string index, string clientId, string secret)
+    {
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
+            configure: builder => builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"Identity:Clients:{index}:ClientId"] = clientId,
+                [$"Identity:Clients:{index}:ClientSecret"] = secret
+            })));
+
+        Assert.Contains("ClientSecret must be at least 32 characters", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -24,10 +24,12 @@ regexes = [
   '''^bm90LWEtdG9rZW4$''',
   '''^not the current one$''',
   '''^not the password$''',
+  '''^reporter-secret-for-tests-at-least-32-chars$''',
   '''^short$''',
   '''^the administrator's passphrase$''',
   '''^too-short$''',
   '''^totally-wrong-password$''',
+  '''^worker-secret-for-tests-at-least-32-chars$''',
 ]
 
 [[allowlists]]

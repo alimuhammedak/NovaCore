@@ -48,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   token endpoint keeps CORS for single-page apps.
 - Identity provider: outside Development the host doesn't start with a plain-http redirect or post-logout URI, except
   on a loopback IP address (`127.0.0.1`, `[::1]`) for a native app (RFC 8252 §7.3).
+- Identity provider: a client secret (`Identity:Clients:n:ClientSecret`) has at least 32 characters, or the host doesn't
+  start (RFC 6749 §10.10).
 
 ### Added
 

@@ -201,6 +201,11 @@ public static class IdentityServerHostingExtensions
                     client.RedirectUris.Concat(client.PostLogoutRedirectUris).All(IsSecureRedirect)),
                 "Identity:Clients:n:RedirectUris and PostLogoutRedirectUris must use https outside Development; plain http "
                 + "only on a loopback IP address (127.0.0.1, [::1]) for a native app (RFC 8252 §7.3).")
+            // RFC 6749 §10.10: a guessable secret is none. 32 characters hold 128 bits or more when they are generated.
+            .Validate(
+                identity => identity.Clients.TrueForAll(client =>
+                    string.IsNullOrEmpty(client.ClientSecret) || client.ClientSecret.Length >= IdentityClientOptions.MinimumSecretLength),
+                "Identity:Clients:n:ClientSecret must be at least 32 characters: generate it, e.g. 32 random bytes in base64.")
             .Validate(
                 identity => identity.Clients.TrueForAll(client => client.SignsInUsers || !string.IsNullOrEmpty(client.ClientSecret)),
                 "Identity:Clients:n without RedirectUris is a service client (client credentials) and needs a ClientSecret.")
