@@ -23,7 +23,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   sign-in session uses Identity's cookies added with the parameterless `AddAuthentication()` (R-061); only `/connect/*`
   and `/account/*` read them.
 - **Hardening (keep these values or stronger):** PBKDF2 `IterationCount = 600_000`; password length-first
-  (`RequiredLength = 12`, no composition rules); lockout 5 attempts / 15 min, new accounts included; a wrong 2FA code
+  (`RequiredLength = 15`, no composition rules, NIST SP 800-63B-4) and no common password (`CommonPasswordValidator`, a
+  singleton over the embedded `CommonPasswords.txt` from SecLists, MIT notice in its header; no outside call); lockout 5 attempts / 15 min, new accounts included; a wrong 2FA code
   counts as a failed access, a recovery code included (`SignInManager` neither checks lockout nor counts a wrong
   recovery code, so `LoginPage` does both before and after redeeming it, R-085); `RequireConfirmedEmail = true`;
   `RequireUniqueEmail = true`. Cookies: the application and two-factor cookies are `Secure` always; antiforgery's is

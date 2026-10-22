@@ -639,8 +639,10 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
 
 ### Hesaplar (authentication)
 - **Parola saklama:** Identity PBKDF2-HMAC-SHA256, **600.000 iterasyon** (OWASP Password Storage).
-- **Parola politikası:** uzunluk öncelikli — **min 12**, max 128, zorunlu kompozisyon kuralı yok
-  (OWASP Authentication: "no composition rules").
+- **Parola politikası:** uzunluk öncelikli — **min 15**, max 128, zorunlu kompozisyon kuralı yok, yaygın parolalar
+  reddedilir (NIST SP 800-63B-4; OWASP Authentication: "no composition rules"). Yaygın parola listesi pakette gömülüdür
+  (`CommonPasswords.txt`: SecLists xato 1M'in 15–128 karakterlik ilk 3000 parolası, MIT, büyük/küçük harf duyarsız);
+  parola hiçbir dış servise gitmez.
 - **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**, hatalı 2FA ya da kurtarma kodu da sayılır), giriş sayfası, token ucu ve
   hesap API'sinde rate limiting (`strict`), bilinmeyen hesap / yanlış parola / kilitli hesap için **tek hata mesajı**.
   Bilinmeyen e-posta da bir parola hash'i doğrular (host'un hasher'ıyla bir kez üretilen sahte hash), böylece yanıt

@@ -50,8 +50,11 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
         Assert.Equal(600_000u, BinaryPrimitives.ReadUInt32BigEndian(hash.AsSpan(5, 4)));
     }
 
+    // NIST SP 800-63B-4: at least 15 characters for a password that can be a single factor, no composition rules.
     [Theory]
     [InlineData("short-pass1", false)]            // 11 characters
+    [InlineData("fourteen-chars", false)]         // 14 characters
+    [InlineData("fifteen-letters", true)]         // 15 characters
     [InlineData("onlylowercaseletters", true)]    // long enough, no composition rules
     public async Task The_password_policy_asks_for_length_not_composition(string password, bool accepted)
     {
@@ -62,6 +65,33 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
         var result = await users.CreateAsync(NewUser(email), password);
 
         Assert.Equal(accepted, result.Succeeded);
+    }
+
+    // NIST SP 800-63B-4: a password from a list of common ones is refused, whatever its length; compared ignoring case.
+    [Theory]
+    [InlineData("1qaz2wsx3edc4rfv")]
+    [InlineData("123456789qwerty")]
+    [InlineData("QAZWSXEDCRFVTGB")]
+    public async Task A_common_password_is_refused(string password)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+        var result = await users.CreateAsync(NewUser($"{Guid.NewGuid():N}@novacore.test"), password);
+
+        Assert.Contains(result.Errors, error => error.Code == "CommonPassword");
+    }
+
+    [Fact]
+    public async Task Registration_refuses_a_common_password()
+    {
+        using var client = _host.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/v1/auth/register",
+            new { email = "common-password@novacore.test", password = "iloveyouforever" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("too common", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
     [Fact]

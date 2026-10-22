@@ -55,8 +55,9 @@ public static class IdentityServerHostingExtensions
                 options.User.RequireUniqueEmail = true;
                 options.SignIn.RequireConfirmedEmail = true;
 
-                // OWASP Authentication Cheat Sheet: length first, no character-composition rules.
-                options.Password.RequiredLength = 12;
+                // Length first, no character-composition rules (OWASP Authentication Cheat Sheet); 15 characters for a
+                // password that can be the only factor (NIST SP 800-63B-4). CommonPasswordValidator adds the blocklist.
+                options.Password.RequiredLength = 15;
                 options.Password.RequiredUniqueChars = 1;
                 options.Password.RequireDigit = false;
                 options.Password.RequireLowercase = false;
@@ -75,6 +76,10 @@ public static class IdentityServerHostingExtensions
             .AddSignInManager()
             .AddDefaultTokenProviders()
             .AddTokenProvider<SingleUseAuthenticatorTokenProvider>(TokenOptions.DefaultAuthenticatorProvider);
+
+        // NIST SP 800-63B-4: refuse commonly used passwords. Checked against a list in the package, never an outside
+        // service. Next to Identity's own validator, which every password still passes first.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IPasswordValidator<ApplicationUser>, CommonPasswordValidator>());
 
         // OWASP Password Storage Cheat Sheet: at least 600,000 iterations for PBKDF2-HMAC-SHA256.
         services.Configure<PasswordHasherOptions>(options => options.IterationCount = 600_000);

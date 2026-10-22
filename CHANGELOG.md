@@ -56,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Development (it never was) and over https in Development.
 - Identity provider: the security audit log names accounts by id only; `user_registered` and `login_failed` no longer
   carry a masked email address (`login_failed` has `User=` instead of `Email=`).
+- Identity provider: passwords have at least 15 characters (was 12) and can't be one of 3,000 common ones (a list from
+  SecLists, MIT, shipped in the package; compared ignoring case; NIST SP 800-63B-4). **Breaking** for registration, password
+  change and reset; existing passwords keep working until they change.
 
 ### Added
 

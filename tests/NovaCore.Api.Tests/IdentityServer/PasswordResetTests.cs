@@ -119,8 +119,12 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
         var reset = await ResetAsync(browser, ResetLink("policy-reset@novacore.test"), "too-short", "too-short");
 
         var html = await reset.Content.ReadAsStringAsync();
-        Assert.Contains("at least 12 characters", html, StringComparison.Ordinal);
+        Assert.Contains("at least 15 characters", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Your password has been reset.", html, StringComparison.Ordinal);
+
+        // A refused password leaves the link usable; a common one is refused too.
+        var common = await ResetAsync(browser, ResetLink("policy-reset@novacore.test"), "iloveyouforever", "iloveyouforever");
+        Assert.Contains("too common", await common.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
     [Fact]
