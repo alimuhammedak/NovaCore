@@ -59,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Identity provider: passwords have at least 15 characters (was 12) and can't be one of 3,000 common ones (a list from
   SecLists, MIT, shipped in the package; compared ignoring case; NIST SP 800-63B-4). **Breaking** for registration, password
   change and reset; existing passwords keep working until they change.
+- Identity provider: registration, the password reset form and resending the confirmation answer before the email is
+  sent; a background service sends the queued emails through the host's `IEmailSender`. A slow mail server no longer
+  shows in the response time, which revealed whether an address had an account (ASVS 6.3.8). A failed send is logged
+  and no longer fails the request. Queued emails are kept in memory: one still queued when the process stops is lost.
 
 ### Added
 

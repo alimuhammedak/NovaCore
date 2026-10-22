@@ -84,7 +84,7 @@ internal static class AccountEndpoints
         RegisterRequest request,
         UserManager<ApplicationUser> users,
         RoleManager<ApplicationRole> roles,
-        IEmailSender emailSender,
+        EmailQueue emails,
         SecurityAuditLogger audit,
         IOptions<JwtOptions> jwt,
         TimeProvider timeProvider,
@@ -113,7 +113,7 @@ internal static class AccountEndpoints
         if (await roles.RoleExistsAsync(IdentityRoles.User))
             await users.AddToRoleAsync(user, IdentityRoles.User);
 
-        await SendConfirmationAsync(users, emailSender, jwt.Value, user, cancellationToken);
+        await SendConfirmationAsync(users, emails, jwt.Value, user, cancellationToken);
 
         audit.UserRegistered(user.Id);
         return TypedResults.Ok(GenericAccepted);
@@ -124,23 +124,24 @@ internal static class AccountEndpoints
     private static async Task<Ok<MessageResponse>> ResendConfirmationEmail(
         ResendConfirmationEmailRequest request,
         UserManager<ApplicationUser> users,
-        IEmailSender emailSender,
+        EmailQueue emails,
         IOptions<JwtOptions> jwt,
         CancellationToken cancellationToken)
     {
         var user = await users.FindByEmailAsync(request.Email);
         if (user is not null && !await users.IsEmailConfirmedAsync(user))
-            await SendConfirmationAsync(users, emailSender, jwt.Value, user, cancellationToken);
+            await SendConfirmationAsync(users, emails, jwt.Value, user, cancellationToken);
 
         return TypedResults.Ok(ConfirmationResent);
     }
 
     private static async Task SendConfirmationAsync(
-        UserManager<ApplicationUser> users, IEmailSender emailSender, JwtOptions jwt, ApplicationUser user, CancellationToken cancellationToken)
+        UserManager<ApplicationUser> users, EmailQueue emails, JwtOptions jwt, ApplicationUser user, CancellationToken cancellationToken)
     {
         var link = EmailLinks.Create(jwt, ConfirmEmailPath, user.Id, await users.GenerateEmailConfirmationTokenAsync(user));
 
-        await emailSender.SendAsync(user.Email!, "Confirm your account",
+        // Queued, not sent here: the answer mustn't wait for the mail server, or its timing would reveal the account.
+        await emails.EnqueueAsync(user.Email!, "Confirm your account",
             $"Welcome! Confirm your email address: <a href=\"{link}\">Confirm</a>", cancellationToken);
     }
 

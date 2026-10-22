@@ -50,9 +50,13 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   account; the "confirm your email" message comes only after the right password. `SignInManager` answers `NotAllowed`
   before it looks at the password, so `LoginPage` checks the password itself and counts a wrong one (D-030 (1)).
   An unknown email costs a password hash like a known one (`DummyPasswordHash`, made once by the host's hasher), so the
-  answer's timing doesn't reveal accounts either (R-087). Registration answers an existing address like a new one. Resending the confirmation answers every address alike and
-  emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
-  account; the reset page answers an unknown or unconfirmed account like a bad token (R-084).
+  answer's timing doesn't reveal accounts either (R-087). Registration answers an existing address like a new one.
+  Resending the confirmation answers every address alike and emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
+  account; the reset page answers an unknown or unconfirmed account like a bad token (R-084). Those three never wait
+  for the mail server: they queue the email (`EmailQueue`, a bounded in-memory channel read by a `BackgroundService`
+  that sends through the host's `IEmailSender`, one at a time), so the response time doesn't reveal the account either
+  (F6b.6a, R-105, ASVS 6.3.8). A queued email is lost if the process stops; a failed send is logged without the address
+  or the body. Send new emails the same way, never by awaiting `IEmailSender` in a handler.
 - **Password reset:** the link carries an Identity token that `ResetPasswordAsync` uses up (it renews the security
   stamp), the new password is typed twice, and a reset revokes every token and authorization of the user like a
   password change. It never signs the user in. A missing `User` role (seeding off) leaves a new account without a role

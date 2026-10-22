@@ -110,6 +110,11 @@ public static class IdentityServerHostingExtensions
             services.TryAddSingleton<IEmailSender, LoggingEmailSender>();
         services.AddHostedService<EmailSenderStartupCheck>();
 
+        // The endpoints queue their emails and answer at once; EmailQueue sends them through the host's IEmailSender in
+        // the background, so the response time doesn't reveal whether an address has an account (R-105).
+        services.AddSingleton<EmailQueue>();
+        services.AddHostedService(provider => provider.GetRequiredService<EmailQueue>());
+
         // Built-in validation is generated per assembly, so the add-on registers it for its own requests (R-052).
         services.AddValidation();
 

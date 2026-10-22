@@ -144,7 +144,7 @@ sonra, `services.PostConfigure<T>` bütün `Configure`'lardan sonra çalışır.
 | `ExceptionHandlerOptions`, `ProblemDetailsOptions` | Exception → durum kodu ve ProblemDetails (`traceId`, `instance`) | Bir exception'ı kendiniz eşlemek için `IExceptionHandler` kaydedin: paketin eşlemesi middleware'in yedek yolunda olduğu için sizinki her zaman önce çalışır |
 | `HybridCacheOptions` | Varsayılan süre `Cache:DefaultExpiration` | L2 için bir `IDistributedCache` (Redis) kaydetmek yeter |
 | `OpenApiOptions` (belge `v1`) | Bearer security scheme | Kendi transformer'larınızı ekleyin |
-| Kimlik eklentisi: `IdentityOptions`, `PasswordHasherOptions`, `DataProtectionTokenProviderOptions`, uygulama cookie'si, `OpenIddictServerOptions` | Parola en az 12, lockout 5 deneme / 15 dk, onaylı e-posta, PBKDF2 600.000, onay token'ı 6 saat, cookie 30 dk kayan, access token 15 dk, refresh 7 gün | Değerleri yükseltmek serbest; düşürmek eklentinin güvenlik varsayımlarını bozar (bkz. [Güvenlik](#güvenlik--yetkilendirme)) |
+| Kimlik eklentisi: `IdentityOptions`, `PasswordHasherOptions`, `DataProtectionTokenProviderOptions`, uygulama cookie'si, `OpenIddictServerOptions` | Parola en az 15 (yaygın parola listesiyle), lockout 5 deneme / 15 dk, onaylı e-posta, PBKDF2 600.000, onay token'ı 6 saat, cookie 30 dk kayan, access token 15 dk, refresh 7 gün | Değerleri yükseltmek serbest; düşürmek eklentinin güvenlik varsayımlarını bozar (bkz. [Güvenlik](#güvenlik--yetkilendirme)) |
 
 ```csharp
 // Program.cs: AddCoreWeb'den sonra
@@ -646,7 +646,11 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
 - **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**, hatalı 2FA ya da kurtarma kodu da sayılır), giriş sayfası, token ucu ve
   hesap API'sinde rate limiting (`strict`), bilinmeyen hesap / yanlış parola / kilitli hesap için **tek hata mesajı**.
   Bilinmeyen e-posta da bir parola hash'i doğrular (host'un hasher'ıyla bir kez üretilen sahte hash), böylece yanıt
-  süresi hesabın varlığını ele vermez. `change-password`'da yanlış mevcut parola da lockout sayacını artırır; kilitli
+  süresi hesabın varlığını ele vermez. Kayıt, parola sıfırlama formu ve onay e-postasını yeniden gönderme e-postayı
+  kuyruğa koyup hemen yanıt verir; bir arka plan servisi (`EmailQueue`) host'un `IEmailSender`'ıyla sırayla gönderir.
+  Yanıt e-posta sunucusunu beklemediği için süresi de hesabın varlığını ele vermez (OWASP Forgot Password, ASVS 6.3.8).
+  Kuyruk bellek içindedir: süreç dururken kuyrukta kalan e-posta kaybolur, kullanıcı linki yeniden ister; gönderim
+  hatası loglanır, istek etkilenmez. `change-password`'da yanlış mevcut parola da lockout sayacını artırır; kilitli
   hesapta parola değişmez.
 - **E-posta onayı** zorunlu (dev'de link loglanır; link `Jwt:Authority`'den üretilir, Host başlığından değil),
   **TOTP 2FA** (authenticator app). Her authenticator kodu bir kez geçer (ASVS 6.5.1): 2FA'yı açan kod girişte

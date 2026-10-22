@@ -1039,3 +1039,15 @@ Biçim:
   - Proje: araştırma hedefi ASVS L1/L2 koymuş, bu kalemi L3/P3 saymıştı (proposals/guvenlik-kalite-arastirmasi.md #29). Kullanıcının K5 kararı ise bunu "ölçülüp açık çıkarsa aynı fazda kapanır" listesine koydu (proposals/guvenlik-kalite-kararlari.md, D-046, PLAN F6b.6).
 - Kaynak: https://github.com/dotnet/aspnetcore/blob/v10.0.12/src/Identity/Core/src/IdentityApiEndpointRouteBuilderExtensions.cs · …/Identity/UI/src/Areas/Identity/Pages/V5/Account/ForgotPassword.cshtml.cs · https://learn.microsoft.com/aspnet/core/security/authentication/accconfirm?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/fundamentals/best-practices?view=aspnetcore-10.0#complete-long-running-tasks-outside-of-http-requests · https://learn.microsoft.com/aspnet/core/fundamentals/host/hosted-services?view=aspnetcore-10.0#queued-background-tasks · https://github.com/keycloak/keycloak/blob/main/services/src/main/java/org/keycloak/authentication/authenticators/resetcred/ResetCredentialEmail.java · https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html · https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html · https://raw.githubusercontent.com/OWASP/ASVS/v5.0.0/5.0/en/0x15-V6-Authentication.md
 - Sonuç: Açık var (ölçüldü). Microsoft ve Keycloak bunu kapatmıyor; kapatma gerekçesi OWASP ve ASVS L3. Kapatma yolu kullanıcıya soruldu (asenkron gönderim / her yolda e-posta / belgelenmiş sapma).
+
+### R-106: Refresh token'ın mutlak ömrü (2026-10-22, faz 6b; ölçüm)
+- Soru: OpenIddict 7.7.1'in rolling refresh token'ları girişten 7 gün sonra bitiyor mu, yoksa her yenileme yeni 7 gün mü veriyor (F6b.4e)?
+- Ölçüm (`FakeTimeProvider`, `RefreshTokenAbsoluteLifetimeTests`): girişten 6 gün sonra yenilenen token, girişten 7 gün + 1 sn sonra 200 aldı. Yani varsayılan "sliding": her yeni refresh token tam ömür alıyor, sürekli yenilenen bir oturum (çalınmış bir token dahil) hiç bitmiyor.
+- Kaynak: R-103 (`DisableSlidingRefreshTokenExpiration()`), ölçüm testi.
+- Sonuç: `server.DisableSlidingRefreshTokenExpiration()`; aynı test 400 `invalid_grant`. Rolling ve 30 sn leeway değişmedi.
+
+### R-107: Antiforgery cookie'sinin `Always` politikası ve düz http (2026-10-22, faz 6b; ölçüm)
+- Soru: Antiforgery cookie'si her ortamda `CookieSecurePolicy.Always` yapılabilir mi (F6b.6b)?
+- Ölçüm: `Always` ile düz http üzerinden açılan `/account/login` 500 döndü (Api host'unun `SecureDefaultsTests`'i http üzerinden yakaladı). Antiforgery, istek SSL değilken `Always` politikasında token üretmeyi reddediyor. Varsayılan `None` ise https'te bile Secure bayrağı koymuyor.
+- Kaynak: R-104 (MS: Development dışında `Always`), ölçüm.
+- Sonuç: Development dışında `Always`, Development'ta `SameAsRequest` (https'te Secure, http'de sayfa çalışır). 2FA cookie'leri uygulama cookie'si gibi her ortamda `Always`: cookie işleyicisi http'de hata vermez, yalnız bayrağı koyar.

@@ -41,7 +41,7 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
 
         using var browser = new OidcFlow(_host);
         Assert.Equal(HttpStatusCode.OK, (await RequestResetAsync(browser, "reset@novacore.test")).StatusCode);
-        var reset = await ResetAsync(browser, ResetLink("reset@novacore.test"), NewPassword, NewPassword);
+        var reset = await ResetAsync(browser, await ResetLinkAsync("reset@novacore.test"), NewPassword, NewPassword);
 
         Assert.Contains("Your password has been reset.", await reset.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(await session.RefreshAsync(tokens.RefreshToken)));
@@ -56,7 +56,7 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
         await _host.CreateUserAsync("once@novacore.test", Password);
         using var browser = new OidcFlow(_host);
         await RequestResetAsync(browser, "once@novacore.test");
-        var link = ResetLink("once@novacore.test");
+        var link = await ResetLinkAsync("once@novacore.test");
 
         await ResetAsync(browser, link, NewPassword, NewPassword);
         var again = await ResetAsync(browser, link, "yet another passphrase", "yet another passphrase");
@@ -91,6 +91,10 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
         Assert.Equal(HttpStatusCode.OK, unknown.StatusCode);
         Assert.Equal(expected, await unknown.Content.ReadAsStringAsync());
         Assert.Equal(expected, await notConfirmed.Content.ReadAsStringAsync());
+        // The emails go out in the order queued: once a later one has gone, nothing queued before it is still pending.
+        await _host.CreateUserAsync("after-reset@novacore.test", Password);
+        await RequestResetAsync(browser, "after-reset@novacore.test");
+        await fixture.Emails.WaitForAsync(email => email.To == "after-reset@novacore.test");
         Assert.Single(fixture.Emails.Sent, email => email.To == "known-reset@novacore.test");
         Assert.DoesNotContain(fixture.Emails.Sent, email => email.To is "nobody-reset@novacore.test" or "unconfirmed-reset@novacore.test");
     }
@@ -102,7 +106,7 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
         using var browser = new OidcFlow(_host);
         await RequestResetAsync(browser, "twice-reset@novacore.test");
 
-        var reset = await ResetAsync(browser, ResetLink("twice-reset@novacore.test"), NewPassword, "a different passphrase");
+        var reset = await ResetAsync(browser, await ResetLinkAsync("twice-reset@novacore.test"), NewPassword, "a different passphrase");
 
         Assert.Contains("The passwords do not match.", await reset.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         using var flow = new OidcFlow(_host);
@@ -116,14 +120,14 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
         using var browser = new OidcFlow(_host);
         await RequestResetAsync(browser, "policy-reset@novacore.test");
 
-        var reset = await ResetAsync(browser, ResetLink("policy-reset@novacore.test"), "too-short", "too-short");
+        var reset = await ResetAsync(browser, await ResetLinkAsync("policy-reset@novacore.test"), "too-short", "too-short");
 
         var html = await reset.Content.ReadAsStringAsync();
         Assert.Contains("at least 15 characters", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Your password has been reset.", html, StringComparison.Ordinal);
 
         // A refused password leaves the link usable; a common one is refused too.
-        var common = await ResetAsync(browser, ResetLink("policy-reset@novacore.test"), "iloveyouforever", "iloveyouforever");
+        var common = await ResetAsync(browser, await ResetLinkAsync("policy-reset@novacore.test"), "iloveyouforever", "iloveyouforever");
         Assert.Contains("too common", await common.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
@@ -151,7 +155,7 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
             new() { ["Email"] = "hostile-reset@novacore.test" },
             request => request.Headers.Host = "evil.example");
 
-        Assert.StartsWith(IdentityServerTestHost.Authority + "/account/reset-password?", ResetLink("hostile-reset@novacore.test"), StringComparison.Ordinal);
+        Assert.StartsWith(IdentityServerTestHost.Authority + "/account/reset-password?", await ResetLinkAsync("hostile-reset@novacore.test"), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -196,9 +200,9 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
         });
     }
 
-    private string ResetLink(string email)
+    private async Task<string> ResetLinkAsync(string email)
     {
-        var body = Assert.Single(fixture.Emails.Sent, sent => sent.To == email).HtmlBody;
+        var body = Assert.Single(await fixture.Emails.WaitForAsync(sent => sent.To == email)).HtmlBody;
         return WebUtility.HtmlDecode(Href().Match(body).Groups["url"].Value);
     }
 
