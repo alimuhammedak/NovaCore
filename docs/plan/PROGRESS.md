@@ -1063,7 +1063,9 @@ Plan onayı (2026-10-21). Kullanıcı kararları: Q-40 (izlenmeyen `.agents/`, `
 ### Faz 6c
 Plan onayı (2026-10-22). Başlangıç: `main` @ `37c8086`, 361 test. Kullanıcı kararları: Q-44 (faz branch'i her adımdan sonra push edilir), Q-45 (şablon da MTP + xUnit 4'e geçer, F6c.1b), Q-46 (önceki fazlardan devredilen üç madde bu fazda: R-055 → F6c.1c, ilk TOTP kaydındaki INSERT yarışı → F6c.2c, yarışı zorlamayan 2FA testi → F6c.2d). Q-40 sürüyor (izlenmeyen `.agents/`, `.codex/`, `AGENTS.md`'ye dokunulmaz). Sıra PLAN'daki gibi; alt adımlar: F6c.1a repo, 1b şablon, 1c R-055; F6c.2a altyapı ve gerçek migration'lar, 2b SQLite'ın gizledikleri, 2c TOTP INSERT yarışı, 2d deterministik 2FA yarış testi. Faz kararları D-056'ya, araştırmalar R-108'den başlayarak yazılır.
 
-- [ ] F6c.1a: MTP + xUnit 4 (repo) — devam ediyor.
+- [x] F6c.1a (ac227a4): MTP + xUnit 4 (R-108). `global.json` `test.runner: Microsoft.Testing.Platform`; `xunit.v3` 3.2.2 → 4.0.2 (MTP v2 2.5.1); `Microsoft.NET.Test.Sdk` ve `xunit.runner.visualstudio` kalktı. CI ve release `dotnet test --solution NovaCore.slnx`. Stop hook'u (kullanıcı onayıyla) `--solution` kullanıyor ve `-nologo`'yu bırakıyor: ölçümde eski komut exit 5 verdi, çünkü `-nologo` MTP modunda test uygulamasına geçiyor. **Plandan sapma:** PLAN'ın `dotnet test NovaCore.slnx` genel kuralı değişmedi; konumsal `.slnx` 10.0.300'de çalışıyor (exit 0). Filtre örnekleri `-- --filter-method "*.Class.Method"` / `--filter-class` oldu (CLAUDE.md, tests/CLAUDE.md, README); üçü de denendi. Kırmızı bir deneme testi exit 2 verdi (hook bunu kırmızı sayar; deneme commit'lenmedi). 361/361 yeşil (~4 dk yerelde).
+- [x] F6c.1b: Şablon MTP + xUnit 4 (Q-45). Şablonun `global.json`'ına `test.runner`, `xunit.v3` 4.0.2, iki VSTest paketi kalktı. Şablonun CI'ındaki `dotnet test -c Release --no-build` proje klasöründe tek çözüm olduğu için MTP modunda aynen çalışıyor (smoke testi aynı komutu koşuyor). `bash eng/template-smoke.sh` yeşil: BuiltIn 8/8, External 7/7, MTP modunda.
+- [ ] F6c.1c: R-055 ölçümü — devam ediyor.
 
 ## Açık sorular (Q)
 
