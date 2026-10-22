@@ -1255,11 +1255,10 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-22, Faz 6b: Kimlik güvenlik sınırı (devam ediyor, kullanıcı kararı bekleniyor).** Branch `faz/6b-kimlik-guvenlik-siniri`, her adımdan sonra push (Q-43). Son commit `368d677`, 348/348 yeşil, CI ve CodeQL yeşil.
+**2026-10-22, Faz 6b: Kimlik güvenlik sınırı (devam ediyor, kullanıcı kararı bekleniyor).** Branch `faz/6b-kimlik-guvenlik-siniri`, her adımdan sonra push (Q-43). Son commit `a6ebccd`, 354/354 yeşil, branch'te CI (secret-scan, build-and-test, template-smoke, workflow-lint) ve CodeQL yeşil.
 
-- **Biten:** F6b.1a–1d, F6b.2, F6b.3a–3b, F6b.4a–4e, F6b.6b–6d, F6b.7 (ayrıntı "Faz 6b" adımlarında). Şablon smoke testi F6b.4a'dan sonra geçti; şablon o zamandan beri değişmedi.
+- **Biten:** F6b.1a–1d, F6b.2, F6b.3a–3b, F6b.4a–4e, F6b.5, F6b.6b–6d, F6b.7 (ayrıntı "Faz 6b" adımlarında).
 - **Bekleyen (kullanıcı):**
-  - F6b.5: SecLists `xato-net-10-million-passwords-1000000.txt` (~8.5 MB) indirme onayı. Dosya indirme sohbette açık onay istiyor; soru aracı reddedildi, cevap gelmedi.
   - F6b.6a: zamanlama açığı ölçüldü (yanıt e-posta gönderimini bekliyor). Kapatma yolu Y-18'deki "kuyruk" maddesine değiyor: bellek içi kuyruk + `BackgroundService` (önerilen) / host'un sorumluluğu (belge) / yanıttan sonra gönderim (`OnCompleted`, keep-alive'da sızıyor).
   - CodeQL #3 ve #4 (`cs/user-controlled-bypass`, false positive, testle gösterildi): GitHub'da "false positive" olarak kapatma dışa dönük işlem. #1 ve #2 kodda düzeldi; main taranınca kapanır.
 - **Faz sonunda yapılacak:** D-054 (bu fazın ek model kararları: test host'unun JSON kaynaklarını düşürmesi, antiforgery'nin ortama göre `Secure` politikası, revoke'ta `strict` yerine global limit, audit'ten e-postanın çıkması, eski ödemelerin boş `OwnerId`'si), RESEARCH R-105… (zamanlama ölçümü, sliding refresh ölçümü, antiforgery `Always` + http), `tests/CLAUDE.md`'deki uzun satırın düzeltilmesi, faz doğrulaması, code review, rapor.
