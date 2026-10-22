@@ -154,8 +154,10 @@ return 429). Don't set environment variables in tests: they are process-wide and
 
 **One factory needs a different value?** Subclass `NovaCoreApiFactory`, override `ConfigureWebHost`, call `base` and
 then add another `ConfigureAppConfiguration`: sources added later win. Examples: `StrictRateLimitApiFactory`, and the
-factory in `ConfigurationValidationTests`. Invalid values stop the host on start (`ValidateOnStart`), so a test can
-assert on `factory.Server` throwing.
+factory in `ConfigurationValidationTests`. Invalid values stop the host on start (`ValidateOnStart`). Assert that on a
+host started directly (`CoreWebTestHost.StartAsync`, `IdentityServerTestHost.StartAsync`), not on `factory.Server`: a
+`WebApplicationFactory` host that fails to start can throw `ObjectDisposedException` instead of the startup error
+(R-055, R-109, dotnet/aspnetcore#69684).
 
 **Different environment?** Override `EnvironmentName` (default `Development`), e.g. `ProductionApiFactory`.
 

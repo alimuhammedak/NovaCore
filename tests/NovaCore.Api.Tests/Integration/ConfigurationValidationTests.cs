@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NovaCore.AspNetCore.Auth;
+using NovaCore.EntityFrameworkCore.Persistence;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -13,6 +14,9 @@ namespace NovaCore.Api.Tests.Integration;
 /// Configuration is bound through the options pattern and validated on start (docs/plan/RESEARCH.md R-048): an invalid
 /// value stops the host with a message naming the setting, and app configuration layered in after
 /// <c>CreateBuilder</c> (as <see cref="Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory{TEntryPoint}"/> does) is honoured.
+/// The settings are the core packages', so a host that must fail to start is composed of those packages and started
+/// directly: a <see cref="Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory{TEntryPoint}"/> host that fails to start
+/// can throw <see cref="ObjectDisposedException"/> instead of the startup error (R-055, dotnet/aspnetcore#69684).
 /// </summary>
 public class ConfigurationValidationTests
 {
@@ -32,9 +36,14 @@ public class ConfigurationValidationTests
     public async Task Invalid_configuration_stops_the_host_at_startup(
         string environment, string key, string value, string expectedInMessage)
     {
-        await using var factory = new ConfiguredApiFactory(environment, new() { [key] = value });
-
-        var error = Assert.ThrowsAny<Exception>(() => factory.Server);
+        var error = await Assert.ThrowsAnyAsync<Exception>(() => CoreWebTestHost.StartAsync(
+            _ => { },
+            environment,
+            builder =>
+            {
+                builder.AddCorePersistence();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { [key] = value });
+            }));
 
         Assert.Contains(expectedInMessage, Messages(error), StringComparison.Ordinal);
     }
