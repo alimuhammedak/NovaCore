@@ -1025,7 +1025,8 @@ Plan onayı (2026-10-21). Kullanıcı kararları: Q-40 (izlenmeyen `.agents/`, `
 - [ ] F6b.1 MFA
   - 2026-10-22, yeni oturum: önceki oturumdan kalan commit'lenmemiş F6b.1a testleri kullanıcının isteğiyle atıldı ("At, baştan yaz"), testler yeniden yazıldı.
   - [x] F6b.1a (cf96566): TOTP tek kullanım (D-053 (2), R-099). `SingleUseAuthenticatorTokenProvider` Identity'nin `Authenticator` sağlayıcısının yerine geçer: Identity'nin ±2 adımlık kontrolünden sonra son beş adımda kabul edilmiş kodları reddeder, yeni kodu `[NovaCore]/UsedAuthenticatorCodes` kullanıcı token'ına yazar; kayıt `ConcurrencyStamp`'la yapıldığı için yarışan iki istekten biri girer. Kodlar sayı olarak karşılaştırılır (Identity `int.TryParse` ile karşılaştırıyor; `0` önekli kod aynı koddur, testi var). Etkilenen iki mevcut test (2FA'yı açan kodla giriş, aynı kodla kapatma) bir sonraki adımın koduna geçti. 4 yeni test; 282/282 yeşil.
-  - [ ] F6b.1b: kurtarma kodu hash'i (devam ediyor)
+  - [x] F6b.1b (3591766): Kurtarma kodu hash'i (D-053 (3), R-099). `HashedRecoveryCodesUserStore` (Identity'nin EF user store'u, `AddEntityFrameworkStores`'tan önce kaydedilir; o yalnızca `TryAdd` yapıyor) kodları `PasswordHasher` varsayılanıyla (V3, PBKDF2-HMAC-SHA512, 100.000) `[NovaCore]/RecoveryCodeHashes` token'ında tutar; `Replace`/`Redeem`/`Count` ezilir. Identity'nin düz metin yuvası (`[AspNetUserStore]/RecoveryCodes`) okunmaz: eski kodlar çalışmaz, CHANGELOG silme komutunu veriyor. Eski kodlar için uyumluluk kodu yazılmadı (Y-45; 0.x önizleme). README'nin 2FA maddesi 1a ve 1b için güncellendi. 2 yeni test; 284/284 yeşil.
+  - [ ] F6b.1c: yeniden kimlik doğrulama (devam ediyor)
 - [ ] F6b.2 Yetki yükseltme
 - [ ] F6b.3 Seeding ve Payments
 - [ ] F6b.4 Token/protokol

@@ -68,7 +68,7 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
         var key = await SetUpAsync(flow, accessToken);
         var code = AuthenticatorCode.For(key);
         Assert.Equal(HttpStatusCode.OK,
-            (await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { code })).StatusCode);
+            (await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { password = Password, code })).StatusCode);
 
         using var signIn = new OidcFlow(_host);
         var (_, codePage) = await CodeStepAsync(signIn, "mfa-enabling-code@novacore.test");
@@ -144,11 +144,125 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
         using var ownedFlow = flow;
         var key = await SetUpAsync(flow, accessToken);
 
-        var enable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { code = AuthenticatorCode.WrongFor(key) });
+        var enable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { password = Password, code = AuthenticatorCode.WrongFor(key) });
 
         Assert.Equal(HttpStatusCode.BadRequest, enable.StatusCode);
         Assert.True((await enable.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").TryGetProperty("code", out _));
         Assert.False(await TwoFactorEnabledAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task A_wrong_code_at_the_api_counts_as_a_failed_access()
+    {
+        var user = await _host.CreateUserAsync("mfa-api-wrong@novacore.test", Password);
+        var (flow, accessToken) = await SignedInAsync("mfa-api-wrong@novacore.test");
+        using var ownedFlow = flow;
+        var key = await SetUpAsync(flow, accessToken);
+
+        await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { password = Password, code = AuthenticatorCode.WrongFor(key) });
+
+        Assert.Equal(1, await AccessFailedCountAsync(user.Id));
+    }
+
+    // ASVS 7.5.1: an access token alone doesn't change the second factor. A wrong password counts toward lockout.
+    [Fact]
+    public async Task Setup_needs_the_current_password()
+    {
+        var user = await _host.CreateUserAsync("mfa-setup-password@novacore.test", Password);
+        var (flow, accessToken) = await SignedInAsync("mfa-setup-password@novacore.test");
+        using var ownedFlow = flow;
+
+        var setup = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/setup", accessToken, new { password = "not the password" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, setup.StatusCode);
+        var json = await setup.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(json.GetProperty("errors").TryGetProperty("password", out _));
+        Assert.False(json.TryGetProperty("sharedKey", out _));
+        Assert.Equal(1, await AccessFailedCountAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task Enabling_needs_the_current_password()
+    {
+        var user = await _host.CreateUserAsync("mfa-enable-password@novacore.test", Password);
+        var (flow, accessToken) = await SignedInAsync("mfa-enable-password@novacore.test");
+        using var ownedFlow = flow;
+        var key = await SetUpAsync(flow, accessToken);
+
+        var enable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken,
+            new { password = "not the password", code = AuthenticatorCode.For(key) });
+
+        Assert.Equal(HttpStatusCode.BadRequest, enable.StatusCode);
+        Assert.True((await enable.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").TryGetProperty("password", out _));
+        Assert.False(await TwoFactorEnabledAsync(user.Id));
+        Assert.Equal(1, await AccessFailedCountAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task Disabling_needs_the_current_password()
+    {
+        var user = await _host.CreateUserAsync("mfa-disable-password@novacore.test", Password);
+        var (key, _) = await EnableAsync("mfa-disable-password@novacore.test");
+        using var flow = new OidcFlow(_host);
+        var (verifier, codePage) = await CodeStepAsync(flow, "mfa-disable-password@novacore.test");
+        var tokens = await flow.FinishSignInAsync(await flow.SubmitCodeAsync(codePage, AuthenticatorCode.For(key, stepsAhead: 1)), verifier);
+
+        var disable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/disable", tokens.AccessToken,
+            new { password = "not the password", code = AuthenticatorCode.For(key, stepsAhead: 2) });
+
+        Assert.Equal(HttpStatusCode.BadRequest, disable.StatusCode);
+        Assert.True(await TwoFactorEnabledAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task Enabling_again_replaces_the_recovery_codes()
+    {
+        await _host.CreateUserAsync("recovery-new@novacore.test", Password);
+        var (key, oldCodes) = await EnableAsync("recovery-new@novacore.test");
+        using var flow = new OidcFlow(_host);
+        var (verifier, codePage) = await CodeStepAsync(flow, "recovery-new@novacore.test");
+        var tokens = await flow.FinishSignInAsync(await flow.SubmitCodeAsync(codePage, AuthenticatorCode.For(key, stepsAhead: 1)), verifier);
+
+        var again = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", tokens.AccessToken,
+            new { password = Password, code = AuthenticatorCode.For(key, stepsAhead: 2) });
+
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        var newCodes = (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("recoveryCodes")
+            .EnumerateArray().Select(code => code.GetString()!).ToArray();
+        Assert.Equal(10, newCodes.Length);
+        Assert.Empty(newCodes.Intersect(oldCodes));
+
+        using var withOld = new OidcFlow(_host);
+        var (_, oldCodePage) = await CodeStepAsync(withOld, "recovery-new@novacore.test");
+        Assert.Contains("Invalid recovery code.",
+            await (await withOld.SubmitCodeAsync(oldCodePage, oldCodes[0])).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        using var withNew = new OidcFlow(_host);
+        var (newVerifier, newCodePage) = await CodeStepAsync(withNew, "recovery-new@novacore.test");
+        Assert.False(string.IsNullOrEmpty(
+            (await withNew.FinishSignInAsync(await withNew.SubmitCodeAsync(newCodePage, newCodes[0]), newVerifier)).AccessToken));
+    }
+
+    // A session that started without the second factor, or with the factor being removed, doesn't outlive the change.
+    [Fact]
+    public async Task Turning_two_factor_authentication_on_or_off_ends_the_sessions()
+    {
+        await _host.CreateUserAsync("mfa-sessions@novacore.test", Password);
+        using var flow = new OidcFlow(_host);
+        var before = await flow.SignInAsync("mfa-sessions@novacore.test", Password);
+        var key = await SetUpAsync(flow, before.AccessToken);
+
+        Assert.Equal(HttpStatusCode.OK, (await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", before.AccessToken,
+            new { password = Password, code = AuthenticatorCode.For(key) })).StatusCode);
+        Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(await flow.RefreshAsync(before.RefreshToken)));
+
+        using var second = new OidcFlow(_host);
+        var (verifier, codePage) = await CodeStepAsync(second, "mfa-sessions@novacore.test");
+        var during = await second.FinishSignInAsync(await second.SubmitCodeAsync(codePage, AuthenticatorCode.For(key, stepsAhead: 1)), verifier);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await second.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/disable", during.AccessToken,
+            new { password = Password, code = AuthenticatorCode.For(key, stepsAhead: 2) })).StatusCode);
+        Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(await second.RefreshAsync(during.RefreshToken)));
     }
 
     [Fact]
@@ -158,7 +272,7 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
         var (flow, accessToken) = await SignedInAsync("mfa-short@novacore.test");
         using var ownedFlow = flow;
 
-        var enable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { code = "12345" });
+        var enable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { password = Password, code = "12345" });
 
         Assert.Equal(HttpStatusCode.BadRequest, enable.StatusCode);
         Assert.True((await enable.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").TryGetProperty("Code", out _));
@@ -171,9 +285,9 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
         var (flow, accessToken) = await SignedInAsync("mfa-off@novacore.test");
         using var ownedFlow = flow;
         var key = await SetUpAsync(flow, accessToken);
-        await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { code = AuthenticatorCode.For(key) });
+        await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { password = Password, code = AuthenticatorCode.For(key) });
 
-        var disable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/disable", accessToken, new { code = AuthenticatorCode.For(key, stepsAhead: 1) });
+        var disable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/disable", accessToken, new { password = Password, code = AuthenticatorCode.For(key, stepsAhead: 1) });
 
         Assert.Equal(HttpStatusCode.NoContent, disable.StatusCode);
         Assert.False(await TwoFactorEnabledAsync(user.Id));
@@ -189,10 +303,10 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
         using var ownedFlow = flow;
         var key = await SetUpAsync(flow, accessToken);
         Assert.Equal(HttpStatusCode.OK,
-            (await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { code = AuthenticatorCode.For(key) })).StatusCode);
+            (await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { password = Password, code = AuthenticatorCode.For(key) })).StatusCode);
 
         // With the key, a stolen access token could compute codes and turn two-factor authentication off.
-        var again = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/setup", accessToken, body: null);
+        var again = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/setup", accessToken, new { password = Password });
 
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
         Assert.DoesNotContain(key, await again.Content.ReadAsStringAsync(), StringComparison.Ordinal);
@@ -319,7 +433,7 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
         using var ownedFlow = flow;
         var key = await SetUpAsync(flow, accessToken);
 
-        var enable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { code = AuthenticatorCode.For(key) });
+        var enable = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken, new { password = Password, code = AuthenticatorCode.For(key) });
         Assert.Equal(HttpStatusCode.OK, enable.StatusCode);
         var recoveryCodes = (await enable.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("recoveryCodes")
             .EnumerateArray().Select(code => code.GetString()!).ToArray();
@@ -343,11 +457,18 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
 
     private static async Task<string> SetUpAsync(OidcFlow flow, string accessToken)
     {
-        var setup = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/setup", accessToken, body: null);
+        var setup = await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/setup", accessToken, new { password = Password });
         Assert.Equal(HttpStatusCode.OK, setup.StatusCode);
         var json = await setup.Content.ReadFromJsonAsync<JsonElement>();
         Assert.StartsWith("otpauth://totp/", json.GetProperty("authenticatorUri").GetString(), StringComparison.Ordinal);
         return json.GetProperty("sharedKey").GetString()!;
+    }
+
+    private async Task<int> AccessFailedCountAsync(Guid userId)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        return await users.GetAccessFailedCountAsync((await users.FindByIdAsync(userId.ToString()))!);
     }
 
     private async Task<bool> TwoFactorEnabledAsync(Guid userId)

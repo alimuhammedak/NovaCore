@@ -35,6 +35,8 @@ internal sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
 
     public void RecoveryCodeUsed(Guid userId) => logger.LogRecoveryCodeUsed(userId);
 
+    public void RecoveryCodesRenewed(Guid userId) => logger.LogRecoveryCodesRenewed(userId);
+
     public void TokenRefreshed(Guid userId, string? ip) => logger.LogTokenRefreshed(userId, ip);
 
     public void SignedOut(Guid userId) => logger.LogSignedOut(userId);
@@ -90,6 +92,9 @@ internal static partial class SecurityAuditLog
     // Warning: a used recovery code can mean a lost authenticator, or a stolen code.
     [LoggerMessage(EventId = 27, Level = LogLevel.Warning, Message = "SECURITY recovery_code_used User={UserId}")]
     public static partial void LogRecoveryCodeUsed(this ILogger logger, Guid userId);
+
+    [LoggerMessage(EventId = 28, Level = LogLevel.Information, Message = "SECURITY recovery_codes_renewed User={UserId}")]
+    public static partial void LogRecoveryCodesRenewed(this ILogger logger, Guid userId);
 
     [LoggerMessage(EventId = 14, Level = LogLevel.Information, Message = "SECURITY token_refreshed User={UserId} Ip={Ip}")]
     public static partial void LogTokenRefreshed(this ILogger logger, Guid userId, string? ip);

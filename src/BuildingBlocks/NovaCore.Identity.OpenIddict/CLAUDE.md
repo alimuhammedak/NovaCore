@@ -56,6 +56,11 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   check; D-030 (2), R-067).
 - **Two-factor keys stay secret once enabled:** `/2fa/setup` answers 409 while 2FA is on; a new authenticator starts
   after `/2fa/disable`, which takes a code (D-030 (3)).
+- **The second factor changes only with the password** (ASVS 7.5.1, D-053 (4)): `/2fa/setup` takes `{ password }`,
+  `/2fa/enable` and `/2fa/disable` take `{ password, code }`. A locked account is refused; a wrong password or code counts
+  toward lockout and only full success resets the count, as on the sign-in page. `/2fa/enable` while 2FA is on returns
+  new recovery codes (no endpoint of its own). Turning 2FA on or off revokes every refresh token and authorization of
+  the user. No `amr`/`acr` or step-up in the token: permissions follow the person on the server, not the token.
 - **Claims contract:** access tokens carry `sub`, `name`, `email`, `role` (the names in `NovaClaims`). **Never
   permissions, never the security stamp:** the core resolves permissions per request (`IdentityPermissionResolver`: role
   + direct `permission` claims for a Guid `sub`, every declared permission for an `Administrator` member,

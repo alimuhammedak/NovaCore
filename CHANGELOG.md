@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Upgrade:** codes issued by an earlier version stop working; users get new ones from `POST /api/v1/auth/2fa/enable`.
   Delete the old plain-text codes with
   `DELETE FROM identity.AspNetUserTokens WHERE LoginProvider = '[AspNetUserStore]' AND Name = 'RecoveryCodes'`.
+- Identity provider: the two-factor endpoints ask for the current password (ASVS 7.5.1). **Breaking:**
+  `POST /api/v1/auth/2fa/setup` takes `{ password }`, `/2fa/enable` and `/2fa/disable` take `{ password, code }`. A wrong
+  password or code counts toward lockout. `/2fa/enable` while two-factor authentication is on returns new recovery
+  codes. Turning it on or off ends every session of the user (refresh tokens and authorizations).
 
 ### Changed
 

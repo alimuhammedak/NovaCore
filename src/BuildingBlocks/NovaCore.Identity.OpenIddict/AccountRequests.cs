@@ -18,9 +18,14 @@ public sealed record RegisterRequest(
 /// <param name="Email">The address the account registered with.</param>
 public sealed record ResendConfirmationEmailRequest([Required, EmailAddress, MaxLength(256)] string Email);
 
+/// <summary>The body of <c>POST /api/v1/auth/2fa/setup</c>.</summary>
+/// <param name="Password">The account's current password: an access token alone doesn't change the second factor.</param>
+public sealed record TwoFactorSetupRequest([Required] string Password);
+
 /// <summary>The body of <c>POST /api/v1/auth/2fa/enable</c> and <c>/2fa/disable</c>.</summary>
-/// <param name="Code">The current code from the authenticator app.</param>
-public sealed record TwoFactorCodeRequest([Required, Length(6, 8)] string Code);
+/// <param name="Password">The account's current password: an access token alone doesn't change the second factor.</param>
+/// <param name="Code">The current code from the authenticator app. Each code is accepted once.</param>
+public sealed record TwoFactorCodeRequest([Required] string Password, [Required, Length(6, 8)] string Code);
 
 /// <summary>The body of <c>POST /api/v1/auth/change-password</c>.</summary>
 /// <param name="CurrentPassword">The password the caller signs in with now.</param>

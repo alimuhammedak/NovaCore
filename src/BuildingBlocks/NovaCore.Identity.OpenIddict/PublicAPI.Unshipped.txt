@@ -38,9 +38,9 @@ NovaCore.Identity.OpenIddict.TwoFactorCodeRequest
 NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.TwoFactorCodeRequest!
 NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Code.get -> string!
 NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Code.init -> void
-NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Deconstruct(out string! Code) -> void
+NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Deconstruct(out string! Password, out string! Code) -> void
 NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Equals(NovaCore.Identity.OpenIddict.TwoFactorCodeRequest? other) -> bool
-NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.TwoFactorCodeRequest(string! Code) -> void
+NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.TwoFactorCodeRequest(string! Password, string! Code) -> void
 override NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Equals(object? obj) -> bool
 override NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.GetHashCode() -> int
 override NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.ToString() -> string!
@@ -85,3 +85,17 @@ override NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.GetHashCode
 override NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.ToString() -> string!
 static NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.operator !=(NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest? left, NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest? right) -> bool
 static NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest.operator ==(NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest? left, NovaCore.Identity.OpenIddict.ResendConfirmationEmailRequest? right) -> bool
+NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Password.get -> string!
+NovaCore.Identity.OpenIddict.TwoFactorCodeRequest.Password.init -> void
+NovaCore.Identity.OpenIddict.TwoFactorSetupRequest
+NovaCore.Identity.OpenIddict.TwoFactorSetupRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.TwoFactorSetupRequest!
+NovaCore.Identity.OpenIddict.TwoFactorSetupRequest.Deconstruct(out string! Password) -> void
+NovaCore.Identity.OpenIddict.TwoFactorSetupRequest.Equals(NovaCore.Identity.OpenIddict.TwoFactorSetupRequest? other) -> bool
+NovaCore.Identity.OpenIddict.TwoFactorSetupRequest.Password.get -> string!
+NovaCore.Identity.OpenIddict.TwoFactorSetupRequest.Password.init -> void
+NovaCore.Identity.OpenIddict.TwoFactorSetupRequest.TwoFactorSetupRequest(string! Password) -> void
+override NovaCore.Identity.OpenIddict.TwoFactorSetupRequest.Equals(object? obj) -> bool
+override NovaCore.Identity.OpenIddict.TwoFactorSetupRequest.GetHashCode() -> int
+override NovaCore.Identity.OpenIddict.TwoFactorSetupRequest.ToString() -> string!
+static NovaCore.Identity.OpenIddict.TwoFactorSetupRequest.operator !=(NovaCore.Identity.OpenIddict.TwoFactorSetupRequest? left, NovaCore.Identity.OpenIddict.TwoFactorSetupRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.TwoFactorSetupRequest.operator ==(NovaCore.Identity.OpenIddict.TwoFactorSetupRequest? left, NovaCore.Identity.OpenIddict.TwoFactorSetupRequest? right) -> bool

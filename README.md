@@ -696,7 +696,7 @@ de izinlerini önbellek süresi dolunca kaybeder.
 | `POST /api/v1/auth/logout-all` | Tüm oturumları kapat |
 | `GET /api/v1/auth/me` | Mevcut principal (id, email, roller, izinler) |
 | `POST /api/v1/auth/change-password` | Parola değiştir (tüm oturumları iptal eder) |
-| `POST /api/v1/auth/2fa/setup` · `enable` · `disable` | TOTP iki-faktör (2FA açıkken `setup` 409 döner, anahtar gizli kalır) |
+| `POST /api/v1/auth/2fa/setup` · `enable` · `disable` | TOTP iki-faktör; üçü de mevcut parolayı ister (`enable`/`disable` ayrıca kodu). 2FA açıkken `setup` 409 döner (anahtar gizli kalır), `enable` yeni kurtarma kodları verir. Açma ve kapama bütün oturumları bitirir |
 | `GET /api/v1/admin/users` · `roles` · `permissions` | Listeleme (permission korumalı) |
 | `POST·DELETE /api/v1/admin/users/{id}/roles` | Rol ata/kaldır (`identity:users:manage`) |
 
