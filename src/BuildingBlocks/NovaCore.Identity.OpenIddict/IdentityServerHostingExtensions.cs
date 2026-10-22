@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Http;
@@ -150,6 +151,13 @@ public static class IdentityServerHostingExtensions
         services.AddOptions<OpenIddictServerOptions>()
             .Configure<IOptions<JwtOptions>>((server, jwt) => server.Issuer = new Uri(jwt.Value.Authority, UriKind.Absolute))
             .ValidateOnStart();
+
+        // This provider's access tokens are RFC 9068 JWTs ("typ": "at+jwt"), and §4 has the resource server check the
+        // type, so no other JWT signed with the same key (an identity token) passes for one. Here, not in the core: the
+        // core validates other providers too, and Microsoft Entra's access tokens say "JWT" (docs/plan/RESEARCH.md
+        // R-101). PostConfigure, because the core's Configure replaces the validation parameters whatever the order.
+        services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
+            options => options.TokenValidationParameters.ValidTypes = [JsonWebTokenTypes.AccessToken]);
 
         // The sign-in session at the provider: Identity's cookies, alongside the API's bearer default (the parameterless
         // AddAuthentication doesn't change the default scheme, docs/plan/RESEARCH.md R-061). Only /connect/* and
