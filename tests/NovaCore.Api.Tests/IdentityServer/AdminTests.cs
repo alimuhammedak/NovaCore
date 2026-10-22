@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,10 +30,16 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
     private const string Password = "a long passphrase for tests";
 
     private readonly IdentityServerTestHost _host = fixture.Host;
+    private readonly Fixture _fixture = fixture;
 
     /// <summary>An initial administrator, and a business permission the roles are seeded from.</summary>
     public class Fixture : IdentityServerFixture
     {
+        private string? _adminAccessToken;
+
+        /// <summary>The seeded administrator's access token, shared by the class (see <see cref="SignInAdministratorAsync"/>).</summary>
+        public async Task<string> AdminAccessTokenAsync() => _adminAccessToken ??= await SignInAdministratorAsync(Host);
+
         protected override void Configure(WebApplicationBuilder builder)
         {
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -42,6 +49,26 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
             });
             builder.Services.AddPermissionDefinitions<ProbePermissions>();
         }
+    }
+
+    /// <summary>
+    /// Signs the seeded administrator in with the password, then turns two-factor authentication on in the store: the
+    /// role counts only with it (F6b.1d). A later sign-in would ask for an authenticator code, so the access token
+    /// (15 minutes) is what the tests use.
+    /// </summary>
+    public static async Task<string> SignInAdministratorAsync(IdentityServerTestHost host)
+    {
+        using var flow = new OidcFlow(host);
+        var tokens = await flow.SignInAsync(AdminEmail, AdminPassword);
+
+        await using var scope = host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var administrator = (await users.FindByEmailAsync(AdminEmail))!;
+        Assert.True((await users.SetTwoFactorEnabledAsync(administrator, true)).Succeeded);
+
+        // The sign-in resolved and cached the permissions without the second factor; the API drops them the same way.
+        await host.Services.GetRequiredService<HybridCache>().RemovePermissionsAsync(administrator.Id.ToString());
+        return tokens.AccessToken;
     }
 
     [Fact]
@@ -63,9 +90,8 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
     public async Task The_administrator_lists_users()
     {
         using var flow = new OidcFlow(_host);
-        var tokens = await flow.SignInAsync(AdminEmail, AdminPassword);
 
-        var response = await flow.CallApiAsync("/api/v1/admin/users", tokens.AccessToken);
+        var response = await flow.CallApiAsync("/api/v1/admin/users", await _fixture.AdminAccessTokenAsync());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("totalCount").GetInt64() >= 1);
@@ -89,20 +115,20 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
     {
         var user = await _host.CreateUserAsync("promoted@novacore.test", Password);
         using var flow = new OidcFlow(_host);
-        var tokens = await flow.SignInAsync(AdminEmail, AdminPassword);
+        var adminToken = await _fixture.AdminAccessTokenAsync();
         var path = $"/api/v1/admin/users/{user.Id}/roles";
 
         Assert.Equal(HttpStatusCode.NoContent,
-            (await flow.CallApiAsync(HttpMethod.Post, path, tokens.AccessToken, new { role = "User" })).StatusCode);
+            (await flow.CallApiAsync(HttpMethod.Post, path, adminToken, new { role = "User" })).StatusCode);
         Assert.True(await IsInRoleAsync(user.Id, "User"));
 
         Assert.Equal(HttpStatusCode.NotFound,
-            (await flow.CallApiAsync(HttpMethod.Post, path, tokens.AccessToken, new { role = "NoSuchRole" })).StatusCode);
+            (await flow.CallApiAsync(HttpMethod.Post, path, adminToken, new { role = "NoSuchRole" })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,
-            (await flow.CallApiAsync(HttpMethod.Post, path, tokens.AccessToken, new { role = "" })).StatusCode);
+            (await flow.CallApiAsync(HttpMethod.Post, path, adminToken, new { role = "" })).StatusCode);
 
         Assert.Equal(HttpStatusCode.NoContent,
-            (await flow.CallApiAsync(HttpMethod.Delete, path + "/User", tokens.AccessToken, body: null)).StatusCode);
+            (await flow.CallApiAsync(HttpMethod.Delete, path + "/User", adminToken, body: null)).StatusCode);
         Assert.False(await IsInRoleAsync(user.Id, "User"));
     }
 
@@ -150,12 +176,12 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
                 ["Identity:Seed:AdminPassword"] = AdminPassword
             }));
         using var flow = new OidcFlow(host);
-        var tokens = await flow.SignInAsync(AdminEmail, AdminPassword);
+        var adminToken = await SignInAdministratorAsync(host);
         Guid adminId;
         await using (var scope = host.Services.CreateAsyncScope())
             adminId = (await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>().FindByEmailAsync(AdminEmail))!.Id;
 
-        var response = await flow.CallApiAsync(HttpMethod.Delete, $"/api/v1/admin/users/{adminId}/roles/Administrator", tokens.AccessToken, body: null);
+        var response = await flow.CallApiAsync(HttpMethod.Delete, $"/api/v1/admin/users/{adminId}/roles/Administrator", adminToken, body: null);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         await using var check = host.Services.CreateAsyncScope();
@@ -170,7 +196,7 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
         using var flow = new OidcFlow(_host);
         var userTokens = await flow.SignInAsync("role-change-now@novacore.test", Password);
         using var adminFlow = new OidcFlow(_host);
-        var adminToken = (await adminFlow.SignInAsync(AdminEmail, AdminPassword)).AccessToken;
+        var adminToken = await _fixture.AdminAccessTokenAsync();
         Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/probe", userTokens.AccessToken)).StatusCode);
 
         // The User role holds the probe permission (seeded from the declared permissions).
@@ -322,9 +348,12 @@ public sealed class AdministratorRemovalTests(FakeClockIdentityServerFixture fix
     public async Task A_removed_administrator_is_forbidden_once_the_cache_lifetime_has_passed()
     {
         var user = await _host.CreateUserAsync(Email, Password);
-        await ChangeAdministratorAsync(user.Id, (users, account) => users.AddToRoleAsync(account, "Administrator"));
         using var flow = new OidcFlow(_host);
         var token = (await flow.SignInAsync(Email, Password)).AccessToken;
+        // The role counts with two-factor authentication on (F6b.1d); turned on after the password sign-in.
+        await ChangeAdministratorAsync(user.Id, (users, account) => users.SetTwoFactorEnabledAsync(account, true));
+        await ChangeAdministratorAsync(user.Id, (users, account) => users.AddToRoleAsync(account, "Administrator"));
+        await _host.Services.GetRequiredService<HybridCache>().RemovePermissionsAsync(user.Id.ToString());
         Assert.Equal(HttpStatusCode.OK, (await flow.CallApiAsync("/api/v1/admin/users", token)).StatusCode);
 
         await ChangeAdministratorAsync(user.Id, (users, account) => users.RemoveFromRoleAsync(account, "Administrator"));

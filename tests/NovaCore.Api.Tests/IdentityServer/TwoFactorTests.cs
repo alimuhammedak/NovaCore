@@ -265,6 +265,31 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
         Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(await second.RefreshAsync(during.RefreshToken)));
     }
 
+    // F6b.1d: the Administrator role counts once the account has the second factor; the change applies to the same token.
+    [Fact]
+    public async Task An_administrator_needs_two_factor_authentication()
+    {
+        var user = await _host.CreateUserAsync("admin-2fa@novacore.test", Password);
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            Assert.True((await users.AddToRoleAsync((await users.FindByIdAsync(user.Id.ToString()))!, "Administrator")).Succeeded);
+        }
+
+        var (flow, accessToken) = await SignedInAsync("admin-2fa@novacore.test");
+        using var ownedFlow = flow;
+        Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/api/v1/admin/users", accessToken)).StatusCode);
+
+        var key = await SetUpAsync(flow, accessToken);
+        Assert.Equal(HttpStatusCode.OK, (await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/enable", accessToken,
+            new { password = Password, code = AuthenticatorCode.For(key) })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await flow.CallApiAsync("/api/v1/admin/users", accessToken)).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await flow.CallApiAsync(HttpMethod.Post, "/api/v1/auth/2fa/disable", accessToken,
+            new { password = Password, code = AuthenticatorCode.For(key, stepsAhead: 1) })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/api/v1/admin/users", accessToken)).StatusCode);
+    }
+
     [Fact]
     public async Task A_malformed_code_is_a_validation_error()
     {

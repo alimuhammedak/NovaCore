@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `identity:users:manage` (whose holder could otherwise make themselves an administrator), and the last administrator
   keeps the role (409). A role change through the admin API takes effect on the user's next request and revokes their
   refresh tokens and authorizations.
+- Identity provider: the `Administrator` role counts only for an account with two-factor authentication on. **Upgrade:**
+  administrators sign in with their password and turn it on (`/api/v1/auth/2fa/setup`, then `/2fa/enable`) before the
+  admin API answers them again.
 
 ### Added
 

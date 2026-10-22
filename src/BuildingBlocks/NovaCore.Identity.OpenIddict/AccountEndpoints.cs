@@ -3,10 +3,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NovaCore.Abstractions.Identity;
 using NovaCore.AspNetCore.Auth;
+using NovaCore.AspNetCore.Authorization;
 using OpenIddict.Abstractions;
 
 namespace NovaCore.Identity.OpenIddict;
@@ -269,6 +271,7 @@ internal static class AccountEndpoints
         TwoFactorCodeRequest request,
         UserManager<ApplicationUser> users,
         ICurrentUser currentUser,
+        HybridCache cache,
         IOpenIddictTokenManager tokens,
         IOpenIddictAuthorizationManager authorizations,
         SecurityAuditLogger audit,
@@ -291,6 +294,9 @@ internal static class AccountEndpoints
             // The sessions so far began without the second factor (a stolen refresh token among them), so they end.
             await users.SetTwoFactorEnabledAsync(user, true);
             await RevokeSessionsAsync(user, tokens, authorizations, cancellationToken);
+
+            // An administrator's permissions depend on it (IdentityPermissionResolver).
+            await cache.RemovePermissionsAsync(user.Id.ToString(), cancellationToken);
             audit.TwoFactorEnabled(user.Id);
             audit.SessionsRevoked(user.Id, "two-factor-enabled");
         }
@@ -303,6 +309,7 @@ internal static class AccountEndpoints
         TwoFactorCodeRequest request,
         UserManager<ApplicationUser> users,
         ICurrentUser currentUser,
+        HybridCache cache,
         IOpenIddictTokenManager tokens,
         IOpenIddictAuthorizationManager authorizations,
         SecurityAuditLogger audit,
@@ -319,6 +326,7 @@ internal static class AccountEndpoints
         await users.SetTwoFactorEnabledAsync(user, false);
         await users.ResetAuthenticatorKeyAsync(user);
         await RevokeSessionsAsync(user, tokens, authorizations, cancellationToken);
+        await cache.RemovePermissionsAsync(user.Id.ToString(), cancellationToken);
         audit.TwoFactorDisabled(user.Id);
         audit.SessionsRevoked(user.Id, "two-factor-disabled");
 

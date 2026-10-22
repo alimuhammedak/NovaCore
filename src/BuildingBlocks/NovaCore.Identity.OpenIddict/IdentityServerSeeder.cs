@@ -16,7 +16,8 @@ namespace NovaCore.Identity.OpenIddict;
 /// <list type="bullet">
 ///   <item>the Administrator role gets every permission the modules declare, the User role their <c>:read</c> ones
 ///   except the provider's own admin permissions (least privilege);</item>
-///   <item>the initial administrator is created when <c>Identity:Seed:AdminEmail</c> and <c>AdminPassword</c> are set;</item>
+///   <item>the initial administrator is created when <c>Identity:Seed:AdminEmail</c> and <c>AdminPassword</c> are set
+///   (the role counts once they turn two-factor authentication on);</item>
 ///   <item>the configured clients are created or updated to match; clients no longer configured are left alone.</item>
 /// </list>
 /// </summary>

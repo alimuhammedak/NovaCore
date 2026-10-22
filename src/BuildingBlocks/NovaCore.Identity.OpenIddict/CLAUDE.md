@@ -63,7 +63,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   the user. No `amr`/`acr` or step-up in the token: permissions follow the person on the server, not the token.
 - **Claims contract:** access tokens carry `sub`, `name`, `email`, `role` (the names in `NovaClaims`). **Never
   permissions, never the security stamp:** the core resolves permissions per request (`IdentityPermissionResolver`: role
-  + direct `permission` claims for a Guid `sub`, every declared permission for an `Administrator` member,
+  + direct `permission` claims for a Guid `sub`, every declared permission for an `Administrator` member with
+  two-factor authentication on (without it the role gives nothing, D-053 (5); turning 2FA on or off drops the cache),
   `Identity:Clients:n:Permissions` for a service client's id). The core has no super-admin role: the token's `role`
   claim is informational and never passes a permission check (D-036 (2)). The core's
   claims transformation runs on OpenIddict's scheme too, so a principal copied into a token drops `permission` claims
@@ -73,7 +74,7 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   tokens and authorizations on every grant or removal. Granting or removing `Administrator` (compared normalized, so
   `administrator` is the same role) also needs `identity:roles:manage`: `identity:users:manage` alone would let its
   holder make themselves an administrator. The last member keeps the role (409). Anything else that changes what the
-  resolver returns for a user must drop the cache the same way.
+  resolver returns for a user must drop the cache the same way (the 2FA endpoints do).
 - **The store is pruned:** `ExpiredTokenPruner` (a `BackgroundService`, a pass at startup, then hourly) calls
   OpenIddict's `PruneAsync` for tokens, then authorizations, with a 14-day minimum lifespan (OpenIddict.Quartz's defaults,
   R-088). Keep the lifespan longer than the refresh token lifetime, so a reused refresh token is still found and revokes

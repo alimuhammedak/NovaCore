@@ -238,7 +238,8 @@ dotnet ef database update --project src/Modules/Catalog/NovaCore.Modules.Catalog
 dotnet ef database update --project src/Modules/Payments/NovaCore.Modules.Payments  --context PaymentsDbContext  --startup-project src/Modules/Payments/NovaCore.Modules.Payments
 dotnet ef database update --project src/Api/NovaCore.Api  --context IdentityServerDbContext  --startup-project src/Api/NovaCore.Api
 
-# 3) İlk admin + roller + izinler için seed (parolayı user-secrets ile ver — repoya YAZMA)
+# 3) İlk admin + roller + izinler için seed (parolayı user-secrets ile ver — repoya YAZMA). Admin izinleri, admin
+#    parolayla girip 2FA'yı açınca gelir: POST /api/v1/auth/2fa/setup, sonra /2fa/enable (parola + authenticator kodu)
 dotnet user-secrets --project src/Api/NovaCore.Api set "Identity:Seed:AdminPassword" "Admin!Passw0rd-2026"
 
 # 4) Çalıştır: https profili. Host kendi kimlik sağlayıcısıdır; Development'ta Jwt:Authority = https://localhost:5443
@@ -681,7 +682,7 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   sunucuların belleği süre dolunca). Kimlik eklentisinin admin API'si her rol değişikliğinde bunu yapar ve kullanıcının
   refresh token'larını iptal eder. Host'ta bir `IPermissionResolver` kayıtlı değilse
   uygulama açılmaz. Token'daki hiçbir rol izin kontrolünü atlatmaz. Kimlik eklentisinde `Administrator` rolünün üyesi,
-modüllerin tanımladığı bütün izinleri sunucuda alır (seed o izni role yazmamış olsa da). Veritabanında doğrudan
+modüllerin tanımladığı bütün izinleri sunucuda alır (seed o izni role yazmamış olsa da), 2FA'sı açıksa. Veritabanında doğrudan
 rolünden çıkarılan bir admin de izinlerini önbellek süresi dolunca kaybeder. `Administrator` rolünü vermek ya da almak
 `identity:users:manage`'e ek olarak `identity:roles:manage` ister (yalnızca admin'de var); son admin rolünü kaybedemez
 (409).
@@ -718,6 +719,8 @@ rolünden çıkarılan bir admin de izinlerini önbellek süresi dolunca kaybede
   kendisi loglar.
 - **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü iş modüllerinin
   `:read` izinlerini alır; opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.
+- **Admin için 2FA zorunlu:** `Administrator` rolü yalnızca 2FA'sı açık hesapta sayılır (çözümleyicide; rolün kendi
+  izinleri dahil). Seed admin parolayla girer, 2FA'yı API'den açar; açma ve kapama izin önbelleğini hemen düşürür.
 
 > **Üretimde mutlaka:** `Jwt:Authority`'yi host'un public https adresine (ya da harici sağlayıcıya) ayarla, imza ve
 > şifreleme sertifikalarını host'ta ekle, TLS/HTTPS'i edge'de zorla, gerçek bir `IEmailSender` (SMTP/SendGrid) tak,
