@@ -26,7 +26,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   (`RequiredLength = 12`, no composition rules); lockout 5 attempts / 15 min, new accounts included; a wrong 2FA code
   counts as a failed access, a recovery code included (`SignInManager` neither checks lockout nor counts a wrong
   recovery code, so `LoginPage` does both before and after redeeming it, R-085); `RequireConfirmedEmail = true`;
-  `RequireUniqueEmail = true`.
+  `RequireUniqueEmail = true`. Cookies: the application and two-factor cookies are `Secure` always; antiforgery's is
+  `Always` outside Development and `SameAsRequest` in it (its default is never Secure; `Always` fails a plain-http page,
+  R-104).
 - **An authenticator code works once** (ASVS 6.5.1): `SingleUseAuthenticatorTokenProvider` replaces Identity's
   `Authenticator` provider, lets Identity verify the code (±2 steps), then refuses a code accepted in the last five
   steps and records the new one in a user token. The save carries the user's concurrency stamp, so two requests racing

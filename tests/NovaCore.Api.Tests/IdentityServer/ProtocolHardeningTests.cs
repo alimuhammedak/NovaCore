@@ -1,5 +1,8 @@
 using System.Net;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -12,7 +15,7 @@ using Xunit;
 namespace NovaCore.Api.Tests.IdentityServer;
 
 /// <summary>
-/// The provider's token and protocol hardening (PLAN F6b.4, DECISIONS D-053 (8)–(9)).
+/// The provider's token and protocol hardening (PLAN F6b.4 and F6b.6, DECISIONS D-053 (8)–(9)).
 /// </summary>
 [Collection(IdentityServerTestGroup.Name)]
 public sealed class ProtocolHardeningTests(IdentityServerFixture fixture) : IClassFixture<IdentityServerFixture>
@@ -58,6 +61,23 @@ public sealed class ProtocolHardeningTests(IdentityServerFixture fixture) : ICla
         var response = await client.SendAsync(preflight, TestContext.Current.CancellationToken);
 
         Assert.Equal(allowed, response.Headers.Contains("Access-Control-Allow-Origin"));
+    }
+
+    // R-104: the antiforgery cookie had no Secure flag, not even over https, and Identity's two-factor cookies follow
+    // the request's scheme, which behind a TLS proxy without forwarded headers is http. The application cookie was
+    // Always already. Outside Development antiforgery is Always too (IdentityServerConfigurationTests).
+    [Fact]
+    public async Task The_sign_in_cookies_are_secure()
+    {
+        var cookies = _host.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>();
+        Assert.Equal(CookieSecurePolicy.Always, cookies.Get(IdentityConstants.TwoFactorUserIdScheme).Cookie.SecurePolicy);
+        Assert.Equal(CookieSecurePolicy.Always, cookies.Get(IdentityConstants.TwoFactorRememberMeScheme).Cookie.SecurePolicy);
+
+        using var client = _host.CreateClient();
+        var page = await client.GetAsync("/account/login", TestContext.Current.CancellationToken);
+
+        var antiforgery = Assert.Single(page.Headers.GetValues("Set-Cookie"), cookie => cookie.StartsWith(".AspNetCore.Antiforgery", StringComparison.Ordinal));
+        Assert.Contains("secure", antiforgery, StringComparison.OrdinalIgnoreCase);
     }
 
     private string SignedByTheProvider(string subject, string type)

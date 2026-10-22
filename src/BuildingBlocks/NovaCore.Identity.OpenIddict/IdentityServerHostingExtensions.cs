@@ -168,21 +168,33 @@ public static class IdentityServerHostingExtensions
         // The sign-in session at the provider: Identity's cookies, alongside the API's bearer default (the parameterless
         // AddAuthentication doesn't change the default scheme, docs/plan/RESEARCH.md R-061). Only /connect/* and
         // /account/* read it.
-        services.AddAuthentication().AddIdentityCookies(cookies => cookies.ApplicationCookie!.Configure(cookie =>
+        services.AddAuthentication().AddIdentityCookies(cookies =>
         {
-            cookie.LoginPath = LoginPage.Path;
-            cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-            cookie.ExpireTimeSpan = TimeSpan.FromMinutes(30);
-            cookie.SlidingExpiration = true;
-
-            // Only a sign-in raises this event, not a renewal, so the time stays the sign-in's for auth_time and max_age.
-            cookie.Events.OnSigningIn = context =>
+            cookies.ApplicationCookie!.Configure(cookie =>
             {
-                ConnectEndpoints.RecordAuthenticationTime(context.Properties);
-                return Task.CompletedTask;
-            };
-        }));
-        services.AddAntiforgery();
+                cookie.LoginPath = LoginPage.Path;
+                cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                cookie.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+                cookie.SlidingExpiration = true;
+
+                // Only a sign-in raises this event, not a renewal, so the time stays the sign-in's for auth_time and max_age.
+                cookie.Events.OnSigningIn = context =>
+                {
+                    ConnectEndpoints.RecordAuthenticationTime(context.Properties);
+                    return Task.CompletedTask;
+                };
+            });
+
+            // The other sign-in cookies too: by default they follow the request's scheme, which behind a TLS proxy without
+            // forwarded headers is http (docs/plan/RESEARCH.md R-104). OpenIddict needs https anyway.
+            cookies.TwoFactorUserIdCookie!.Configure(cookie => cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always);
+            cookies.TwoFactorRememberMeCookie!.Configure(cookie => cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always);
+        });
+
+        // Antiforgery's cookie has no Secure flag by default, not even over https. Microsoft's guidance: Always outside
+        // Development (R-104). In Development it follows the request, since Always fails a plain-http page outright.
+        services.AddAntiforgery(antiforgery => antiforgery.Cookie.SecurePolicy =
+            builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always);
 
         // The cookie is read only at /connect/* and /account/*, so checking its security stamp on every read is cheap, and
         // a password change or "sign out everywhere" ends the provider session at once instead of within 30 minutes.

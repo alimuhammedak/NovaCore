@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -100,6 +102,16 @@ public sealed class IdentityServerConfigurationTests
         await using var host = await IdentityServerTestHost.StartAsync(
             Environments.Production, builder => AddProductionServices(builder, keyStore: true));
         Assert.IsType<InMemoryKeyStore>(host.Services.GetRequiredService<IOptions<KeyManagementOptions>>().Value.XmlRepository);
+    }
+
+    // Microsoft's antiforgery guidance (R-104). Development keeps plain-http pages working.
+    [Fact]
+    public async Task Outside_Development_the_antiforgery_cookie_is_always_secure()
+    {
+        await using var host = await IdentityServerTestHost.StartAsync(
+            Environments.Production, builder => AddProductionServices(builder, keyStore: true));
+
+        Assert.Equal(CookieSecurePolicy.Always, host.Services.GetRequiredService<IOptions<AntiforgeryOptions>>().Value.Cookie.SecurePolicy);
     }
 
     [Fact]

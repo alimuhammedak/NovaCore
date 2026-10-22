@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start (RFC 6749 §10.10).
 - Identity provider: refresh tokens expire seven days after the sign-in; a refresh no longer starts a new seven days, so
   a session ends at the latest a week after the password was entered.
+- Identity provider: the two-factor cookies are always `Secure`, and the antiforgery cookie is `Secure` outside
+  Development (it never was) and over https in Development.
 
 ### Added
 
