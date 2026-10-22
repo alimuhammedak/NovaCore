@@ -819,7 +819,10 @@ Alternatif: `Database:ApplyMigrations=true` ile uygulama açılışta tüm modü
 
 ```bash
 dotnet test
+dotnet test -- --filter-class "*.CatalogEndpointsTests"    # tek sınıf (--filter-method: tek test)
 ```
+Testler xUnit v3 (4.x) ile **Microsoft.Testing.Platform** üzerinde koşar: `global.json`'daki `test.runner`, `dotnet test`'i
+MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri `--`'dan sonra gelir.
 - **Unit:** `Result<T>`, `PaginationRequest`/`PagedList<T>` davranışları.
 - **Integration:** gerçek host'u `WebApplicationFactory` ile ayağa kaldırır; her DbContext testte **in-memory
   SQLite**'a takılır. Token'ları bellek içi bir OpenID Connect issuer'ı (`TestIdentityProvider`) üretir.

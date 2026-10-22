@@ -95,7 +95,8 @@ if (build.error) {
 }
 if (build.status !== 0) fail('build', build);
 
-const test = run(['test', solution, '--no-build', '-nologo']);
+// global.json runs `dotnet test` in Microsoft.Testing.Platform mode: the solution goes through --solution.
+const test = run(['test', '--solution', solution, '--no-build']);
 if (test.status !== 0) fail('test', test);
 
 fs.writeFileSync(stampFile, new Date().toISOString() + '\n');

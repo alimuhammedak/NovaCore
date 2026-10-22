@@ -1051,3 +1051,19 @@ Biçim:
 - Ölçüm: `Always` ile düz http üzerinden açılan `/account/login` 500 döndü (Api host'unun `SecureDefaultsTests`'i http üzerinden yakaladı). Antiforgery, istek SSL değilken `Always` politikasında token üretmeyi reddediyor. Varsayılan `None` ise https'te bile Secure bayrağı koymuyor.
 - Kaynak: R-104 (MS: Development dışında `Always`), ölçüm.
 - Sonuç: Development dışında `Always`, Development'ta `SameAsRequest` (https'te Secure, http'de sayfa çalışır). 2FA cookie'leri uygulama cookie'si gibi her ortamda `Always`: cookie işleyicisi http'de hata vermez, yalnız bayrağı koyar.
+
+## Faz 6c araştırması (2026-10-22)
+
+### R-108: `dotnet test`'in MTP modu ve xUnit v3 4.x (2026-10-22, faz 6c; kaynak + ölçüm)
+- Soru: .NET 10 SDK'da `dotnet test` Microsoft.Testing.Platform (MTP) modunda nasıl çalışıyor, xUnit 4.0.x hangi paketleri istiyor, repo'nun komutlarından hangileri kırılıyor (F6c.1a)?
+- Bulgu (kaynak):
+  - MTP modu `global.json`'daki `"test": { "runner": "Microsoft.Testing.Platform" }` ile açılır. Bu modda bütün test projeleri MTP olmalı. MS'in geçiş adımları çözümü `--solution`'la vermeyi söylüyor; test uygulamasının seçenekleri `--`'dan sonra gelir. `--nologo` MTP modunda ancak .NET 11 Preview 7'de tanınıyor.
+  - xunit.v3 4.0.2 (2026-10-09) MTP v2 (2.5.1) kullanıyor; MTP v1 desteği 4.0.0'da kalktı. MTP için `xunit.v3` yeterli. `Microsoft.NET.Test.Sdk` ve `xunit.runner.visualstudio` yalnız VSTest için gerekli (xUnit: "you can remove the package references"); Test Explorer MTP projelerini kendi MTP deneyimiyle çalıştırıyor.
+  - 4.0'ın kırıcı değişiklikleri (`CollectionBehavior`'ın paralellik özellikleri, `ITestCaseOrderer`, `Xunit.Runners`) repo'da kullanılmıyor (grep).
+  - Filtreler: `--filter-class`, `--filter-method`, `--filter-namespace`, `--filter-trait` (ve `-not-` biçimleri), `--filter-query`; `*` yalnız başta ya da sonda. 4.0.0 VSTest biçimli `--filter`'ı da geri getirdi.
+- Ölçüm (SDK 10.0.300, xunit.v3 4.0.2):
+  - 361/361 yeşil, yerelde ~4 dk.
+  - Stop hook'unun eski komutu `dotnet test NovaCore.slnx --no-build -nologo` exit 5 verdi: `-nologo` test uygulamasına geçiyor ve tanınmıyor. Konumsal `NovaCore.slnx` ise 10.0.300'de hâlâ çalışıyor (exit 0); SDK'nın "should be via '--solution'" mesajı bu durumda çıkmadı.
+  - `-- --filter-method "*.AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"` 1 test, `-- --filter-class "*.ResultTests"` 6 test, `-- --filter "FullyQualifiedName~…"` 1 test koşturdu.
+- Kaynak: https://learn.microsoft.com/dotnet/core/testing/unit-testing-with-dotnet-test · https://learn.microsoft.com/dotnet/core/tools/dotnet-test-mtp · https://xunit.net/releases/v3/4.0.0 · https://xunit.net/releases/v3/4.0.2 · https://xunit.net/docs/getting-started/v3/microsoft-testing-platform · https://xunit.net/docs/query-filter-language
+- Sonuç: `global.json`'a `test.runner`; `xunit.v3` 4.0.2; iki VSTest paketi kalkar. Hook, CI ve release `dotnet test --solution NovaCore.slnx` kullanır (MS'in önerdiği biçim). Hook'tan `-nologo` kalkar. PLAN'daki `dotnet test NovaCore.slnx` genel kuralı çalıştığı için değişmedi (planlanan PLAN düzenlemesi gereksiz çıktı).

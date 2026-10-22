@@ -48,7 +48,7 @@ jobs:
         run: dotnet build NovaCore.slnx -c Release --no-restore
 
       - name: Test
-        run: dotnet test NovaCore.slnx -c Release --no-build
+        run: dotnet test --solution NovaCore.slnx -c Release --no-build
 
       # Each module owns a DbContext, and the host owns the identity provider's; a model change without a migration
       # fails here.

@@ -76,7 +76,7 @@ jobs:
         run: dotnet build NovaCore.slnx -c Release --no-restore "-p:VersionSuffix=$VERSION_SUFFIX"
 
       - name: Test
-        run: dotnet test NovaCore.slnx -c Release --no-build
+        run: dotnet test --solution NovaCore.slnx -c Release --no-build
 
       - name: Pack
         env:

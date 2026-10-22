@@ -62,7 +62,9 @@ bash eng/lint-workflows.sh [dir ...]          # actionlint + zizmor on .github (
 git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release
 dotnet test                                   # all tests (no SQL Server needed — every DbContext runs on SQLite)
-dotnet test --filter "FullyQualifiedName~AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"   # single test
+dotnet test -- --filter-method "*.AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"   # single test (--filter-class for a class)
+#   `dotnet test` runs on Microsoft.Testing.Platform (global.json): the solution goes through --solution, xUnit's own
+#   options come after `--`, and -nologo isn't accepted before .NET 11 (exit code 5).
 
 # Run (Development opens Scalar UI at /scalar/v1)
 dotnet run --project src/Api/NovaCore.Api

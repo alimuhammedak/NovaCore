@@ -76,6 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Template: the generated CI workflow pins its actions to commit SHAs, narrows its permissions and doesn't persist the
   checkout token. A `.github/dependabot.yml` keeps the pins up to date.
+- Tests run on Microsoft.Testing.Platform with xUnit v3 4.0.2 (`global.json` `test.runner`); `Microsoft.NET.Test.Sdk`
+  and `xunit.runner.visualstudio` are gone. Run one test with `dotnet test -- --filter-method "*.Class.Method"`.
 
 ## [0.1.0-preview.1] - 2026-10-20
 
