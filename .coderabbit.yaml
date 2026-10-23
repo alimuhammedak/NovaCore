@@ -31,7 +31,7 @@ reviews:
       instructions: >-
         Template content is not compiled in this repository; only `bash eng/template-smoke.sh` builds it. Check that
         it mirrors the repository change it copies (the same standards, D-040 (5)) and that template symbols
-        (`--auth BuiltIn|External`, the `NovaCore` source name) stay consistent.
+        (`--auth BuiltIn|External`, the `MyService` source name, D-040 (4)) stay consistent.
     - path: "**/Migrations/*.cs"
       instructions: >-
         EF Core writes these files. Review only that the migration matches the model change in the same PR and that
@@ -60,9 +60,12 @@ reviews:
         mode: warning
         instructions: >-
           Fail if the change adds a warning suppression (`NoWarn`, `WarningsNotAsErrors`, `#pragma warning disable`,
-          `[SuppressMessage]`, or an `.editorconfig` severity lowered to none/silent/suggestion) without either a
-          DECISIONS D-entry that the PR adds or cites, or a justification that quotes Microsoft's "When to suppress"
-          section for that rule. Also fail if a test is skipped, deleted or weakened without that.
+          `[SuppressMessage]`, or an `.editorconfig` severity lowered to none/silent/suggestion) unless one of these
+          holds: (a) Microsoft's "When to suppress warnings" section for that rule explicitly allows it, the
+          suppression is permanent (not "for now"), and it carries a justification and an R- or D-entry as its source;
+          or (b) a D- or Q-entry records the user's approval of that suppression. Separately, fail if a test is
+          skipped, deleted or weakened (fewer assertions, looser expectations) without a D- or Q-entry recording the
+          user's approval; a Microsoft quote does not cover tests.
       - name: "Geçici kod yok (Y-38, Y-45)"
         mode: warning
         instructions: >-
