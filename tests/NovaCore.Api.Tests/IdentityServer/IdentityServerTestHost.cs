@@ -66,7 +66,7 @@ public sealed class IdentityServerTestHost : IAsyncDisposable
         // isn't thread-safe (docs/plan/RESEARCH.md R-069). No pooling, so the database goes when the host does.
         var connection = new SqliteConnection(
             $"Data Source=identity-tests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared;Pooling=False");
-        connection.Open();
+        await connection.OpenAsync();
         WebApplication? app = null;
 
         try

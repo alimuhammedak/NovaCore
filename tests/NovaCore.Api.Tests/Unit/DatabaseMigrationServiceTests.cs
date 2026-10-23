@@ -19,7 +19,7 @@ public class DatabaseMigrationServiceTests
     public async Task Startup_migrations_follow_the_ApplyMigrations_setting(bool applyMigrations)
     {
         using var connection = new SqliteConnection("DataSource=:memory:");
-        connection.Open();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
         var builder = Host.CreateApplicationBuilder();
         builder.AddCorePersistence();

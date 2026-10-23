@@ -1094,6 +1094,10 @@ Başlangıç 2026-10-23, `main` @ `1841d6f`, 389 test. Kullanıcı "6d izinsiz d
 
 **Bu fazda yapılmayacaklar:** 6e'nin işleri (DAST, ajan koşuları); `SonarAnalyzer.CSharp` NuGet paketi (Y-06, D-045); AwesomeAssertions (D-045 (2)); Y-44 istisnası olmayan bastırma; Microsoft'un "When to suppress" izni olmayan kuralda kapsam daraltarak susturma.
 
+- [x] F6d.1 Kategori bazlı analiz (alt adımlar 1a–1d)
+  - [x] F6d.1a (4a479b7): `AnalysisLevelSecurity=latest-all` (R-117: `AnalysisMode<Kategori>` bileşik `AnalysisLevel`'ın yanında yok sayılıyor). Bulgu yok. 389/389.
+  - [x] F6d.1b (adc7e09): `AnalysisLevelReliability=latest-all`. CA2007: `.editorconfig`'te Api, modüller, testler ve `NovaCore.AspNetCore`/`NovaCore.Identity.OpenIddict` için `none` (MS "When to suppress": uygulama kodu ve SynchronizationContext'siz ASP.NET Core); `NovaCore.EntityFrameworkCore`'un 15 `await`'i `ConfigureAwait(false)` (`await using` için `scope.ConfigureAwait(false)`). Kapsam deneme dosyasıyla doğrulandı: EF Core'da CA2007 hata, AspNetCore'da değil (commit'lenmedi). CA2000: testlerde `FormUrlEncodedContent`/`StringContent`/`HttpRequestMessage`/`LogCapture` `using` aldı, `OidcFlow`'un cookie handler'ı bir alanda tutulup `Dispose`'ta bırakılıyor. CA2025: `EmailQueueTests`'teki kayıt isteği host kapanmadan bekleniyor. 389/389.
+
 ## Açık sorular (Q)
 
 Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa DECISIONS'a D-kaydı olarak eklenir.
