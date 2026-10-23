@@ -1136,6 +1136,9 @@ Başlangıç 2026-10-23, `main` @ `af5ce0b` (plan commit'i henüz push edilmemi�
 
 **Bu fazda yapılmayacaklar:** çok kiracılılık (7b); kurum başına veritabanı; MySQL/Oracle testleri (yalnız belgelenir); RLS; `.claude/hooks/` düzenlemesi (kullanıcıda); repo'nun `NovaCoreApiFactory`'sindeki strip yaklaşımını sadeleştirmek (Y-09); token pruning'in gerçek veritabanında testi.
 
+- [x] F7a.1 (23f89f9): Lisans kapısı adlı sağlayıcı istisnalarını tam paket adıyla taşır (`Npgsql`, `Npgsql.EntityFrameworkCore.PostgreSQL`, iki geçişte; `Polly.*` yalnız geçişli). **Ölçüm (R-125, scratchpad deneme projesi):** istisnasız kırmızı (exit 3), iki ad yazılınca yalnız `Npgsql.NodaTime` kırmızı (exit 1), yalnız `Npgsql` yazılınca EF sağlayıcısı da kırmızı (exit 2: tam ad önek gibi davranmıyor), üçü yazılınca yeşil. Repo kapısı yeşil. Şablon: üretilen projeye `eng/check-licenses.sh` (`nuget-license` 4.0.18 araç manifestinde) ve CI'da "Package licenses" adımı; `bash eng/template-smoke.sh` her iki `--auth`'ta kapıyı koşturdu, yeşil (BuiltIn ve External testleri geçti). Y-06 → Y-47: `ci.yml`, `eng/check-licenses.sh`, README; hook mesajı (`.claude/hooks/package-guard.js:99`) kullanıcıda. D-072, CHANGELOG. 387/387. CodeRabbit CLI: 10 bulgu; 1'i kapsam içi (R-125'teki belirsiz parantez) düzeltildi, 9'u izlenmeyen `.agents/`, `.codex/` dosyalarında (Q-40, dokunulmadı). *Not:* üretilen projenin CI'ı GitHub'da koşmuyor; `dotnet tool restore` adımı migration adımındaki gibi feed token'ı almıyor (package source mapping'e güveniyor).
+- [ ] F7a.2 devam ediyor: sağlayıcı host'ta, migration'lar ve design-time factory'ler host'a. Taşımadan önceki `migrations list` ve `script --idempotent` çıktıları scratchpad'de (`migrations-before`).
+
 ## Açık sorular (Q)
 
 Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa DECISIONS'a D-kaydı olarak eklenir.
