@@ -21,7 +21,7 @@
 | 5 | ✅ tamam | `faz/5-sablon-yayin` | 2026-10-20 | 2026-10-20 | 2026-10-20 (kullanıcı onayı, `--no-ff`; push 2026-10-20; push'taki CI yeşil (`build-and-test`, `template-smoke`); `v0.1.0-preview.1` tag'i kullanıcı onayıyla, release.yml yeşil, 8 paket GitHub Packages'ta) |
 | 6a | ✅ tamam | `faz/6a-ci-sertlestirme` | 2026-10-21 | 2026-10-21 | 2026-10-21 (kullanıcı onayı, `--no-ff`; push 2026-10-21, kullanıcı isteği) |
 | 6b | ✅ tamam | `faz/6b-kimlik-guvenlik-siniri` | 2026-10-21 | 2026-10-22 | 2026-10-22 (kullanıcı onayı, `--no-ff`, `4909fe4`; push 2026-10-22, kullanıcı isteği) |
-| 6c | ✅ tamam | `faz/6c-test-altyapisi` | 2026-10-22 | 2026-10-23 | |
+| 6c | ✅ tamam | `faz/6c-test-altyapisi` | 2026-10-22 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `64b3ab6`; push 2026-10-23, kullanıcı isteği) |
 | 6d | ⏳ başlamadı | | | | |
 | 6e | ⏳ başlamadı | | | | |
 
@@ -1294,7 +1294,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-23, Faz 6c: Test altyapısı (tamam, merge onayı bekliyor).** Branch `faz/6c-test-altyapisi`, her adımdan sonra push edildi (Q-44); 17 commit. Son kod commit'i `fa2da44`, kapanış `85d532a` sonrası. 389/389 yeşil; CI ve CodeQL yeşil.
+**2026-10-23, Faz 6c: Test altyapısı (tamam, `main`'e merge ve push edildi).** Kullanıcı onayı: "faz/6c-test-altyapisi'yi main'e --no-ff merge et ve push et"; merge `64b3ab6`. Branch `faz/6c-test-altyapisi`, her adımdan sonra push edildi (Q-44); 16 commit. Son kod commit'i `fa2da44`, kapanış `85d532a` sonrası. 389/389 yeşil; CI ve CodeQL yeşil.
 
 - **Yapılanlar:** F6c.1a–1c (MTP + xUnit 4.0.2, şablon da; R-055'in teorisi doğrudan başlatılan host'ta), F6c.2a–2d (Testcontainers SQL Server katmanı, gerçek migration'lar ve EXEC'li veri adımları, `GET /payments`, şema, collation, `decimal(18,2)`; ilk TOTP INSERT yarışı düzeltildi; yarış testleri deterministik), F6c.3 (outbox saklama silmesi SQL'de; SQLite test bağlamları `DateTimeOffset`'i tick saklıyor; şablon da), F6c.4 (coverage ratchet), F6c.5 (commit'li OpenAPI belgesi + oasdiff), F6c.6 (CsCheck property testleri), F6c.7 (Stryker haftalık, `tests/NovaCore.Domain.Tests`). Kararlar D-056…D-063, araştırma R-108…R-116. Testler 361 → 389.
 - **Bulgular (testlerin bulduğu gerçek hatalar):** SQL Server fiyatı sessizce yuvarlıyordu (0.001 → 0.00; Q-47 ile 400); ilk TOTP kaydında yarışı kaybeden istek 500 alıyordu (D-058); `PaginationRequest.Skip` büyük sayfada taşıyordu (D-062); mutation raporu property üreteçlerinin sınırları kaçırdığını gösterdi.
