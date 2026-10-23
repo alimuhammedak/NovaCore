@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
@@ -19,6 +20,8 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 namespace NovaCore.Identity.OpenIddict;
 
 /// <summary>Service registration for the OpenID Connect provider.</summary>
+[SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
+    Justification = "The provider's composition root registers ASP.NET Core Identity, OpenIddict, the cookies, CORS, options and the add-on's services, so it names their types; each registration stays a few lines (docs/plan/RESEARCH.md R-117).")]
 public static class IdentityServerHostingExtensions
 {
     /// <summary>
@@ -45,6 +48,8 @@ public static class IdentityServerHostingExtensions
     /// </remarks>
     /// <param name="builder">The host application builder.</param>
     /// <returns><paramref name="builder"/>, for chaining.</returns>
+    [SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
+        Justification = "The provider's composition root registers ASP.NET Core Identity, OpenIddict, the cookies, CORS, options and the add-on's services, so it names their types; each registration stays a few lines (docs/plan/RESEARCH.md R-117).")]
     public static IHostApplicationBuilder AddCoreIdentityServer(this IHostApplicationBuilder builder)
     {
         var services = builder.Services;

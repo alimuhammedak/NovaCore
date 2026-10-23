@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
@@ -58,6 +59,8 @@ public sealed class IdentityServerTestHost : IAsyncDisposable
     /// Builds and starts the host. <paramref name="configure"/> runs after the standard registrations, so it can add
     /// configuration (later sources win) or services, e.g. the certificates a host adds outside Development.
     /// </summary>
+    [SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
+        Justification = "The test host's composition: the core, the add-on, the SQLite store and the test server, wired in one place (docs/plan/RESEARCH.md R-117).")]
     public static async Task<IdentityServerTestHost> StartAsync(
         string environment = "Development", Action<WebApplicationBuilder>? configure = null)
     {

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -32,6 +33,8 @@ internal static class AccountEndpoints
     /// <summary>A message for the caller, e.g. after registration or when a resource is missing.</summary>
     internal sealed record MessageResponse(string Message);
 
+    [SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
+        Justification = "The account API's route table: one Map call per endpoint, each naming its handler and the types of its request and response (docs/plan/RESEARCH.md R-117).")]
     public static RouteGroupBuilder Map(IEndpointRouteBuilder endpoints)
     {
         var auth = endpoints.MapGroup("/api/v1/auth").WithTags("Auth").RequireRateLimiting("strict");

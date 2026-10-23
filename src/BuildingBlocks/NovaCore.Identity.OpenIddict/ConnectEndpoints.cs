@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore;
@@ -43,6 +44,8 @@ internal static class ConnectEndpoints
             .ExcludeFromDescription().AllowAnonymous();
     }
 
+    [SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
+        Justification = "The authorization endpoint is one linear OpenID Connect flow over the request, the session, the client, the user and the authorization; splitting it would scatter the protocol's steps (docs/plan/RESEARCH.md R-117).")]
     private static async Task<IResult> Authorize(
         HttpContext context,
         UserManager<ApplicationUser> users,
