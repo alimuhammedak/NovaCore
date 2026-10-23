@@ -85,7 +85,7 @@ public sealed class ExceptionMappingTests
     {
         await using var host = await StartAsync(builder => builder.Services.AddExceptionHandler<TimeoutHandler>());
 
-        var timeout = await host.CreateClient().GetAsync($"/throw/{nameof(TimeoutException)}");
+        var timeout = await host.CreateClient().GetAsync(new Uri($"/throw/{nameof(TimeoutException)}", UriKind.Relative));
         var (status, _) = await GetProblemAsync(host, "/throw/not-found");
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, timeout.StatusCode);
@@ -113,10 +113,10 @@ public sealed class ExceptionMappingTests
         using var log = new LogCapture();
         await using var host = await StartAsync(builder => builder.Logging.AddProvider(log));
 
-        await host.CreateClient().GetAsync("/throw/not-found");
+        await host.CreateClient().GetAsync(new Uri("/throw/not-found", UriKind.Relative));
         Assert.DoesNotContain(log.Messages, message => message.Contains("unhandled exception", StringComparison.OrdinalIgnoreCase));
 
-        await host.CreateClient().GetAsync($"/throw/{nameof(InvalidOperationException)}");
+        await host.CreateClient().GetAsync(new Uri($"/throw/{nameof(InvalidOperationException)}", UriKind.Relative));
         Assert.Contains(log.Messages, message => message.Contains("unhandled exception", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -128,7 +128,7 @@ public sealed class ExceptionMappingTests
         using var client = factory.CreateClientWithPermissions(CatalogPermissions.ProductsCreate);
 
         using var body = new StringContent("{ \"name\": ", Encoding.UTF8, "application/json");
-        var response = await client.PostAsync("/api/v1/products", body);
+        var response = await client.PostAsync(new Uri("/api/v1/products", UriKind.Relative), body);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -162,7 +162,7 @@ public sealed class ExceptionMappingTests
 
     private static async Task<(int Status, JsonElement Problem)> GetProblemAsync(CoreWebTestHost host, string path)
     {
-        var response = await host.CreateClient().GetAsync(path);
+        var response = await host.CreateClient().GetAsync(new Uri(path, UriKind.Relative));
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         return ((int)response.StatusCode, await response.Content.ReadFromJsonAsync<JsonElement>());
     }

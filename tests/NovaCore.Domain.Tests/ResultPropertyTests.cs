@@ -21,7 +21,7 @@ public sealed class ResultPropertyTests
     {
         Gen.Int.Sample(value =>
         {
-            Result<int> result = value;
+            var result = Result.Success(value);
 
             Assert.True(result.IsSuccess);
             Assert.False(result.IsFailure);
@@ -36,7 +36,7 @@ public sealed class ResultPropertyTests
     {
         Failures.Sample(error =>
         {
-            Result<int> result = error;
+            var result = Result.Failure<int>(error);
 
             Assert.True(result.IsFailure);
             Assert.Equal(error, result.Error);

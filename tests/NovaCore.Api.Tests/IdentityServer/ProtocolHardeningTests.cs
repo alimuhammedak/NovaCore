@@ -74,7 +74,7 @@ public sealed class ProtocolHardeningTests(IdentityServerFixture fixture) : ICla
         Assert.Equal(CookieSecurePolicy.Always, cookies.Get(IdentityConstants.TwoFactorRememberMeScheme).Cookie.SecurePolicy);
 
         using var client = _host.CreateClient();
-        var page = await client.GetAsync("/account/login", TestContext.Current.CancellationToken);
+        var page = await client.GetAsync(new Uri("/account/login", UriKind.Relative), TestContext.Current.CancellationToken);
 
         var antiforgery = Assert.Single(page.Headers.GetValues("Set-Cookie"), cookie => cookie.StartsWith(".AspNetCore.Antiforgery", StringComparison.Ordinal));
         Assert.Contains("secure", antiforgery, StringComparison.OrdinalIgnoreCase);
@@ -97,7 +97,7 @@ public sealed class ProtocolHardeningTests(IdentityServerFixture fixture) : ICla
                 ["client_id"] = IdentityServerTestHost.ClientId,
                 ["token"] = "not-a-token"
             });
-            statuses.Add((await client.PostAsync("/connect/revoke", form, TestContext.Current.CancellationToken)).StatusCode);
+            statuses.Add((await client.PostAsync(new Uri("/connect/revoke", UriKind.Relative), form, TestContext.Current.CancellationToken)).StatusCode);
         }
 
         // RFC 7009 §2.2: an unknown token is answered like a revoked one, so the answers reveal nothing until the limit.

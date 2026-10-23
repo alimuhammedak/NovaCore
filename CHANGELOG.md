@@ -97,6 +97,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Catalog: a product's price must fit its `decimal(18,2)` column: at most 2 decimal places and 16 digits before the
   point, else 400. SQL Server rounded the rest away, so a price of 0.001 was stored as 0.00 and 10.005 as 10.01 while
   the API answered 201.
+- The build runs every Security, Reliability, Performance and Usage analyzer rule (`AnalysisLevel<Category>=latest-all`),
+  taint analysis included. `NovaCore.EntityFrameworkCore` calls `ConfigureAwait(false)`, as a library that doesn't depend
+  on ASP.NET Core.
+
+### Removed
+
+- **Breaking:** `Result<T>` has no implicit conversions from `T` or `Error` any more. Their named alternates would have
+  to be public static members of the generic `Result<T>` (CA2225), which CA1000 forbids. **Upgrade:** write
+  `Result.Success(value)` and `Result.Failure<T>(error)` where a method returned a value or an `Error` as a `Result<T>`.
 
 ## [0.1.0-preview.1] - 2026-10-20
 

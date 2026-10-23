@@ -63,16 +63,11 @@ public sealed class Result<T> : Result
         ? _value!
         : throw new InvalidOperationException("Cannot access the value of a failed result.");
 
-    // Internal: callers use Result.Success<T>/Result.Failure<T> or the implicit conversions, so a type argument never has
-    // to be spelled out on the generic type (CA1000, docs/plan/DECISIONS.md D-012).
+    // Internal: callers use Result.Success<T>/Result.Failure<T>, so a type argument never has to be spelled out on the
+    // generic type (CA1000, docs/plan/DECISIONS.md D-012). There are no implicit conversions from T or Error: their named
+    // alternates would have to be public statics here too (CA2225), which CA1000 forbids (docs/plan/DECISIONS.md D-064).
     internal static Result<T> Success(T value) => new(value);
     internal static new Result<T> Failure(Error error) => new(error);
-
-    /// <summary>Lets handlers simply <c>return value;</c> for the happy path.</summary>
-    public static implicit operator Result<T>(T value) => Success(value);
-
-    /// <summary>Lets handlers simply <c>return error;</c> for the failure path.</summary>
-    public static implicit operator Result<T>(Error error) => Failure(error);
 
     /// <summary>Functional fold over both branches — handy when mapping to a transport response.</summary>
     public TOut Match<TOut>(Func<T, TOut> onSuccess, Func<Error, TOut> onFailure) =>

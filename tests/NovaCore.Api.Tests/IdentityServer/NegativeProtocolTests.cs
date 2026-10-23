@@ -132,7 +132,7 @@ public sealed class NegativeProtocolTests(NegativeProtocolTests.Fixture fixture)
     public async Task The_authorization_response_names_the_issuer()
     {
         using var flow = new OidcFlow(_host);
-        var discovery = await (await flow.Browser.GetAsync("/.well-known/openid-configuration")).Content.ReadFromJsonAsync<JsonElement>();
+        var discovery = await (await flow.Browser.GetAsync(new Uri("/.well-known/openid-configuration", UriKind.Relative))).Content.ReadFromJsonAsync<JsonElement>();
         var (_, afterPassword) = await flow.BeginSignInAsync(
             (await _host.CreateUserAsync("iss@novacore.test", Password)).Email!, Password);
 
@@ -146,9 +146,10 @@ public sealed class NegativeProtocolTests(NegativeProtocolTests.Fixture fixture)
     public async Task The_published_keys_hold_no_private_parts()
     {
         using var flow = new OidcFlow(_host);
-        var discovery = await (await flow.Browser.GetAsync("/.well-known/openid-configuration")).Content.ReadFromJsonAsync<JsonElement>();
+        var discovery = await (await flow.Browser.GetAsync(new Uri("/.well-known/openid-configuration", UriKind.Relative))).Content.ReadFromJsonAsync<JsonElement>();
 
-        var jwks = await (await flow.Browser.GetAsync(new Uri(discovery.GetProperty("jwks_uri").GetString()!).PathAndQuery))
+        var jwksPath = new Uri(discovery.GetProperty("jwks_uri").GetString()!).PathAndQuery;
+        var jwks = await (await flow.Browser.GetAsync(new Uri(jwksPath, UriKind.Relative)))
             .Content.ReadFromJsonAsync<JsonElement>();
 
         var keys = jwks.GetProperty("keys").EnumerateArray().ToList();
@@ -166,7 +167,7 @@ public sealed class NegativeProtocolTests(NegativeProtocolTests.Fixture fixture)
     {
         using var flow = new OidcFlow(_host);
 
-        var response = await flow.Browser.GetAsync(path);
+        var response = await flow.Browser.GetAsync(new Uri(path, UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("DENY", Assert.Single(response.Headers.GetValues("X-Frame-Options")));

@@ -263,7 +263,7 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
     {
         await _host.CreateUserAsync($"not-a-form-{Guid.NewGuid():N}@novacore.test", Password);
         using var flow = new OidcFlow(_host);
-        var page = await flow.Browser.GetAsync("/account/login");
+        var page = await flow.Browser.GetAsync(new Uri("/account/login", UriKind.Relative));
         var token = OidcFlow.HiddenValue(await page.Content.ReadAsStringAsync(), "__RequestVerificationToken");
 
         using var request = new HttpRequestMessage(HttpMethod.Post, path)
@@ -277,7 +277,7 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
     }
 
     private static async Task<HttpResponseMessage> SignInPageAsync(OidcFlow flow, string email, string password) =>
-        await flow.SubmitLoginAsync(await flow.Browser.GetAsync("/account/login?ReturnUrl=%2F"), email, password);
+        await flow.SubmitLoginAsync(await flow.Browser.GetAsync(new Uri("/account/login?ReturnUrl=%2F", UriKind.Relative)), email, password);
 
     private static ApplicationUser NewUser(string email) =>
         new() { UserName = email, Email = email, CreatedAtUtc = TimeProvider.System.GetUtcNow() };

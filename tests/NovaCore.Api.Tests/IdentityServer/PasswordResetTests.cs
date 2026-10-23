@@ -150,7 +150,7 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
         await _host.CreateUserAsync("hostile-reset@novacore.test", Password);
         using var browser = new OidcFlow(_host);
 
-        var form = await browser.Browser.GetAsync("/account/forgot-password");
+        var form = await browser.Browser.GetAsync(new Uri("/account/forgot-password", UriKind.Relative));
         await browser.SubmitFormAsync(form, "/account/forgot-password",
             new() { ["Email"] = "hostile-reset@novacore.test" },
             request => request.Headers.Host = "evil.example");
@@ -163,7 +163,7 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
     {
         using var browser = new OidcFlow(_host);
 
-        var html = await (await browser.Browser.GetAsync("/account/login")).Content.ReadAsStringAsync();
+        var html = await (await browser.Browser.GetAsync(new Uri("/account/login", UriKind.Relative))).Content.ReadAsStringAsync();
 
         Assert.Contains("href=\"/account/forgot-password\"", html, StringComparison.Ordinal);
     }
@@ -186,13 +186,14 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
 
     private static async Task<HttpResponseMessage> RequestResetAsync(OidcFlow browser, string email)
     {
-        var form = await browser.Browser.GetAsync("/account/forgot-password");
+        var form = await browser.Browser.GetAsync(new Uri("/account/forgot-password", UriKind.Relative));
         return await browser.SubmitFormAsync(form, "/account/forgot-password", new() { ["Email"] = email });
     }
 
     private static async Task<HttpResponseMessage> ResetAsync(OidcFlow browser, string link, string password, string confirmation)
     {
-        var form = await browser.Browser.GetAsync(new Uri(link, UriKind.RelativeOrAbsolute).IsAbsoluteUri ? new Uri(link).PathAndQuery : link);
+        var target = new Uri(link, UriKind.RelativeOrAbsolute);
+        var form = await browser.Browser.GetAsync(target.IsAbsoluteUri ? new Uri(target.PathAndQuery, UriKind.Relative) : target);
         return await browser.SubmitFormAsync(form, "/account/reset-password", new()
         {
             ["Password"] = password,

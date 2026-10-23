@@ -27,24 +27,6 @@ public class ResultTests
     }
 
     [Fact]
-    public void Implicit_conversion_from_value_yields_success()
-    {
-        Result<string> result = "hello";
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal("hello", result.Value);
-    }
-
-    [Fact]
-    public void Implicit_conversion_from_error_yields_failure()
-    {
-        Result<string> result = Error.Validation("x.invalid", "bad");
-
-        Assert.True(result.IsFailure);
-        Assert.Equal(ErrorType.Validation, result.Error.Type);
-    }
-
-    [Fact]
     public void Match_folds_both_branches()
     {
         Result<int> success = Result.Success(10);

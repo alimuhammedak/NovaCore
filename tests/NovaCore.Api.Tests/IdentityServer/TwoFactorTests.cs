@@ -445,7 +445,7 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
     {
         using var flow = new OidcFlow(_host);
 
-        var response = await flow.Browser.GetAsync("/account/login/2fa?ReturnUrl=%2F");
+        var response = await flow.Browser.GetAsync(new Uri("/account/login/2fa?ReturnUrl=%2F", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.StartsWith("/account/login?", response.Headers.Location!.OriginalString, StringComparison.Ordinal);

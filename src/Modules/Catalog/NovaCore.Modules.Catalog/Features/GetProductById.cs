@@ -31,9 +31,9 @@ public static class GetProductById
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
-        Result<ProductDto> result = product is null
-            ? Error.NotFound("product.not_found", $"Product '{id}' was not found.")
-            : ProductMapper.ToDto(product);
+        var result = product is null
+            ? Result.Failure<ProductDto>(Error.NotFound("product.not_found", $"Product '{id}' was not found."))
+            : Result.Success(ProductMapper.ToDto(product));
 
         return result.ToHttpResult();
     }

@@ -152,12 +152,12 @@ public sealed class IdentityServerConfigurationTests
             ["client_id"] = "worker",
             ["client_secret"] = "worker-secret-for-tests-at-least-32-chars"
         });
-        var token = await client.PostAsync("/connect/token", form);
+        var token = await client.PostAsync(new Uri("/connect/token", UriKind.Relative), form);
         var accessToken = (await token.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("access_token").GetString()!;
         Assert.Equal(SecurityAlgorithms.EcdsaSha256, new JsonWebToken(accessToken).Alg);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/probe")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(new Uri("/probe", UriKind.Relative))).StatusCode);
     }
 
     [Theory]

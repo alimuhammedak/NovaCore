@@ -78,7 +78,7 @@ internal sealed partial class OidcFlow : IDisposable
             ["ReturnUrl"] = HiddenValue(html, "ReturnUrl"),
             ["Code"] = code
         });
-        return await Browser.PostAsync("/account/login/2fa", form);
+        return await Browser.PostAsync(new Uri("/account/login/2fa", UriKind.Relative), form);
     }
 
     /// <summary>
@@ -103,7 +103,7 @@ internal sealed partial class OidcFlow : IDisposable
     }
 
     /// <summary>An authorization request for the test client; <paramref name="extra"/> adds or overrides parameters.</summary>
-    public static string AuthorizeUri(string? codeChallenge, params (string Name, string? Value)[] extra)
+    public static Uri AuthorizeUri(string? codeChallenge, params (string Name, string? Value)[] extra)
     {
         var parameters = new Dictionary<string, string?>
         {
@@ -118,7 +118,8 @@ internal sealed partial class OidcFlow : IDisposable
         foreach (var (name, value) in extra)
             parameters[name] = value;
 
-        return QueryHelpers.AddQueryString("/connect/authorize", parameters.Where(pair => pair.Value is not null));
+        return new Uri(
+            QueryHelpers.AddQueryString("/connect/authorize", parameters.Where(pair => pair.Value is not null)), UriKind.Relative);
     }
 
     /// <summary>Posts the sign-in form of <paramref name="loginPage"/> with its antiforgery token and return URL.</summary>
@@ -134,7 +135,7 @@ internal sealed partial class OidcFlow : IDisposable
             ["Email"] = email,
             ["Password"] = password
         });
-        return await Browser.PostAsync("/account/login", form);
+        return await Browser.PostAsync(new Uri("/account/login", UriKind.Relative), form);
     }
 
     /// <summary>Exchanges an authorization code (with its PKCE verifier) at the token endpoint.</summary>
@@ -161,7 +162,7 @@ internal sealed partial class OidcFlow : IDisposable
     {
         parameters.TryAdd("client_id", IdentityServerTestHost.ClientId);
         using var form = new FormUrlEncodedContent(parameters);
-        return await Browser.PostAsync("/connect/token", form);
+        return await Browser.PostAsync(new Uri("/connect/token", UriKind.Relative), form);
     }
 
     /// <summary>Calls <paramref name="path"/> with <paramref name="accessToken"/> as the bearer token.</summary>

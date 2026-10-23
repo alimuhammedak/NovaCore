@@ -32,9 +32,9 @@ public static class GetTodoById
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
-        Result<TodoDto> result = todo is null
-            ? Error.NotFound("todo.not_found", $"Todo '{id}' was not found.")
-            : TodoMapper.ToDto(todo);
+        var result = todo is null
+            ? Result.Failure<TodoDto>(Error.NotFound("todo.not_found", $"Todo '{id}' was not found."))
+            : Result.Success(TodoMapper.ToDto(todo));
 
         return result.ToHttpResult();
     }

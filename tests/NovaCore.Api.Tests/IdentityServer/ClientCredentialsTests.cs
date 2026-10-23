@@ -81,7 +81,7 @@ public sealed class ClientCredentialsTests(ClientCredentialsTests.Fixture fixtur
             parameters["client_secret"] = secret;
 
         using var form = new FormUrlEncodedContent(parameters);
-        return await _host.CreateClient().PostAsync("/connect/token", form);
+        return await _host.CreateClient().PostAsync(new Uri("/connect/token", UriKind.Relative), form);
     }
 
     private async Task<HttpResponseMessage> CallProbeAsync(string accessToken)

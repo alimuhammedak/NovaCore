@@ -19,7 +19,7 @@ public sealed class OpenApiContractTests(NovaCoreApiFactory factory) : IClassFix
     public async Task The_committed_document_is_the_one_the_host_serves()
     {
         using var client = factory.CreateClient();
-        var served = (await client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken))
+        var served = (await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative), TestContext.Current.CancellationToken))
             .ReplaceLineEndings("\n");
         var committed = File.Exists(CommittedDocument)
             ? (await File.ReadAllTextAsync(CommittedDocument, TestContext.Current.CancellationToken)).ReplaceLineEndings("\n")

@@ -18,11 +18,9 @@ namespace NovaCore.Api.Tests.Integration;
 /// </summary>
 public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>, IAsyncLifetime
 {
-    private readonly NovaCoreApiFactory _factory = factory;
-
     public async ValueTask InitializeAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<CatalogDbContext>().Database.EnsureCreatedAsync();
     }
 
@@ -31,9 +29,9 @@ public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : I
     [Fact]
     public async Task A_granted_permission_opens_its_endpoint()
     {
-        using var client = _factory.CreateClientWithPermissions(CatalogPermissions.ProductsRead);
+        using var client = factory.CreateClientWithPermissions(CatalogPermissions.ProductsRead);
 
-        var response = await client.GetAsync("/api/v1/products");
+        var response = await client.GetAsync(new Uri("/api/v1/products", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -41,7 +39,7 @@ public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : I
     [Fact]
     public async Task A_granted_permission_does_not_open_another_endpoint()
     {
-        using var client = _factory.CreateClientWithPermissions(CatalogPermissions.ProductsRead);
+        using var client = factory.CreateClientWithPermissions(CatalogPermissions.ProductsRead);
 
         var response = await client.PostAsJsonAsync("/api/v1/products", new { name = "Widget", price = 9.99m, stock = 5 });
 
@@ -55,7 +53,7 @@ public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : I
         // token expires. Permissions, an administrator's included, come from the server (F4c.2).
         using var client = ClientWith(new Claim(NovaClaims.Role, "Administrator"));
 
-        var response = await client.GetAsync("/api/v1/products");
+        var response = await client.GetAsync(new Uri("/api/v1/products", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -63,9 +61,9 @@ public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : I
     [Fact]
     public async Task An_authenticated_caller_without_the_permission_is_forbidden()
     {
-        using var client = _factory.CreateClientWithPermissions();
+        using var client = factory.CreateClientWithPermissions();
 
-        var response = await client.GetAsync("/api/v1/products");
+        var response = await client.GetAsync(new Uri("/api/v1/products", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -75,11 +73,11 @@ public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : I
     {
         using var client = ClientWith(new Claim(NovaClaims.Permission, CatalogPermissions.ProductsRead));
 
-        var response = await client.GetAsync("/api/v1/products");
+        var response = await client.GetAsync(new Uri("/api/v1/products", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private HttpClient ClientWith(params Claim[] claims) =>
-        _factory.CreateClientWithClaims([new Claim(NovaClaims.Subject, Guid.NewGuid().ToString()), .. claims]);
+        factory.CreateClientWithClaims([new Claim(NovaClaims.Subject, Guid.NewGuid().ToString()), .. claims]);
 }

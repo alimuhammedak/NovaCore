@@ -42,7 +42,7 @@ public sealed class EmailQueueTests
         await using var host = await StartAsync(sender);
         await host.CreateUserAsync("queued-reset@novacore.test", Password);
         using var browser = new OidcFlow(host);
-        var page = await browser.Browser.GetAsync("/account/forgot-password", TestContext.Current.CancellationToken);
+        var page = await browser.Browser.GetAsync(new Uri("/account/forgot-password", UriKind.Relative), TestContext.Current.CancellationToken);
 
         var response = await browser.SubmitFormAsync(page, "/account/forgot-password", new() { ["Email"] = "queued-reset@novacore.test" })
             .WaitAsync(ResponseTimeout, TestContext.Current.CancellationToken);
@@ -107,7 +107,7 @@ public sealed class EmailQueueTests
         });
         await host.CreateUserAsync("queue-full@novacore.test", Password);
         using var browser = new OidcFlow(host);
-        var page = await browser.Browser.GetAsync("/account/forgot-password", TestContext.Current.CancellationToken);
+        var page = await browser.Browser.GetAsync(new Uri("/account/forgot-password", UriKind.Relative), TestContext.Current.CancellationToken);
 
         // One email held by the sender, a thousand waiting: the queue is full.
         for (var request = 0; request < 1001; request++)

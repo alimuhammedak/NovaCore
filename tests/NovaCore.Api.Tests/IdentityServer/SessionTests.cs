@@ -37,7 +37,7 @@ public sealed class SessionTests(IdentityServerFixture fixture) : IClassFixture<
     [Fact]
     public async Task Me_needs_a_signed_in_caller()
     {
-        Assert.Equal(HttpStatusCode.Unauthorized, (await _host.CreateClient().GetAsync("/api/v1/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _host.CreateClient().GetAsync(new Uri("/api/v1/auth/me", UriKind.Relative))).StatusCode);
     }
 
     [Fact]

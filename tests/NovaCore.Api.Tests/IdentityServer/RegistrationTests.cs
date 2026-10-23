@@ -41,7 +41,7 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         var link = await ConfirmationLinkAsync("new@novacore.test");
         Assert.StartsWith(IdentityServerTestHost.Authority + "/api/v1/auth/confirm-email?", link, StringComparison.Ordinal);
 
-        var confirm = await _host.CreateClient().GetAsync(new Uri(link).PathAndQuery);
+        var confirm = await _host.CreateClient().GetAsync(new Uri(new Uri(link).PathAndQuery, UriKind.Relative));
         Assert.Equal(HttpStatusCode.OK, confirm.StatusCode);
 
         using var flow = new OidcFlow(_host);
@@ -95,7 +95,7 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
     {
         var user = await _host.CreateUserAsync("token@novacore.test", Password);
 
-        var response = await _host.CreateClient().GetAsync($"/api/v1/auth/confirm-email?userId={user.Id}&token=bm90LWEtdG9rZW4");
+        var response = await _host.CreateClient().GetAsync(new Uri($"/api/v1/auth/confirm-email?userId={user.Id}&token=bm90LWEtdG9rZW4", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -135,7 +135,7 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         Assert.Equal(2, sent.Count);
         var link = WebUtility.HtmlDecode(Href().Match(sent[1].HtmlBody).Groups["url"].Value);
 
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(new Uri(link).PathAndQuery)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(new Uri(new Uri(link).PathAndQuery, UriKind.Relative))).StatusCode);
     }
 
     [Fact]

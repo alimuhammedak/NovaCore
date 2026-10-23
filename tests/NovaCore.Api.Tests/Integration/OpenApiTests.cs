@@ -13,7 +13,7 @@ public class OpenApiTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreAp
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/openapi/v1.json");
+        var response = await client.GetAsync(new Uri("/openapi/v1.json", UriKind.Relative));
         var json = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -37,7 +37,7 @@ public class OpenApiTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreAp
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/scalar/v1");
+        var response = await client.GetAsync(new Uri("/scalar/v1", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
