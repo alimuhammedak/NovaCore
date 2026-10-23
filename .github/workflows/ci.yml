@@ -58,6 +58,13 @@ jobs:
       - name: Test with coverage
         run: bash eng/check-coverage.sh Release
 
+      # For the sonar job: the same run's coverage, so it doesn't run the tests again.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: TestResults/coverage/coverage.cobertura.*.xml
+          retention-days: 1
+
       # Without coverage: coverlet instruments the built assemblies, and these tests inspect their references.
       - name: Architecture tests
         run: dotnet test --project tests/NovaCore.Api.Tests -c Release --no-build -- --filter-namespace NovaCore.Api.Tests.Architecture
@@ -84,6 +91,70 @@ jobs:
           dotnet list NovaCore.slnx package --vulnerable --include-transitive --format json > vulnerable.json
           jq -e '[.projects[].frameworks[]? | (.topLevelPackages // [])[], (.transitivePackages // [])[]] | length == 0' vulnerable.json \
             || { cat vulnerable.json; exit 1; }
+
+  # Whether this run has a SONAR_TOKEN. A fork, Dependabot's runs and a repository not set up for SonarQube Cloud have
+  # none, and the sonar job then doesn't run. Pushes only: a pull request's push already ran it.
+  sonar-token:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      present: ${{ steps.check.outputs.present }}
+
+    steps:
+      - id: check
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: if [[ -n "$SONAR_TOKEN" ]]; then echo present=true; else echo present=false; fi >> "$GITHUB_OUTPUT"
+
+  # SonarQube Cloud's analysis (docs/plan/DECISIONS.md D-045): its scanner wraps a build, and build-and-test's coverage
+  # goes with it. The scanner runs here only, never as a package reference (SonarAnalyzer.CSharp's license is not MIT or
+  # Apache, Y-06). The begin step also turns warnings-as-errors off, which is why this is a job of its own.
+  sonar:
+    needs: [build-and-test, sonar-token]
+    if: needs.sonar-token.outputs.present == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      SONAR_SCANNER_VERSION: 12.0.0
+
+    steps:
+      # The whole history: SonarQube Cloud attributes new code and issues by blame.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage
+          path: TestResults/coverage
+
+      - name: Restore
+        run: dotnet restore NovaCore.slnx --locked-mode
+
+      - name: Install the scanner
+        run: dotnet tool install dotnet-sonarscanner --version "$SONAR_SCANNER_VERSION" --tool-path "$RUNNER_TEMP/sonar"
+
+      - name: Analyze
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          "$RUNNER_TEMP/sonar/dotnet-sonarscanner" begin /k:"alimuhammedak_NovaCore" /o:"alimuhammedak" \
+            /d:sonar.token="$SONAR_TOKEN" \
+            /d:sonar.cs.cobertura.reportsPaths="TestResults/coverage/coverage.cobertura.*.xml" \
+            /d:sonar.exclusions="**/Migrations/**"
+          dotnet build NovaCore.slnx -c Release --no-restore --no-incremental
+          "$RUNNER_TEMP/sonar/dotnet-sonarscanner" end /d:sonar.token="$SONAR_TOKEN"
 
   # The committed OpenAPI document (docs/openapi/v1.json, kept current by OpenApiContractTests) against the base
   # revision's: a breaking change fails unless eng/openapi-breaking-accepted.txt accepts it (oasdiff from an image pinned
