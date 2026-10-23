@@ -100,6 +100,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The build runs every Security, Reliability, Performance and Usage analyzer rule (`AnalysisLevel<Category>=latest-all`),
   taint analysis included. `NovaCore.EntityFrameworkCore` calls `ConfigureAwait(false)`, as a library that doesn't depend
   on ASP.NET Core.
+- Dead private members, values never read, unused parameters, unnecessary usings (in the packages) and excessive
+  complexity or coupling (Microsoft's default code metric thresholds) fail the build. CI checks the formatting
+  (`dotnet format --verify-no-changes`); `.editorconfig` no longer sets `end_of_line`, and `.gitattributes` checks text
+  files out with the platform's line endings.
+- Template: the generated project runs the same Security, Reliability, Performance and Usage rules, the dead-code
+  rules and the code metric rules (CA2007, CA1812, and CA1506 in `Program.cs`, stay off: the project is ASP.NET Core
+  application code). Its tests pass `Uri` objects to `HttpClient`.
 
 ### Removed
 

@@ -12,15 +12,37 @@ csharp_style_namespace_declarations = file_scoped:suggestion
 csharp_style_prefer_primary_constructors = true:suggestion
 csharp_prefer_braces = when_multiline:silent
 dotnet_sort_system_directives_first = true
+# The solution is application code on ASP.NET Core, which has no SynchronizationContext: ConfigureAwait changes nothing
+# here, the case CA2007's documentation names for suppressing it (xUnit1030 also forbids it in tests).
+dotnet_diagnostic.CA2007.severity = none
+# CA1812 looks for constructor calls only; the internal classes here are created by DI, the options, EF Core or JSON,
+# the cases its documentation recommends suppressing it for.
+dotnet_diagnostic.CA1812.severity = none
+# Dead private members, values never read and unused parameters fail the build; by default they are only suggestions.
+dotnet_diagnostic.IDE0051.severity = warning
+dotnet_diagnostic.IDE0052.severity = warning
+dotnet_diagnostic.IDE0059.severity = warning
+dotnet_diagnostic.IDE0060.severity = warning
+# Code metrics with Microsoft's default thresholds: cyclomatic complexity, maintainability index, class coupling.
+dotnet_diagnostic.CA1502.severity = warning
+dotnet_diagnostic.CA1505.severity = warning
+dotnet_diagnostic.CA1506.severity = warning
 
 [tests/**.cs]
 # Test names are sentences (Completing_a_todo_twice_is_a_conflict), as in Microsoft's unit-testing guidance.
 dotnet_diagnostic.CA1707.severity = none
 
+[src/Api/**/Program.cs]
+# The host's composition root names every building block and module it composes, so its class coupling grows with each
+# module. CA1506's documentation allows suppressing it for code that stays maintainable despite its dependencies.
+dotnet_diagnostic.CA1506.severity = none
+
 [src/**/Migrations/*.cs]
 # EF Core migrations pass constant column arrays. Up/Down run once per database and the builder keeps the arrays: the
 # two cases CA1861's documentation allows suppressing.
 dotnet_diagnostic.CA1861.severity = none
+# dotnet ef writes migrations with a byte order mark.
+charset = utf-8-bom
 
 [*.{csproj,props,targets,slnx,config}]
 indent_size = 2
