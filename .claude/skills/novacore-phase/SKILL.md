@@ -101,7 +101,7 @@ Faz tek oturuma sığmayacak kadar büyükse bir adım sınırında dur. PROGRES
    | Adımı tamamlamak için gereken düzeltme; kaynağın net söylediği yol; planlanan yaklaşımın teknik olarak çalışmaması; analyzer veya MS kuralının gerektirdiği public API değişikliği (yayımlanmamış 0.x paket); adım için gereken yeni dosya | **Kendin karar ver ve uygula.** Kalıcıysa DECISIONS'a D-kaydı ekle (ekleme onay istemez), PROGRESS notuna ve adım satırına yaz, CHANGELOG'a işle. Faz raporunda "Kendi aldığım kararlar" altında listele. |
    | Başka bir fazın işi ve şimdi gerekli | O fazı oku. Toplamda şimdi yapmak daha ucuzsa **eksiksiz** yap (D-kaydı, adım ID'si korunur); değilse dokunma. Geçici çözüm yok (Y-45). |
    | Kapsam dışı ama değerli, şimdi gerekli değil | PROGRESS → "Sonraya bırakılanlar" listesine yaz, **dokunma** (Y-09). |
-   | Uyarı çıktı | Önce düzelt. Düzeltme yerine bastırmak ancak MS dokümanının o kural için "When to suppress" bölümünün açıkça izin verdiği kalıcı durumda olur, gerekçe ve kaynakla (Y-44). Geçici bastırma yok. |
+   | Uyarı çıktı | Önce düzelt. Düzeltme yerine bastırmak ancak MS dokümanının o kural için "When to suppress" bölümünün açıkça izin verdiği kalıcı durumda olur, gerekçe ve kaynakla; bunun dışındaki her bastırma kullanıcıya sorulur ve onayı bir D/Q kaydına yazılır (Y-46). Geçici bastırma yok. |
    | **Sor (`AskUserQuestion`):** bir D/Y kaydıyla çelişki ya da onu yeniden açma; PLAN'ın kullanıcıya bıraktığı ürün veya sahiplik kararı; Microsoft dışı yeni paket; mevcut bir D/Y satırını değiştirmek; merge, push, tag, yayın, silme | Seçenekler, önerin, kaynak (R-ID). |
    | Yapılmayacaklar listesindeki bir şey gerekli görünüyor | **Uygulama.** Gerekçeyi ve kaynağı göster, sor. |
 

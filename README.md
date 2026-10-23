@@ -339,7 +339,7 @@ Her build analizörleri uyarılar hata sayılarak çalıştırır (`TreatWarning
 | Meziantou.Analyzer | `Directory.Packages.props` (`GlobalPackageReference`) | Varsayılan önemler; kapalı (kullanıcı onayı, Q-50): MA0048, MA0004 (CA2007'nin kapalı olduğu yerlerde), MA0051 (migration'larda) |
 | Format | CI | `dotnet format --verify-no-changes`; `.editorconfig` satır sonu belirlemez, `.gitattributes` `* text=auto` |
 
-Bastırmalar yalnızca Microsoft'un o kural için "When to suppress" izniyle ya da kullanıcı onayıyla yapılır (Y-44):
+Bastırmalar yalnızca Microsoft'un o kural için "When to suppress" izniyle ya da kullanıcı onayıyla yapılır (Y-46):
 CA2007 uygulama kodunda ve yalnız ASP.NET Core'da koşan iki pakette kapalıdır (diğer paketlerde açık;
 `NovaCore.EntityFrameworkCore` `ConfigureAwait(false)` çağırır); CA1812 kapalıdır (DI'ın oluşturduğu sınıfları raporluyor,
 ölü tipleri haftalık Roslynator raporu yakalar); CA1506 üç composition root ve protokol akışında gerekçeli

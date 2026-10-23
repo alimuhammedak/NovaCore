@@ -227,7 +227,7 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   `dotnet restore NovaCore.slnx --force-evaluate` and commit the lock files with it.
 
 - **0 warnings is enforced** (`TreatWarningsAsErrors`). Fix a warning; don't suppress it. Suppressing (`NoWarn`,
-  `#pragma`, `.editorconfig` severity, `[SuppressMessage]`) needs user approval (DECISIONS Y-44), unless Microsoft's
+  `#pragma`, `.editorconfig` severity, `[SuppressMessage]`) needs user approval (DECISIONS Y-46), unless Microsoft's
   "When to suppress" section for that rule allows it permanently. The approved ones are
   listed under Gotchas.
 
@@ -281,7 +281,7 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 - **Suppressed-by-design warnings** (all user-approved, DECISIONS D-011):
   - `Directory.Build.props`: `NoWarn` `RMG020` (Mapperly intentional source-member drops). `WarningsNotAsErrors`
     `NU1901;NU1902` (low/moderate advisories stay warnings; high/critical fail restore; CI fails on any).
-  - Allowed by Microsoft's "When to suppress" section (DECISIONS Y-44): `.editorconfig` CA1861 off for
+  - Allowed by Microsoft's "When to suppress" section (DECISIONS Y-46): `.editorconfig` CA1861 off for
     `src/**/Migrations/*.cs` (EF migrations, R-064); `[SuppressMessage]` CA5350 on the test TOTP generator (R-063).
   - `.editorconfig`: CA1707 is off for `tests/**.cs` (test names are sentences).
   - Allowed by Microsoft's "When to suppress" (D-064, D-065): CA2007 off for the host, the modules, the tests and the

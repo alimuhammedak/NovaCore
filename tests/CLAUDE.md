@@ -44,7 +44,7 @@ start or end). xUnit's options go after `--`; a solution goes through `--solutio
   `ValidationTests` pins the 400 validation ProblemDetails (type, instance, traceId, error keys) of every validated
   request, so a module that forgets `services.AddValidation()` fails here. Update the expected lists when you add or
   change an endpoint.
-  **Keep these green** — they are the guardrails for the whole design; never weaken one to pass (Y-44).
+  **Keep these green** — they are the guardrails for the whole design; never weaken one to pass (Y-46).
 
 ## How the test host works (and why)
 
