@@ -141,6 +141,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (written with the change, delivered, retention), the payment list and the identity provider's sign-in run the same
   scenarios on SQL Server and PostgreSQL. The PostgreSQL migrations live in the test project; `docker-compose.yml` has
   an optional `postgres` service (`POSTGRES_PASSWORD` in `.env`).
+- Template: `dotnet new novacore --db SqlServer|PostgreSql` (default `SqlServer`) chooses the database of the generated
+  project: the provider package, `AddModuleDatabase` in `Program.cs`, the design-time database, the connection string,
+  the migrations of each context and, for PostgreSQL, the license gate's named exception. The test project replaces the
+  host's database with SQLite through `AddModuleDatabase`, whichever was chosen.
 
 ### Removed
 

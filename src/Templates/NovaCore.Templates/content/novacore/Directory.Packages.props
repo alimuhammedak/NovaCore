@@ -21,14 +21,23 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The database provider the host gives every module context (Program.cs, AddModuleDatabase). -->
+<!--#if (DbSqlServer) -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
+<!--#endif -->
+<!--#if (DbPostgreSql) -->
+    <!-- PostgreSQL license, with its driver Npgsql: a named exception of eng/check-licenses.sh. -->
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+<!--#endif -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
+<!--#if (DbSqlServer) -->
     <!--
       Microsoft.Data.SqlClient (under EF Core SqlServer) depends on System.Security.Cryptography.Pkcs 9.0.11, which has
       high-severity advisories. Every project that references the SQL Server provider references the patched version
       directly. Remove it once the SqlClient that EF Core brings depends on a patched Pkcs.
     -->
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+<!--#endif -->
     <PackageVersion Include="Riok.Mapperly" Version="4.3.1" />
   </ItemGroup>
 

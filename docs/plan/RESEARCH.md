@@ -1282,3 +1282,10 @@ Bağlam: CRM-Nominal (çok kiracılı eğitim kurumu CRM'i, PostgreSQL) NovaCore
 - `.editorconfig`: `src/**/Migrations/*.cs` bir klasörün doğrudan altındaki dosyaları eşliyor; `Migrations/Catalog/` gibi bir alt klasör eşleşmiyordu. PG migration'ları host'un düzeninde (`PostgreSql/<Modül>/Migrations`), bölüm `{src,tests}/**/Migrations/*.cs`.
 - Kaynak: ölçüm · https://hub.docker.com/_/postgres (18 notu, tag'ler) · https://www.npgsql.org/efcore/ · https://learn.microsoft.com/ef/core/managing-schemas/migrations/providers
 - Sonuç: D-074.
+
+### R-128: Şablon motorunda sağlayıcı başına dosya seçimi (2026-10-24, faz 7a, F7a.4; kaynak + ölçüm)
+- Soru: `--db` seçimiyle iki migration setinden yalnız seçileni, üretilen projede `Migrations` klasörüne nasıl koyarız (iki setin snapshot dosyasının adı aynı); `.sh` dosyasında `#if` çalışır mı?
+- Kaynak (dotnet/templating wiki, "Reference for template.json"): `sources[].modifiers[]` yalnız `condition`, `include`, `exclude`, `copyOnly` alır; `rename` kaynak düzeyindedir ve "Each key is a path to a file". Sembollerin `fileRename`'i "The portion of template filenames to be replaced by the symbol value"; üretilmiş sembollerde 5.0.200'den beri, `join` örneği bir klasörü yeniden adlandırıyor. `constant` üreticisi `parameters.value` alır. MS Learn ("Templates for authors") `fileRename`'i parametreler için belgeliyor. Koşullu yorum sözdizimi belgesi `.sh`'ı "Single hash line comments" grubunda sayıyor: `#if (...)` varsayılan olarak işlenir.
+- Ölçüm: paketlenmiş şablondan `--db PostgreSql` ile üretilen projede `eng/check-licenses.sh`'ın `#if` blokları işlendi; SQL Server migration klasörleri `exclude` ile dışarıda kaldı.
+- Kaynak: https://github.com/dotnet/templating/wiki/Reference-for-template.json · https://github.com/dotnet/templating/wiki/Available-Symbols-Generators · https://github.com/dotnet/templating/blob/main/docs/Conditional-processing-and-comment-syntax.md · https://learn.microsoft.com/dotnet/core/tools/templates
+- Sonuç: D-075 (2). PostgreSQL seti şablonda `MigrationsPostgreSql` klasörlerinde, sabit sembolün `fileRename`'iyle `Migrations` olur.

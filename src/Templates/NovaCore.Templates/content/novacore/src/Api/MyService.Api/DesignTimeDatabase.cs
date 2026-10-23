@@ -14,10 +14,18 @@ internal static class DesignTimeDatabase
     public static DbContextOptions<TContext> Options<TContext>(string schema)
         where TContext : DbContext =>
         new DbContextOptionsBuilder<TContext>()
+#if (DbSqlServer)
             .UseSqlServer(
                 "Server=localhost;Database=MyService;Trusted_Connection=True;TrustServerCertificate=True;Encrypt=True;",
                 sql => sql
                     .MigrationsAssembly(typeof(DesignTimeDatabase).Assembly)
                     .MigrationsHistoryTable(HistoryRepository.DefaultTableName, schema))
+#else
+            .UseNpgsql(
+                "Host=localhost;Database=MyService",
+                npgsql => npgsql
+                    .MigrationsAssembly(typeof(DesignTimeDatabase).Assembly)
+                    .MigrationsHistoryTable(HistoryRepository.DefaultTableName, schema))
+#endif
             .Options;
 }

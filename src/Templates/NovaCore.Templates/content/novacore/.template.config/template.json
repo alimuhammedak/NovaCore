@@ -33,6 +33,38 @@
       "type": "computed",
       "value": "(auth == \"BuiltIn\")"
     },
+    "db": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "The database of every module context. The host chooses it (AddModuleDatabase in Program.cs) and keeps the migrations; the modules don't.",
+      "choices": [
+        {
+          "choice": "SqlServer",
+          "description": "SQL Server (Microsoft.EntityFrameworkCore.SqlServer, MIT)."
+        },
+        {
+          "choice": "PostgreSql",
+          "description": "PostgreSQL (Npgsql.EntityFrameworkCore.PostgreSQL, PostgreSQL license: a named exception of eng/check-licenses.sh)."
+        }
+      ],
+      "defaultValue": "SqlServer"
+    },
+    "DbSqlServer": {
+      "type": "computed",
+      "value": "(db == \"SqlServer\")"
+    },
+    "DbPostgreSql": {
+      "type": "computed",
+      "value": "(db == \"PostgreSql\")"
+    },
+    "PostgreSqlMigrationsFolder": {
+      "type": "generated",
+      "generator": "constant",
+      "parameters": {
+        "value": "Migrations"
+      },
+      "fileRename": "MigrationsPostgreSql"
+    },
     "HttpsPort": {
       "type": "generated",
       "generator": "port",
@@ -62,6 +94,20 @@
           "exclude": [
             "src/Api/MyService.Api/Identity/**",
             "tests/MyService.Api.Tests/IdentityProviderTests.cs"
+          ]
+        },
+        {
+          "condition": "(!DbSqlServer)",
+          "exclude": [
+            "src/Api/MyService.Api/Todos/Migrations/**",
+            "src/Api/MyService.Api/Identity/Migrations/**"
+          ]
+        },
+        {
+          "condition": "(!DbPostgreSql)",
+          "exclude": [
+            "src/Api/MyService.Api/Todos/MigrationsPostgreSql/**",
+            "src/Api/MyService.Api/Identity/MigrationsPostgreSql/**"
           ]
         }
       ]

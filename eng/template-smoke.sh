@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Consumer smoke test of the template (docs/plan/PLAN.md F5.2). Packs the NovaCore packages and the template into a local
-# feed, creates a project from the template with each identity option, and builds and tests it the way a consumer does:
-# the packages come from the feed (not from this repository's projects), warnings are errors, and the migrations must
-# match the model. Usage: eng/template-smoke.sh [work-directory]
+# feed, creates a project from the template with each identity option and each database (--auth x --db), and builds and
+# tests it the way a consumer does: the packages come from the feed (not from this repository's projects), warnings are
+# errors, the package licenses pass the project's gate and the migrations match the model.
+# Usage: eng/template-smoke.sh [work-directory]
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,10 +32,12 @@ echo "== Installing $(basename "$template") into a template hive of its own"
 dotnet new install "$(native "$template")" --debug:custom-hive "$hive"
 
 for auth in BuiltIn External; do
-  name="Smoke$auth"
+for db in SqlServer PostgreSql; do
+  # Short names: on Windows a native library's path under tests/<name>.Api.Tests/bin must stay within MAX_PATH.
+  case "$db" in SqlServer) name="Smoke${auth}Sql" ;; PostgreSql) name="Smoke${auth}Pg" ;; esac
   project="$work/projects/$name"
-  echo "== dotnet new novacore --auth $auth"
-  dotnet new novacore -n "$name" --auth "$auth" -o "$(native "$project")" --debug:custom-hive "$hive"
+  echo "== dotnet new novacore --auth $auth --db $db"
+  dotnet new novacore -n "$name" --auth "$auth" --db "$db" -o "$(native "$project")" --debug:custom-hive "$hive"
 
   # The generated nuget.config maps BMD.NovaCore.* to the GitHub feed; here the same source name points at the local one.
   (cd "$project" && dotnet nuget update source novacore --source "$feed" --configfile nuget.config)
@@ -62,9 +65,23 @@ for auth in BuiltIn External; do
   if find "$project" -name 'PublicAPI.*.txt' -not -path '*/bin/*' -not -path '*/obj/*' | grep -q .; then
     echo "::error::$name contains PublicAPI files"; exit 1
   fi
-  if grep -rIl --exclude-dir=bin --exclude-dir=obj -e 'Muhammed' -e 'NOVACORE_PACKAGE_VERSION' -e 'NOVACORE_HTTPS_PORT' -e 'NOVACORE_HTTP_PORT' -e 'MyService' "$project"; then
-    echo "::error::$name contains the author's name or an unreplaced template token (files above)"; exit 1
+  if grep -rIl --exclude-dir=bin --exclude-dir=obj -e 'Muhammed' -e 'NOVACORE_PACKAGE_VERSION' -e 'NOVACORE_HTTPS_PORT' -e 'NOVACORE_HTTP_PORT' -e 'MyService' -e '#if (' "$project"; then
+    echo "::error::$name contains the author's name or an unreplaced template token or conditional (files above)"; exit 1
   fi
+
+  echo "== $name: the chosen database only"
+  # One migration set per context, the chosen provider's, in Migrations (the template keeps the other's apart).
+  if find "$project" -path '*MigrationsPostgreSql*' -not -path '*/bin/*' -not -path '*/obj/*' | grep -q .; then
+    echo "::error::$name contains a MigrationsPostgreSql folder"; exit 1
+  fi
+  if [[ "$db" == SqlServer ]]; then use=UseSqlServer; annotations=SqlServer; other=Npgsql; else use=UseNpgsql; annotations=Npgsql; other=SqlServer; fi
+  grep -q "$use" "$project/src/Api/$name.Api/Program.cs" || { echo "::error::$name doesn't call $use"; exit 1; }
+  grep -q "$annotations" "$project/src/Api/$name.Api/Todos/Migrations/TodosDbContextModelSnapshot.cs" \
+    || { echo "::error::$name's Todos migrations aren't $db's"; exit 1; }
+  if grep -rIl --exclude-dir=bin --exclude-dir=obj -e "$other" "$project/src"; then
+    echo "::error::$name references the other database (files above)"; exit 1
+  fi
+done
 done
 
 echo "== Template smoke test passed"

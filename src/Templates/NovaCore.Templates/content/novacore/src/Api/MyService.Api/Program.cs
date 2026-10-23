@@ -23,9 +23,15 @@ builder.AddCorePersistence();                      // audit stamping, the outbox
 
 // The database of every module context, chosen here and nowhere else. Their migrations live in this project (one folder
 // per context), as does what `dotnet ef` builds them with (DesignTimeDatabase.cs): change the two together.
+#if (DbSqlServer)
 builder.Services.AddModuleDatabase((services, db) => db.UseSqlServer(
     services.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
     sql => sql.MigrationsAssembly(typeof(Program).Assembly).EnableRetryOnFailure()));
+#else
+builder.Services.AddModuleDatabase((services, db) => db.UseNpgsql(
+    services.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
+    npgsql => npgsql.MigrationsAssembly(typeof(Program).Assembly).EnableRetryOnFailure()));
+#endif
 
 #if (BuiltInAuth)
 // The OpenID Connect provider issuing the tokens Jwt:Authority points at: this host. Its store is a context of the
