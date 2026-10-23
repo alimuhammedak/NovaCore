@@ -45,8 +45,8 @@ dotnet_diagnostic.CA1707.severity = none
 # CA2007 (ConfigureAwait on every await) is meant for libraries that may run under a SynchronizationContext. The host,
 # the modules and the tests are application code, and the two packages below run only inside ASP.NET Core, which has no
 # SynchronizationContext: the two cases its "When to suppress" section names (docs/plan/RESEARCH.md R-117). xUnit1030
-# also forbids ConfigureAwait(false) in tests. NovaCore.Abstractions and NovaCore.EntityFrameworkCore don't depend on
-# ASP.NET Core, so they keep the rule and call ConfigureAwait(false).
+# also forbids ConfigureAwait(false) in tests. The packages that don't depend on ASP.NET Core keep the rule:
+# NovaCore.EntityFrameworkCore calls ConfigureAwait(false).
 [{src/Api/**.cs,src/Modules/**.cs,tests/**.cs}]
 dotnet_diagnostic.CA2007.severity = none
 # Meziantou's MA0004 is the same rule; off where CA2007 is, for the same reason (user-approved, Q-50).

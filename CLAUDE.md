@@ -71,6 +71,8 @@ bash eng/check-coverage.sh [Debug] [--update] # tests with coverage, held to eng
 bash eng/check-openapi.sh [base-revision]     # breaking changes in docs/openapi/v1.json since main (oasdiff, Docker; D-061)
 bash eng/mutation.sh                          # Stryker.NET on the abstractions and domain code, a report (D-063)
 bash eng/lint-workflows.sh [dir ...]          # actionlint + zizmor on .github (Docker; GH_TOKEN enables online audits)
+bash eng/find-unused.sh                       # unused internal/private types, fields, constants (Roslynator, D-066)
+dotnet format NovaCore.slnx                   # fixes what CI's `dotnet format --verify-no-changes` reports
 git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release
 dotnet test                                   # all tests: SQLite, plus the SQL Server layer in a Docker container (skips without Docker)

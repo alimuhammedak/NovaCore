@@ -340,8 +340,8 @@ Her build analizörleri uyarılar hata sayılarak çalıştırır (`TreatWarning
 | Format | CI | `dotnet format --verify-no-changes`; `.editorconfig` satır sonu belirlemez, `.gitattributes` `* text=auto` |
 
 Bastırmalar yalnızca Microsoft'un o kural için "When to suppress" izniyle ya da kullanıcı onayıyla yapılır (Y-44):
-CA2007 uygulama kodunda ve yalnız ASP.NET Core'da koşan iki pakette kapalıdır (`NovaCore.EntityFrameworkCore` ve
-`NovaCore.Abstractions` `ConfigureAwait(false)` çağırır); CA1812 kapalıdır (DI'ın oluşturduğu sınıfları raporluyor,
+CA2007 uygulama kodunda ve yalnız ASP.NET Core'da koşan iki pakette kapalıdır (diğer paketlerde açık;
+`NovaCore.EntityFrameworkCore` `ConfigureAwait(false)` çağırır); CA1812 kapalıdır (DI'ın oluşturduğu sınıfları raporluyor,
 ölü tipleri haftalık Roslynator raporu yakalar); CA1506 üç composition root ve protokol akışında gerekçeli
 `[SuppressMessage]` taşır.
 
