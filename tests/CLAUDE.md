@@ -224,4 +224,9 @@ host started directly (`CoreWebTestHost.StartAsync`, `IdentityServerTestHost.Sta
 `xUnit1051` (CancellationToken) is `NoWarn`'d for these simple `HttpClient` tests.
 
 Warnings are errors here too. Test names are sentences with underscores (`Refresh_rotates_the_refresh_token`), so
-`.editorconfig` turns CA1707 off for `tests/**.cs` only (DECISIONS D-011). Every other analyzer rule applies.
+`.editorconfig` turns CA1707 off for `tests/**.cs` only (DECISIONS D-011). Every other analyzer rule applies, the
+Usage and Reliability categories at `latest-all` and Meziantou.Analyzer included (D-064, D-066): pass `HttpClient` a
+`Uri` (`new Uri("/api/v1/products", UriKind.Relative)`, CA2234), dispose request contents and messages (CA2000),
+compare strings and key string collections with `StringComparer.Ordinal`/`StringComparison.Ordinal` (MA0002, MA0006),
+and give a `Regex` a timeout (MA0009). No `ConfigureAwait` in tests: CA2007 and MA0004 are off here, and xUnit1030
+forbids `ConfigureAwait(false)` in a test method.

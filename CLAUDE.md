@@ -47,6 +47,15 @@ completed phases update this file.
 - Outside the restructuring (a quick question, a one-off fix the user asks for), work normally, but still
   respect DECISIONS.md.
 
+### Working habits (from the Ponytail skill, DECISIONS D-048 (4))
+
+- **Before an edit, list every place it must reach**: the callers (grep them), the tests and fixtures, the
+  configuration, the docs that describe it, and the template's copies under `src/Templates/.../content`, which this
+  repository doesn't compile (only `bash eng/template-smoke.sh` does).
+- **A bug fix starts with the callers**: grep every caller of the code you touch and fix the root cause once, in the
+  shared code, instead of at each call site.
+- **End a report with what you skipped or did not check**, and any risk the user must know, in a line or two.
+
 ---
 
 ## Commands
@@ -90,8 +99,11 @@ dotnet new novacore -n MyProject [--auth BuiltIn|External]
 dotnet pack NovaCore.slnx -c Release -o artifacts [--version-suffix preview.1]
 ```
 
-There is no separate lint step: every build runs the `latest-recommended` analyzers with `EnforceCodeStyleInBuild=true`
-and `TreatWarningsAsErrors=true`. `dotnet format` is available but optional. Publishing is `.github/workflows/release.yml`
+There is no separate lint step: every build runs the analyzers with `EnforceCodeStyleInBuild=true` and
+`TreatWarningsAsErrors=true`: `latest-recommended`, every Security, Reliability, Performance and Usage rule
+(`AnalysisLevel<Category>=latest-all`; `AnalysisMode<Category>` would be ignored, R-117), the dead-code IDE rules,
+Microsoft's code metrics, BannedApiAnalyzers under `src/` (`src/BannedSymbols*.txt`) and Meziantou.Analyzer (D-064…D-066).
+CI also runs `dotnet format NovaCore.slnx --verify-no-changes`; run `dotnet format NovaCore.slnx` to fix what it reports. Publishing is `.github/workflows/release.yml`
 on a `v*` tag that must match `VersionPrefix` (GitHub Packages): a read-only `build` job, then a `publish` job in the
 `release` environment (owner approval) that signs build provenance and pushes. CI also runs CodeQL (`codeql.yml`),
 Scorecard (`scorecard.yml`), a Betterleaks history scan and the workflow linters; the SDK is pinned exactly
@@ -222,7 +234,7 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   `configuration.GetValue`/`Get<T>` while registering services: values added after `CreateBuilder` (tests, hosts)
   would be missed (docs/plan/RESEARCH.md R-048).
 - **Time comes from an injected `TimeProvider`**, never `DateTime(Offset).UtcNow`/`Now` (`SourceHygieneTests`
-  enforces it under `src/`). The building blocks register `TimeProvider.System` with `TryAddSingleton` next to their
+  enforces it under `src/` by text, BannedApiAnalyzers by symbol everywhere but `NovaCore.Abstractions`). The building blocks register `TimeProvider.System` with `TryAddSingleton` next to their
   consumers; tests swap in `FakeTimeProvider` (`Microsoft.Extensions.TimeProvider.Testing`). The one exception is the
   `DomainEvent.OccurredOnUtc` default (DECISIONS D-021).
 - **Logging is source-generated** (CA1848 is an error): `[LoggerMessage]` partial methods, explicit `EventId`s unique
@@ -268,6 +280,12 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   - Allowed by Microsoft's "When to suppress" section (DECISIONS Y-44): `.editorconfig` CA1861 off for
     `src/**/Migrations/*.cs` (EF migrations, R-064); `[SuppressMessage]` CA5350 on the test TOTP generator (R-063).
   - `.editorconfig`: CA1707 is off for `tests/**.cs` (test names are sentences).
+  - Allowed by Microsoft's "When to suppress" (D-064, D-065): CA2007 off for the host, the modules, the tests and the
+    two packages that run only inside ASP.NET Core (`NovaCore.AspNetCore`, `NovaCore.Identity.OpenIddict`); the other
+    packages call `ConfigureAwait(false)`. CA1812 off everywhere (DI and framework-created classes). CA1506 with a
+    justified `[SuppressMessage]` on three composition roots and protocol flows (the template: its `Program.cs`).
+  - Meziantou, user-approved (Q-50): MA0048 off (related types share a file), MA0004 off where CA2007 is, MA0051 off
+    for migrations.
   - `[SuppressMessage]` with justification on `Error` (CA1716) and `IDomainEventHandler<T>` (CA1711).
 - **`Directory.Build.targets` is too late for some properties.** The SDK computes `DocumentationFile` (from
   `GenerateDocumentationFile`) and Roslyn `DeterministicSourcePaths` (from `ContinuousIntegrationBuild`) before it is
