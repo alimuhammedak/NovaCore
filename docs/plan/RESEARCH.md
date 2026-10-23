@@ -1156,3 +1156,23 @@ Biçim:
   - Hayatta kalanlar: `PagedList.HasPreviousPage`/`HasNextPage` ve `pageSize = 1` sınırları (rastgele üreteçler sınırlara nadiren düşüyordu), sınanmayan `Result.Failure(Error.None)` değişmezi, hata mesajı metinleri, eşdeğer mutantlar (`page < 1` → `page <= 1`). Üreteçlere sınır değerleri ve değişmeze bir test eklenince Abstractions %79,07.
 - Kaynak: https://stryker-mutator.io/docs/stryker-net/configuration/ · https://stryker-mutator.io/docs/stryker-net/operating-modes/ · https://github.com/stryker-mutator/stryker-net/releases · ölçüm
 - Sonuç: `eng/mutation.sh` üç hedefi `tests/NovaCore.Domain.Tests`'e karşı koşturur (`--break-at 0`, html/markdown/json); `mutation.yml` haftalık + `workflow_dispatch`. D-063.
+
+## Faz 6d araştırması (2026-10-23)
+
+### R-117: Kategori bazlı analiz modu ve ilk ölçüm (2026-10-23, faz 6d; kaynak + ölçüm)
+- Soru: PLAN F6d.1'deki `AnalysisMode<Kategori>=All` bu repoda hangi kuralları açar, kaç bulgu çıkar?
+- Bulgu (kaynak): `Directory.Build.props` `AnalysisLevel=latest-recommended` (bileşik değer) kullanıyor. SDK, kategori ayarı yoksa `AnalysisLevel<Kategori>`'yi `AnalysisLevel`'dan alır ve modu onun son ekinden okur; `AnalysisMode<Kategori>`'ye yalnız son ek boşsa bakar (`sdk/10.0.300/Sdks/Microsoft.NET.Sdk/analyzers/build/Microsoft.CodeAnalysis.NetAnalyzers.targets:502`, `:531`–`:532`). MS: "if you specify both properties, `AnalysisLevel` takes precedence over `AnalysisMode`". Yani `AnalysisModeSecurity=All` burada hiçbir kural açmaz (ölçüldü: 0 uyarı). Doğrusu `AnalysisLevel<Kategori>=latest-all`; Security için `analysislevelsecurity_10_all.globalconfig` CA2100, CA3001, CA3075, CA5394, CA5404'ü warning yapıyor. Metrik kuralları (CA1501/1502/1505/1506/1509) `All`'da da kapalı, tek tek açılır.
+- Ölçüm (`dotnet build NovaCore.slnx --no-incremental -p:TreatWarningsAsErrors=false -p:AnalysisLevel<Kategori>=latest-all`, her kategori ayrı, tekil konum):
+  - Security: 0.
+  - Reliability: CA2007 480 (Identity.OpenIddict 161, EntityFrameworkCore 15, AspNetCore 3, modüller 19, testler 282), CA2000 17 ve CA2025 1 (hepsi testlerde).
+  - Performance: CA1812 59 (paketler 29, modüller 7, testler 23), CA1849 3 (testlerde `SqliteConnection.Open()`).
+  - Usage: CA2234 79 (hepsi testlerde, `HttpClient` string URI), CA2225 2 (`Result<T>`'nin örtük operatörleri), CA2213 2 (testlerde dispose edilmeyen factory alanları).
+- Kural sayfaları ("When to suppress"):
+  - CA2007: "generally appropriate to suppress the warning entirely for projects that represent application code"; ASP.NET Core'da SynchronizationContext yok, `ConfigureAwait` davranışı değiştirmez. "Passing `false` is a good option for app-independent libraries."
+  - CA1812: "safe to suppress"; önerilen durumlar: IoC container'a kayıtlı, reflection'la ya da ASP.NET/runtime tarafından oluşturulan sınıflar.
+  - CA2234: yalnızca parametre URI değilse bastırılabilir.
+  - CA2225: "Do not suppress a warning from this rule if you're implementing a shared library."
+  - CA1000: "Do not suppress a warning from this rule." CA2225'in analizörü karşılığı yalnızca operatörü tanımlayan tipte, public ve `To<Hedef>`/`From<Kaynak>` adıyla arıyor (dotnet/sdk `OperatorOverloadsHaveNamedAlternates.cs`); generic `Result<T>`'de bu public static bir üye demek, yani CA1000 ile çakışıyor → Q-48.
+  - CA1506: "You can suppress this warning when the type or method is considered maintainable despite its large number of dependencies on other types." Varsayılan eşik tip 95, diğerleri 40; `CodeMetricsConfig.txt` yalnızca eşiği değiştirmek için.
+- Kaynak: https://learn.microsoft.com/dotnet/core/project-sdk/msbuild-props#analysislevelcategory · https://learn.microsoft.com/dotnet/fundamentals/code-analysis/overview · https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2007 · …/ca1812 · …/ca2234 · …/ca2225 · …/ca1000 · …/ca1506 · https://github.com/dotnet/sdk/blob/release/10.0.3xx/src/Microsoft.CodeAnalysis.NetAnalyzers/src/Microsoft.CodeAnalysis.NetAnalyzers/Microsoft.CodeQuality.Analyzers/ApiDesignGuidelines/OperatorOverloadsHaveNamedAlternates.cs · ölçüm
+- Sonuç: F6d.1 `AnalysisLevel<Kategori>=latest-all` kullanır (plandaki özellik adından sapma); bastırma kararları D-064.
