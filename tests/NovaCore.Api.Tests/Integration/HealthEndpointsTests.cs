@@ -48,7 +48,7 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
 
         foreach (var context in new[] { "CatalogDbContext", "IdentityServerDbContext", "PaymentsDbContext" })
         {
-            var check = Assert.Single(registrations, registration => registration.Name == context);
+            var check = Assert.Single(registrations, registration => string.Equals(registration.Name, context, StringComparison.Ordinal));
             Assert.Contains("ready", check.Tags);
         }
     }

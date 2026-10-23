@@ -20,6 +20,6 @@ public partial class SqlServerImageTests
         Assert.Equal([TestSqlServer.Image], images);
     }
 
-    [GeneratedRegex(@"^\s*image:\s*(?<image>mcr\.microsoft\.com/mssql/server\S*)\s*$", RegexOptions.Multiline)]
+    [GeneratedRegex(@"^\s*image:\s*(?<image>mcr\.microsoft\.com/mssql/server\S*)\s*$", RegexOptions.Multiline, matchTimeoutMilliseconds: 1000)]
     private static partial Regex ComposeImage();
 }

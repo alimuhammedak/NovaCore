@@ -32,7 +32,7 @@ public sealed class EmailQueueTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         sender.Release();
-        await sender.Delivered.WaitForAsync(email => email.To == "queued-register@novacore.test");
+        await sender.Delivered.WaitForAsync(email => string.Equals(email.To, "queued-register@novacore.test", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -44,12 +44,12 @@ public sealed class EmailQueueTests
         using var browser = new OidcFlow(host);
         var page = await browser.Browser.GetAsync(new Uri("/account/forgot-password", UriKind.Relative), TestContext.Current.CancellationToken);
 
-        var response = await browser.SubmitFormAsync(page, "/account/forgot-password", new() { ["Email"] = "queued-reset@novacore.test" })
+        var response = await browser.SubmitFormAsync(page, "/account/forgot-password", new(StringComparer.Ordinal) { ["Email"] = "queued-reset@novacore.test" })
             .WaitAsync(ResponseTimeout, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         sender.Release();
-        await sender.Delivered.WaitForAsync(email => email.To == "queued-reset@novacore.test");
+        await sender.Delivered.WaitForAsync(email => string.Equals(email.To, "queued-reset@novacore.test", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class EmailQueueTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         sender.Release();
-        await sender.Delivered.WaitForAsync(email => email.To == "queued-resend@novacore.test", count: 2);
+        await sender.Delivered.WaitForAsync(email => string.Equals(email.To, "queued-resend@novacore.test", StringComparison.Ordinal), count: 2);
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public sealed class EmailQueueTests
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
-        await sender.Delivered.WaitForAsync(email => email.To == "goes-second@novacore.test");
+        await sender.Delivered.WaitForAsync(email => string.Equals(email.To, "goes-second@novacore.test", StringComparison.Ordinal));
         var failure = Assert.Single(log.Messages, message => message.StartsWith("Sending an email failed", StringComparison.Ordinal));
         Assert.DoesNotContain("fails-first", failure, StringComparison.Ordinal);
     }
@@ -111,9 +111,9 @@ public sealed class EmailQueueTests
 
         // One email held by the sender, a thousand waiting: the queue is full.
         for (var request = 0; request < 1001; request++)
-            await browser.SubmitFormAsync(page, "/account/forgot-password", new() { ["Email"] = "queue-full@novacore.test" });
+            await browser.SubmitFormAsync(page, "/account/forgot-password", new(StringComparer.Ordinal) { ["Email"] = "queue-full@novacore.test" });
 
-        var response = await browser.SubmitFormAsync(page, "/account/forgot-password", new() { ["Email"] = "queue-full@novacore.test" })
+        var response = await browser.SubmitFormAsync(page, "/account/forgot-password", new(StringComparer.Ordinal) { ["Email"] = "queue-full@novacore.test" })
             .WaitAsync(ResponseTimeout, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

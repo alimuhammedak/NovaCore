@@ -26,7 +26,7 @@ internal sealed class OAuthSecuritySchemeTransformer(IOptions<JwtOptions> jwt) :
                 {
                     AuthorizationUrl = new Uri(authority + "/connect/authorize"),
                     TokenUrl = new Uri(authority + "/connect/token"),
-                    Scopes = new Dictionary<string, string>
+                    Scopes = new Dictionary<string, string>(StringComparer.Ordinal)
                     {
                         ["openid"] = "Sign in",
                         ["profile"] = "Name",
@@ -39,7 +39,7 @@ internal sealed class OAuthSecuritySchemeTransformer(IOptions<JwtOptions> jwt) :
         };
 
         document.Components ??= new OpenApiComponents();
-        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>(StringComparer.Ordinal);
         document.Components.SecuritySchemes[IdentityServerHostingExtensions.OpenApiSecuritySchemeId] = scheme;
 
         return Task.CompletedTask;

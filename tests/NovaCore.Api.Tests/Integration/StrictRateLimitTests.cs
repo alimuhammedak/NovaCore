@@ -68,6 +68,6 @@ public sealed class StrictRateLimitApiFactory : NovaCoreApiFactory
         base.ConfigureWebHost(builder);
 
         builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
-            new Dictionary<string, string?> { ["RateLimiting:PermitLimit"] = "10" }));
+            new Dictionary<string, string?>(StringComparer.Ordinal) { ["RateLimiting:PermitLimit"] = "10" }));
     }
 }

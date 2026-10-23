@@ -106,7 +106,7 @@ internal static class PasswordResetPage
         var result = await users.ResetPasswordAsync(user, decoded, password);
         if (!result.Succeeded)
         {
-            return result.Errors.Any(error => error.Code == nameof(IdentityErrorDescriber.InvalidToken))
+            return result.Errors.Any(error => string.Equals(error.Code, nameof(IdentityErrorDescriber.InvalidToken), StringComparison.Ordinal))
                 ? HtmlPage.Message("Reset your password", InvalidLink)
                 : PasswordForm(context, antiforgery, userId, token, string.Join(" ", result.Errors.Select(error => error.Description)));
         }

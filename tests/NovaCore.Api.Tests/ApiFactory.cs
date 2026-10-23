@@ -26,7 +26,7 @@ public abstract class ApiFactory : WebApplicationFactory<Program>
 {
     // Permissions granted on the server to subjects of IdentityProvider's tokens (none unless granted). Other tokens, the
     // identity provider add-on's, are resolved by the host's resolver from its store.
-    private readonly ConcurrentDictionary<string, string[]> _grants = new();
+    private readonly ConcurrentDictionary<string, string[]> _grants = new(StringComparer.Ordinal);
 
     /// <summary>The host environment the app boots in. Override to test environment-specific wiring.</summary>
     protected virtual string EnvironmentName => Environments.Development;
@@ -81,7 +81,7 @@ public abstract class ApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Jwt:Authority"] = TestIdentityProvider.Issuer,
                 ["Database:ApplyMigrations"] = "false",
@@ -105,7 +105,7 @@ public abstract class ApiFactory : WebApplicationFactory<Program>
 
             // A production host brings keys (certificates, stood in for by ephemeral keys), a real email sender and a
             // Data Protection key store.
-            if (EnvironmentName != Environments.Development)
+            if (!string.Equals(EnvironmentName, Environments.Development, StringComparison.Ordinal))
             {
                 services.AddOpenIddict().AddServer(server => server.AddEphemeralSigningKey().AddEphemeralEncryptionKey());
                 services.AddSingleton<IEmailSender>(new CapturingEmailSender());
@@ -132,7 +132,7 @@ public abstract class ApiFactory : WebApplicationFactory<Program>
     {
         public Task<IReadOnlyCollection<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken cancellationToken)
         {
-            if (user.FindFirstValue(JwtRegisteredClaimNames.Iss) != TestIdentityProvider.Issuer)
+            if (!string.Equals(user.FindFirstValue(JwtRegisteredClaimNames.Iss), TestIdentityProvider.Issuer, StringComparison.Ordinal))
                 return hostResolver.GetPermissionsAsync(user, cancellationToken);
 
             return Task.FromResult<IReadOnlyCollection<string>>(

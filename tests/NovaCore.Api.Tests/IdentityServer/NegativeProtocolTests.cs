@@ -32,7 +32,7 @@ public sealed class NegativeProtocolTests(NegativeProtocolTests.Fixture fixture)
     public sealed class Fixture : IdentityServerFixture
     {
         protected override void Configure(WebApplicationBuilder builder) =>
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Identity:Clients:1:ClientId"] = OtherClientId,
                 ["Identity:Clients:1:RedirectUris:0"] = OtherRedirectUri
@@ -95,7 +95,7 @@ public sealed class NegativeProtocolTests(NegativeProtocolTests.Fixture fixture)
         var response = await RedeemAsync(flow, code, verifier);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains(await OidcFlow.ErrorFrom(response), PkceErrors);
+        Assert.Contains(await OidcFlow.ErrorFrom(response), PkceErrors, StringComparer.Ordinal);
     }
 
     // RFC 9700 §2.1.2 and §2.4: no implicit flow, no resource owner password credentials.
@@ -116,7 +116,7 @@ public sealed class NegativeProtocolTests(NegativeProtocolTests.Fixture fixture)
         var user = await _host.CreateUserAsync("ropc@novacore.test", Password);
         using var flow = new OidcFlow(_host);
 
-        var response = await flow.TokenRequestAsync(new()
+        var response = await flow.TokenRequestAsync(new(StringComparer.Ordinal)
         {
             ["grant_type"] = "password",
             ["username"] = user.Email!,
@@ -187,7 +187,7 @@ public sealed class NegativeProtocolTests(NegativeProtocolTests.Fixture fixture)
         OidcFlow flow, string code, string? verifier, string clientId = IdentityServerTestHost.ClientId,
         string redirectUri = IdentityServerTestHost.RedirectUri)
     {
-        var parameters = new Dictionary<string, string>
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["grant_type"] = "authorization_code",
             ["code"] = code,

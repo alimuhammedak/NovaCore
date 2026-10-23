@@ -16,7 +16,7 @@ internal static class EmailLinks
     public static string Create(JwtOptions jwt, string path, Guid userId, string token) =>
         QueryHelpers.AddQueryString(
             new Uri(new Uri(jwt.Authority.TrimEnd('/') + "/"), path.TrimStart('/')).AbsoluteUri,
-            new Dictionary<string, string?>
+            new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["userId"] = userId.ToString(),
                 ["token"] = Base64Url.EncodeToString(Encoding.UTF8.GetBytes(token))

@@ -94,8 +94,8 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
         // The emails go out in the order queued: once a later one has gone, nothing queued before it is still pending.
         await _host.CreateUserAsync("after-reset@novacore.test", Password);
         await RequestResetAsync(browser, "after-reset@novacore.test");
-        await fixture.Emails.WaitForAsync(email => email.To == "after-reset@novacore.test");
-        Assert.Single(fixture.Emails.Sent, email => email.To == "known-reset@novacore.test");
+        await fixture.Emails.WaitForAsync(email => string.Equals(email.To, "after-reset@novacore.test", StringComparison.Ordinal));
+        Assert.Single(fixture.Emails.Sent, email => string.Equals(email.To, "known-reset@novacore.test", StringComparison.Ordinal));
         Assert.DoesNotContain(fixture.Emails.Sent, email => email.To is "nobody-reset@novacore.test" or "unconfirmed-reset@novacore.test");
     }
 
@@ -152,7 +152,7 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
 
         var form = await browser.Browser.GetAsync(new Uri("/account/forgot-password", UriKind.Relative));
         await browser.SubmitFormAsync(form, "/account/forgot-password",
-            new() { ["Email"] = "hostile-reset@novacore.test" },
+            new(StringComparer.Ordinal) { ["Email"] = "hostile-reset@novacore.test" },
             request => request.Headers.Host = "evil.example");
 
         Assert.StartsWith(IdentityServerTestHost.Authority + "/account/reset-password?", await ResetLinkAsync("hostile-reset@novacore.test"), StringComparison.Ordinal);
@@ -187,14 +187,14 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
     private static async Task<HttpResponseMessage> RequestResetAsync(OidcFlow browser, string email)
     {
         var form = await browser.Browser.GetAsync(new Uri("/account/forgot-password", UriKind.Relative));
-        return await browser.SubmitFormAsync(form, "/account/forgot-password", new() { ["Email"] = email });
+        return await browser.SubmitFormAsync(form, "/account/forgot-password", new(StringComparer.Ordinal) { ["Email"] = email });
     }
 
     private static async Task<HttpResponseMessage> ResetAsync(OidcFlow browser, string link, string password, string confirmation)
     {
         var target = new Uri(link, UriKind.RelativeOrAbsolute);
         var form = await browser.Browser.GetAsync(target.IsAbsoluteUri ? new Uri(target.PathAndQuery, UriKind.Relative) : target);
-        return await browser.SubmitFormAsync(form, "/account/reset-password", new()
+        return await browser.SubmitFormAsync(form, "/account/reset-password", new(StringComparer.Ordinal)
         {
             ["Password"] = password,
             ["ConfirmPassword"] = confirmation
@@ -203,10 +203,10 @@ public sealed partial class PasswordResetTests(PasswordResetTests.Fixture fixtur
 
     private async Task<string> ResetLinkAsync(string email)
     {
-        var body = Assert.Single(await fixture.Emails.WaitForAsync(sent => sent.To == email)).HtmlBody;
+        var body = Assert.Single(await fixture.Emails.WaitForAsync(sent => string.Equals(sent.To, email, StringComparison.Ordinal))).HtmlBody;
         return WebUtility.HtmlDecode(Href().Match(body).Groups["url"].Value);
     }
 
-    [GeneratedRegex("href=\"(?<url>[^\"]+)\"")]
+    [GeneratedRegex("href=\"(?<url>[^\"]+)\"", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
     private static partial Regex Href();
 }

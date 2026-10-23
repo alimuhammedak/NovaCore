@@ -31,7 +31,7 @@ public sealed class SessionTests(IdentityServerFixture fixture) : IClassFixture<
 
         Assert.Equal(user.Id.ToString(), me.GetProperty("userId").GetString());
         Assert.Equal("me@novacore.test", me.GetProperty("email").GetString());
-        Assert.Equal([IdentityServerTestHost.ProbePermission], me.GetProperty("permissions").EnumerateArray().Select(p => p.GetString()));
+        Assert.Equal([IdentityServerTestHost.ProbePermission], me.GetProperty("permissions").EnumerateArray().Select(p => p.GetString()), StringComparer.Ordinal);
     }
 
     [Fact]

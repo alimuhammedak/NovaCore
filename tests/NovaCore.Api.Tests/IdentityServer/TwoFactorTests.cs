@@ -211,7 +211,7 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
         var newCodes = (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("recoveryCodes")
             .EnumerateArray().Select(code => code.GetString()!).ToArray();
         Assert.Equal(10, newCodes.Length);
-        Assert.Empty(newCodes.Intersect(oldCodes));
+        Assert.Empty(newCodes.Intersect(oldCodes, StringComparer.Ordinal));
 
         using var withOld = new OidcFlow(_host);
         var (_, oldCodePage) = await CodeStepAsync(withOld, "recovery-new@novacore.test");

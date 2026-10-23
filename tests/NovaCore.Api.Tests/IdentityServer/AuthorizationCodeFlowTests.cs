@@ -46,7 +46,7 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         Assert.Equal("RS256", accessToken.Alg);
         Assert.Equal("at+jwt", accessToken.Typ);
         Assert.Equal(IdentityServerTestHost.Authority + "/", accessToken.Issuer);
-        Assert.Equal(["novacore.api"], accessToken.Audiences);
+        Assert.Equal(["novacore.api"], accessToken.Audiences, StringComparer.Ordinal);
         Assert.Equal(user.Id.ToString(), accessToken.Subject);
         // Permissions are resolved on the server, never carried by the token.
         Assert.False(accessToken.TryGetClaim("permission", out _));
@@ -117,7 +117,7 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         await _host.CreateUserAsync("csrf@novacore.test", Password);
         using var flow = new OidcFlow(_host);
 
-        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["Email"] = "csrf@novacore.test",
             ["Password"] = Password,
@@ -137,7 +137,7 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
 
         var refreshed = await OidcFlow.TokensFrom(await flow.RefreshAsync(tokens.RefreshToken));
 
-        Assert.NotEqual(tokens.RefreshToken, refreshed.RefreshToken);
+        Assert.NotEqual(tokens.RefreshToken, refreshed.RefreshToken, StringComparer.Ordinal);
         Assert.Equal(HttpStatusCode.OK, (await flow.CallApiAsync("/probe", refreshed.AccessToken)).StatusCode);
     }
 
@@ -165,7 +165,7 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         using var flow = new OidcFlow(_host);
         var tokens = await flow.SignInAsync("revoke@novacore.test", Password);
 
-        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["token"] = tokens.RefreshToken,
             ["token_type_hint"] = "refresh_token",
@@ -233,7 +233,7 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         await flow.SignInAsync("cross-site@novacore.test", Password);
 
         // What a form on another site can post: the parameters, but no antiforgery token.
-        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["client_id"] = IdentityServerTestHost.ClientId,
             ["post_logout_redirect_uri"] = IdentityServerTestHost.PostLogoutRedirectUri
@@ -256,7 +256,7 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
     }
 
     private static Uri EndSessionUri => new(
-        QueryHelpers.AddQueryString("/connect/endsession", new Dictionary<string, string?>
+        QueryHelpers.AddQueryString("/connect/endsession", new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["client_id"] = IdentityServerTestHost.ClientId,
             ["post_logout_redirect_uri"] = IdentityServerTestHost.PostLogoutRedirectUri

@@ -18,7 +18,7 @@ public class ModuleBoundaryTests
             from reference in module.GetReferencedAssemblies()
             let referenced = reference.Name!
             where referenced.StartsWith("NovaCore.Modules.", StringComparison.Ordinal)
-                  && referenced != name
+                  && !string.Equals(referenced, name, StringComparison.Ordinal)
                   && !referenced.EndsWith(".Contracts", StringComparison.Ordinal)
             select $"{name} -> {referenced}";
 
@@ -34,7 +34,7 @@ public class ModuleBoundaryTests
             .ToList();
         Assert.NotEmpty(projects);
 
-        var allowed = new Regex(@"^NovaCore\.Modules\.[A-Za-z0-9]+(\.Contracts)?$");
+        var allowed = new Regex(@"^NovaCore\.Modules\.[A-Za-z0-9]+(\.Contracts)?$", RegexOptions.ExplicitCapture, TimeSpan.FromSeconds(1));
 
         Assert.DoesNotContain(projects, project => !allowed.IsMatch(project!));
     }

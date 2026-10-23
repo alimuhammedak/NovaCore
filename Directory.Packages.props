@@ -81,6 +81,15 @@
 
   <ItemGroup>
     <!--
+      Meziantou.Analyzer (MIT, docs/plan/DECISIONS.md D-045, D-066) in every project, as its README recommends under
+      Central Package Management. A global reference is a development dependency (PrivateAssets=all), so no package
+      depends on it. Each rule keeps its default severity: the warnings fail the build, the suggestions don't.
+    -->
+    <GlobalPackageReference Include="Meziantou.Analyzer" Version="3.0.303" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
       Test stack: xUnit v3 on Microsoft.Testing.Platform (MTP v2), the runner global.json selects for `dotnet test`.
       No VSTest packages (Microsoft.NET.Test.Sdk, xunit.runner.visualstudio): MTP mode doesn't use them
       (docs/plan/RESEARCH.md R-108).

@@ -30,7 +30,8 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
 
             // Lock down API responses; leave the docs UI (Scalar) free to load its assets.
             var path = ctx.Request.Path;
-            if (!path.StartsWithSegments("/scalar") && !path.StartsWithSegments("/openapi"))
+            if (!path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase)
+                && !path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase))
                 headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
 
             return Task.CompletedTask;

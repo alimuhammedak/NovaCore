@@ -25,7 +25,7 @@ public sealed class OpenApiContractTests(NovaCoreApiFactory factory) : IClassFix
             ? (await File.ReadAllTextAsync(CommittedDocument, TestContext.Current.CancellationToken)).ReplaceLineEndings("\n")
             : null;
 
-        if (served == committed)
+        if (string.Equals(served, committed, StringComparison.Ordinal))
             return;
 
         Directory.CreateDirectory(Path.GetDirectoryName(CommittedDocument)!);

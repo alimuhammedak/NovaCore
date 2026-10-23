@@ -79,7 +79,7 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
 
         var result = await users.CreateAsync(NewUser($"{Guid.NewGuid():N}@novacore.test"), password);
 
-        Assert.Contains(result.Errors, error => error.Code == "CommonPassword");
+        Assert.Contains(result.Errors, error => string.Equals(error.Code, "CommonPassword", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public sealed class SignInHardeningTests(SignInHardeningTests.Fixture fixture) :
         second.UserName = "another-name";
         var result = await users.CreateAsync(second, Password);
 
-        Assert.Contains(result.Errors, error => error.Code == "DuplicateEmail");
+        Assert.Contains(result.Errors, error => string.Equals(error.Code, "DuplicateEmail", StringComparison.Ordinal));
     }
 
     [Fact]

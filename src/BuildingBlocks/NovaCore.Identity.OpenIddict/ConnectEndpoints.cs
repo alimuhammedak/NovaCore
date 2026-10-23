@@ -128,7 +128,7 @@ internal static class ConnectEndpoints
         // principal went through the core's claims transformation like every authenticated one, so it carries resolved
         // permissions; they stay out of the token (they are resolved per request).
         var identity = new ClaimsIdentity(
-            principal.Claims.Where(claim => claim.Type != NovaClaims.Permission),
+            principal.Claims.Where(claim => !string.Equals(claim.Type, NovaClaims.Permission, StringComparison.Ordinal)),
             TokenValidationParameters.DefaultAuthenticationType, Claims.Name, Claims.Role);
         SetUserClaims(identity, user, await users.GetRolesAsync(user));
         identity.SetDestinations(GetDestinations);
@@ -272,7 +272,7 @@ internal static class ConnectEndpoints
     }
 
     private static IResult Forbid(string error, string description) => Results.Forbid(
-        new AuthenticationProperties(new Dictionary<string, string?>
+        new AuthenticationProperties(new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             [OpenIddictServerAspNetCoreConstants.Properties.Error] = error,
             [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = description

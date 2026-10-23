@@ -146,7 +146,7 @@ public sealed class ExceptionMappingTests
     {
         Exception exception = kind switch
         {
-            nameof(ArgumentException) => new ArgumentException(Secret),
+            nameof(ArgumentException) => new ArgumentException(Secret, nameof(kind)),
             nameof(FormatException) => new FormatException(Secret),
             nameof(UnauthorizedAccessException) => new UnauthorizedAccessException(Secret),
             nameof(KeyNotFoundException) => new KeyNotFoundException(Secret),

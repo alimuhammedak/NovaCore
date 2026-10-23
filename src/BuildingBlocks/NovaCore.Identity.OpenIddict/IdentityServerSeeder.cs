@@ -64,7 +64,7 @@ internal sealed partial class IdentityServerSeeder(
     {
         var permissions = permissionProviders
             .SelectMany(provider => provider.GetPermissions())
-            .DistinctBy(permission => permission.Name)
+            .DistinctBy(permission => permission.Name, StringComparer.Ordinal)
             .ToList();
 
         await EnsureRoleAsync(roles, IdentityRoles.Administrator, "Full administrative access",
@@ -89,7 +89,7 @@ internal sealed partial class IdentityServerSeeder(
         }
 
         var existing = (await roles.GetClaimsAsync(role))
-            .Where(claim => claim.Type == NovaClaims.Permission)
+            .Where(claim => string.Equals(claim.Type, NovaClaims.Permission, StringComparison.Ordinal))
             .Select(claim => claim.Value)
             .ToHashSet(StringComparer.Ordinal);
 

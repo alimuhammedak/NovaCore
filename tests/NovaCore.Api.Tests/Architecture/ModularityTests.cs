@@ -27,8 +27,8 @@ public class ModularityTests
             .Select(a => a.Name)
             .ToList();
 
-        Assert.DoesNotContain("NovaCore.Modules.Catalog", referenced);
-        Assert.Contains("NovaCore.Modules.Catalog.Contracts", referenced);
+        Assert.DoesNotContain("NovaCore.Modules.Catalog", referenced, StringComparer.Ordinal);
+        Assert.Contains("NovaCore.Modules.Catalog.Contracts", referenced, StringComparer.Ordinal);
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public class ModularityTests
             .Select(a => a.Name)
             .ToList();
 
-        Assert.DoesNotContain("NovaCore.Modules.Payments", referenced);
+        Assert.DoesNotContain("NovaCore.Modules.Payments", referenced, StringComparer.Ordinal);
     }
 
     [Fact]

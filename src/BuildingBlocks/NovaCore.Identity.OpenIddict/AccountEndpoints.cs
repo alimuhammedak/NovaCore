@@ -197,7 +197,7 @@ internal static class AccountEndpoints
         var result = await users.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
         if (!result.Succeeded)
         {
-            if (result.Errors.Any(error => error.Code == nameof(IdentityErrorDescriber.PasswordMismatch)))
+            if (result.Errors.Any(error => string.Equals(error.Code, nameof(IdentityErrorDescriber.PasswordMismatch), StringComparison.Ordinal)))
             {
                 await users.AccessFailedAsync(user);
                 if (await users.IsLockedOutAsync(user))
@@ -377,13 +377,13 @@ internal static class AccountEndpoints
     private static Task<ApplicationUser?> FindAsync(UserManager<ApplicationUser> users, ICurrentUser currentUser) =>
         Guid.TryParse(currentUser.UserId, out var id) ? users.FindByIdAsync(id.ToString()) : Task.FromResult<ApplicationUser?>(null);
 
-    private static ValidationProblem InvalidCode() => TypedResults.ValidationProblem(new Dictionary<string, string[]>
+    private static ValidationProblem InvalidCode() => TypedResults.ValidationProblem(new Dictionary<string, string[]>(StringComparer.Ordinal)
     {
         ["code"] = ["The verification code is invalid."]
     });
 
     private static ValidationProblem PasswordProblem(string[] errors) =>
-        TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["password"] = errors });
+        TypedResults.ValidationProblem(new Dictionary<string, string[]>(StringComparer.Ordinal) { ["password"] = errors });
 
     private static async Task<Results<Ok<MessageResponse>, BadRequest<MessageResponse>>> ConfirmEmail(
         Guid userId,

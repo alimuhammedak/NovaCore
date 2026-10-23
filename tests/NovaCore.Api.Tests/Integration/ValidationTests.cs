@@ -68,7 +68,7 @@ public class ValidationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCor
         Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("traceId").GetString()));
 
         var errors = root.GetProperty("errors").EnumerateObject().ToList();
-        Assert.Equal(expectedFields, errors.Select(error => error.Name).Order(StringComparer.Ordinal));
+        Assert.Equal(expectedFields, errors.Select(error => error.Name).Order(StringComparer.Ordinal), StringComparer.Ordinal);
         Assert.All(errors, error => Assert.NotEqual(0, error.Value.GetArrayLength()));
     }
 

@@ -65,10 +65,10 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
     [Fact]
     public async Task Outside_development_the_authority_is_trusted_over_https_metadata()
     {
-        await using var factory = new ProductionApiFactory();
-        await EnsureCatalogCreatedAsync(factory);
+        await using var production = new ProductionApiFactory();
+        await EnsureCatalogCreatedAsync(production);
 
-        var accepted = await GetWithTokenAsync(factory, factory.IdentityProvider.CreateToken(Reader(factory)));
+        var accepted = await GetWithTokenAsync(production, production.IdentityProvider.CreateToken(Reader(production)));
 
         Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
     }
@@ -80,7 +80,7 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
     {
         // Only the authority's published asymmetric keys sign tokens (DECISIONS D-028): an HS256 token with the trusted
         // issuer and audience is still refused, in Development too.
-        await using var production = environment == "Production" ? new ProductionApiFactory() : null;
+        await using var production = string.Equals(environment, "Production", StringComparison.Ordinal) ? new ProductionApiFactory() : null;
         var host = production ?? factory;
         await EnsureCatalogCreatedAsync(host);
         var symmetricKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("a-symmetric-key-that-is-long-enough-0123456789"));

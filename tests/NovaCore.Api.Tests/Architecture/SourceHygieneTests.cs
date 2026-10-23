@@ -9,12 +9,12 @@ namespace NovaCore.Api.Tests.Architecture;
 /// </summary>
 public class SourceHygieneTests
 {
-    private static readonly Regex UntrackedWork = new(@"\b(TODO|FIXME)\b");
+    private static readonly Regex UntrackedWork = new(@"\b(TODO|FIXME)\b", RegexOptions.ExplicitCapture, TimeSpan.FromSeconds(1));
 
     // The static clocks: DateTime(Offset).UtcNow/Now/Today, and reading TimeProvider.System directly instead of the
     // injected provider (registering TimeProvider.System as the default is fine).
     private static readonly Regex AmbientClock =
-        new(@"\bDateTime(Offset)?\.(UtcNow|Now|Today)\b|\bTimeProvider\.System\.Get\w+\(");
+        new(@"\bDateTime(Offset)?\.(UtcNow|Now|Today)\b|\bTimeProvider\.System\.Get\w+\(", RegexOptions.ExplicitCapture, TimeSpan.FromSeconds(1));
 
     // DECISIONS D-021 (6): domain events are created in domain code, which has no DI. Their default timestamp is the
     // moment of creation, and the creator can set it with init. Only that line is exempt.

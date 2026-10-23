@@ -83,9 +83,9 @@ internal static class AdminEndpoints
     {
         var permissions = providers
             .SelectMany(provider => provider.GetPermissions())
-            .DistinctBy(permission => permission.Name)
-            .GroupBy(permission => permission.Group)
-            .Select(group => new PermissionGroup(group.Key, [.. group.OrderBy(permission => permission.Name)]))
+            .DistinctBy(permission => permission.Name, StringComparer.Ordinal)
+            .GroupBy(permission => permission.Group, StringComparer.Ordinal)
+            .Select(group => new PermissionGroup(group.Key, [.. group.OrderBy(permission => permission.Name, StringComparer.Ordinal)]))
             .ToArray();
 
         return TypedResults.Ok(permissions);
@@ -118,7 +118,7 @@ internal static class AdminEndpoints
             var result = await users.AddToRoleAsync(user, request.Role);
             if (!result.Succeeded)
             {
-                return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+                return TypedResults.ValidationProblem(new Dictionary<string, string[]>(StringComparer.Ordinal)
                 {
                     ["role"] = result.Errors.Select(error => error.Description).ToArray()
                 });

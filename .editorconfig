@@ -28,6 +28,10 @@ dotnet_diagnostic.IDE0060.severity = warning
 dotnet_diagnostic.CA1502.severity = warning
 dotnet_diagnostic.CA1505.severity = warning
 dotnet_diagnostic.CA1506.severity = warning
+# MA0048 (one type per file, named after it) is off: related types share a file on purpose here (an options type and its
+# validator, an exception family, an entity and its status enum), and migration files carry a timestamp. User-approved,
+# Meziantou isn't a Microsoft analyzer (docs/plan/DECISIONS.md Y-44, Q-50).
+dotnet_diagnostic.MA0048.severity = none
 
 [src/BuildingBlocks/**.cs]
 # Unnecessary usings. The build reports IDE0005 only where it generates XML documentation, which only the packages do;
@@ -45,9 +49,12 @@ dotnet_diagnostic.CA1707.severity = none
 # ASP.NET Core, so they keep the rule and call ConfigureAwait(false).
 [{src/Api/**.cs,src/Modules/**.cs,tests/**.cs}]
 dotnet_diagnostic.CA2007.severity = none
+# Meziantou's MA0004 is the same rule; off where CA2007 is, for the same reason (user-approved, Q-50).
+dotnet_diagnostic.MA0004.severity = none
 
 [{src/BuildingBlocks/NovaCore.AspNetCore/**.cs,src/BuildingBlocks/NovaCore.Identity.OpenIddict/**.cs}]
 dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.MA0004.severity = none
 
 [src/**/Migrations/*.cs]
 # EF Core migrations pass constant column arrays (composite indexes). Up/Down run once per database and the builder keeps
@@ -55,6 +62,8 @@ dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.CA1861.severity = none
 # dotnet ef writes migrations with a byte order mark; dotnet format checks the charset.
 charset = utf-8-bom
+# A migration's Up/Down is generated and as long as the model change (MA0051, user-approved, Q-50).
+dotnet_diagnostic.MA0051.severity = none
 
 [*.{csproj,props,targets}]
 indent_size = 2
