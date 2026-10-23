@@ -16,8 +16,9 @@ Where this file's Architecture/Standards sections disagree with `DECISIONS.md`, 
 completed phases update this file.
 
 - **Phase work starts only via `/novacore-phase <id>`** (project skill, user-invoked), one phase per fresh
-  session. When a phase ends, **stop**. "devam"/"continue" means "next step inside the approved phase
-  plan", never "start the next phase".
+  session. When a phase ends, **stop**. A phase merges through a `faz/...` → `main` pull request that CodeRabbit
+  reviews (advisory, `.coderabbit.yaml`, D-067); the merge itself still waits for the user. "devam"/"continue"
+  means "next step inside the approved phase plan", never "start the next phase".
 - **Never implement anything in DECISIONS.md → "Yapılmayacaklar"**, not even as a design suggestion. If one
   seems necessary, stop and ask with the reason and a source.
 - **Counter the "most typical answer" pull (Y-40…Y-43, applies to every session, not only phase work):**
@@ -72,6 +73,7 @@ bash eng/check-openapi.sh [base-revision]     # breaking changes in docs/openapi
 bash eng/mutation.sh                          # Stryker.NET on the abstractions and domain code, a report (D-063)
 bash eng/lint-workflows.sh [dir ...]          # actionlint + zizmor on .github (Docker; GH_TOKEN enables online audits)
 bash eng/find-unused.sh                       # unused internal/private types, fields, constants (Roslynator, D-066)
+coderabbit review --agent --uncommitted --include-untracked   # CodeRabbit CLI review of local changes (D-067; `coderabbit auth login` first)
 dotnet format NovaCore.slnx                   # fixes what CI's `dotnet format --verify-no-changes` reports
 git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release
