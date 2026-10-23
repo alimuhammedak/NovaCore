@@ -44,15 +44,6 @@
     <None Include="$(MSBuildThisFileDirectory)src/PACKAGE.md" Pack="true" PackagePath="README.md" Visible="false" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(NovaCoreLibraryPackage)' == 'true'">
-    <!--
-      The public API baseline read by Microsoft.CodeAnalysis.PublicApiAnalyzers. The package doesn't add these itself
-      (checked in its buildTransitive files, R-037). Everything goes to Unshipped until a release is declared (F5.4).
-    -->
-    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
-    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
-  </ItemGroup>
-
   <!--
     XML docs can't be switched on from here (the SDK has already computed DocumentationFile, R-040), so each packable
     .csproj sets GenerateDocumentationFile itself. This check stops a new package from shipping without docs.
@@ -63,8 +54,10 @@
   </Target>
 
   <!--
-    The PublicAPI.*.txt files above are only checked when the project references the analyzer. Without it, a new package
-    would silently ship an untracked public API, so a packable project without the reference fails the build (D-020).
+    The analyzer reads the project's PublicAPI.Shipped.txt and PublicAPI.Unshipped.txt (its buildTransitive targets add
+    them, docs/plan/RESEARCH.md R-118; everything goes to Unshipped until a release is declared, F5.4). Without the
+    reference, a new package would silently ship an untracked public API, so a packable project without it fails the
+    build (D-020).
   -->
   <Target Name="NovaCoreRequirePublicApiTracking" BeforeTargets="CoreCompile" Condition="'$(NovaCoreLibraryPackage)' == 'true'">
     <ItemGroup>
