@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MyService.Modules.Todos.Authorization;
@@ -23,20 +22,11 @@ public sealed class TodosModule : IModule
 
     public IServiceCollection AddModule(IServiceCollection services, IConfiguration configuration)
     {
-        // Also adds the outbox interceptor and a "ready" health check for the context.
-        services.AddModuleDbContext<TodosDbContext>((serviceProvider, options) =>
-        {
-            options.UseSqlServer(
-                configuration.GetConnectionString("Database"),
-                sql =>
-                {
-                    sql.MigrationsHistoryTable("__EFMigrationsHistory", TodosDbContext.Schema);
-                    sql.EnableRetryOnFailure();
-                });
-
-            // Stamps CreatedBy/CreatedAtUtc/ModifiedBy/ModifiedAtUtc on every save.
-            options.AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>());
-        });
+        // The database is the host's choice (AddModuleDatabase in Program.cs); the module brings its schema, which also
+        // keeps its migration history, and its interceptors. Also adds the outbox interceptor and a "ready" health check
+        // for the context. The audit interceptor stamps CreatedBy/CreatedAtUtc/ModifiedBy/ModifiedAtUtc on every save.
+        services.AddModuleDbContext<TodosDbContext>(TodosDbContext.Schema, (serviceProvider, options) =>
+            options.AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>()));
 
         services.AddPermissionDefinitions<TodosPermissionProvider>();
 

@@ -10,10 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-    <!-- Lifts SqlClient's vulnerable System.Security.Cryptography.Pkcs (see Directory.Packages.props). -->
-    <PackageReference Include="System.Security.Cryptography.Pkcs" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
     <PackageReference Include="Riok.Mapperly" />
   </ItemGroup>
 

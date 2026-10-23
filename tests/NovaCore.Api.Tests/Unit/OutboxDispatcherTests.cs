@@ -307,10 +307,11 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
         builder.Services.AddSingleton<TimeProvider>(_clock);
         builder.Services.AddSingleton(_log);
         builder.AddCorePersistence();
-        builder.Services.AddModuleDbContext<ShopDbContext>((_, options) => options
-            .UseSqlite(_database.ConnectionString, sqlite)
-            .ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>()
-            .AddInterceptors(interceptors));
+        builder.Services
+            .AddModuleDatabase((_, options) => options
+                .UseSqlite(_database.ConnectionString, sqlite)
+                .ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>())
+            .AddModuleDbContext<ShopDbContext>("shop", (_, options) => options.AddInterceptors(interceptors));
         registerHandlers(builder.Services);
         builder.ConfigureContainer(new DefaultServiceProviderFactory(new ServiceProviderOptions { ValidateScopes = true }));
 

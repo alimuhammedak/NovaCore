@@ -1191,12 +1191,9 @@
         "dependencies": {
           "BMD.NovaCore.AspNetCore": "[0.1.0, )",
           "BMD.NovaCore.EntityFrameworkCore": "[0.1.0, )",
-          "Microsoft.EntityFrameworkCore.Design": "[10.0.12, )",
-          "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.12, )",
           "NovaCore.Modules.Catalog.Contracts": "[0.1.0, )",
           "NovaCore.Modules.Payments.Contracts": "[0.1.0, )",
-          "Riok.Mapperly": "[4.3.1, )",
-          "System.Security.Cryptography.Pkcs": "[10.0.13, )"
+          "Riok.Mapperly": "[4.3.1, )"
         }
       },
       "novacore.modules.catalog.contracts": {
@@ -1210,12 +1207,9 @@
         "dependencies": {
           "BMD.NovaCore.AspNetCore": "[0.1.0, )",
           "BMD.NovaCore.EntityFrameworkCore": "[0.1.0, )",
-          "Microsoft.EntityFrameworkCore.Design": "[10.0.12, )",
-          "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.12, )",
           "NovaCore.Modules.Catalog.Contracts": "[0.1.0, )",
           "NovaCore.Modules.Payments.Contracts": "[0.1.0, )",
-          "Riok.Mapperly": "[4.3.1, )",
-          "System.Security.Cryptography.Pkcs": "[10.0.13, )"
+          "Riok.Mapperly": "[4.3.1, )"
         }
       },
       "novacore.modules.payments.contracts": {

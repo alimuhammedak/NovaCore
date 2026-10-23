@@ -46,11 +46,11 @@ for auth in BuiltIn External; do
   (
     cd "$project"
     dotnet tool restore
-    module="src/Modules/Todos/$name.Modules.Todos"
-    dotnet ef migrations has-pending-model-changes --project "$module" --startup-project "$module" \
+    api="src/Api/$name.Api"
+    dotnet ef migrations has-pending-model-changes --project "$api" --startup-project "$api" \
       --context TodosDbContext --configuration Release --no-build
     if [[ "$auth" == BuiltIn ]]; then
-      dotnet ef migrations has-pending-model-changes --project "src/Api/$name.Api" --startup-project "src/Api/$name.Api" \
+      dotnet ef migrations has-pending-model-changes --project "$api" --startup-project "$api" \
         --context IdentityServerDbContext --configuration Release --no-build
     fi
   )

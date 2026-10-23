@@ -9,11 +9,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The identity provider's store runs on SQL Server; its migrations live in this project (docs/plan/RESEARCH.md R-060). -->
+    <!--
+      The host chooses the database of every module context (AddModuleDatabase): SQL Server. Their migrations live in
+      this project, the modules' and the identity provider's (docs/plan/DECISIONS.md D-073, RESEARCH R-060).
+    -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <!-- Lifts SqlClient's vulnerable System.Security.Cryptography.Pkcs (see Directory.Packages.props). -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
-    <!-- Dev-only: lets `dotnet ef` use the Api as a startup project when needed. -->
+    <!-- Dev-only: lets `dotnet ef` use the Api as the startup project for every context's migrations. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

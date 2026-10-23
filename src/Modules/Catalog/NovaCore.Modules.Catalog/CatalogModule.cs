@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Abstractions.Messaging;
@@ -27,19 +26,10 @@ public sealed class CatalogModule : IModule
 
     public IServiceCollection AddModule(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddModuleDbContext<CatalogDbContext>((serviceProvider, options) =>
-        {
-            options.UseSqlServer(
-                configuration.GetConnectionString("Database"),
-                sql =>
-                {
-                    sql.MigrationsHistoryTable("__EFMigrationsHistory", CatalogDbContext.Schema);
-                    sql.EnableRetryOnFailure();
-                });
-
-            // Auditing (CreatedBy/ModifiedAt) is stamped centrally for every module.
-            options.AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>());
-        });
+        // The database is the host's choice (AddModuleDatabase); the module brings its schema and its interceptors.
+        // Auditing (CreatedBy/ModifiedAt) is stamped centrally for every module.
+        services.AddModuleDbContext<CatalogDbContext>(CatalogDbContext.Schema, (serviceProvider, options) =>
+            options.AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>()));
 
         // The module's public, in-process API for other modules.
         services.AddScoped<IProductCatalog, ProductCatalog>();

@@ -23,7 +23,9 @@ public class DatabaseMigrationServiceTests
 
         var builder = Host.CreateApplicationBuilder();
         builder.AddCorePersistence();
-        builder.Services.AddModuleDbContext<SampleDbContext>((_, options) => options.UseSqlite(connection));
+        builder.Services
+            .AddModuleDatabase((_, options) => options.UseSqlite(connection))
+            .AddModuleDbContext<SampleDbContext>("sample", (_, _) => { });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["Database:ApplyMigrations"] = applyMigrations ? "true" : "false"

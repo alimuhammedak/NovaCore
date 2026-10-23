@@ -101,7 +101,8 @@ public sealed class OutboxInterceptorTests : IDisposable
         where TContext : DbContext
     {
         var services = new ServiceCollection()
-            .AddModuleDbContext<TContext>((_, options) => options.UseSqlite(_connection))
+            .AddModuleDatabase((_, options) => options.UseSqlite(_connection))
+            .AddModuleDbContext<TContext>("shop", (_, _) => { })
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
 
         await using var scope = services.CreateAsyncScope();
