@@ -2,7 +2,7 @@ using NovaCore.Modules.Payments.Contracts;
 using NovaCore.Modules.Payments.Domain;
 using Xunit;
 
-namespace NovaCore.Api.Tests.Unit;
+namespace NovaCore.Domain.Tests;
 
 /// <summary>
 /// PLAN F4b.2 (D-034, D-035 (4)): a payment starts pending and asks for its stock with <see cref="PaymentCreated"/>. The

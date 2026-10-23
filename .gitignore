@@ -17,6 +17,7 @@ x86/
 
 ## Build / test output
 TestResults/
+StrykerOutput/
 artifacts/
 *.trx
 coverage*.json

@@ -1,7 +1,7 @@
 using NovaCore.Abstractions.Messaging;
 using Xunit;
 
-namespace NovaCore.Api.Tests.Unit;
+namespace NovaCore.Domain.Tests;
 
 public class DomainEventTests
 {

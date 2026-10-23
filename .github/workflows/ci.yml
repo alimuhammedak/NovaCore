@@ -55,7 +55,7 @@ jobs:
 
       # Without coverage: coverlet instruments the built assemblies, and these tests inspect their references.
       - name: Architecture tests
-        run: dotnet test --solution NovaCore.slnx -c Release --no-build -- --filter-namespace NovaCore.Api.Tests.Architecture
+        run: dotnet test --project tests/NovaCore.Api.Tests -c Release --no-build -- --filter-namespace NovaCore.Api.Tests.Architecture
 
       # Each module owns a DbContext, and the host owns the identity provider's; a model change without a migration
       # fails here.

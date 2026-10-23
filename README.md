@@ -288,6 +288,7 @@ Repo public'tir (DECISIONS D-042). Kararlar D-048, D-051 ve D-052'de; kaynaklar 
 | Secret taraması | `ci.yml` → `secret-scan` | Betterleaks 1.9.0, bütün geçmiş, `.betterleaks.toml` |
 | Workflow denetimi | `ci.yml` → `workflow-lint` | actionlint + zizmor, digest'e sabit imajlarla (`eng/lint-workflows.sh`) |
 | Statik analiz | `codeql.yml` | C#, manual build (kaynak üreteçlerinin kodu da analiz edilir); uyarılar Security sekmesinde |
+| Mutation testi | `mutation.yml` | Haftalık ve elle: Stryker.NET, `NovaCore.Abstractions` ve modüllerin `Domain/` kodu, `NovaCore.Domain.Tests`'e karşı; skor job özetinde, raporlar artifact (`eng/mutation.sh`, D-063) |
 | Tedarik zinciri puanı | `scorecard.yml` | OpenSSF Scorecard, main'e push'ta ve haftalık |
 | Güncellemeler | `.github/dependabot.yml` | NuGet, action'lar, SDK, compose imajları; 7 gün bekleme |
 | Yayın | `release.yml` | `build` ve `publish` ayrı job'lar; `publish` `release` environment'ında onay bekler |
@@ -300,6 +301,7 @@ dotnet restore NovaCore.slnx --locked-mode          # CI'ın yaptığı kontrol
 bash eng/check-licenses.sh                           # her paket MIT/Apache-2.0 (Microsoft ve Polly istisnası: D-052)
 bash eng/check-coverage.sh [--update]                # testler coverage'la, baseline'a karşı (önce Release build; Docker gerekir)
 bash eng/check-openapi.sh                            # docs/openapi/v1.json'da main'e göre kırıcı değişiklik (oasdiff, Docker)
+bash eng/mutation.sh                                 # Stryker.NET mutation raporu, ~2 dk (StrykerOutput/)
 bash eng/lint-workflows.sh                           # Docker gerekir; GH_TOKEN varsa zizmor online denetimleri de yapar
 
 # Opt-in: staged değişiklikler commit'ten önce taranır (Betterleaks 1.9.0 PATH'te olmalı)
@@ -830,7 +832,8 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
   `decimal`, `DateTimeOffset` sıralaması) gerçek bir SQL Server'da sınar. Testcontainers, `docker-compose.yml`'deki imajla
   koşu başına bir container açar; Api host'u migration'ları açılışta üretimdeki gibi uygular. Docker yoksa bu testler
   atlanır; CI `--fail-skips on` ile koşar, orada atlanan test koşuyu kırar.
-- **Unit:** `Result<T>`, `PaginationRequest`/`PagedList<T>` davranışları.
+- **Domain (`NovaCore.Domain.Tests`):** `Result<T>`, `PaginationRequest`/`PagedList<T>`, `Payment`, `Product`, domain
+  event'leri; host'suz, saniyeler içinde. CsCheck property testleri ve haftalık mutation testi bu projede.
 - **Integration:** gerçek host'u `WebApplicationFactory` ile ayağa kaldırır; her DbContext testte **in-memory
   SQLite**'a takılır. Token'ları bellek içi bir OpenID Connect issuer'ı (`TestIdentityProvider`) üretir.
 - **Outbox:** event'in entity ile aynı transaction'da yazıldığı (iki yönlü rollback) ve bir mesajın her handler'a bir

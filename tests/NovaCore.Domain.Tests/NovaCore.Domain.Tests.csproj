@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pure logic tests of the core abstractions and the modules' domain code: no host, no database, no Docker. Fast, so
+    they are what mutation testing runs against (eng/mutation.sh, docs/plan/DECISIONS.md D-063).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="CsCheck" />
+    <PackageReference Include="coverlet.MTP" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BuildingBlocks\NovaCore.Abstractions\NovaCore.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\BuildingBlocks\NovaCore.AspNetCore\NovaCore.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\NovaCore.Modules.Catalog\NovaCore.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Payments\NovaCore.Modules.Payments\NovaCore.Modules.Payments.csproj" />
+  </ItemGroup>
+
+</Project>

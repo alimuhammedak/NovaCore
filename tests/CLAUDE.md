@@ -7,12 +7,21 @@ Stack: **xUnit v3 4.x on Microsoft.Testing.Platform** (test projects are `Output
 `dotnet test -- --filter-method "*.ClassName.MethodName"` (`--filter-class "*.ClassName"` for a class; `*` only at the
 start or end). xUnit's options go after `--`; a solution goes through `--solution`.
 
-## Three flavors, one project
+## Two projects
 
-- **Unit** (`Unit/`) — pure logic (`Result<T>`, pagination), and building blocks on a small generic host of their own
-  (`Host.CreateApplicationBuilder`, never the Api): startup migrations and the outbox. `*PropertyTests` check rules over
-  generated inputs and operation sequences with CsCheck (a failure prints the seed that reproduces it:
-  `Sample(..., seed: "...")`); a property test that goes to a database limits its own samples (`iter`, `threads: 1`).
+- **`NovaCore.Domain.Tests`** — pure logic of the core abstractions and the modules' domain code (`Result<T>`,
+  pagination, `Payment`, `Product`, domain events): no host, no database, no Docker, a few seconds. It is what mutation
+  testing runs against (`bash eng/mutation.sh`, below), so a test of that code belongs here. `*PropertyTests` check rules
+  over generated inputs and operation sequences with CsCheck (a failure prints the seed that reproduces it:
+  `Sample(..., seed: "...")`); give a generator the boundary values too (`Gen.OneOf(Gen.Int, Gen.Int[-2, 3])`), random
+  ones rarely hit them.
+- **`NovaCore.Api.Tests`** — everything that needs a host, in three flavors below. A property test there that goes to a
+  database limits its own samples (`iter`, `threads: 1`, `StockReservationPropertyTests`).
+
+### `NovaCore.Api.Tests`: three flavors
+
+- **Unit** (`Unit/`) — building blocks on a small generic host of their own (`Host.CreateApplicationBuilder`, never the
+  Api): startup migrations and the outbox.
 - **Integration** (`Integration/`) — boot the real host via `NovaCoreApiFactory` (`WebApplicationFactory`).
   DB-free tests (health, OpenAPI, security headers, 401/validation gates) need no seeding. A caller with specific roles
   comes from `factory.CreateClientWithClaims(...)`: the factory's in-memory issuer (`factory.IdentityProvider`, see
@@ -73,10 +82,18 @@ contract change into the same commit (run the tests again, then commit the file)
 file with the base revision's (`eng/check-openapi.sh`, oasdiff): a breaking change fails unless a line of
 `eng/openapi-breaking-accepted.txt` accepts it.
 
+## Mutation testing
+
+`bash eng/mutation.sh` (weekly in `mutation.yml`) runs Stryker.NET with its Microsoft.Testing.Platform runner (preview)
+against `NovaCore.Domain.Tests`: `NovaCore.Abstractions` and the `Domain/` folders of Catalog and Payments, about two
+minutes. The score is a report (`--break-at 0`); the html reports are in `StrykerOutput/<project>/reports`. A surviving
+mutant is a change no test noticed. Against `NovaCore.Api.Tests` it is impractical: the runner captures coverage one test
+at a time, and those tests start hosts (docs/plan/RESEARCH.md R-116).
+
 ## Coverage
 
-`bash eng/check-coverage.sh` (CI's "Test with coverage" step) runs the tests with coverlet.MTP over the `NovaCore.*`
-assemblies (not the tests, not the migrations) and fails when line or branch coverage falls more than its tolerance below
+`bash eng/check-coverage.sh` (CI's "Test with coverage" step) runs both test projects with coverlet.MTP over the
+`NovaCore.*` assemblies (not the tests, not the migrations) and fails when line or branch coverage falls more than its tolerance below
 `eng/coverage-baseline.txt`, the coverage main reached. Raise the baseline with `--update` when a change raises the
 coverage, and commit it with the change. The architecture tests run in a step of their own, without coverage: coverlet
 instruments the built assemblies in place (an instrumented assembly references `netstandard`), and those tests read the

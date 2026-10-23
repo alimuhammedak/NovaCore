@@ -1,7 +1,7 @@
 using NovaCore.Modules.Catalog.Domain;
 using Xunit;
 
-namespace NovaCore.Api.Tests.Unit;
+namespace NovaCore.Domain.Tests;
 
 /// <summary>
 /// PLAN F4b.2 (D-035): a payment's stock comes out of its product through <see cref="Product.RemoveStock"/>. Stock never

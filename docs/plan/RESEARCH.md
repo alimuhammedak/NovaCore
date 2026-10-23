@@ -1145,3 +1145,14 @@ Biçim:
   - `Result<T>`, `ToHttpResult` (her `ErrorType` için durum, `detail`, `code`), `PagedList` sayıları, `Payment` durum geçişleri, `Product` stok dizileri ve Catalog rezervasyon handler'ının tekrar teslimi (25 örnek, tek iş parçacığı, paylaşılan SQLite host'u) yeşil. Tam takım 388/388, ~5 dk.
 - Kaynak: https://github.com/AnthonyLloyd/CsCheck · https://www.nuget.org/packages/CsCheck/4.9.1 · ölçüm
 - Sonuç: Property testleri `Unit/*PropertyTests` ve `Integration/StockReservationPropertyTests`. `Skip` `long`'da hesaplanıp `int.MaxValue`'da kesiliyor (D-062).
+
+### R-116: Stryker.NET 5.0 ve Microsoft.Testing.Platform runner'ı (2026-10-23, faz 6c; kaynak + ölçüm)
+- Soru: Stryker.NET xUnit v3 4.x + MTP ile koşuyor mu, Abstractions ve modüllerin domain kodu haftalık nasıl mutasyona uğratılır (F6c.7)?
+- Bulgu (kaynak): dotnet-stryker 5.0.0 (Apache-2.0) .NET 10 runtime'ında koşar; `--test-runner mtp` önizlemedir ("may have limitations"); xUnit v3'ün MTP runner'ında `test-case-filter` yok. Çalışma kipleri: test projesinden (`--project` doğrudan referanslardan biri), kaynak projeden (`--test-project`) ya da çözümden (`--solution`). `--mutate` glob alır, `--break-at` 0 iken hiçbir skor koşuyu kırmaz.
+- Ölçüm (yerel, SDK 10.0.300):
+  - Test projesi kipi (`tests/NovaCore.Api.Tests`, `--project NovaCore.Abstractions.csproj`) ve kaynak projesi kipi "No project found" ile durdu: Buildalyzer bu makinede Visual Studio 18 Insiders'ın MSBuild'ini kullanıyor, test projesinin ve Api'nin "simulated build"i düşüyor, Abstractions ise yalnızca geçişli referans.
+  - Çözüm kipi (`--solution NovaCore.slnx`) çalıştı: 388 test bulundu, ilk koşu ~5 dk, Abstractions'ta 46 mutant. Ama test başına coverage yakalaması her testi tek tek koşturuyor ve host açan testler zaman aşımıyla "Dubious" oluyor (6 dakikada 26 test, bitmedi). Coverage'sız ya da toplu coverage'da her mutant tam takımı (~5 dk) koşturur: yalnız Abstractions için ~1 saat.
+  - Saf testler `tests/NovaCore.Domain.Tests`'e taşınınca (37 test, 2–4 sn) test projesi kipi çalıştı: Abstractions 46 mutant, Catalog `Domain/` 14, Payments `Domain/` 10 test edildi; üç koşu toplam ~2 dk 20 sn. İlk skorlar %69,77 / %61,11 / %70,00.
+  - Hayatta kalanlar: `PagedList.HasPreviousPage`/`HasNextPage` ve `pageSize = 1` sınırları (rastgele üreteçler sınırlara nadiren düşüyordu), sınanmayan `Result.Failure(Error.None)` değişmezi, hata mesajı metinleri, eşdeğer mutantlar (`page < 1` → `page <= 1`). Üreteçlere sınır değerleri ve değişmeze bir test eklenince Abstractions %79,07.
+- Kaynak: https://stryker-mutator.io/docs/stryker-net/configuration/ · https://stryker-mutator.io/docs/stryker-net/operating-modes/ · https://github.com/stryker-mutator/stryker-net/releases · ölçüm
+- Sonuç: `eng/mutation.sh` üç hedefi `tests/NovaCore.Domain.Tests`'e karşı koşturur (`--break-at 0`, html/markdown/json); `mutation.yml` haftalık + `workflow_dispatch`. D-063.

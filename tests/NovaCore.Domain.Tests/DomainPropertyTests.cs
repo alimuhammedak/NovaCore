@@ -3,7 +3,7 @@ using NovaCore.Modules.Catalog.Domain;
 using NovaCore.Modules.Payments.Domain;
 using Xunit;
 
-namespace NovaCore.Api.Tests.Unit;
+namespace NovaCore.Domain.Tests;
 
 /// <summary>
 /// The domain rules the reservation flow depends on, over generated sequences of operations (CsCheck) checked against a

@@ -1,0 +1,48 @@
+name: Mutation
+
+# Mutation testing with Stryker.NET (docs/plan/DECISIONS.md D-063): how many small changes to the core abstractions and
+# the modules' domain code the domain tests notice. A report, not a gate yet (--break-at 0): weekly and on demand, with
+# the score in the job summary and the html reports as an artifact.
+on:
+  schedule:
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+# A run is never cancelled by another: it is a weekly report.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  stryker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore NovaCore.slnx --locked-mode
+
+      - name: Mutation testing
+        run: bash eng/mutation.sh
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: mutation-report
+          path: StrykerOutput/*/reports/
+          retention-days: 30

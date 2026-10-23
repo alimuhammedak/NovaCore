@@ -80,6 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `xunit.runner.visualstudio` are gone. Run one test with `dotnet test -- --filter-method "*.Class.Method"`.
 - The Api's OpenAPI document is committed (`docs/openapi/v1.json`, kept current by a test) and CI fails on a breaking
   change against main's unless it is accepted in `eng/openapi-breaking-accepted.txt` (oasdiff).
+- A weekly mutation testing run (Stryker.NET, `mutation.yml`) reports how many small changes to the core abstractions and
+  the modules' domain code the tests catch. Those tests moved to a host-free project, `tests/NovaCore.Domain.Tests`.
 - CI holds the line and branch coverage of the NovaCore assemblies to `eng/coverage-baseline.txt` (coverlet.MTP,
   ReportGenerator; `eng/check-coverage.sh`).
 - Template: the generated test project runs on Microsoft.Testing.Platform with xUnit v3 4.0.2 too (`global.json`

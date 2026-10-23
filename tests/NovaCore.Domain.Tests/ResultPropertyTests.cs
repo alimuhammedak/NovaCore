@@ -4,7 +4,7 @@ using NovaCore.Abstractions.Results;
 using NovaCore.AspNetCore.Http;
 using Xunit;
 
-namespace NovaCore.Api.Tests.Unit;
+namespace NovaCore.Domain.Tests;
 
 /// <summary>
 /// <see cref="Result{T}"/> and its HTTP translation over generated values and errors (CsCheck): a result holds a value or

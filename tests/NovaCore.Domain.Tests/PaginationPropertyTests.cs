@@ -2,7 +2,7 @@ using CsCheck;
 using NovaCore.Abstractions.Pagination;
 using Xunit;
 
-namespace NovaCore.Api.Tests.Unit;
+namespace NovaCore.Domain.Tests;
 
 /// <summary>
 /// Pagination arithmetic over every input the query string can carry (CsCheck): a request is always a valid page, and a
@@ -13,12 +13,17 @@ public sealed class PaginationPropertyTests
     [Fact]
     public void Any_page_and_size_become_a_valid_request_whose_offset_skips_the_pages_before_it()
     {
-        Gen.Select(Gen.Int, Gen.Int).Sample((page, pageSize) =>
+        // Any int, with the values around the bounds often enough to land on them.
+        var pages = Gen.OneOf(Gen.Int, Gen.Int[-2, 3]);
+        var sizes = Gen.OneOf(Gen.Int, Gen.Int[-2, 3], Gen.Int[PaginationRequest.MaxPageSize - 2, PaginationRequest.MaxPageSize + 2]);
+
+        Gen.Select(pages, sizes).Sample((page, pageSize) =>
         {
             var request = new PaginationRequest(page, pageSize);
 
-            Assert.InRange(request.Page, 1, int.MaxValue);
-            Assert.InRange(request.PageSize, 1, PaginationRequest.MaxPageSize);
+            Assert.Equal(page < 1 ? 1 : page, request.Page);
+            Assert.Equal(pageSize < 1 ? PaginationRequest.DefaultPageSize : Math.Min(pageSize, PaginationRequest.MaxPageSize),
+                request.PageSize);
             Assert.Equal(Math.Min((request.Page - 1L) * request.PageSize, int.MaxValue), request.Skip);
         });
     }
@@ -26,7 +31,8 @@ public sealed class PaginationPropertyTests
     [Fact]
     public void A_pages_counts_agree_with_the_total()
     {
-        Gen.Select(Gen.Int[1, 10_000], Gen.Int[1, PaginationRequest.MaxPageSize], Gen.Long[0, 1_000_000_000])
+        // Small numbers, so the first and the last page come up often.
+        Gen.Select(Gen.Int[1, 12], Gen.Int[1, 10], Gen.Long[0, 100])
             .Sample((page, pageSize, totalCount) =>
             {
                 var list = new PagedList<int>([], page, pageSize, totalCount);

@@ -26,5 +26,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NovaCore.Api.Tests/NovaCore.Api.Tests.csproj" />
+    <Project Path="tests/NovaCore.Domain.Tests/NovaCore.Domain.Tests.csproj" />
   </Folder>
 </Solution>

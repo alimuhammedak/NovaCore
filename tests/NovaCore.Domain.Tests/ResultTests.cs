@@ -1,7 +1,7 @@
 using NovaCore.Abstractions.Results;
 using Xunit;
 
-namespace NovaCore.Api.Tests.Unit;
+namespace NovaCore.Domain.Tests;
 
 public class ResultTests
 {
@@ -58,6 +58,13 @@ public class ResultTests
     public void Constructing_success_with_an_error_is_an_invariant_violation()
     {
         Assert.Throws<InvalidOperationException>(() => new BrokenResult());
+    }
+
+    [Fact]
+    public void A_failure_without_an_error_is_an_invariant_violation()
+    {
+        Assert.Throws<InvalidOperationException>(() => Result.Failure(Error.None));
+        Assert.Throws<InvalidOperationException>(() => Result.Failure<int>(Error.None));
     }
 
     // Success must carry Error.None; passing a real error must throw.

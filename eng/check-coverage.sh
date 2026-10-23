@@ -4,9 +4,9 @@
 # by more than the run-to-run noise (TOLERANCE). The baseline is what main reached; a change that raises the coverage can
 # write the new values with --update and commit the file with it. Lowering it is an edit of that file, visible in the diff.
 #
-# The architecture tests run without coverage (a separate `dotnet test`): coverlet instruments the built assemblies in
-# place, and those tests inspect the built assemblies' references. The SQL Server tests are part of the baseline, so
-# without Docker (they skip) the run fails (--fail-skips on).
+# The architecture tests run without coverage (a separate `dotnet test --project tests/NovaCore.Api.Tests`): coverlet
+# instruments the built assemblies in place, and those tests inspect the built assemblies' references. The SQL Server
+# tests are part of the baseline, so without Docker (they skip) the run fails (--fail-skips on).
 #
 # Usage: eng/check-coverage.sh [configuration] [--update]   (build first; the configuration defaults to Release)
 set -euo pipefail
@@ -30,7 +30,7 @@ rm -rf "$results"
 dotnet test --solution NovaCore.slnx -c "$configuration" --no-build --results-directory "$results" -- \
   --fail-skips on --filter-not-namespace NovaCore.Api.Tests.Architecture \
   --coverlet --coverlet-output-format cobertura \
-  --coverlet-include "[NovaCore.*]*" --coverlet-exclude "[NovaCore.Api.Tests]*" \
+  --coverlet-include "[NovaCore.*]*" --coverlet-exclude "[*.Tests]*" \
   --coverlet-exclude-by-file "**/Migrations/*.cs"
 
 dotnet tool restore > /dev/null
