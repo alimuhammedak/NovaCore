@@ -1,0 +1,4 @@
+# Text files are stored with LF and checked out with the platform's line endings (core.eol defaults to native), whatever
+# a machine's core.autocrlf says. dotnet format writes the line breaks it touches with the platform's line ending, as
+# .editorconfig sets no end_of_line, so a checkout must match it (docs/plan/DECISIONS.md D-065).
+* text=auto
