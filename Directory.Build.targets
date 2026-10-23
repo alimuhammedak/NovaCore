@@ -45,6 +45,18 @@
   </ItemGroup>
 
   <!--
+    Banned APIs for the code under src/ (RS0030, docs/plan/DECISIONS.md D-066): src/BannedSymbols.txt everywhere, the
+    static clocks of BannedSymbols.Clock.txt everywhere but NovaCore.Abstractions, which holds the one exception (D-021).
+    The template package compiles nothing. PackageType comes from the .csproj, hence here and not in the props.
+  -->
+  <ItemGroup Condition="$(MSBuildProjectDirectory.StartsWith('$(MSBuildThisFileDirectory)src')) And '$(PackageType)' != 'Template'">
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)src/BannedSymbols.txt" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)src/BannedSymbols.Clock.txt"
+                     Condition="'$(MSBuildProjectName)' != 'NovaCore.Abstractions'" />
+  </ItemGroup>
+
+  <!--
     XML docs can't be switched on from here (the SDK has already computed DocumentationFile, R-040), so each packable
     .csproj sets GenerateDocumentationFile itself. This check stops a new package from shipping without docs.
   -->

@@ -1,0 +1,16 @@
+// APIs the code under src/ must not call (Microsoft.CodeAnalysis.BannedApiAnalyzers, RS0030; docs/plan/DECISIONS.md D-066).
+// The static clocks are in BannedSymbols.Clock.txt. Each overload is an entry of its own.
+
+// Library code takes no host decisions (Y-24): it logs through ILogger and leaves the process to the host.
+T:System.Console;Log through ILogger: the host decides where output goes (Y-24)
+M:System.Environment.Exit(System.Int32);Leave the process to the host: throw or return a Result (Y-24)
+
+// A second container duplicates singletons and is never disposed (Y-24): resolve from the host's provider.
+M:Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(Microsoft.Extensions.DependencyInjection.IServiceCollection);Resolve from the host's provider, don't build a second one (Y-24)
+M:Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Boolean);Resolve from the host's provider, don't build a second one (Y-24)
+M:Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(Microsoft.Extensions.DependencyInjection.IServiceCollection,Microsoft.Extensions.DependencyInjection.ServiceProviderOptions);Resolve from the host's provider, don't build a second one (Y-24)
+
+// An HttpClient per call exhausts sockets and misses DNS changes (Y-30): IHttpClientFactory or a typed client.
+M:System.Net.Http.HttpClient.#ctor;Use IHttpClientFactory or a typed client (Y-30)
+M:System.Net.Http.HttpClient.#ctor(System.Net.Http.HttpMessageHandler);Use IHttpClientFactory or a typed client (Y-30)
+M:System.Net.Http.HttpClient.#ctor(System.Net.Http.HttpMessageHandler,System.Boolean);Use IHttpClientFactory or a typed client (Y-30)

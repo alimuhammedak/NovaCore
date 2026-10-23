@@ -1,0 +1,8 @@
+// The static clocks (PLAN F2b.3): code reads the time from an injected TimeProvider, which tests replace with a fake.
+// Every project under src/ gets this file except NovaCore.Abstractions, whose DomainEvent.OccurredOnUtc default is the
+// one exception (docs/plan/DECISIONS.md D-021 (6)); SourceHygieneTests covers that project, and the rest, by text.
+P:System.DateTime.Now;Read the time from the injected TimeProvider
+P:System.DateTime.UtcNow;Read the time from the injected TimeProvider
+P:System.DateTime.Today;Read the time from the injected TimeProvider
+P:System.DateTimeOffset.Now;Read the time from the injected TimeProvider
+P:System.DateTimeOffset.UtcNow;Read the time from the injected TimeProvider

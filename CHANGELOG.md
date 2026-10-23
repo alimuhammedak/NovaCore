@@ -104,6 +104,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   complexity or coupling (Microsoft's default code metric thresholds) fail the build. CI checks the formatting
   (`dotnet format --verify-no-changes`); `.editorconfig` no longer sets `end_of_line`, and `.gitattributes` checks text
   files out with the platform's line endings.
+- The code under `src/` can't call the static clocks (`DateTime.UtcNow` and the like, except `DomainEvent`'s default),
+  `Console`, `Environment.Exit`, `BuildServiceProvider` or an `HttpClient` constructor: BannedApiAnalyzers reports them
+  (`src/BannedSymbols*.txt`).
 - Template: the generated project runs the same Security, Reliability, Performance and Usage rules, the dead-code
   rules and the code metric rules (CA2007, CA1812, and CA1506 in `Program.cs`, stay off: the project is ASP.NET Core
   application code). Its tests pass `Uri` objects to `HttpClient`.
