@@ -228,7 +228,7 @@ Gereksinim: **.NET 10 SDK**, tam olarak `global.json`'daki sürüm (10.0.300; `r
 **SQL Server** (yerel instance, Windows auth — bkz. `appsettings.json`).
 
 ```bash
-# 1) Bağımlılıkları derle + test et (veritabanı GEREKMEZ — testler SQLite kullanır)
+# 1) Bağımlılıkları derle + test et (SQL Server kurulumu GEREKMEZ: testler SQLite kullanır, SQL Server katmanı Docker'da koşar)
 dotnet build
 dotnet test
 
@@ -282,11 +282,13 @@ Repo public'tir (DECISIONS D-042). Kararlar D-048, D-051 ve D-052'de; kaynaklar 
 
 | Ne | Nerede | Not |
 |---|---|---|
-| Build, test, migration kontrolü, açık paket kontrolü | `ci.yml` → `build-and-test` | Restore `--locked-mode` ile; ardından lisans kapısı (`eng/check-licenses.sh`) |
+| Build, test, migration kontrolü, açık paket kontrolü | `ci.yml` → `build-and-test` | Restore `--locked-mode` ile; ardından lisans kapısı (`eng/check-licenses.sh`). Testler coverage'la koşar: satır ve dal kapsamı `eng/coverage-baseline.txt`'in altına düşerse kırmızı (`eng/check-coverage.sh`, D-060); mimari testler ayrı adımda, coverage'sız |
+| API sözleşmesi | `ci.yml` → `api-contract` | Commit'li `docs/openapi/v1.json` main'dekiyle karşılaştırılır; kırıcı değişiklik `eng/openapi-breaking-accepted.txt`'te kabul edilmediyse kırmızı (oasdiff, `eng/check-openapi.sh`); belgeyi `OpenApiContractTests` güncel tutar |
 | Şablonun tüketici smoke testi | `ci.yml` → `template-smoke` | Üretilen projelerin workflow'ları da lint'lenir |
 | Secret taraması | `ci.yml` → `secret-scan` | Betterleaks 1.9.0, bütün geçmiş, `.betterleaks.toml` |
 | Workflow denetimi | `ci.yml` → `workflow-lint` | actionlint + zizmor, digest'e sabit imajlarla (`eng/lint-workflows.sh`) |
 | Statik analiz | `codeql.yml` | C#, manual build (kaynak üreteçlerinin kodu da analiz edilir); uyarılar Security sekmesinde |
+| Mutation testi | `mutation.yml` | Haftalık ve elle: Stryker.NET, `NovaCore.Abstractions` ve modüllerin `Domain/` kodu, `NovaCore.Domain.Tests`'e karşı; skor job özetinde, raporlar artifact (`eng/mutation.sh`, D-063) |
 | Tedarik zinciri puanı | `scorecard.yml` | OpenSSF Scorecard, main'e push'ta ve haftalık |
 | Güncellemeler | `.github/dependabot.yml` | NuGet, action'lar, SDK, compose imajları; 7 gün bekleme |
 | Yayın | `release.yml` | `build` ve `publish` ayrı job'lar; `publish` `release` environment'ında onay bekler |
@@ -297,6 +299,9 @@ dotnet restore NovaCore.slnx --force-evaluate
 dotnet restore NovaCore.slnx --locked-mode          # CI'ın yaptığı kontrol
 
 bash eng/check-licenses.sh                           # her paket MIT/Apache-2.0 (Microsoft ve Polly istisnası: D-052)
+bash eng/check-coverage.sh [--update]                # testler coverage'la, baseline'a karşı (önce Release build; Docker gerekir)
+bash eng/check-openapi.sh                            # docs/openapi/v1.json'da main'e göre kırıcı değişiklik (oasdiff, Docker)
+bash eng/mutation.sh                                 # Stryker.NET mutation raporu, ~2 dk (StrykerOutput/)
 bash eng/lint-workflows.sh                           # Docker gerekir; GH_TOKEN varsa zizmor online denetimleri de yapar
 
 # Opt-in: staged değişiklikler commit'ten önce taranır (Betterleaks 1.9.0 PATH'te olmalı)
@@ -819,8 +824,16 @@ Alternatif: `Database:ApplyMigrations=true` ile uygulama açılışta tüm modü
 
 ```bash
 dotnet test
+dotnet test -- --filter-class "*.CatalogEndpointsTests"    # tek sınıf (--filter-method: tek test)
 ```
-- **Unit:** `Result<T>`, `PaginationRequest`/`PagedList<T>` davranışları.
+Testler xUnit v3 (4.x) ile **Microsoft.Testing.Platform** üzerinde koşar: `global.json`'daki `test.runner`, `dotnet test`'i
+MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri `--`'dan sonra gelir.
+- **SQL Server katmanı (`SqlServer/`):** SQLite'ın gizlediklerini (migration'lar ve içlerindeki SQL, şemalar, collation,
+  `decimal`, `DateTimeOffset` sıralaması) gerçek bir SQL Server'da sınar. Testcontainers, `docker-compose.yml`'deki imajla
+  koşu başına bir container açar; Api host'u migration'ları açılışta üretimdeki gibi uygular. Docker yoksa bu testler
+  atlanır; CI `--fail-skips on` ile koşar, orada atlanan test koşuyu kırar.
+- **Domain (`NovaCore.Domain.Tests`):** `Result<T>`, `PaginationRequest`/`PagedList<T>`, `Payment`, `Product`, domain
+  event'leri; host'suz, saniyeler içinde. CsCheck property testleri ve haftalık mutation testi bu projede.
 - **Integration:** gerçek host'u `WebApplicationFactory` ile ayağa kaldırır; her DbContext testte **in-memory
   SQLite**'a takılır. Token'ları bellek içi bir OpenID Connect issuer'ı (`TestIdentityProvider`) üretir.
 - **Outbox:** event'in entity ile aynı transaction'da yazıldığı (iki yönlü rollback) ve bir mesajın her handler'a bir

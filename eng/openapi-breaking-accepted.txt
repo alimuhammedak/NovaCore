@@ -1,0 +1,3 @@
+# Breaking API changes made on purpose: one line per change, oasdiff's message for it (eng/check-openapi.sh).
+# Delete a line once the change is on main and main's own check has passed it: a line left here would excuse the same
+# break again later.

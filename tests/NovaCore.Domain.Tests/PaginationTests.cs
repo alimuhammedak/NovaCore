@@ -2,7 +2,7 @@ using System.Globalization;
 using NovaCore.Abstractions.Pagination;
 using Xunit;
 
-namespace NovaCore.Api.Tests.Unit;
+namespace NovaCore.Domain.Tests;
 
 public class PaginationTests
 {

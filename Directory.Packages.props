@@ -78,12 +78,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Test stack (xUnit v3) -->
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
-    <PackageVersion Include="xunit.v3" Version="3.2.2" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!--
+      Test stack: xUnit v3 on Microsoft.Testing.Platform (MTP v2), the runner global.json selects for `dotnet test`.
+      No VSTest packages (Microsoft.NET.Test.Sdk, xunit.runner.visualstudio): MTP mode doesn't use them
+      (docs/plan/RESEARCH.md R-108).
+    -->
+    <PackageVersion Include="xunit.v3" Version="4.0.2" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
+    <!-- The SQL Server test layer (DECISIONS D-043): a real SQL Server in a container (MIT), reset between tests (Apache-2.0). -->
+    <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
+    <PackageVersion Include="Respawn" Version="7.0.0" />
+    <!-- Code coverage for Microsoft.Testing.Platform (MIT), gated by eng/check-coverage.sh. -->
+    <PackageVersion Include="coverlet.MTP" Version="10.1.0" />
+    <!-- Property-based tests (Apache-2.0, no dependencies). -->
+    <PackageVersion Include="CsCheck" Version="4.9.1" />
   </ItemGroup>
 
 </Project>

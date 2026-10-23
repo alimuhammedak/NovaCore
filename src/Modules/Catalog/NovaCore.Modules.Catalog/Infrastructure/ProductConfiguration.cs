@@ -6,6 +6,12 @@ namespace NovaCore.Modules.Catalog.Infrastructure;
 
 internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
+    /// <summary>The price column's <c>decimal(18,2)</c>; the requests validate against it (<see cref="DecimalColumnAttribute"/>).</summary>
+    public const int PricePrecision = 18;
+
+    /// <inheritdoc cref="PricePrecision"/>
+    public const int PriceScale = 2;
+
     public void Configure(EntityTypeBuilder<Product> builder)
     {
         builder.ToTable("products");
@@ -13,7 +19,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(p => p.Name).HasMaxLength(200).IsRequired();
         builder.Property(p => p.Description).HasMaxLength(2000);
-        builder.Property(p => p.Price).HasPrecision(18, 2);
+        builder.Property(p => p.Price).HasPrecision(PricePrecision, PriceScale);
 
         // Stock is the concurrency token: any update or delete of a product whose stock changed after it was read fails
         // (DbUpdateConcurrencyException) instead of undoing a sale or selling the same unit twice. Concurrent changes to

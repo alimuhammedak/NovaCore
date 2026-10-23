@@ -18,7 +18,7 @@ internal static class ModuleTestData
     /// <summary>The <c>sub</c> the payments saved here belong to.</summary>
     public const string TestOwner = "test-owner";
 
-    public static async Task<Guid> AddProductAsync(this NovaCoreApiFactory factory, int stock, bool active = true)
+    public static async Task<Guid> AddProductAsync(this ApiFactory factory, int stock, bool active = true)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var catalog = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
@@ -34,7 +34,7 @@ internal static class ModuleTestData
     /// Saves a pending payment as <c>CreatePayment</c> does, without its checks: its <see cref="PaymentCreated"/> waits in
     /// the Payments outbox for the dispatcher.
     /// </summary>
-    public static async Task<Guid> AddPaymentAsync(this NovaCoreApiFactory factory, Guid productId, int quantity)
+    public static async Task<Guid> AddPaymentAsync(this ApiFactory factory, Guid productId, int quantity)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var payments = scope.ServiceProvider.GetRequiredService<PaymentsDbContext>();
@@ -49,7 +49,7 @@ internal static class ModuleTestData
     /// request is kept out of the outbox, so the dispatcher never delivers it at the same time.
     /// </summary>
     public static async Task<PaymentCreated> AddPaymentForDirectHandlingAsync(
-        this NovaCoreApiFactory factory, Guid productId, int quantity)
+        this ApiFactory factory, Guid productId, int quantity)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var payments = scope.ServiceProvider.GetRequiredService<PaymentsDbContext>();
@@ -62,14 +62,14 @@ internal static class ModuleTestData
     }
 
     /// <summary>Hands <paramref name="domainEvent"/> to its handler in a scope of its own, as the outbox dispatcher does.</summary>
-    public static async Task HandleAsync<TEvent>(this NovaCoreApiFactory factory, TEvent domainEvent)
+    public static async Task HandleAsync<TEvent>(this ApiFactory factory, TEvent domainEvent)
         where TEvent : IDomainEvent
     {
         await using var scope = factory.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<IDomainEventHandler<TEvent>>().HandleAsync(domainEvent);
     }
 
-    public static async Task<int> StockAsync(this NovaCoreApiFactory factory, Guid productId)
+    public static async Task<int> StockAsync(this ApiFactory factory, Guid productId)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<CatalogDbContext>().Products
@@ -78,7 +78,7 @@ internal static class ModuleTestData
             .SingleAsync();
     }
 
-    public static async Task<StockReservation> ReservationAsync(this NovaCoreApiFactory factory, Guid paymentId)
+    public static async Task<StockReservation> ReservationAsync(this ApiFactory factory, Guid paymentId)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<CatalogDbContext>().StockReservations
@@ -86,8 +86,8 @@ internal static class ModuleTestData
             .SingleAsync(reservation => reservation.Id == paymentId);
     }
 
-    // From the database: the payment list orders by a DateTimeOffset, and the SQLite test database can't order by one.
-    public static async Task<PaymentStatus> PaymentStatusAsync(this NovaCoreApiFactory factory, Guid paymentId)
+    // From the database, not through the API: no caller or permission needed.
+    public static async Task<PaymentStatus> PaymentStatusAsync(this ApiFactory factory, Guid paymentId)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<PaymentsDbContext>().Payments

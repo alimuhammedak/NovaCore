@@ -37,8 +37,8 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   on a `PeriodicTimer` driven by `TimeProvider`. It reads each outbox in `Id` order in keyset batches, gives each message
   a DI scope for its handlers and records the finished handlers in `outbox_consumers` (key: the message's `Id` + the
   handler, FK with cascade delete). Each pass then deletes the processed messages older than `ProcessedRetention`
-  (7 days); the age is compared in memory over `Id`-ordered batches, since SQLite can't compare `DateTimeOffset` in SQL
-  (R-068). It opens no transaction, so every query and write is a retriable unit of the context's execution strategy.
+  (7 days) in SQL, a batch per statement, on the `(ProcessedOnUtc, Id)` index (F6c.3, D-059); the SQLite test databases
+  store `DateTimeOffset` as ticks so they can run it too. It opens no transaction, so every query and write is a retriable unit of the context's execution strategy.
   The interval, batch size, 10 attempts and the retention are constants: no consumer needs them configurable yet (Y-19).
 
 **Add-ons** (optional, one third-party library each; they may reference AspNetCore/Abstractions only):

@@ -6,8 +6,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using MyService.Modules.Todos.Infrastructure;
 using NovaCore.AspNetCore.Authorization;
@@ -37,9 +39,10 @@ public class ApiFactory : WebApplicationFactory<Program>
 #endif
 
     // The SQLite contexts get their own EF Core internal service provider: the host registers SQL Server, and EF Core
-    // allows one provider per container.
+    // allows one provider per container. It stores DateTimeOffset as UTC ticks, which SQLite can compare and order.
     private readonly ServiceProvider _sqliteServices = new ServiceCollection()
         .AddEntityFrameworkSqlite()
+        .Replace(ServiceDescriptor.Singleton<IModelCustomizer, UtcTicksModelCustomizer>())
         .BuildServiceProvider();
 
     private readonly ConcurrentDictionary<string, string[]> _grants = new();
@@ -48,13 +51,13 @@ public class ApiFactory : WebApplicationFactory<Program>
     {
         // The schemas exist from the start, as after the migrations: the host's background services (the outbox
         // dispatcher, the identity provider's pruning) read them as soon as it starts.
-        using var todos = new TodosDbContext(
-            new DbContextOptionsBuilder<TodosDbContext>().UseSqlite(_todosDatabase).Options);
+        using var todos = new TodosDbContext(new DbContextOptionsBuilder<TodosDbContext>()
+            .UseSqlite(_todosDatabase).UseInternalServiceProvider(_sqliteServices).Options);
         todos.Database.EnsureCreated();
 #if (BuiltInAuth)
 
-        using var identity = new IdentityServerDbContext(
-            new DbContextOptionsBuilder<IdentityServerDbContext>().UseSqlite(_identityDatabase).Options);
+        using var identity = new IdentityServerDbContext(new DbContextOptionsBuilder<IdentityServerDbContext>()
+            .UseSqlite(_identityDatabase).UseInternalServiceProvider(_sqliteServices).Options);
         identity.Database.EnsureCreated();
 #endif
     }

@@ -58,11 +58,16 @@ dotnet restore NovaCore.slnx --force          # incremental builds skip restore,
 dotnet restore NovaCore.slnx --force-evaluate # after changing a package version: rewrites the packages.lock.json files
 dotnet restore NovaCore.slnx --locked-mode    # what CI runs: fails if the package graph differs from the lock files
 bash eng/check-licenses.sh                    # license gate: every package MIT/Apache-2.0 (Microsoft and Polly.*: D-052)
+bash eng/check-coverage.sh [Debug] [--update] # tests with coverage, held to eng/coverage-baseline.txt (D-060); build first
+bash eng/check-openapi.sh [base-revision]     # breaking changes in docs/openapi/v1.json since main (oasdiff, Docker; D-061)
+bash eng/mutation.sh                          # Stryker.NET on the abstractions and domain code, a report (D-063)
 bash eng/lint-workflows.sh [dir ...]          # actionlint + zizmor on .github (Docker; GH_TOKEN enables online audits)
 git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release
-dotnet test                                   # all tests (no SQL Server needed — every DbContext runs on SQLite)
-dotnet test --filter "FullyQualifiedName~AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"   # single test
+dotnet test                                   # all tests: SQLite, plus the SQL Server layer in a Docker container (skips without Docker)
+dotnet test -- --filter-method "*.AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"   # single test (--filter-class for a class)
+#   `dotnet test` runs on Microsoft.Testing.Platform (global.json): the solution goes through --solution, xUnit's own
+#   options come after `--`, and -nologo isn't accepted before .NET 11 (exit code 5).
 
 # Run (Development opens Scalar UI at /scalar/v1)
 dotnet run --project src/Api/NovaCore.Api

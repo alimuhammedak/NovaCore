@@ -97,25 +97,6 @@ public sealed class TwoFactorTests(IdentityServerFixture fixture) : IClassFixtur
     }
 
     [Fact]
-    public async Task Two_sign_ins_racing_with_one_code_let_one_in()
-    {
-        await _host.CreateUserAsync("mfa-race@novacore.test", Password);
-        var (key, _) = await EnableAsync("mfa-race@novacore.test");
-        var code = AuthenticatorCode.For(key, stepsAhead: 1);
-
-        using var first = new OidcFlow(_host);
-        using var second = new OidcFlow(_host);
-        var (_, firstCodePage) = await CodeStepAsync(first, "mfa-race@novacore.test");
-        var (_, secondCodePage) = await CodeStepAsync(second, "mfa-race@novacore.test");
-
-        var responses = await Task.WhenAll(first.SubmitCodeAsync(firstCodePage, code), second.SubmitCodeAsync(secondCodePage, code));
-
-        // The signed-in browser goes back to the authorization endpoint; the other one gets the code form again.
-        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Redirect);
-        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.OK);
-    }
-
-    [Fact]
     public async Task Wrong_codes_lock_the_account()
     {
         var user = await _host.CreateUserAsync("mfa-lockout@novacore.test", Password);

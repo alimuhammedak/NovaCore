@@ -19,6 +19,7 @@ public static class UpdateProduct
         [Required, MaxLength(200)] string Name,
         [MaxLength(2000)] string? Description,
         [Range(0d, double.MaxValue, MinimumIsExclusive = true, ErrorMessage = "The field {0} must be greater than 0.")]
+        [DecimalColumn(ProductConfiguration.PricePrecision, ProductConfiguration.PriceScale)]
         decimal Price,
         [Range(0, int.MaxValue)] int Stock);
 

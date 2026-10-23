@@ -2,13 +2,26 @@
 
 Subtree rules for `tests/`. See the repo-root `CLAUDE.md` for global standards.
 
-Stack: **xUnit v3** (test projects are `OutputType=Exe`). Run a single test with
-`dotnet test --filter "FullyQualifiedName~ClassName.MethodName"`.
+Stack: **xUnit v3 4.x on Microsoft.Testing.Platform** (test projects are `OutputType=Exe`; `global.json` puts
+`dotnet test` in MTP mode, so there is no VSTest package). Run a single test with
+`dotnet test -- --filter-method "*.ClassName.MethodName"` (`--filter-class "*.ClassName"` for a class; `*` only at the
+start or end). xUnit's options go after `--`; a solution goes through `--solution`.
 
-## Three flavors, one project
+## Two projects
 
-- **Unit** (`Unit/`) — pure logic (`Result<T>`, pagination), and building blocks on a small generic host of their own
-  (`Host.CreateApplicationBuilder`, never the Api): startup migrations and the outbox.
+- **`NovaCore.Domain.Tests`** — pure logic of the core abstractions and the modules' domain code (`Result<T>`,
+  pagination, `Payment`, `Product`, domain events): no host, no database, no Docker, a few seconds. It is what mutation
+  testing runs against (`bash eng/mutation.sh`, below), so a test of that code belongs here. `*PropertyTests` check rules
+  over generated inputs and operation sequences with CsCheck (a failure prints the seed that reproduces it:
+  `Sample(..., seed: "...")`); give a generator the boundary values too (`Gen.OneOf(Gen.Int, Gen.Int[-2, 3])`), random
+  ones rarely hit them.
+- **`NovaCore.Api.Tests`** — everything that needs a host, in three flavors below. A property test there that goes to a
+  database limits its own samples (`iter`, `threads: 1`, `StockReservationPropertyTests`).
+
+### `NovaCore.Api.Tests`: three flavors
+
+- **Unit** (`Unit/`) — building blocks on a small generic host of their own (`Host.CreateApplicationBuilder`, never the
+  Api): startup migrations and the outbox.
 - **Integration** (`Integration/`) — boot the real host via `NovaCoreApiFactory` (`WebApplicationFactory`).
   DB-free tests (health, OpenAPI, security headers, 401/validation gates) need no seeding. A caller with specific roles
   comes from `factory.CreateClientWithClaims(...)`: the factory's in-memory issuer (`factory.IdentityProvider`, see
@@ -35,7 +48,9 @@ Stack: **xUnit v3** (test projects are `OutputType=Exe`). Run a single test with
 
 ## How the test host works (and why)
 
-`NovaCoreApiFactory` swaps **every DbContext** (Catalog, Payments and the identity provider's) from SQL Server to its own
+`ApiFactory` boots the real Program host with what every test host shares (the test issuer, server-side grants,
+environment, scope validation, production extras) and lets a subclass choose the databases. `NovaCoreApiFactory`, the
+default, swaps **every DbContext** (Catalog, Payments and the identity provider's) from SQL Server to its own
 **in-memory SQLite** connection (`ReplaceWithSqlite<TContext>`), so the full auth flow and the `/health` database
 checks run without a database. Two non-obvious requirements, both load-bearing:
 
@@ -58,6 +73,47 @@ Protection key store (`InMemoryKeyStore.AddTo(services)`). A test that expects a
 Development adds the key store too, or the missing store is what stops the host. A subclass can
 call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsTests` points one at a missing file with
 `Mode=ReadWrite`: the dispatcher opens it too, and the default mode would create the file.
+
+## The API contract
+
+`OpenApiContractTests` compares the document the host serves (`/openapi/v1.json`) with the committed
+`docs/openapi/v1.json`; when they differ it writes the new document there and fails, so an endpoint change brings its
+contract change into the same commit (run the tests again, then commit the file). CI's `api-contract` job compares that
+file with the base revision's (`eng/check-openapi.sh`, oasdiff): a breaking change fails unless a line of
+`eng/openapi-breaking-accepted.txt` accepts it.
+
+## Mutation testing
+
+`bash eng/mutation.sh` (weekly in `mutation.yml`) runs Stryker.NET with its Microsoft.Testing.Platform runner (preview)
+against `NovaCore.Domain.Tests`: `NovaCore.Abstractions` and the `Domain/` folders of Catalog and Payments, about two
+minutes. The score is a report (`--break-at 0`); the html reports are in `StrykerOutput/<project>/reports`. A surviving
+mutant is a change no test noticed. Against `NovaCore.Api.Tests` it is impractical: the runner captures coverage one test
+at a time, and those tests start hosts (docs/plan/RESEARCH.md R-116).
+
+## Coverage
+
+`bash eng/check-coverage.sh` (CI's "Test with coverage" step) runs both test projects with coverlet.MTP over the
+`NovaCore.*` assemblies (not the tests, not the migrations) and fails when line or branch coverage falls more than its tolerance below
+`eng/coverage-baseline.txt`, the coverage main reached. Raise the baseline with `--update` when a change raises the
+coverage, and commit it with the change. The architecture tests run in a step of their own, without coverage: coverlet
+instruments the built assemblies in place (an instrumented assembly references `netstandard`), and those tests read the
+built assemblies' references.
+
+## The SQL Server layer (`SqlServer/`)
+
+SQLite hides what only SQL Server does: migrations (the SQLite databases come from `EnsureCreated`) and their raw SQL,
+schemas, collations, `decimal` precision, `DateTimeOffset` ordering (docs/plan/DECISIONS.md D-043, D-056). The tests
+under `SqlServer/` run on a real SQL Server instead:
+- `TestSqlServer` starts one container for the whole run (Testcontainers, the image `docker-compose.yml` pins, which
+  `SqlServerImageTests` keeps equal), when the first test needs it. Fixtures can't depend on each other, so it is a
+  static `Lazy`; Testcontainers' resource reaper removes the container when the test process ends.
+- `SqlServerApiFactory` is the Api host (`ApiFactory`, like `NovaCoreApiFactory`) with Program's SQL Server
+  registrations kept, in a database of its own (`TestSqlServer.CreateDatabaseAsync`), and `Database:ApplyMigrations` on:
+  the host migrates the three contexts when it starts, the way production does. A test that needs an empty or a
+  half-migrated database creates its own (`MigrationTests` migrates step by step with `IMigrator`).
+- Without Docker these tests skip (`TestDatabase.SkipIfUnavailable()` first in each test). CI and release run
+  `dotnet test ... -- --fail-skips on`, so there a skip fails the run.
+- Raw SQL names the schema (`[payments].[payments]`); SQL Server has no default schema for these tables.
 
 ## Background work: the outbox dispatcher
 
@@ -85,8 +141,11 @@ advances in the same class fixture. So:
 - a test that needs several requests past `CreatePayment`'s check saves them with `AddPaymentAsync` instead of racing
   POSTs against that pass.
 
-`GET /api/v1/payments` orders by a `DateTimeOffset`, which SQLite can't translate (R-068), so tests read payments from
-the database (`PaymentStatusAsync`).
+SQLite keeps `DateTimeOffset` as text and EF Core can't compare or order it there (R-068), so every SQLite test context
+stores it as UTC ticks instead (`UtcTicksModelCustomizer`: in `NovaCoreApiFactory`'s EF service provider, and through
+`ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>()` on the small hosts): production code compares and orders
+`DateTimeOffset` in SQL, as it should on SQL Server (the outbox retention, the payment list). Raw SQL against those
+columns writes and reads ticks (`OutboxDispatcherTests`). `SqlServerQueryTests` tests the payment list on SQL Server.
 
 `StockRaceApiFactory` (a `FakeClockApiFactory`) plays a concurrent writer for `StockConcurrencyTests`.
 `ChangeStockBeforeNextSave(productId, stock)` makes the next Catalog save that modifies or deletes the product first
@@ -130,6 +189,9 @@ and waits for that first (they go out in the order queued). `OidcFlow` plays the
 redirects) and the public client: authorize → sign-in form (antiforgery token) → code → token endpoint. Other forms
 (password reset, the sign-out question) go through `OidcFlow.SubmitFormAsync`, which posts a page's hidden fields with
 the given ones. `TokenPruningTests` moves a fake clock by an hour to run a pruning pass; it signs nobody in.
+`TwoFactorRaceTests` makes two requests verifying one authenticator code interleave on every run: its host's store
+contexts carry `UsedCodeRace`, which runs the competing request to its end just before the next save that records a
+used code, so both read the user before either writes.
 `IdentityServerFixture` shares one host per class; tests that need a different host start their own
 (`IdentityServerTestHost.StartAsync(environment, configure)`). These classes run in the `IdentityServerTestGroup`
 collection, apart from the parallel tests: their CPU load made the `WebApplicationFactory` startup race (R-055) hit
@@ -152,8 +214,10 @@ return 429). Don't set environment variables in tests: they are process-wide and
 
 **One factory needs a different value?** Subclass `NovaCoreApiFactory`, override `ConfigureWebHost`, call `base` and
 then add another `ConfigureAppConfiguration`: sources added later win. Examples: `StrictRateLimitApiFactory`, and the
-factory in `ConfigurationValidationTests`. Invalid values stop the host on start (`ValidateOnStart`), so a test can
-assert on `factory.Server` throwing.
+factory in `ConfigurationValidationTests`. Invalid values stop the host on start (`ValidateOnStart`). Assert that on a
+host started directly (`CoreWebTestHost.StartAsync`, `IdentityServerTestHost.StartAsync`), not on `factory.Server`: a
+`WebApplicationFactory` host that fails to start can throw `ObjectDisposedException` instead of the startup error
+(R-055, R-109, dotnet/aspnetcore#69684).
 
 **Different environment?** Override `EnvironmentName` (default `Development`), e.g. `ProductionApiFactory`.
 

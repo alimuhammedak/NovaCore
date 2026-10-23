@@ -1051,3 +1051,108 @@ Biçim:
 - Ölçüm: `Always` ile düz http üzerinden açılan `/account/login` 500 döndü (Api host'unun `SecureDefaultsTests`'i http üzerinden yakaladı). Antiforgery, istek SSL değilken `Always` politikasında token üretmeyi reddediyor. Varsayılan `None` ise https'te bile Secure bayrağı koymuyor.
 - Kaynak: R-104 (MS: Development dışında `Always`), ölçüm.
 - Sonuç: Development dışında `Always`, Development'ta `SameAsRequest` (https'te Secure, http'de sayfa çalışır). 2FA cookie'leri uygulama cookie'si gibi her ortamda `Always`: cookie işleyicisi http'de hata vermez, yalnız bayrağı koyar.
+
+## Faz 6c araştırması (2026-10-22)
+
+### R-108: `dotnet test`'in MTP modu ve xUnit v3 4.x (2026-10-22, faz 6c; kaynak + ölçüm)
+- Soru: .NET 10 SDK'da `dotnet test` Microsoft.Testing.Platform (MTP) modunda nasıl çalışıyor, xUnit 4.0.x hangi paketleri istiyor, repo'nun komutlarından hangileri kırılıyor (F6c.1a)?
+- Bulgu (kaynak):
+  - MTP modu `global.json`'daki `"test": { "runner": "Microsoft.Testing.Platform" }` ile açılır. Bu modda bütün test projeleri MTP olmalı. MS'in geçiş adımları çözümü `--solution`'la vermeyi söylüyor; test uygulamasının seçenekleri `--`'dan sonra gelir. `--nologo` MTP modunda ancak .NET 11 Preview 7'de tanınıyor.
+  - xunit.v3 4.0.2 (2026-10-09) MTP v2 (2.5.1) kullanıyor; MTP v1 desteği 4.0.0'da kalktı. MTP için `xunit.v3` yeterli. `Microsoft.NET.Test.Sdk` ve `xunit.runner.visualstudio` yalnız VSTest için gerekli (xUnit: "you can remove the package references"); Test Explorer MTP projelerini kendi MTP deneyimiyle çalıştırıyor.
+  - 4.0'ın kırıcı değişiklikleri (`CollectionBehavior`'ın paralellik özellikleri, `ITestCaseOrderer`, `Xunit.Runners`) repo'da kullanılmıyor (grep).
+  - Filtreler: `--filter-class`, `--filter-method`, `--filter-namespace`, `--filter-trait` (ve `-not-` biçimleri), `--filter-query`; `*` yalnız başta ya da sonda. 4.0.0 VSTest biçimli `--filter`'ı da geri getirdi.
+- Ölçüm (SDK 10.0.300, xunit.v3 4.0.2):
+  - 361/361 yeşil, yerelde ~4 dk.
+  - Stop hook'unun eski komutu `dotnet test NovaCore.slnx --no-build -nologo` exit 5 verdi: `-nologo` test uygulamasına geçiyor ve tanınmıyor. Konumsal `NovaCore.slnx` ise 10.0.300'de hâlâ çalışıyor (exit 0); SDK'nın "should be via '--solution'" mesajı bu durumda çıkmadı.
+  - `-- --filter-method "*.AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"` 1 test, `-- --filter-class "*.ResultTests"` 6 test, `-- --filter "FullyQualifiedName~…"` 1 test koşturdu.
+- Kaynak: https://learn.microsoft.com/dotnet/core/testing/unit-testing-with-dotnet-test · https://learn.microsoft.com/dotnet/core/tools/dotnet-test-mtp · https://xunit.net/releases/v3/4.0.0 · https://xunit.net/releases/v3/4.0.2 · https://xunit.net/docs/getting-started/v3/microsoft-testing-platform · https://xunit.net/docs/query-filter-language
+- Sonuç: `global.json`'a `test.runner`; `xunit.v3` 4.0.2; iki VSTest paketi kalkar. Hook, CI ve release `dotnet test --solution NovaCore.slnx` kullanır (MS'in önerdiği biçim). Hook'tan `-nologo` kalkar. PLAN'daki `dotnet test NovaCore.slnx` genel kuralı çalıştığı için değişmedi (planlanan PLAN düzenlemesi gereksiz çıktı).
+
+### R-109: R-055'in açılış yarışı MTP + xUnit 4 altında ve upstream durumu (2026-10-22, faz 6c; kaynak + ölçüm)
+- Soru: Açılışın düşmesini bekleyen testlerin ara sıra gerçek hata yerine `ObjectDisposedException` alması (R-055) MTP + xUnit 4 altında sürüyor mu, framework'te düzeltildi mi (F6c.1c, Q-46)?
+- Bulgu (kaynak): `DeferredHostBuilder.DeferredHost.StartAsync` hem `release/10.0`'da hem `main`'de hâlâ `_hostStartedTcs`'i beklemeden önce `_host.Services.GetRequiredService<IHostApplicationLifetime>()` çağırıyor. Hata dotnet/aspnetcore#69684 olarak açık ("WebApplicationFactory sometimes throws ObjectDisposedException instead of the app's startup exception", 2026-10-06); düzeltme PR'ı #69685 açık, merge edilmemiş. Yani kök neden bizim tarafta değişmedi.
+- Ölçüm: MTP + xUnit 4.0.2, Release, 1 tam koşu (361/361, isabet yok); 10 koşuluk ölçüm, koşu başına ~4,5 dk sürdüğü ve kök neden kaynakta doğrulandığı için durduruldu. Eski sıklık ~2/45 koşu (R-055) ve 6a'da CI; birkaç koşu bir şey kanıtlamazdı.
+- CI kanıtı: F6c.1c'den önceki `f32b0ec` push'unda (MTP + xUnit 4.0.2) `ConfigurationValidationTests.Invalid_configuration_stops_the_host_at_startup(Production, Jwt:Authority, http://idp.example.com)` beklenen mesaj yerine "Cannot access a disposed object. Object name: 'IServiceProvider'" aldı; taşımadan sonraki koşular yeşil.
+- Repo'da etkilenen tek test: `ConfigurationValidationTests.Invalid_configuration_stops_the_host_at_startup` (12 vaka). Diğer açılış hatası testleri zaten kendi host'larında (`CoreWebTestHost`, `IdentityServerTestHost`) `StartAsync` ile koşuyor.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Mvc/Mvc.Testing/src/DeferredHostBuilder.cs · https://github.com/dotnet/aspnetcore/issues/69684 · https://github.com/dotnet/aspnetcore/pull/69685
+- Sonuç: Teori `CoreWebTestHost` + `AddCorePersistence` üzerinde, `StartAsync`'in kendi exception'ıyla koşuyor: ayarlar çekirdek paketlerin, Program'ın değil. 12 vakanın hepsi beklenen mesajla düştü; aynı host geçerli yapılandırmayla Development ve Production'da açıldı (deneme, commit'lenmedi). "Sonradan eklenen yapılandırma" davranışını gösteren iki test Api factory'sinde kaldı (host açılıyor, yarış yok). #69685 yayımlanınca bir şey yapmak gerekmez.
+
+### R-110: SQL Server test katmanı: Testcontainers 4.16, xUnit v3 fixture'ları ve gerçek migration'lar (2026-10-22, faz 6c; kaynak + ölçüm)
+- Soru: Gerçek SQL Server'da test için container nasıl açılır, test sınıfları nasıl paylaşır, Docker yokken ne olur, migration'lar nasıl sınanır (F6c.2a, D-043)?
+- Bulgu (kaynak):
+  - `Testcontainers.MsSql` 4.16.0 (MIT): `new MsSqlBuilder(image).Build()` + `StartAsync()`, `GetConnectionString()`. Geçişliler (Docker.DotNet.Enhanced*, SSH.NET 2026.0.0, SharpZipLib, BouncyCastle.Cryptography) MIT; lisans kapısı geçti. Ryuk (resource reaper, `testcontainers/ryuk:0.14.0`) container'ı test süreci bitince siler; Testcontainers onu kapatmamayı öneriyor.
+  - `DockerUnavailableException` (`DotNet.Testcontainers.Builders`): "thrown when a connection to the Docker endpoint cannot be established".
+  - xUnit v3: fixture'lar birbirine bağımlı olamaz ("fixtures cannot take dependencies on other fixtures"); assembly fixture'ları her testten önce, hevesle oluşturuluyor. `Assert.Skip/SkipWhen/SkipUnless` testi çalışma anında atlatıyor; MTP'de `--fail-skips on` atlanan testi başarısız sayıyor.
+  - Respawn 7.0.0 bağımlılıksız (Apache-2.0); veriyi sıfırlamak gereken ilk test F6c.2b'de geldiği için paket orada eklenir.
+- Ölçüm (yerel, Docker Desktop 29.2.1):
+  - İlk koşu imaj indirmesiyle ~2 dk, sonrakiler ~40 sn (4 test: container, Api host'unun açılıştaki migration'ı ve üç ayrı veritabanı).
+  - `DOCKER_HOST=tcp://127.0.0.1:1` Docker'sız durumu taklit etmedi: Testcontainers sıradaki uç noktaya (Docker Desktop'ın named pipe'ı) geçip testleri koşturdu. Docker'sız skip yolu yerelde denenemedi; Docker gerçekten yoksa `DockerUnavailableException` beklenir, başka bir exception gelirse testler atlanmaz, kırmızı olur (sessiz değil).
+  - Tam takım 366/366 (`--fail-skips on`), ~5,5 dk.
+- Kaynak: https://dotnet.testcontainers.org/modules/mssql/ · https://dotnet.testcontainers.org/api/resource_reaper/ · https://xunit.net/docs/shared-context · https://xunit.net/docs/getting-started/v3/whats-new · https://www.nuget.org/packages/Testcontainers.MsSql/4.16.0 · Testcontainers 4.16.0 XML belgeleri (NuGet paketi)
+- Sonuç: Statik `Lazy` ile koşu başına tek container (`TestSqlServer`), sınıf başına veritabanı, `SqlServerApiFactory` üretimdeki `DatabaseMigrationService` yolunu kullanır. Docker yoksa yerelde skip; CI ve release `--fail-skips on`. D-056.
+
+### R-111: SQL Server'da `LIKE` collation'ı ve `decimal(18,2)` (2026-10-22, faz 6c; ölçüm)
+- Soru: SQLite'ın göstermediği iki SQL Server davranışı: ürün aramasının `EF.Functions.Like`'ı hangi collation'la eşleşiyor ve `decimal(18,2)` sütunu fazla basamağı ne yapıyor (F6c.2b)?
+- Ölçüm (`mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04`, EF Core 10.0.12, varsayılan sunucu collation'ı, `SqlServerQueryTests`):
+  - Arama büyük/küçük harf duyarsız (`blue` → "Blue Widget" ve "BLUE gadget", `CAFÉ` → "Café crème"), aksan duyarlı (`cafe` hiçbir şey bulmuyor). Liste `Name`'e göre de bu collation'la sıralanıyor ("BLUE gadget" < "Blue Widget").
+  - `POST /api/v1/products` 201 döndü ama fiyat yuvarlanarak kaydedildi: 0.001 → 0.00, 10.004 → 10.00, 10.005 → 10.01, 10.999 → 11.00. Yani "0'dan büyük" kuralını geçen 0.001 bedava bir ürün olarak kaydediliyordu ve API'nin kabul ettiği değer okunan değerden farklıydı. SQLite `decimal`'ı metin olarak birebir sakladığı için bunu hiç göstermedi. 16'dan fazla tam basamak `decimal(18,2)`'ye sığmıyor.
+- Kaynak: ölçüm; https://learn.microsoft.com/ef/core/providers/sqlite/limitations (SQLite'ta `decimal` karşılaştırması ve saklanması)
+- Sonuç: Kullanıcı reddetmeyi seçti (Q-47). Ürün isteklerinin `Price`'ı `DecimalColumnAttribute(18, 2)` taşıyor: en fazla 2 ondalık ve 16 tam basamak, yoksa 400. Hassasiyet `ProductConfiguration`'daki sabitlerden geliyor (sütun ve kural tek yerden). Sütunun sınır değerleri (0.01, 9999999999999999.99) SQL Server'da birebir dönüyor. Collation davranışı testle sabitlendi; `LIKE` aramasında `%`, `_` ve `[` joker olarak yorumlanıyor (kaçırılmıyor) → Sonraya bırakılanlar.
+
+### R-112: Outbox saklama silmesi SQL'de ve SQLite test katmanında `DateTimeOffset` (2026-10-23, faz 6c; kaynak + ölçüm)
+- Soru: `OutboxDispatcher.DeleteExpiredAsync`'teki "SQLite karşılaştıramıyor" diye bellekte yapılan yaş karşılaştırması (`OutboxDispatcher.cs:178`) üretim kodunu test aracına göre şekillendiriyor mu, doğrusu ne (F6c.3)?
+- Bulgu (kaynak + kod):
+  - MS: SQLite `DateTimeOffset`'i yerel olarak desteklemiyor; eşitlik dışındaki karşılaştırma ve sıralama istemcide yapılmak zorunda. Değer dönüştürücü (value conversion) sağlayıcı tipini değiştirmenin belgelenmiş yolu.
+  - `AddOutbox()` `outbox_messages`'a `(ProcessedOnUtc, Id)` index'ini zaten koyuyor (`OutboxDispatch` migration'ı). Yani `ProcessedOnUtc < cutoff` index üzerinde bir aralık araması; `Id` sıralı parçalar ve "geç işlenmiş mesaj ilk parçayı tutmasın" mantığı yalnızca SQLite yüzünden vardı.
+- Ölçüm:
+  - Yeni sorgu (`Where(ProcessedOnUtc < cutoff).OrderBy(ProcessedOnUtc).Take(50).ExecuteDeleteAsync()`, kısa parçaya kadar döngü) SQL Server'da çalıştı: Api host'unun kendi dispatcher'ı süresi dolan mesajı kayıtlarıyla (cascade) sildi, dolmayanı bıraktı (`OutboxRetentionTests`).
+  - SQLite test bağlamları `DateTimeOffset`'i UTC tick (`long`) olarak saklayınca (`UtcTicksModelCustomizer`, yalnız test kodu) aynı sorgu SQLite'ta da çevrildi; `OutboxDispatcherTests`'in saklama testleri (geç işlenmiş mesaj dahil) yeşil. Ham SQL bu sütunlara tick yazıp okuyor.
+  - Ek gözlem: Docker Desktop yeniden başladıktan sonraki ilk koşuda Testcontainers'ın Ryuk container'ı hazırlık kontrolünde kayboldu ("Could not find resource 'DockerContainer'"), fixture düştü; ikinci koşu yeşil. Ortamdan kaynaklı, kalıcı değil.
+- Kaynak: https://learn.microsoft.com/ef/core/providers/sqlite/limitations · https://learn.microsoft.com/ef/core/modeling/value-conversions · `OutboxModelBuilderExtensions.cs` (index)
+- Sonuç: Karşılaştırma SQL'de, mevcut index üzerinde; SQLite katmanı kendini uyarlar (D-059). Modelde ve migration'larda değişiklik yok.
+
+### R-113: Coverage: coverlet.MTP, ReportGenerator ve ratchet (2026-10-23, faz 6c; kaynak + ölçüm)
+- Soru: MTP'de coverage nasıl toplanır, main'e göre düşüşü engelleyen kapı nasıl kurulur (F6c.4)?
+- Bulgu (kaynak):
+  - coverlet.MTP 10.1.0 (MIT) MTP ≥ 2.4.1 ister (repo 2.5.1); seçenekler test uygulamasına `--` sonrası gider: `--coverlet`, `--coverlet-output-format cobertura`, `--coverlet-include/exclude "[Assembly]Type"`, `--coverlet-exclude-by-file`. Kendi eşiği (`--coverlet-threshold`) belgede "henüz desteklenmiyor" diye de geçtiği için kullanılmadı.
+  - ReportGenerator 5.5.11 (Apache-2.0, dotnet tool) Cobertura'dan `TextSummary`, `JsonSummary`, `MarkdownSummaryGithub` üretir.
+- Ölçüm:
+  - Coverlet derlenmiş DLL'leri yerinde enstrümante ediyor; enstrümante edilmiş `NovaCore.Abstractions` bir `netstandard` referansı kazandı ve `PackageDependencyTests` ("yalnız BCL") kırmızı oldu. Mimari testler bu yüzden coverage'sız, ayrı bir `dotnet test` adımında (`--filter-namespace`) koşuyor; coverage koşusu onları `--filter-not-namespace` ile dışarıda bırakıyor.
+  - Çıktı dosyası `coverage.cobertura.<zaman damgası>.xml`; desen `coverage.cobertura.*.xml`. Git Bash'te `-reports:/c/...` Windows yoluna çevrilmiyor, betik göreli yol kullanıyor. Bu makinede `jq` yok; betik ReportGenerator'ın metin özetini `sed` ile okuyor.
+  - Release'te iki tam koşu (mimari testler hariç 356 test, SQL Server dahil, ~4,5 dk) birebir aynı sonucu verdi: satır %95,5 (2088/2186), dal %82,0 (548/668). Debug'ta (mimari testler dahil) %95,2 / %81,6; baseline Release (CI) değeri.
+  - Kapı denemesi: baseline %99 iken betik exit 1 verdi (karşılaştırma ve `--update`'in yalnız yukarı yazan aritmetiği ayrıca denendi).
+- Kaynak: https://github.com/coverlet-coverage/coverlet/blob/master/Documentation/Coverlet.MTP.Integration.md · https://github.com/danielpalme/ReportGenerator · https://www.nuget.org/packages/coverlet.MTP/10.1.0 · ölçüm
+- Sonuç: `eng/check-coverage.sh`: testleri coverage'la koşar, satır ve dal kapsamı `eng/coverage-baseline.txt`'in 0,3 puandan fazla altına düşerse kırmızı; `--update` baseline'ı yalnız yukarı yazar. CI'da "Test with coverage" + "Architecture tests" adımları. D-060.
+
+### R-114: API sözleşmesi: build sırasında belge üretimi ve oasdiff'in OpenAPI 3.1 kapsamı (2026-10-23, faz 6c; kaynak + ölçüm)
+- Soru: OpenAPI belgesi build'de üretilip commit'lenebilir mi (PLAN F6c.5), oasdiff .NET 10'un 3.1 belgesindeki kırıcı değişiklikleri yakalıyor mu?
+- Bulgu (kaynak):
+  - MS: `Microsoft.Extensions.ApiDescription.Server` belgeyi build'de, uygulamanın giriş noktasını sahte bir sunucuyla çalıştırarak üretir; "any logic in the apps startup is invoked". Ortamı seçen `OpenApiGenerationEnvironment` ".NET 11'den itibaren"; .NET 10'da tek yol, giriş assembly'sine (`GetDocument.Insider`) bakan bir dal.
+  - oasdiff: OpenAPI 3.1 desteği v1.15.0'dan beri genel kullanımda (`$dynamicRef` ve bileşenlerdeki path item'lar hariç). `--err-ignore` dosyası oasdiff'in mesaj satırlarıyla eşleşir. GitHub Action'ın `review` girdisi varsayılan olarak karşılaştırmayı oasdiff.com'a yükler; action kullanılmadı.
+- Ölçüm:
+  - `Microsoft.Extensions.ApiDescription.Server` 10.0.12 ile Api build'i GetDocument adımında düştü: Program Production'da açıldı ve `No Data Protection key store is configured. Outside Development ...` (D-036 (6)) ile durdu. Deneme geri alındı.
+  - Test host'unun (Development) `/openapi/v1.json`'u iki koşuda birebir aynı (OpenAPI 3.1.1, 1637 satır).
+  - oasdiff v1.33.0 (`tufin/oasdiff@sha256:6263a96d…`, 7 günlük cooldown'a uyan en yeni; v1.34.1'in güvenlik düzeltmesi yalnız `--open` ve action için) bu belgenin kopyalarında: işlem silme (`api-removed-without-deprecation`), yanıttan zorunlu alan silme (`response-required-property-removed`), istekte yeni zorunlu alan (`new-required-request-property`) ve yanıt alanı tip değişikliği (`response-property-type-changed`, 3.1'in `["integer","string"]` birleşimi dahil) exit 1; yeni opsiyonel yanıt alanı ve aynı belge exit 0. Kabul dosyasındaki bir satır ilgili kırılımı susturdu; `#` yorum satırı zararsız.
+  - Yan gözlem: `CreateProduct.Request` ve `CreatePayment.Request` belgede `Request`/`Request2` gibi sıralı adlar alıyor; kayıt sırası değişirse şema adları kayar (oasdiff `$ref`'i çözdüğü için kırıcı sayılmaz).
+- Kaynak: https://learn.microsoft.com/aspnet/core/fundamentals/openapi/aspnetcore-openapi?view=aspnetcore-10.0#generate-openapi-documents-at-build-time · https://github.com/oasdiff/oasdiff/blob/main/docs/OPENAPI-31.md · https://github.com/oasdiff/oasdiff/blob/main/docs/BREAKING-CHANGES.md · https://github.com/oasdiff/oasdiff-action · ölçüm
+- Sonuç: Belge build'de değil test host'unda üretilir ve commit'lenir (`docs/openapi/v1.json`, `OpenApiContractTests`); CI'ın `api-contract` job'u `eng/check-openapi.sh` ile main'e göre kırıcı değişikliği yakalar. D-061.
+
+### R-115: CsCheck property testleri (2026-10-23, faz 6c; kaynak + ölçüm)
+- Soru: Property-based testler için CsCheck nasıl kullanılır, hangi kuralları sınamaya değer (F6c.6)?
+- Bulgu (kaynak): CsCheck (Apache-2.0, bağımlılıksız) test çatısından bağımsızdır, başarısızlıkta exception atar ve yeniden üretmek için seed basar ("Set seed: ... to reproduce"); varsayılan 100 iterasyon, işlemci sayısı kadar iş parçacığı. Üreteçler: `Gen.Int[a, b]`, `Gen.Long[a, b]`, `Gen.String[Gen.Char.AlphaNumeric, min, max]`, `Gen.Enum<T>()`, `gen.Array[min, max]`, `Gen.Select(...)`; `Sample` / `SampleAsync(..., iter, threads)`. Model tabanlı denetim (`SampleModelBased`) var; birkaç işlem için işlem listesi üretip küçük bir modelle karşılaştırmak yeterli. Belgeler 5.x'i anlatıyor; kullanılan API 4.9.1'de derlendi.
+- Ölçüm:
+  - `PaginationRequest.Skip` her `int` sayfa için denendiğinde taştı: `(Page - 1) * PageSize` büyük sayfada `int` sarıyordu (ör. `page=2147483647` başka bir sayfanın ofsetini veriyordu). Shrink'ten sonra seed `e_6U6vth8ZA3`.
+  - `Result<T>`, `ToHttpResult` (her `ErrorType` için durum, `detail`, `code`), `PagedList` sayıları, `Payment` durum geçişleri, `Product` stok dizileri ve Catalog rezervasyon handler'ının tekrar teslimi (25 örnek, tek iş parçacığı, paylaşılan SQLite host'u) yeşil. Tam takım 388/388, ~5 dk.
+- Kaynak: https://github.com/AnthonyLloyd/CsCheck · https://www.nuget.org/packages/CsCheck/4.9.1 · ölçüm
+- Sonuç: Property testleri `Unit/*PropertyTests` ve `Integration/StockReservationPropertyTests`. `Skip` `long`'da hesaplanıp `int.MaxValue`'da kesiliyor (D-062).
+
+### R-116: Stryker.NET 5.0 ve Microsoft.Testing.Platform runner'ı (2026-10-23, faz 6c; kaynak + ölçüm)
+- Soru: Stryker.NET xUnit v3 4.x + MTP ile koşuyor mu, Abstractions ve modüllerin domain kodu haftalık nasıl mutasyona uğratılır (F6c.7)?
+- Bulgu (kaynak): dotnet-stryker 5.0.0 (Apache-2.0) .NET 10 runtime'ında koşar; `--test-runner mtp` önizlemedir ("may have limitations"); xUnit v3'ün MTP runner'ında `test-case-filter` yok. Çalışma kipleri: test projesinden (`--project` doğrudan referanslardan biri), kaynak projeden (`--test-project`) ya da çözümden (`--solution`). `--mutate` glob alır, `--break-at` 0 iken hiçbir skor koşuyu kırmaz.
+- Ölçüm (yerel, SDK 10.0.300):
+  - Test projesi kipi (`tests/NovaCore.Api.Tests`, `--project NovaCore.Abstractions.csproj`) ve kaynak projesi kipi "No project found" ile durdu: Buildalyzer bu makinede Visual Studio 18 Insiders'ın MSBuild'ini kullanıyor, test projesinin ve Api'nin "simulated build"i düşüyor, Abstractions ise yalnızca geçişli referans.
+  - Çözüm kipi (`--solution NovaCore.slnx`) çalıştı: 388 test bulundu, ilk koşu ~5 dk, Abstractions'ta 46 mutant. Ama test başına coverage yakalaması her testi tek tek koşturuyor ve host açan testler zaman aşımıyla "Dubious" oluyor (6 dakikada 26 test, bitmedi). Coverage'sız ya da toplu coverage'da her mutant tam takımı (~5 dk) koşturur: yalnız Abstractions için ~1 saat.
+  - Saf testler `tests/NovaCore.Domain.Tests`'e taşınınca (37 test, 2–4 sn) test projesi kipi çalıştı: Abstractions 46 mutant, Catalog `Domain/` 14, Payments `Domain/` 10 test edildi; üç koşu toplam ~2 dk 20 sn. İlk skorlar %69,77 / %61,11 / %70,00.
+  - Hayatta kalanlar: `PagedList.HasPreviousPage`/`HasNextPage` ve `pageSize = 1` sınırları (rastgele üreteçler sınırlara nadiren düşüyordu), sınanmayan `Result.Failure(Error.None)` değişmezi, hata mesajı metinleri, eşdeğer mutantlar (`page < 1` → `page <= 1`). Üreteçlere sınır değerleri ve değişmeze bir test eklenince Abstractions %79,07.
+- Kaynak: https://stryker-mutator.io/docs/stryker-net/configuration/ · https://stryker-mutator.io/docs/stryker-net/operating-modes/ · https://github.com/stryker-mutator/stryker-net/releases · ölçüm
+- Sonuç: `eng/mutation.sh` üç hedefi `tests/NovaCore.Domain.Tests`'e karşı koşturur (`--break-at 0`, html/markdown/json); `mutation.yml` haftalık + `workflow_dispatch`. D-063.
