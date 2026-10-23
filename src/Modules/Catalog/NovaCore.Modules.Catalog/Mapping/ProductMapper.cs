@@ -1,6 +1,6 @@
-using Riok.Mapperly.Abstractions;
 using NovaCore.Modules.Catalog.Contracts;
 using NovaCore.Modules.Catalog.Domain;
+using Riok.Mapperly.Abstractions;
 
 namespace NovaCore.Modules.Catalog.Mapping;
 

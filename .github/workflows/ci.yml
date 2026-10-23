@@ -47,6 +47,11 @@ jobs:
       - name: Build
         run: dotnet build NovaCore.slnx -c Release --no-restore
 
+      # Whitespace, usings and the code style .editorconfig sets, as `dotnet format NovaCore.slnx` would fix them. Line
+      # endings are git's business (the index is LF), so .editorconfig doesn't set end_of_line.
+      - name: Formatting
+        run: dotnet format NovaCore.slnx --verify-no-changes --no-restore
+
       # The tests, with the line and branch coverage held to eng/coverage-baseline.txt (docs/plan/DECISIONS.md D-060). The
       # SQL Server tests run in a container (Docker is on the runner); without Docker they would skip, and --fail-skips
       # makes a skipped test fail the run (D-056).

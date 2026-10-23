@@ -8,9 +8,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.JsonWebTokens;
+using NovaCore.Api.Tests.IdentityServer;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
-using NovaCore.Api.Tests.IdentityServer;
 using NovaCore.Identity.OpenIddict;
 
 namespace NovaCore.Api.Tests;

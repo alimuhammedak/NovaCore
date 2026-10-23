@@ -2,7 +2,6 @@ root = true
 
 [*]
 charset = utf-8
-end_of_line = crlf
 insert_final_newline = true
 trim_trailing_whitespace = true
 indent_style = space
@@ -54,6 +53,8 @@ dotnet_diagnostic.CA2007.severity = none
 # EF Core migrations pass constant column arrays (composite indexes). Up/Down run once per database and the builder keeps
 # the arrays, the two cases CA1861's documentation allows suppressing (docs/plan/RESEARCH.md R-064).
 dotnet_diagnostic.CA1861.severity = none
+# dotnet ef writes migrations with a byte order mark; dotnet format checks the charset.
+charset = utf-8-bom
 
 [*.{csproj,props,targets}]
 indent_size = 2
