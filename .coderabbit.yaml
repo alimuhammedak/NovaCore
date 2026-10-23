@@ -54,7 +54,8 @@ reviews:
         instructions: >-
           Fail if the change adds anything listed under "Yapılmayacaklar" in docs/plan/DECISIONS.md: e.g. MediatR,
           AutoMapper, FluentAssertions or any mediator/request-dispatch abstraction (Y-01, Y-43), a package that is not
-          MIT/Apache-2.0 or Microsoft (Y-06), a generic repository/unit of work over EF Core (Y-15), assembly-scanning
+          MIT/Apache-2.0 or Microsoft and is not a named exception in DECISIONS (Y-47: Polly.* transitively, D-052; a
+          project's database provider recorded by name, D-068), a generic repository/unit of work over EF Core (Y-15), assembly-scanning
           registration (Y-20), EF InMemory or a mocked DbSet in tests (Y-32), lazy-loading proxies (Y-33). Name the Y-ID.
       - name: "Bastırma gerekçesi (Y-46)"
         mode: warning

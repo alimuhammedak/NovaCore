@@ -19,9 +19,9 @@
 ## Faz sırası ve bağımlılıklar
 
 ```
-0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 4c → 4d → 5 → 6a → 6b → 6c → 6d → 6e
+0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 4c → 4d → 5 → 6a → 6b → 6c → 6d → 7a → 7b → 6e
 ```
-Bir faza başlamadan önce kendisinden önceki tüm fazlar PROGRESS.md'de "tamam" olarak işaretlenmiş olmalıdır. 4d koşulludur: F4d.1'deki karar fazı gereksiz kılarsa faz `✅ tamam (atlandı)` olarak işaretlenir. 4c ve 4d, 2026-09-28'de tüketici hazırlığı araştırmasıyla eklendi (D-033, [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md)). 6a–6e, 2026-10-21'de güvenlik ve kalite araştırmasıyla eklendi (D-042…D-049, [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-kararlari.md)).
+Bir faza başlamadan önce kendisinden önceki tüm fazlar PROGRESS.md'de "tamam" olarak işaretlenmiş olmalıdır. 4d koşulludur: F4d.1'deki karar fazı gereksiz kılarsa faz `✅ tamam (atlandı)` olarak işaretlenir. 4c ve 4d, 2026-09-28'de tüketici hazırlığı araştırmasıyla eklendi (D-033, [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md)). 6a–6e, 2026-10-21'de güvenlik ve kalite araştırmasıyla eklendi (D-042…D-049, [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-kararlari.md)). 7a ve 7b, 2026-10-23'te CRM-Nominal geçişi değerlendirmesiyle eklendi (D-068…D-071, [proposals/crm-cok-kiracililik.md](proposals/crm-cok-kiracililik.md)). 6e'den önce yürürler: 6e'nin denetimleri son kod yüzeyini görmeli (D-071 (3)).
 
 ---
 
@@ -303,3 +303,45 @@ Kaynak: [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-karar
 | F6e.3 | **OpenID conformance suite.** Yerel Docker, sürüm öncesi. | — | Rapor |
 | F6e.4 | **Ajan koşuları.** Cloudflare `security-audit-skill` + Claude Security plugin: önce auth çekirdeği, sonra bütün repo, her kapsam en az iki kez. Girdi: Faz 6b listesi ve araştırmanın OIDC kontrol listesi. | — | Bulgu listesi |
 | F6e.5 | **Triage kuralı.** Ajan bulgusu ancak başarısız bir xUnit testine dönüşebiliyorsa düzeltilir; test regresyon testi olarak kalır. Dönüşmeyen bulgu `needs_validation` olarak PROGRESS'e yazılır. | tests, PROGRESS | Her bulgu ya testli düzeltme ya `needs_validation` |
+
+---
+
+## Faz 7: İlk tüketici hazırlığı (7a, 7b)
+
+Kaynak: [proposals/crm-cok-kiracililik.md](proposals/crm-cok-kiracililik.md) (kullanıcı kararları → D-068…D-071) ve RESEARCH R-122…R-124. CRM-Nominal, NovaCore üzerinde yeniden kurulacak (D-070). Önce NovaCore'un iki eksiği tamamlanır, CRM'in geçişi ondan sonra ayrıca planlanır. Sıra `6d → 7a → 7b → 6e` (D-071 (3)).
+
+## Faz 7a: Veritabanı özgürlüğü (D-068)
+
+**Amaç:** NovaCore hiçbir projeyi bir veritabanına bağlamaz. Paketler bugün de sağlayıcıdan bağımsız. Bu faz kilidi şablondan ve testlerden kaldırır, Y-47'yi lisans kapısına uygular ve bağımsızlığı ikinci bir sağlayıcıda kanıtlar.
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F7a.1 | **Lisans kuralı (Y-47).** Lisans kapısı, projede adıyla kaydedilmiş sağlayıcı istisnasını tanır (D-052 kalıbı). Repo'nun istisnası, PostgreSQL test katmanı için Npgsql'dir. Şablonun ürettiği projeye de bir lisans kapısı girer (bugün yok); seçilen sağlayıcı orada adlı istisnadır. Y-06'ya canlı atıflar Y-47'ye taşınır (`ci.yml`, `eng/check-licenses.sh`, README; `.claude/hooks/` mesajı korumalı, kullanıcı onayıyla). | `eng/check-licenses.sh`, `ci.yml`, şablonun CI'ı, README | Adlı istisnası olmayan `PostgreSQL` lisanslı bir paket kapıda kırmızı, istisnalı olan yeşil (yerelde denenir); üretilen projenin kapısı yeşil |
+| F7a.2 | **Sağlayıcı tek yerden.** Modüller sağlayıcı seçmez. Host seçer, `AddModuleDbContext` seçimi her modül context'ine uygular; modül yalnız kendi ayarını (şema, migration geçmişi tablosu) ekler. Kesin API fazda R-kaydıyla seçilir; 0.x'te public API değişikliğidir, CHANGELOG'a girer. Repo'nun modülleri, Api host'u ve şablonun `Todos` modülü geçirilir. | `NovaCore.EntityFrameworkCore/Persistence`, `src/Modules/*`, `src/Api`, şablon | Hiçbir modül sağlayıcı seçmiyor (mimari test); davranış ve migration'lar aynı, `has-pending-model-changes` temiz |
+| F7a.3 | **İkinci sağlayıcı: PostgreSQL test katmanı.** `Testcontainers.PostgreSql` (MIT) ve Npgsql EF sağlayıcısı (F7a.1'in adlı istisnası; yeni paketler hook onayıyla). Outbox (yazma, dağıtım, saklama silmesi), migration servisi ve kimlik eklentisi PostgreSQL'de koşar. Sağlayıcı başına ayrı migration seti (MS). SQL Server katmanının kalıbı (D-056 (3)–(5)): Docker yoksa yerelde atlanır, CI'da `--fail-skips on`. | tests, `docker-compose.yml` | PostgreSQL katmanı CI'da yeşil; aynı senaryolar iki sağlayıcıda |
+| F7a.4 | **Şablon `--db SqlServer\|PostgreSql`.** `--auth` gibi bir şablon parametresi: seçilen sağlayıcının paketi, bağlantı dizesi, compose servisi, migration'ları ve CI'ı. SqlClient'ın Pkcs pini (D-036 (8)) yalnız SQL Server seçiminde. | şablon, `eng/template-smoke.sh` | Smoke testi dört bileşimde (iki `--auth` × iki `--db`) build, test ve migration kontrolünden geçer |
+| F7a.5 | **Belgeler.** Desteklenen sağlayıcılar ve "modül başına şema" varsayımının sınırı (MySQL/MariaDB'de şema bir veritabanıdır, SQLite şemayı yok sayar; ölçülür ya da belgelenir). Kök CLAUDE.md'deki "SQL Server, not Postgres" notu, README, CHANGELOG, memory. | dokümanlar | — |
+
+**Bu fazda yapılmayacaklar:** çok kiracılılık (7b); kurum başına veritabanı; MySQL, Oracle ve diğer sağlayıcıların test edilmesi (yalnız belgelenir); RLS.
+
+## Faz 7b: Çok kiracılılık (D-069, D-070)
+
+**Amaç:** Birçok kuruma satılan ürünlerin ortak altyapısını isteğe bağlı bir paket olarak sunmak. Tasarım Microsoft'un çok kiracılı rehberinden çıkar (R-124). İlk tüketici CRM-Nominal, ama CRM'e özgü parçalar (şube kapsamı, roller, KVKK kuralları) girmez.
+
+**Kural:** Her güvenlik kuralı önce kırmızı testle başlar (6b gibi). İzolasyon testleri iki sağlayıcıda koşar (7a).
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F7b.1 | **Tasarım kararları.** (1) Finbuckle tabanlı bir eklenti mi (Apache-2.0; yeni paket hook onayıyla), Microsoft'un yapı taşları üzerine kendi uygulamamız mı: maliyet hesabıyla (D-016). (2) Paket sınırı: hangi parça isteğe bağlı pakete, hangisi çekirdeğe girer (D-003: çekirdek yalnız Microsoft). (3) Kurum çözüm yöntemleri (yol, alan adı, başlık, claim) ve şablonun varsayılanı. | — | R ve D kaydı |
+| F7b.2 | **Kurum bağlamı ve çözümü.** İstek başına kurum bağlamı. Kurum yalnız çağıranın o kurumda aktif üyeliği varsa ve kurum aktifse çözülür (fail-closed). Askıdaki kurum çözülmez; middleware gerekmez (D-070 (5)). | yeni paket, `NovaCore.AspNetCore` | Test: üyesi olunmayan kuruma istek erişemez; askıdaki kurum hiçbir veri görmez; geçerli token'la yola başka bir kurum yazmak erişim vermez |
+| F7b.3 | **Veri izolasyonu.** `TenantId` taşıyan her varlığa adlı bir okuma filtresi ve yazma koruması (boşsa doldurur, başka kurumunsa reddeder), `AddModuleDbContext`'te otomatik (outbox interceptor'ı gibi). Açık ve dar bir sistem işi bağlamı. Filtresiz bir kurum varlığını yakalayan konvansiyon testi. | `NovaCore.EntityFrameworkCore`, yeni paket | Test (iki sağlayıcıda): başka kurumun verisi okunmaz, ona yazma reddedilir; başka bir adlı filtreyi kapatmak (`IgnoreQueryFilters([...])`) kurum filtresini yerinde bırakır; filtresiz bir kurum varlığı konvansiyon testini kırmızı yapar |
+| F7b.4 | **Üyelik ve kuruma göre izin.** Kullanıcı ↔ kurum ↔ rol üyeliği. İzinler birden çok kaynaktan çözülür: kimlik eklentisinin platform izinleri ve üyelik (bugün DI'daki son `IPermissionResolver` kaydı kazanıyor). Önbellek anahtarı kuruma göre bölümlenir; `RemovePermissionsAsync(sub)` bütün bölümleri düşürür. "Sonraya bırakılanlar"daki izin önbelleği bölümlemesi maddesi buradadır. | `NovaCore.AspNetCore/Authorization`, yeni paket, kimlik eklentisi | Test: aynı `sub` iki kurumda farklı izin alır; önbellek kurumlar arasında sızmaz; Administrator kuralı (2FA, D-053 (5)) üyelik kaynağıyla birlikte de çalışır |
+| F7b.5 | **Arka plan bağlamı.** Outbox mesajı kurum bağlamını ve trace bağlamını taşır, dağıtıcı onu handler'ın scope'unda geri yükler. Kurumsuz yazılan mesaj kurumsuz kalır. "Sonraya bırakılanlar"daki trace bağlamı maddesi buradadır. | `NovaCore.EntityFrameworkCore/Messaging`, migration'lar | Test: handler, mesajı yazan kurumun verisini görür, başka kurumunkini görmez; handler'ın span'i isteğin trace'ine bağlı |
+| F7b.6 | **Kurum yaşam döngüsü.** Aktif, askıda, kapalı (MS: devre dışı bırakma geçicidir). Kapanan kurumun verisinin silinmesi için bir yol (saklama süresi, yeniden katılım); kapsamı fazda ölçülür. | yeni paket | Test: askıya alınan kurum, fazda belirlenen süre içinde bütün erişimini kaybeder; yeniden etkinleşince erişim döner |
+| F7b.7 | **Çekirdek düzeltmeleri (R-122).** Bir projenin kendi `IClaimsTransformation`'ı NovaCore'un izin çözümlemesinin yerini aldıysa host açılmaz (`PermissionResolverStartupCheck` kalıbı). `AuditableEntityInterceptor` `CreatedBy`/`ModifiedBy`'a `sub` yazar: değişmez ve kişisel veri değil (D-054 (11)); 0.x davranış değişikliği, CHANGELOG'a girer. | `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore` | Test: ikinci bir `IClaimsTransformation` kaydı açılışı durdurur; damga `sub`'dır |
+| F7b.8 | **Şablon.** İsteğe bağlı çok kiracılılık seçeneği (şablon parametresi); örnek modülde kurum kapsamlı bir varlık. | şablon, `eng/template-smoke.sh` | Smoke testi seçenek açıkken ve kapalıyken yeşil |
+| F7b.9 | **Belgeler.** README'de çok kiracılılık rehberi (kurum çözümü, izolasyon, sistem işi, arka plan, sağlayıcı başına RLS örneği). README'deki "Ezilemeyenler" paragrafı güncellenir (middleware yeri D-070 (5), izin önbelleği F7b.4). Y-14'e canlı atıflar Y-48'e taşınır. CLAUDE.md'ler, CHANGELOG, memory. | dokümanlar | — |
+
+**Bu fazda yapılmayacaklar:** şube kapsamı ve CRM'in rolleri (CRM'in işi); kurum başına veritabanı; RLS'in paketlere girmesi; token'da kurum claim'i (D-070 (3)); kurum başına istek sınırı; CRM'in geçişi (ayrı plan, D-070 (4)).
+
+**Faz doğrulaması (7a ve 7b):** `dotnet build NovaCore.slnx -c Release`, `dotnet test NovaCore.slnx` (SQLite, SQL Server ve PostgreSQL katmanları), `bash eng/template-smoke.sh`, her context için `has-pending-model-changes`, lisans kapısı, coverage ve OpenAPI sözleşmesi kapıları, faz branch'inde CI.

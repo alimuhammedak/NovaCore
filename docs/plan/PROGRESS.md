@@ -23,6 +23,8 @@
 | 6b | ✅ tamam | `faz/6b-kimlik-guvenlik-siniri` | 2026-10-21 | 2026-10-22 | 2026-10-22 (kullanıcı onayı, `--no-ff`, `4909fe4`; push 2026-10-22, kullanıcı isteği) |
 | 6c | ✅ tamam | `faz/6c-test-altyapisi` | 2026-10-22 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `64b3ab6`; push 2026-10-23, kullanıcı isteği) |
 | 6d | ✅ tamam | `faz/6d-analizor-sikilastirma` | 2026-10-23 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `231b05f`; push 2026-10-23, kullanıcı isteği) |
+| 7a | ⏳ başlamadı | | | | |
+| 7b | ⏳ başlamadı | | | | |
 | 6e | ⏳ başlamadı | | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
@@ -1179,6 +1181,12 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-49 | F6d.4: SonarQube Cloud hesabı/projesi + `SONAR_TOKEN` ve CodeRabbit GitHub uygulaması kullanıcının yapabileceği kurulumlar. Ne zaman? (faz içinde / faz sonrasına / Sonar ve CodeRabbit olmasın) | F6d.4 | **Faz içinde, kullanıcı kurar** (2026-10-23, kullanıcı; önerilen). Model workflow'u ve yapılandırmayı hazırlar, ilk koşuları raporlar |
 | Q-51 | F6d.4 (merge sonrası): CodeRabbit'in tamamı. (1) Faz merge'leri: PR üzerinden / yerel kalsın. (2) Merge kapısı: danışman / engelleyici (request changes + ruleset'te PR zorunlu). (3) CodeRabbit CLI + Claude Code eklentisi: kur / kurma | F6d.4 | **PR üzerinden, danışman, CLI ve eklenti kurulsun** (2026-10-23, kullanıcı; üçü de önerilen). Kullanıcı: "Bir parça değil tam tüm CodeRabbit'i kullanmak istiyorum" → D-067 |
 | Q-52 | F6d.4d (PR #10): Y-44 bastırma için yalnız Microsoft iznini yazıyor, kullanıcı onayı yolunu (Yapılmayacaklar girişi, CLAUDE.md, D-011, Q-50) yazmıyor; CodeRabbit bu yüzden aynı bulguyu iki kez açıp geri çekti. Y-44 revize edilsin mi? (revize et / olduğu gibi kalsın) | F6d.4d | **Revize et** (2026-10-23, kullanıcı: "önerileni yap"; önerilen). Y-44 üstü çizildi, yerine Y-46: iki izinli yol açıkça; canlı atıflar (CLAUDE.md, README, tests/CLAUDE.md, faz skill'i, `.coderabbit.yaml`) Y-46'ya taşındı, eski D/R kayıtları ve proposals tarihî olduğu için değişmedi |
+| Q-53 | CRM geçişi değerlendirmesi (faz dışı): CRM, NovaCore'un DECISIONS kurallarını ne ölçüde devralsın? (yasaklar evet, Clean katmanlar Y-03 istisnası / tamamen / yalnız paketleri tüketir) | CRM geçişi | **Tamamen devralır** (2026-10-23, kullanıcı; önerilen "yasaklar evet, katmanlar istisna" idi) → D-070 (1) |
+| Q-54 | CRM'in kimlik modeli: G-a, tek hesap + uygulamada üyelik / G-b, tek hesap + kurum token'da / P, kurum başına hesap | CRM geçişi | İlk turda kullanıcı daha çok açıklama istedi: "asıl anlamak istediğim bir şey yaparsak bu sadece bu projede mi kullanılacak yoksa diğer projelerde de bu gibi ihtiyaçlar olabilir mi?" Senaryolu karşılaştırmadan sonra **G-a** (2026-10-23, kullanıcı; önerilen) → D-070 (3) |
+| Q-55 | Npgsql (`PostgreSQL` lisansı) Y-06'nın dışında kalıyor. Nasıl ilerlenecek? | CRM geçişi | İlk turda kullanıcı: "Novacore bizi bir veritabanına mahkum etmemeli. Her proje kendi veritabanını özgürce kullanabilmeli." İkinci turda (projede adlı istisna / izin listesine OSI izinli lisanslar / sağlayıcılar kapı dışında) **projede adlı istisna** (2026-10-23, kullanıcı; önerilen) → D-068, Y-47 |
+| Q-56 | Sırada ne var: önce CRM spike'ı mı, önce NovaCore fazı mı? | CRM geçişi | Kullanıcı: önce eksiğin NovaCore'da olup olmadığına karar verilir, eksik varsa tamamlanır; CRM'in altyapısı değil, iş mantığı ve validasyonların mantığı taşınır (2026-10-23) → D-070 (2), (4) |
+| Q-57 | NovaCore üzerinde hangi tür projeler kurulacak? (birçok kuruma satılan ürün / tek kurumun iç uygulaması / son kullanıcı uygulaması / bilinmiyor) | CRM geçişi | **Birçok kuruma satılan ürün** (2026-10-23, kullanıcı) → D-069 (1) |
+| Q-58 | Y-14 açılıp çok kiracılılık NovaCore'a alınsın mı? (evet, isteğe bağlı paket / hayır, ikinci proje gelene kadar) | CRM geçişi | **Evet, isteğe bağlı paket** (2026-10-23, kullanıcı; önerilen) → D-069, Y-48. Ardından kullanıcı: "Kararları DECISIONS'a revizyon kuralıyla işle (Y-06 ve Y-14), iki yeni fazı (veritabanı özgürlüğü, çok kiracılılık) PLAN'a ekle ve PROGRESS'i güncelle." → D-071, Faz 7a ve 7b |
 
 ## Sonraya bırakılanlar
 
@@ -1198,11 +1206,11 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 - ~~Catalog/Payments uçtan uca testleri (Faz 2c) → F5.3 (4b'de).~~ → F5.3'te yapıldı (Faz 4b).
 
 **D-033 ile bilerek plana alınmayanlar.** Bugün bir tüketicileri yok (Y-14). Madde, yanındaki koşul gerçekleşince plana alınır:
-- `UseCoreWeb`'e kimlik doğrulama ile yetkilendirme arasında bir middleware yeri. *Koşul:* bir proje yetkilendirmeden önce kimliğe bağlı bir middleware'e (ör. tenant çözümü) ihtiyaç duyar. Bugün proje kendi middleware'ini `UseCoreWeb`'den sonra ekleyebiliyor.
-- İzin önbelleğinin anahtarına `iss` ya da ek bir bölümleme. *Koşul:* ikinci bir issuer'a güvenilir, ya da izinler kullanıcıdan başka bir şeye (ör. tenant) göre değişir. Bu yapılmadan önce iki issuer'dan gelen aynı `sub` başka bir kullanıcının izinlerini alabilir (Faz 3a maddesi).
+- ~~`UseCoreWeb`'e kimlik doğrulama ile yetkilendirme arasında bir middleware yeri. *Koşul:* bir proje yetkilendirmeden önce kimliğe bağlı bir middleware'e (ör. tenant çözümü) ihtiyaç duyar. Bugün proje kendi middleware'ini `UseCoreWeb`'den sonra ekleyebiliyor.~~ → Koşul 2026-10-23'te ilk tüketiciyle (CRM-Nominal) incelendi ve **tutmadı**: izin çözümlemesi kimlik doğrulamanın içinde çalışıyor (`IClaimsTransformation`), uygulamanın middleware'i `UseCoreWeb`'den sonra endpoint'ten önce çalışıyor, askıdaki kurumun kontrolü kurum çözümüne giriyor. Eklenmeyecek (D-070 (5), R-122).
+- İzin önbelleğinin anahtarına `iss` ya da ek bir bölümleme. *Koşul:* ikinci bir issuer'a güvenilir, ya da izinler kullanıcıdan başka bir şeye (ör. tenant) göre değişir. Bu yapılmadan önce iki issuer'dan gelen aynı `sub` başka bir kullanıcının izinlerini alabilir (Faz 3a maddesi). → **Kurum bölümlemesi F7b.4'e alındı (D-069, D-071).** `iss` kısmı koşuluyla burada kalıyor.
 - Request timeouts middleware'i (R-073). *Koşul:* uzun süren bir uç ya da bir OWASP API4 bulgusu.
-- Outbox'ın birden çok örnekte çalışması (kilit/lease) ve mesajda trace bağlamı. *Koşul:* proje yatayda ölçeklenir, ya da event zincirlerini trace'te izlemek gerekir.
-- `ApplicationUser` genişletme ve token'a claim ekleme kancası. *Koşul:* bir proje kullanıcıya bağlı ek bir claim ister.
+- Outbox'ın birden çok örnekte çalışması (kilit/lease) ve mesajda trace bağlamı. *Koşul:* proje yatayda ölçeklenir, ya da event zincirlerini trace'te izlemek gerekir. → **Trace bağlamı, kurum bağlamıyla birlikte F7b.5'e alındı (D-071).** Kilit/lease kısmı koşuluyla burada kalıyor.
+- `ApplicationUser` genişletme ve token'a claim ekleme kancası. *Koşul:* bir proje kullanıcıya bağlı ek bir claim ister. → 2026-10-23: CRM-Nominal'in kimlik modeli token'a kurum ya da şube koymuyor (D-070 (3)), koşul **tetiklenmedi**. Bir proje kurumu token'da isterse (Microsoft'un "tenant claim" yolu, R-124) yeniden değerlendirilir.
 - BFF paketi ya da şablonu (R-073). *Koşul:* iki proje tarayıcı frontend'i için aynı BFF'e ihtiyaç duyar. O güne kadar README önerisi (F5.5) yeterli.
 
 - xUnit v3 → 4.x ve xunit.runner.visualstudio 4.x major güncellemesi (F0.2 kapsamı dışında). Kaynak: `dotnet list package --outdated`, 2026-09-24.
@@ -1349,6 +1357,23 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 ## Son devir notu
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
+
+**2026-10-23, faz dışı: CRM-Nominal geçişi değerlendirmesi ve plan değişikliği (Faz 7a ve 7b eklendi).** Kod değişmedi. Kullanıcı, CRM-Nominal'i (çok kiracılı eğitim kurumu CRM'i, PostgreSQL) NovaCore üzerinde yeniden kurmak istiyor. İlk analizin (Haiku) NovaCore'dan istekleri Microsoft'un belgeleri ve iki reponun koduyla karşılaştırıldı; kullanıcıya iki tur soru soruldu.
+
+- **Kararlar:**
+  - D-068: veritabanı özgürlüğü; Y-06'nın yerine Y-47 (sağlayıcı, projede adlı istisna).
+  - D-069: çok kiracılılık NovaCore'a isteğe bağlı bir paketle girer; Y-14'ün yerine Y-48.
+  - D-070: CRM NovaCore üzerinde yeniden kurulur (kod değil iş mantığı taşınır); kimlik modeli tek hesap + uygulamada üyelik; `UseCoreWeb`'e kimlik doğrulama ile yetkilendirme arasında middleware yeri eklenmez.
+  - D-071: Faz 7a ve 7b; sıra `6d → 7a → 7b → 6e`.
+  - Sorular Q-53…Q-58, araştırma R-122…R-124, belge [proposals/crm-cok-kiracililik.md](proposals/crm-cok-kiracililik.md).
+- **Bulgular:** İlk analizin üç öncülü tutmadı: middleware kancası gerekmiyor, kurumun yalnız token'dan çözülmesi şart değil, Microsoft kurum başına hesap yerine kişi başına tek hesap öneriyor. Kaçırdığı iki engel var: Npgsql'in lisansı ve ASP.NET Core'un tek bir `IClaimsTransformation` çalıştırması (R-122, R-123).
+- **Sonraki faz 7a (`/novacore-phase 7a`) bilmeli:**
+  - Şablonda ve repo'nun modüllerinde sağlayıcıyı her modül kendisi seçiyor (`UseSqlServer`).
+  - Şablonun ürettiği projede lisans kapısı yok.
+  - Y-06'ya canlı atıflar F7a.1'de Y-47'ye taşınır: `ci.yml`, `eng/check-licenses.sh`, README; hook mesajı korumalı. `.coderabbit.yaml`'ın Y-list check'i bu oturumda Y-47'ye çevrildi.
+  - Npgsql ve `Testcontainers.PostgreSql` yeni paketler: hook onay ister.
+- **Değişmeyen:** Aşağıdaki 6d notundaki "6e bilmeli" maddeleri 6e için geçerli; 6e artık 7b'den sonra.
+- **Yapılmayan:** commit.
 
 **2026-10-23, Faz 6d: Analizör ve platform sıkılaştırma (tamam, `main`'e merge ve push edildi).** Kullanıcı onayı: "faz/6d-analizor-sikilastirma'yı main'e --no-ff merge et ve push et"; merge `231b05f` (ağaç faz branch'inin ucu `13b4eed` ile aynı). Branch `faz/6d-analizor-sikilastirma`, her adımdan sonra push edildi; kullanıcı "izinsiz devam et" dedi, plan onayı beklenmeden PROGRESS'e yazıldı. 17 commit. 387/387 yeşil; CI ve CodeQL yeşil.
 
