@@ -110,6 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Meziantou.Analyzer runs in every project with its default severities (MA0048, MA0004 where CA2007 is off, and MA0051
   in migrations excepted). String comparisons and string-keyed collections say `Ordinal`; the identity provider's
   permission list (`GET /api/v1/admin/permissions`) is ordered by ordinal comparison instead of the server's culture.
+- A weekly report (`unused-code.yml`, `eng/find-unused.sh`, Roslynator CLI) lists the internal and private types,
+  fields, constants and events nothing references.
 - Template: the generated project runs the same Security, Reliability, Performance and Usage rules, the dead-code
   rules and the code metric rules (CA2007, CA1812, and CA1506 in `Program.cs`, stay off: the project is ASP.NET Core
   application code). Its tests pass `Uri` objects to `HttpClient`.
