@@ -67,7 +67,7 @@ Her adım için aynı döngü:
 1. **Başlat:** PROGRESS'te adıma "devam ediyor" notu düş.
 2. **Test:** Adım bir hata düzeltmesi veya yeni davranış içeriyorsa önce testi yaz ve kırmızı olduğunu gör.
 3. **Uygula:** Yalnızca o adımın kapsamı. Aynı dosyada yan bir şey gözüne çarparsa dokunma, §4'ü uygula.
-4. **Doğrula:** `dotnet build NovaCore.slnx` ve `dotnet test NovaCore.slnx`. Paket değiştiyse `dotnet restore NovaCore.slnx --force` da çalıştır. Kırmızıysa düzelt. Düzeltme kapsam dışına taşıyorsa §4.
+4. **Doğrula:** `dotnet build NovaCore.slnx` ve `dotnet test NovaCore.slnx`. Paket değiştiyse `dotnet restore NovaCore.slnx --force` da çalıştır. Kırmızıysa düzelt. Düzeltme kapsam dışına taşıyorsa §4. Ardından adımın değişikliklerini CodeRabbit CLI'a incelet (D-067): `coderabbit review --agent --uncommitted --include-untracked`. Kapsam içi gerçek bulguyu düzelt ve build ile testleri (paket değiştiyse restore'u da) commit'ten önce yeniden çalıştır, kapsam dışını §4'e göre "Sonraya bırakılanlar"a yaz, yanlış pozitifi tek cümleyle commit notuna ekle. CLI kurulu ya da oturum açık değilse (`coderabbit auth status`) ya da rate limit'e takılırsa adımı bekletme: PROGRESS notuna "CLI incelemesi yok: <neden>" yaz, PR incelemesi yine yakalar.
 5. **Commit:** `faz<id>(<adım-id>): <özet>`, sonuna oturumun attribution satırını ekle. Sadece o adımın dosyalarını stage'le (`git add <yol>`); `git add -A` kullanma.
 6. **Kaydet:** PROGRESS'te `- [x] <adım-id> (<kısa-hash>): <kısa not>`.
 7. **Bilgilendir:** Kullanıcıya tek satır yaz, ör. "F0.3 tamam: strict limiter IP bazlı, 2 yeni test." Adımda kendi aldığın bir karar varsa aynı satıra ekle. Plan onaylandığı için adımlar arasında onay bekleme. Yalnızca §4'teki "sor" durumunda dur.
@@ -101,7 +101,7 @@ Faz tek oturuma sığmayacak kadar büyükse bir adım sınırında dur. PROGRES
    | Adımı tamamlamak için gereken düzeltme; kaynağın net söylediği yol; planlanan yaklaşımın teknik olarak çalışmaması; analyzer veya MS kuralının gerektirdiği public API değişikliği (yayımlanmamış 0.x paket); adım için gereken yeni dosya | **Kendin karar ver ve uygula.** Kalıcıysa DECISIONS'a D-kaydı ekle (ekleme onay istemez), PROGRESS notuna ve adım satırına yaz, CHANGELOG'a işle. Faz raporunda "Kendi aldığım kararlar" altında listele. |
    | Başka bir fazın işi ve şimdi gerekli | O fazı oku. Toplamda şimdi yapmak daha ucuzsa **eksiksiz** yap (D-kaydı, adım ID'si korunur); değilse dokunma. Geçici çözüm yok (Y-45). |
    | Kapsam dışı ama değerli, şimdi gerekli değil | PROGRESS → "Sonraya bırakılanlar" listesine yaz, **dokunma** (Y-09). |
-   | Uyarı çıktı | Önce düzelt. Düzeltme yerine bastırmak ancak MS dokümanının o kural için "When to suppress" bölümünün açıkça izin verdiği kalıcı durumda olur, gerekçe ve kaynakla (Y-44). Geçici bastırma yok. |
+   | Uyarı çıktı | Önce düzelt. Düzeltme yerine bastırmak ancak MS dokümanının o kural için "When to suppress" bölümünün açıkça izin verdiği kalıcı durumda olur, gerekçe ve kaynakla; bunun dışındaki her bastırma kullanıcıya sorulur ve onayı bir D/Q kaydına yazılır (Y-46). Geçici bastırma yok. |
    | **Sor (`AskUserQuestion`):** bir D/Y kaydıyla çelişki ya da onu yeniden açma; PLAN'ın kullanıcıya bıraktığı ürün veya sahiplik kararı; Microsoft dışı yeni paket; mevcut bir D/Y satırını değiştirmek; merge, push, tag, yayın, silme | Seçenekler, önerin, kaynak (R-ID). |
    | Yapılmayacaklar listesindeki bir şey gerekli görünüyor | **Uygulama.** Gerekçeyi ve kaynağı göster, sor. |
 
@@ -122,8 +122,9 @@ Faz tek oturuma sığmayacak kadar büyükse bir adım sınırında dur. PROGRES
 2. `code-review` skill'ini (Skill aracıyla) bu branch'in değişiklikleri üzerinde çalıştır. Bulguları rapora ekle. Kapsam dışı bulguları **düzeltme**, "Sonraya bırakılanlar" listesine yaz. Kapsam içi gerçek hataları düzelt ve yeniden doğrula.
 3. PROGRESS'i güncelle: faz `✅ tamam`, bitiş tarihi, **son devir notu** (yapılanlar, sürprizler, bekleyen sorular, sonraki fazın bilmesi gerekenler).
 4. Faz bir konvansiyonu değiştirdiyse README, CLAUDE.md dosyaları ve memory'nin güncellendiğini doğrula (Genel kurallar).
-5. Aşağıdaki rapor şablonuyla raporla.
-6. **Dur.** Sonraki faza başlama. Merge için kullanıcıya sor (`faz/...` → `main`). Kullanıcı sonraki fazı yeni bir oturumda `/novacore-phase <id>` ile başlatacak. "devam" bir sonraki faz için onay **değildir**.
+5. **PR ve CodeRabbit (D-067):** 2–4'teki düzeltmeleri ve PROGRESS güncellemesini (son adımın `[x]` kaydı dahil) doğrulayıp commit'le; çalışma ağacı temizken branch'i push et ve `gh pr create --base main --head faz/<id>-<kısa-ad>` ile PR aç (başlık `faz<id>: <faz adı>`, gövde: son devir notunun özeti). PR'ı açmak bu sürecin parçasıdır, ayrıca sorulmaz; merge sorulur. CodeRabbit kendiliğinden inceler. İncelemeyi bekle (poll etme; PR araçları CI'ı ve yorumları bildirir), sonra her yorumu sınıflandır: kapsam içi gerçek hata → düzelt, doğrula, aynı branch'e commit ve push; kapsam dışı → "Sonraya bırakılanlar"; yanlış pozitif ya da bir D/Y kaydıyla çelişen öneri → yorumu gerekçesi ve kaydın ID'siyle yanıtla. Pre-merge check'lerin uyarılarını da aynı şekilde ele al. Sonucu PROGRESS'e yaz, commit'le ve aynı branch'e push et; merge'ten önce PR'da commit'lenmemiş bir şey kalmasın. CodeRabbit inceleme yapmadıysa (rate limit, kesinti) bunu raporda söyle; merge'ü engellemez (danışman, D-067 (2)).
+6. Aşağıdaki rapor şablonuyla raporla.
+7. **Dur.** Sonraki faza başlama. Merge için kullanıcıya sor. Onay gelince `gh pr merge <no> --merge` (merge commit; squash ya da rebase değil, adım commit'leri korunur), ardından yerel `main`'i `git pull --ff-only` ile güncelle. Kullanıcı sonraki fazı yeni bir oturumda `/novacore-phase <id>` ile başlatacak. "devam" bir sonraki faz için onay **değildir**.
 
 ### Rapor şablonu
 
@@ -152,6 +153,9 @@ Faz tek oturuma sığmayacak kadar büyükse bir adım sınırında dur. PROGRES
 ### Code review özeti
 - ...
 
+### CodeRabbit (PR #N)
+- Düzeltilen / Sonraya bırakılan / yanıtlanan yorumlar; pre-merge check sonuçları.
+
 ### Sonraki adım
-Merge onayı bekleniyor. Ardından yeni oturumda: `/novacore-phase <sonraki-id>`
+PR #N için merge onayı bekleniyor. Ardından yeni oturumda: `/novacore-phase <sonraki-id>`
 ```

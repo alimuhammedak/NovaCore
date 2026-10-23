@@ -16,8 +16,9 @@ Where this file's Architecture/Standards sections disagree with `DECISIONS.md`, 
 completed phases update this file.
 
 - **Phase work starts only via `/novacore-phase <id>`** (project skill, user-invoked), one phase per fresh
-  session. When a phase ends, **stop**. "devam"/"continue" means "next step inside the approved phase
-  plan", never "start the next phase".
+  session. When a phase ends, **stop**. A phase merges through a `faz/...` → `main` pull request that CodeRabbit
+  reviews (advisory, `.coderabbit.yaml`, D-067); the merge itself still waits for the user. "devam"/"continue"
+  means "next step inside the approved phase plan", never "start the next phase".
 - **Never implement anything in DECISIONS.md → "Yapılmayacaklar"**, not even as a design suggestion. If one
   seems necessary, stop and ask with the reason and a source.
 - **Counter the "most typical answer" pull (Y-40…Y-43, applies to every session, not only phase work):**
@@ -72,6 +73,7 @@ bash eng/check-openapi.sh [base-revision]     # breaking changes in docs/openapi
 bash eng/mutation.sh                          # Stryker.NET on the abstractions and domain code, a report (D-063)
 bash eng/lint-workflows.sh [dir ...]          # actionlint + zizmor on .github (Docker; GH_TOKEN enables online audits)
 bash eng/find-unused.sh                       # unused internal/private types, fields, constants (Roslynator, D-066)
+coderabbit review --agent --uncommitted --include-untracked   # CodeRabbit CLI review of local changes (D-067; `coderabbit auth login` first)
 dotnet format NovaCore.slnx                   # fixes what CI's `dotnet format --verify-no-changes` reports
 git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release
@@ -225,7 +227,7 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   `dotnet restore NovaCore.slnx --force-evaluate` and commit the lock files with it.
 
 - **0 warnings is enforced** (`TreatWarningsAsErrors`). Fix a warning; don't suppress it. Suppressing (`NoWarn`,
-  `#pragma`, `.editorconfig` severity, `[SuppressMessage]`) needs user approval (DECISIONS Y-44), unless Microsoft's
+  `#pragma`, `.editorconfig` severity, `[SuppressMessage]`) needs user approval (DECISIONS Y-46), unless Microsoft's
   "When to suppress" section for that rule allows it permanently. The approved ones are
   listed under Gotchas.
 
@@ -279,7 +281,7 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 - **Suppressed-by-design warnings** (all user-approved, DECISIONS D-011):
   - `Directory.Build.props`: `NoWarn` `RMG020` (Mapperly intentional source-member drops). `WarningsNotAsErrors`
     `NU1901;NU1902` (low/moderate advisories stay warnings; high/critical fail restore; CI fails on any).
-  - Allowed by Microsoft's "When to suppress" section (DECISIONS Y-44): `.editorconfig` CA1861 off for
+  - Allowed by Microsoft's "When to suppress" section (DECISIONS Y-46): `.editorconfig` CA1861 off for
     `src/**/Migrations/*.cs` (EF migrations, R-064); `[SuppressMessage]` CA5350 on the test TOTP generator (R-063).
   - `.editorconfig`: CA1707 is off for `tests/**.cs` (test names are sentences).
   - Allowed by Microsoft's "When to suppress" (D-064, D-065): CA2007 off for the host, the modules, the tests and the
