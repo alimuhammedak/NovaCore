@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Api.Catalog;
 using NovaCore.Api.Identity;
 using NovaCore.Api.Payments;
+using NovaCore.Api.Tests.Databases;
 using NovaCore.Identity.OpenIddict;
 using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Payments.Infrastructure;
@@ -13,33 +14,16 @@ using Xunit;
 namespace NovaCore.Api.Tests.SqlServer;
 
 /// <summary>
-/// The migrations on a real SQL Server. The SQLite tests never run them (their schema comes from <c>EnsureCreated</c>) and
-/// CI's <c>has-pending-model-changes</c> only compares the model with them, so this is where their SQL runs: every
-/// migration applies to an empty database through the host's own startup migration, and the data steps carry existing
-/// rows over (their raw SQL, in <c>EXEC</c>, both ways).
+/// The migrations on SQL Server: the startup migrations every provider runs (<see cref="MigrationScenarios{TFactory}"/>),
+/// what only the host's SQL Server migrations have, their data steps (raw SQL, in <c>EXEC</c>, carrying existing rows
+/// over both ways), and the design-time factories `dotnet ef` builds them with. CI's <c>has-pending-model-changes</c>
+/// only compares the model with them.
 /// </summary>
-public sealed class MigrationTests(SqlServerApiFactory factory) : IClassFixture<SqlServerApiFactory>
+public sealed class MigrationTests(SqlServerApiFactory factory) : MigrationScenarios<SqlServerApiFactory>(factory)
 {
     private const string Handler = "Sample.Handler";
 
-    [Fact]
-    public async Task The_host_applies_every_migration_of_every_context_when_it_starts()
-    {
-        factory.Database.SkipIfUnavailable();
-        await using var scope = factory.Services.CreateAsyncScope();
-
-        foreach (var context in new DbContext[]
-                 {
-                     scope.ServiceProvider.GetRequiredService<CatalogDbContext>(),
-                     scope.ServiceProvider.GetRequiredService<PaymentsDbContext>(),
-                     scope.ServiceProvider.GetRequiredService<IdentityServerDbContext>()
-                 })
-        {
-            Assert.NotEmpty(context.Database.GetMigrations());
-            Assert.Equal(context.Database.GetMigrations(), await context.Database.GetAppliedMigrationsAsync(), StringComparer.Ordinal);
-            Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-        }
-    }
+    protected override IReadOnlyCollection<string> SystemSchemas { get; } = [];
 
     [Fact]
     public async Task The_design_time_factories_build_the_contexts_the_host_runs()
@@ -47,8 +31,8 @@ public sealed class MigrationTests(SqlServerApiFactory factory) : IClassFixture<
         // `dotnet ef` (migrations, scripts, bundles) builds the contexts with the host's design-time factories, the host
         // with AddModuleDatabase and AddModuleDbContext: the same provider, migrations and history table, or a bundle
         // would apply the migrations somewhere the host doesn't look (EF Core: "Design-time DbContext Creation").
-        factory.Database.SkipIfUnavailable();
-        await using var scope = factory.Services.CreateAsyncScope();
+        Factory.Database.SkipIfUnavailable();
+        await using var scope = Factory.Services.CreateAsyncScope();
 
         foreach (var (runtime, designTime) in new (DbContext, DbContext)[]
                  {

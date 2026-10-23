@@ -100,6 +100,12 @@
     <!-- The SQL Server test layer (DECISIONS D-043): a real SQL Server in a container (MIT), reset between tests (Apache-2.0). -->
     <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
+    <!--
+      The PostgreSQL test layer (D-068, D-074): a PostgreSQL in a container (MIT) and the EF Core provider, whose license
+      (PostgreSQL, with its driver Npgsql) is a named exception of eng/check-licenses.sh (Y-47, D-072).
+    -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <!-- Code coverage for Microsoft.Testing.Platform (MIT), gated by eng/check-coverage.sh. -->
     <PackageVersion Include="coverlet.MTP" Version="10.1.0" />
     <!-- Property-based tests (Apache-2.0, no dependencies). -->

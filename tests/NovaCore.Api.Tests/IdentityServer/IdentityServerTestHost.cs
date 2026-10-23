@@ -170,7 +170,8 @@ public sealed class IdentityServerTestHost : IAsyncDisposable
     }
 
     // The backchannel is configured before the server exists, so it resolves the server's handler on first use.
-    private sealed class TestServerHandler(Func<TestServer> server) : HttpMessageHandler
+    /// <summary>Sends JwtBearer's backchannel requests (discovery, keys) to a host's own in-memory server.</summary>
+    internal sealed class TestServerHandler(Func<TestServer> server) : HttpMessageHandler
     {
         private HttpMessageInvoker? _invoker;
 

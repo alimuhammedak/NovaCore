@@ -137,6 +137,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Template: the same. `TodosModule` chooses no database, `Program.cs` calls `AddModuleDatabase`, and the Todos
   migrations and design-time factory live in the Api project (`Todos/`), which references the provider and
   `Microsoft.EntityFrameworkCore.Design` with either `--auth`.
+- The packages are tested on PostgreSQL too (Testcontainers, `postgres:18.4`): the startup migrations, the outbox
+  (written with the change, delivered, retention), the payment list and the identity provider's sign-in run the same
+  scenarios on SQL Server and PostgreSQL. The PostgreSQL migrations live in the test project; `docker-compose.yml` has
+  an optional `postgres` service (`POSTGRES_PASSWORD` in `.env`).
 
 ### Removed
 

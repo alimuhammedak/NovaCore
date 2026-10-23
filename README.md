@@ -935,7 +935,9 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
 | Microsoft.EntityFrameworkCore.Relational / Extensions.Hosting.Abstractions / Options.ConfigurationExtensions / Diagnostics.HealthChecks.EntityFrameworkCore | Microsoft-yerleşik (`NovaCore.EntityFrameworkCore`) | **MIT** |
 | Microsoft.AspNetCore.Identity.EntityFrameworkCore | Kullanıcı/rol deposu (`NovaCore.Identity.OpenIddict`) | **MIT** |
 | OpenIddict.Server.AspNetCore / OpenIddict.EntityFrameworkCore | OpenID Connect sağlayıcı (`NovaCore.Identity.OpenIddict` eklentisi) | **Apache-2.0** |
-| Microsoft.EntityFrameworkCore.SqlServer | EF Core sağlayıcı | **MIT** |
+| Microsoft.EntityFrameworkCore.SqlServer | EF Core sağlayıcı (Api host'u; paketler sağlayıcıya bağlanmaz, D-068) | **MIT** |
+| Npgsql.EntityFrameworkCore.PostgreSQL / Npgsql | PostgreSQL test katmanının sağlayıcısı ve sürücüsü (yalnız testler) | **PostgreSQL** (adlı istisna, D-068, D-072) |
+| Testcontainers.MsSql / Testcontainers.PostgreSql, Respawn | Gerçek veritabanı test katmanları (yalnız testler) | **MIT** / **Apache-2.0** |
 | Microsoft.CodeAnalysis.PublicApiAnalyzers | Public API takibi (yalnızca build, pakete girmez) | **MIT** |
 | Microsoft.CodeAnalysis.BannedApiAnalyzers | Yasak API'ler, `src/` altında (yalnızca build, pakete girmez) | **MIT** |
 | Meziantou.Analyzer | Ek analizör kuralları, her projede (yalnızca build, pakete girmez) | **MIT** |

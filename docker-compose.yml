@@ -25,6 +25,22 @@ services:
     volumes:
       - novacore-mssql:/var/opt/mssql
 
+  # Optional containerized PostgreSQL, for a host that gives its module contexts PostgreSQL (AddModuleDatabase with
+  # UseNpgsql; the repository's own tests start theirs with Testcontainers). The password is read from .env
+  # (POSTGRES_PASSWORD); unlike the SA password it isn't required to bring the other services up, and the image refuses
+  # to initialize without it. Connection string (user secrets, never in appsettings):
+  #   ConnectionStrings:Database = "Host=localhost;Port=5432;Database=NovaCore;Username=postgres;Password=<POSTGRES_PASSWORD>"
+  postgres:
+    image: postgres:18.4-trixie@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
+    container_name: novacore-postgres
+    environment:
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-}"
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # PostgreSQL 18's image keeps its data under /var/lib/postgresql/18 and declares the parent as its volume.
+      - novacore-postgres:/var/lib/postgresql
+
   # Structured log UI. Enable by setting Seq:ServerUrl=http://localhost:5341
   seq:
     image: datalust/seq:2026.1.17182@sha256:9e9cc9183c6efaa7c187407d16901506ab3bc0aed7522bfc3ad7b529be30d8d8
@@ -47,3 +63,4 @@ services:
 
 volumes:
   novacore-mssql:
+  novacore-postgres:

@@ -1,71 +1,31 @@
-using Microsoft.AspNetCore.Hosting;
+using System.Data.Common;
 using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using NovaCore.Modules.Catalog.Infrastructure;
-using NovaCore.Modules.Payments.Infrastructure;
+using NovaCore.Api.Tests.Databases;
 using Respawn;
-using Respawn.Graph;
-using Xunit;
 
 namespace NovaCore.Api.Tests.SqlServer;
 
 /// <summary>
-/// The test host (<see cref="ApiFactory"/>) on a real SQL Server (<see cref="TestSqlServer"/>), in a database of its own.
-/// The DbContexts keep the SQL Server registrations Program gives them, and the host applies the migrations when it starts,
-/// as production does (<c>Database:ApplyMigrations</c>, <c>DatabaseMigrationService</c>): every migration of the three
-/// contexts runs, its SQL steps included. Without Docker the host isn't built; the tests skip through
-/// <see cref="Database"/>. <see cref="ResetAsync"/> empties the module tables between the tests of a class.
+/// The test host on a real SQL Server (<see cref="TestSqlServer"/>), in a database of its own: the DbContexts keep the
+/// SQL Server database Program gives them (<c>AddModuleDatabase</c>) and the host's SQL Server migrations.
 /// </summary>
-public sealed class SqlServerApiFactory : ApiFactory, IAsyncLifetime
+public class SqlServerApiFactory : DatabaseApiFactory
 {
-    private Respawner? _respawner;
+    private protected override Task<TestDatabase> CreateDatabaseAsync() => TestSqlServer.CreateDatabaseAsync();
 
-    internal TestDatabase Database { get; private set; } = new(null, "not initialized");
+    protected override DbConnection CreateConnection(string connectionString) => new SqlConnection(connectionString);
 
-    /// <summary>Creates the database and starts the host, which migrates it before the first test.</summary>
-    public async ValueTask InitializeAsync()
-    {
-        Database = await TestSqlServer.CreateDatabaseAsync();
-        if (Database.IsAvailable)
-            _ = Server;
-    }
+    protected override IDbAdapter RespawnAdapter => DbAdapter.SqlServer;
 
-    /// <summary>
-    /// Deletes every row of the module schemas (Respawn), keeping their migration history; skips the test without Docker.
-    /// The identity store keeps its rows: the tests here sign nobody in through it.
-    /// </summary>
-    public async Task ResetAsync()
-    {
-        Database.SkipIfUnavailable();
-        await using var connection = new SqlConnection(Database.ConnectionString);
-        await connection.OpenAsync();
-        _respawner ??= await Respawner.CreateAsync(connection, new RespawnerOptions
-        {
-            SchemasToInclude = [CatalogDbContext.Schema, PaymentsDbContext.Schema],
-            TablesToIgnore =
-            [
-                new Table(CatalogDbContext.Schema, "__EFMigrationsHistory"),
-                new Table(PaymentsDbContext.Schema, "__EFMigrationsHistory")
-            ]
-        });
-        await _respawner.ResetAsync(connection);
-    }
-
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
-    {
-        base.ConfigureWebHost(builder);
-
-        builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
-            new Dictionary<string, string?>(StringComparer.Ordinal)
-            {
-                ["ConnectionStrings:Database"] = Database.ConnectionString,
-                ["Database:ApplyMigrations"] = "true"
-            }));
-    }
-
-    // Program's SQL Server registrations stay.
+    // Program's SQL Server database stays.
     protected override void ConfigureDatabases(IServiceCollection services)
     {
     }
+}
+
+/// <summary><see cref="SqlServerApiFactory"/> as its own authority, so the identity provider's tokens reach the modules.</summary>
+public sealed class SqlServerAuthorityApiFactory : SqlServerApiFactory
+{
+    protected override bool IsItsOwnAuthority => true;
 }
