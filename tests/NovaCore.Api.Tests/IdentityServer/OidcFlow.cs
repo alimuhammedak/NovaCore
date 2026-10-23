@@ -18,6 +18,8 @@ namespace NovaCore.Api.Tests.IdentityServer;
 /// </summary>
 internal sealed partial class OidcFlow : IDisposable
 {
+    private readonly CookieContainerHandler _cookies;
+
     public OidcFlow(IdentityServerTestHost host)
         : this(host.Server)
     {
@@ -26,7 +28,8 @@ internal sealed partial class OidcFlow : IDisposable
     /// <summary>Drives the provider of any TestServer at <see cref="IdentityServerTestHost.Authority"/>, e.g. the Api host.</summary>
     public OidcFlow(TestServer server)
     {
-        Browser = new HttpClient(new CookieContainerHandler { InnerHandler = server.CreateHandler() })
+        _cookies = new CookieContainerHandler { InnerHandler = server.CreateHandler() };
+        Browser = new HttpClient(_cookies, disposeHandler: false)
         {
             BaseAddress = new Uri(IdentityServerTestHost.Authority)
         };
@@ -69,12 +72,13 @@ internal sealed partial class OidcFlow : IDisposable
         Assert.Equal(HttpStatusCode.OK, codePage.StatusCode);
         var html = await codePage.Content.ReadAsStringAsync();
 
-        return await Browser.PostAsync("/account/login/2fa", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["__RequestVerificationToken"] = HiddenValue(html, "__RequestVerificationToken"),
             ["ReturnUrl"] = HiddenValue(html, "ReturnUrl"),
             ["Code"] = code
-        }));
+        });
+        return await Browser.PostAsync(new Uri("/account/login/2fa", UriKind.Relative), form);
     }
 
     /// <summary>
@@ -89,7 +93,7 @@ internal sealed partial class OidcFlow : IDisposable
         var html = await page.Content.ReadAsStringAsync();
 
         var values = HiddenInput().Matches(html)
-            .ToDictionary(match => match.Groups["name"].Value, match => WebUtility.HtmlDecode(match.Groups["value"].Value));
+            .ToDictionary(match => match.Groups["name"].Value, match => WebUtility.HtmlDecode(match.Groups["value"].Value), StringComparer.Ordinal);
         foreach (var (name, value) in fields)
             values[name] = value;
 
@@ -99,9 +103,9 @@ internal sealed partial class OidcFlow : IDisposable
     }
 
     /// <summary>An authorization request for the test client; <paramref name="extra"/> adds or overrides parameters.</summary>
-    public static string AuthorizeUri(string? codeChallenge, params (string Name, string? Value)[] extra)
+    public static Uri AuthorizeUri(string? codeChallenge, params (string Name, string? Value)[] extra)
     {
-        var parameters = new Dictionary<string, string?>
+        var parameters = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["client_id"] = IdentityServerTestHost.ClientId,
             ["redirect_uri"] = IdentityServerTestHost.RedirectUri,
@@ -114,7 +118,8 @@ internal sealed partial class OidcFlow : IDisposable
         foreach (var (name, value) in extra)
             parameters[name] = value;
 
-        return QueryHelpers.AddQueryString("/connect/authorize", parameters.Where(pair => pair.Value is not null));
+        return new Uri(
+            QueryHelpers.AddQueryString("/connect/authorize", parameters.Where(pair => pair.Value is not null)), UriKind.Relative);
     }
 
     /// <summary>Posts the sign-in form of <paramref name="loginPage"/> with its antiforgery token and return URL.</summary>
@@ -123,19 +128,20 @@ internal sealed partial class OidcFlow : IDisposable
         Assert.Equal(HttpStatusCode.OK, loginPage.StatusCode);
         var html = await loginPage.Content.ReadAsStringAsync();
 
-        return await Browser.PostAsync("/account/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["__RequestVerificationToken"] = HiddenValue(html, "__RequestVerificationToken"),
             ["ReturnUrl"] = HiddenValue(html, "ReturnUrl"),
             ["Email"] = email,
             ["Password"] = password
-        }));
+        });
+        return await Browser.PostAsync(new Uri("/account/login", UriKind.Relative), form);
     }
 
     /// <summary>Exchanges an authorization code (with its PKCE verifier) at the token endpoint.</summary>
     public async Task<TokenSet> RedeemAsync(string code, string verifier)
     {
-        var response = await TokenRequestAsync(new()
+        var response = await TokenRequestAsync(new(StringComparer.Ordinal)
         {
             ["grant_type"] = "authorization_code",
             ["code"] = code,
@@ -146,16 +152,17 @@ internal sealed partial class OidcFlow : IDisposable
     }
 
     /// <summary>A refresh token request; the caller checks the response.</summary>
-    public Task<HttpResponseMessage> RefreshAsync(string refreshToken) => TokenRequestAsync(new()
+    public Task<HttpResponseMessage> RefreshAsync(string refreshToken) => TokenRequestAsync(new(StringComparer.Ordinal)
     {
         ["grant_type"] = "refresh_token",
         ["refresh_token"] = refreshToken
     });
 
-    public Task<HttpResponseMessage> TokenRequestAsync(Dictionary<string, string> parameters)
+    public async Task<HttpResponseMessage> TokenRequestAsync(Dictionary<string, string> parameters)
     {
         parameters.TryAdd("client_id", IdentityServerTestHost.ClientId);
-        return Browser.PostAsync("/connect/token", new FormUrlEncodedContent(parameters));
+        using var form = new FormUrlEncodedContent(parameters);
+        return await Browser.PostAsync(new Uri("/connect/token", UriKind.Relative), form);
     }
 
     /// <summary>Calls <paramref name="path"/> with <paramref name="accessToken"/> as the bearer token.</summary>
@@ -199,18 +206,22 @@ internal sealed partial class OidcFlow : IDisposable
         return (verifier, Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(verifier))));
     }
 
-    public void Dispose() => Browser.Dispose();
+    public void Dispose()
+    {
+        Browser.Dispose();
+        _cookies.Dispose();
+    }
 
     public static string HiddenValue(string html, string name)
     {
-        var match = HiddenInput().Matches(html).FirstOrDefault(m => m.Groups["name"].Value == name);
+        var match = HiddenInput().Matches(html).FirstOrDefault(m => string.Equals(m.Groups["name"].Value, name, StringComparison.Ordinal));
         Assert.NotNull(match);
         return WebUtility.HtmlDecode(match.Groups["value"].Value);
     }
 
     private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-    [GeneratedRegex("""<input type="hidden" name="(?<name>[^"]+)" value="(?<value>[^"]*)">""")]
+    [GeneratedRegex("""<input type="hidden" name="(?<name>[^"]+)" value="(?<value>[^"]*)">""", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
     private static partial Regex HiddenInput();
 }
 

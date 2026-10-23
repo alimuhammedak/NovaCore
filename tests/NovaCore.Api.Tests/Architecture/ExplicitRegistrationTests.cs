@@ -15,7 +15,8 @@ public class ExplicitRegistrationTests
     // RegisterServicesFromAssembly and the like). EF Core's ApplyConfigurationsFromAssembly configures the model, not the
     // container, so it is allowed (DECISIONS D-023).
     private static readonly Regex AssemblyScanning = new(
-        @"\bAssembly\.Load(From|File)?\s*\(|\.GetAssemblies\s*\(|\bAssemblyName\.GetAssemblyName\s*\(|\bAssemblyLoadContext\b|\.GetTypes\s*\(|\.GetExportedTypes\s*\(|\.(DefinedTypes|ExportedTypes)\b|\b(?!ApplyConfigurationsFromAssembly\b)\w*FromAssembl\w*");
+        @"\bAssembly\.Load(From|File)?\s*\(|\.GetAssemblies\s*\(|\bAssemblyName\.GetAssemblyName\s*\(|\bAssemblyLoadContext\b|\.GetTypes\s*\(|\.GetExportedTypes\s*\(|\.(DefinedTypes|ExportedTypes)\b|\b(?!ApplyConfigurationsFromAssembly\b)\w*FromAssembl\w*",
+        RegexOptions.ExplicitCapture, TimeSpan.FromSeconds(1));
 
     [Fact]
     public void Source_does_not_scan_assemblies_to_register_services()

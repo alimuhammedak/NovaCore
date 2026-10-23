@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using NovaCore.Abstractions.Results;
-using NovaCore.AspNetCore.Http;
 using NovaCore.AspNetCore.Authorization;
+using NovaCore.AspNetCore.Http;
 using NovaCore.Modules.Catalog.Authorization;
 using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Catalog.Mapping;
@@ -31,9 +31,9 @@ public static class GetProductById
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
-        Result<ProductDto> result = product is null
-            ? Error.NotFound("product.not_found", $"Product '{id}' was not found.")
-            : ProductMapper.ToDto(product);
+        var result = product is null
+            ? Result.Failure<ProductDto>(Error.NotFound("product.not_found", $"Product '{id}' was not found."))
+            : Result.Success(ProductMapper.ToDto(product));
 
         return result.ToHttpResult();
     }

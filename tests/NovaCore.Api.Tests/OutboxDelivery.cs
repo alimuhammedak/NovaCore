@@ -27,9 +27,10 @@ internal static class OutboxDelivery
                 await Task.Delay(TimeSpan.FromMilliseconds(50), timeout.Token);
             }
         }
-        catch (OperationCanceledException) when (!TestContext.Current.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (!TestContext.Current.CancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException($"The outbox didn't deliver the expected effect within {Timeout.TotalSeconds} seconds.");
+            throw new TimeoutException(
+                $"The outbox didn't deliver the expected effect within {Timeout.TotalSeconds} seconds.", exception);
         }
     }
 }

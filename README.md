@@ -282,12 +282,14 @@ Repo public'tir (DECISIONS D-042). Kararlar D-048, D-051 ve D-052'de; kaynaklar 
 
 | Ne | Nerede | Not |
 |---|---|---|
-| Build, test, migration kontrolü, açık paket kontrolü | `ci.yml` → `build-and-test` | Restore `--locked-mode` ile; ardından lisans kapısı (`eng/check-licenses.sh`). Testler coverage'la koşar: satır ve dal kapsamı `eng/coverage-baseline.txt`'in altına düşerse kırmızı (`eng/check-coverage.sh`, D-060); mimari testler ayrı adımda, coverage'sız |
+| Build, format, test, migration kontrolü, açık paket kontrolü | `ci.yml` → `build-and-test` | Restore `--locked-mode` ile; ardından lisans kapısı (`eng/check-licenses.sh`). Build'den sonra `dotnet format --verify-no-changes`. Testler coverage'la koşar: satır ve dal kapsamı `eng/coverage-baseline.txt`'in altına düşerse kırmızı (`eng/check-coverage.sh`, D-060); mimari testler ayrı adımda, coverage'sız |
 | API sözleşmesi | `ci.yml` → `api-contract` | Commit'li `docs/openapi/v1.json` main'dekiyle karşılaştırılır; kırıcı değişiklik `eng/openapi-breaking-accepted.txt`'te kabul edilmediyse kırmızı (oasdiff, `eng/check-openapi.sh`); belgeyi `OpenApiContractTests` güncel tutar |
 | Şablonun tüketici smoke testi | `ci.yml` → `template-smoke` | Üretilen projelerin workflow'ları da lint'lenir |
 | Secret taraması | `ci.yml` → `secret-scan` | Betterleaks 1.9.0, bütün geçmiş, `.betterleaks.toml` |
 | Workflow denetimi | `ci.yml` → `workflow-lint` | actionlint + zizmor, digest'e sabit imajlarla (`eng/lint-workflows.sh`) |
 | Statik analiz | `codeql.yml` | C#, manual build (kaynak üreteçlerinin kodu da analiz edilir); uyarılar Security sekmesinde |
+| SonarQube Cloud | `ci.yml` → `sonar` | Yalnız push'ta (fork ve Dependabot koşularında secret yok); tarayıcı job'da kurulur, NuGet referansı yoktur (D-045); `build-and-test`'in coverage'ını alır. `SONAR_TOKEN` secret'ı ister |
+| Kullanılmayan kod | `unused-code.yml` | Haftalık ve elle: Roslynator, referansı olmayan internal/private tip, alan ve sabitler (`eng/find-unused.sh`, D-066) |
 | Mutation testi | `mutation.yml` | Haftalık ve elle: Stryker.NET, `NovaCore.Abstractions` ve modüllerin `Domain/` kodu, `NovaCore.Domain.Tests`'e karşı; skor job özetinde, raporlar artifact (`eng/mutation.sh`, D-063) |
 | Tedarik zinciri puanı | `scorecard.yml` | OpenSSF Scorecard, main'e push'ta ve haftalık |
 | Güncellemeler | `.github/dependabot.yml` | NuGet, action'lar, SDK, compose imajları; 7 gün bekleme |
@@ -303,6 +305,8 @@ bash eng/check-coverage.sh [--update]                # testler coverage'la, base
 bash eng/check-openapi.sh                            # docs/openapi/v1.json'da main'e göre kırıcı değişiklik (oasdiff, Docker)
 bash eng/mutation.sh                                 # Stryker.NET mutation raporu, ~2 dk (StrykerOutput/)
 bash eng/lint-workflows.sh                           # Docker gerekir; GH_TOKEN varsa zizmor online denetimleri de yapar
+dotnet format NovaCore.slnx                          # CI'ın format kontrolünün bulduklarını düzeltir
+bash eng/find-unused.sh                              # kullanılmayan internal/private tipler, alanlar, sabitler (Roslynator)
 
 # Opt-in: staged değişiklikler commit'ten önce taranır (Betterleaks 1.9.0 PATH'te olmalı)
 git config core.hooksPath .githooks
@@ -321,6 +325,29 @@ git config core.hooksPath .githooks
   gh attestation verify BMD.NovaCore.AspNetCore.<sürüm>.nupkg --repo alimuhammedak/NovaCore
   ```
 - `docker-compose*.yml` servisleri yalnızca `127.0.0.1`'de dinler, imajlar tag + digest ile sabittir.
+
+### Analizörler
+
+Her build analizörleri uyarılar hata sayılarak çalıştırır (`TreatWarningsAsErrors`); kararlar DECISIONS D-064…D-066'da,
+ölçümler RESEARCH R-117…R-119'da.
+
+| Ne | Nerede | Not |
+|---|---|---|
+| .NET analizörleri | `Directory.Build.props` | `latest-recommended`; Security, Reliability, Performance ve Usage'da bütün kurallar (`AnalysisLevel<Kategori>=latest-all`, taint analizi dahil). `AnalysisMode<Kategori>` bileşik `AnalysisLevel`'ın yanında yok sayılır |
+| Ölü kod ve metrikler | `.editorconfig` | IDE0051/52/59/60 her yerde, IDE0005 paketlerde (XML belgesi üretenler); CA1502/1505/1506 Microsoft'un eşikleriyle |
+| Yasak API'ler | `src/BannedSymbols*.txt` | BannedApiAnalyzers, `src/` altında: statik saatler (D-021'in istisnası olan `NovaCore.Abstractions` hariç), `Console`, `Environment.Exit`, `BuildServiceProvider`, `HttpClient` kurucuları |
+| Meziantou.Analyzer | `Directory.Packages.props` (`GlobalPackageReference`) | Varsayılan önemler; kapalı (kullanıcı onayı, Q-50): MA0048, MA0004 (CA2007'nin kapalı olduğu yerlerde), MA0051 (migration'larda) |
+| Format | CI | `dotnet format --verify-no-changes`; `.editorconfig` satır sonu belirlemez, `.gitattributes` `* text=auto` |
+
+Bastırmalar yalnızca Microsoft'un o kural için "When to suppress" izniyle ya da kullanıcı onayıyla yapılır (Y-44):
+CA2007 uygulama kodunda ve yalnız ASP.NET Core'da koşan iki pakette kapalıdır (diğer paketlerde açık;
+`NovaCore.EntityFrameworkCore` `ConfigureAwait(false)` çağırır); CA1812 kapalıdır (DI'ın oluşturduğu sınıfları raporluyor,
+ölü tipleri haftalık Roslynator raporu yakalar); CA1506 üç composition root ve protokol akışında gerekçeli
+`[SuppressMessage]` taşır.
+
+Claude Code'da düzenlemeden hemen sonra derleyici ve analizör bulgularını görmek için `csharp-lsp` eklentisi
+(`claude-plugins-official`) önerilir: `dotnet tool install --global csharp-ls` (0.28.0+, `.slnx` ve .NET 10) ve
+eklentiyi `/plugin` ile etkinleştirin.
 
 ---
 
@@ -910,8 +937,12 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
 | OpenIddict.Server.AspNetCore / OpenIddict.EntityFrameworkCore | OpenID Connect sağlayıcı (`NovaCore.Identity.OpenIddict` eklentisi) | **Apache-2.0** |
 | Microsoft.EntityFrameworkCore.SqlServer | EF Core sağlayıcı | **MIT** |
 | Microsoft.CodeAnalysis.PublicApiAnalyzers | Public API takibi (yalnızca build, pakete girmez) | **MIT** |
+| Microsoft.CodeAnalysis.BannedApiAnalyzers | Yasak API'ler, `src/` altında (yalnızca build, pakete girmez) | **MIT** |
+| Meziantou.Analyzer | Ek analizör kuralları, her projede (yalnızca build, pakete girmez) | **MIT** |
 | Polly.Core / Extensions / RateLimiting | Geçişli: `Microsoft.Extensions.Http.Resilience`'ın bağımlılığı | **BSD-3-Clause** (adlı istisna, D-052) |
 | nuget-license, CycloneDX (dotnet tool) | Lisans kapısı, SBOM (yalnızca CI ve yayın, pakete girmez) | **Apache-2.0** |
+| Roslynator CLI (dotnet tool) | Haftalık kullanılmayan kod raporu (pakete girmez) | **Apache-2.0** |
+| dotnet-sonarscanner | Yalnızca CI'daki `sonar` job'unda kurulur, hiçbir projeye referans değildir; indirdiği Sonar analizörleri SSALv1 (D-045, K4: kullanıcı onayı) | **LGPL-3.0** |
 
 CI'daki lisans kapısı (`eng/check-licenses.sh`) geçişliler dahil her paketi denetler: MIT ya da Apache-2.0 olmalı;
 Microsoft paketleri (`Microsoft.*`, `System.*`) lisansa bakılmadan geçer (Y-06), getirdikleri paketler yine denetlenir.

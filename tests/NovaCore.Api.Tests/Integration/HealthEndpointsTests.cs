@@ -24,7 +24,7 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/health");
+        var response = await client.GetAsync(new Uri("/health", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
@@ -35,7 +35,7 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/alive");
+        var response = await client.GetAsync(new Uri("/alive", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
@@ -48,7 +48,7 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
 
         foreach (var context in new[] { "CatalogDbContext", "IdentityServerDbContext", "PaymentsDbContext" })
         {
-            var check = Assert.Single(registrations, registration => registration.Name == context);
+            var check = Assert.Single(registrations, registration => string.Equals(registration.Name, context, StringComparison.Ordinal));
             Assert.Contains("ready", check.Tags);
         }
     }
@@ -59,7 +59,7 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
         await using var unreachable = new UnreachableCatalogApiFactory();
         var client = unreachable.CreateClient();
 
-        var response = await client.GetAsync("/health");
+        var response = await client.GetAsync(new Uri("/health", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("Unhealthy", await response.Content.ReadAsStringAsync());
@@ -74,7 +74,7 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
         // Authenticated: an anonymous caller gets 401 for any path the fallback policy guards, mapped or not (F4c.1).
         var client = production.CreateClientWithClaims(new Claim(NovaClaims.Subject, Guid.NewGuid().ToString()));
 
-        var response = await client.GetAsync(path);
+        var response = await client.GetAsync(new Uri(path, UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }

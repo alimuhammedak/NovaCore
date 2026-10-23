@@ -75,6 +75,17 @@
   <ItemGroup>
     <!-- Build-time only (PrivateAssets=all): tracks each package's public API in PublicAPI.*.txt (R-037). -->
     <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" />
+    <!-- Build-time only: the APIs src/BannedSymbols*.txt bans (Directory.Build.targets). Same release as the one above. -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Meziantou.Analyzer (MIT, docs/plan/DECISIONS.md D-045, D-066) in every project, as its README recommends under
+      Central Package Management. A global reference is a development dependency (PrivateAssets=all), so no package
+      depends on it. Each rule keeps its default severity: the warnings fail the build, the suggestions don't.
+    -->
+    <GlobalPackageReference Include="Meziantou.Analyzer" Version="3.0.303" />
   </ItemGroup>
 
   <ItemGroup>

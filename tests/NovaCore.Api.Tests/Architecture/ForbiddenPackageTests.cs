@@ -22,7 +22,7 @@ public class ForbiddenPackageTests
     public void No_banned_package_is_in_the_dependency_graph()
     {
         var packages = ResolvedPackages();
-        Assert.Contains("Microsoft.EntityFrameworkCore", packages); // guards against reading the wrong file
+        Assert.Contains("Microsoft.EntityFrameworkCore", packages, StringComparer.Ordinal); // guards against reading the wrong file
 
         var banned = packages.Where(package => BannedPackages.Any(ban =>
             package.Equals(ban, StringComparison.OrdinalIgnoreCase)
@@ -39,7 +39,7 @@ public class ForbiddenPackageTests
         using var deps = JsonDocument.Parse(File.ReadAllText(depsFile));
 
         return deps.RootElement.GetProperty("libraries").EnumerateObject()
-            .Where(library => library.Value.GetProperty("type").GetString() == "package")
+            .Where(library => string.Equals(library.Value.GetProperty("type").GetString(), "package", StringComparison.Ordinal))
             .Select(library => library.Name[..library.Name.IndexOf('/')])
             .ToList();
     }

@@ -25,7 +25,7 @@ internal sealed class IdentityPermissionResolver(
         // Client ids are never Guids (validated on start), so a subject that isn't one is a client or unknown.
         if (!Guid.TryParse(subject, out var userId))
         {
-            var client = options.Value.Clients.Find(client => !client.SignsInUsers && client.ClientId == subject);
+            var client = options.Value.Clients.Find(client => !client.SignsInUsers && string.Equals(client.ClientId, subject, StringComparison.Ordinal));
             return client?.Permissions ?? [];
         }
 
@@ -40,7 +40,7 @@ internal sealed class IdentityPermissionResolver(
         // administrator password alone gets nothing from it. The seeded administrator signs in with the password and
         // turns two-factor authentication on through the account API, which drops the cached permissions.
         if (roleNames.Contains(IdentityRoles.Administrator) && !await userManager.GetTwoFactorEnabledAsync(account))
-            roleNames = [.. roleNames.Where(name => name != IdentityRoles.Administrator)];
+            roleNames = [.. roleNames.Where(name => !string.Equals(name, IdentityRoles.Administrator, StringComparison.Ordinal))];
 
         // From the store, not the token's role claim, so a removed administrator loses it within the cache lifetime.
         // From the declarations, not the role's claims, so a module added since the last seed is covered too.
@@ -54,12 +54,12 @@ internal sealed class IdentityPermissionResolver(
                 continue;
 
             foreach (var claim in await roleManager.GetClaimsAsync(role))
-                if (claim.Type == NovaClaims.Permission)
+                if (string.Equals(claim.Type, NovaClaims.Permission, StringComparison.Ordinal))
                     permissions.Add(claim.Value);
         }
 
         foreach (var claim in await userManager.GetClaimsAsync(account))
-            if (claim.Type == NovaClaims.Permission)
+            if (string.Equals(claim.Type, NovaClaims.Permission, StringComparison.Ordinal))
                 permissions.Add(claim.Value);
 
         return permissions;

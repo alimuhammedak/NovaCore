@@ -5,8 +5,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using NovaCore.Abstractions.Identity;
 using NovaCore.Abstractions.Results;
-using NovaCore.AspNetCore.Http;
 using NovaCore.AspNetCore.Authorization;
+using NovaCore.AspNetCore.Http;
 using NovaCore.Modules.Catalog.Contracts;
 using NovaCore.Modules.Payments.Authorization;
 using NovaCore.Modules.Payments.Domain;
@@ -67,19 +67,20 @@ public static class CreatePayment
         var product = await catalog.GetProductAsync(request.ProductId, cancellationToken);
 
         if (product is null)
-            return Error.NotFound("payment.product_not_found", $"Product '{request.ProductId}' was not found.");
+            return Result.Failure<Response>(Error.NotFound("payment.product_not_found", $"Product '{request.ProductId}' was not found."));
 
         if (!product.IsActive)
-            return Error.Validation("payment.product_inactive", $"Product '{product.Name}' is not available.");
+            return Result.Failure<Response>(
+                Error.Validation("payment.product_inactive", $"Product '{product.Name}' is not available."));
 
         if (product.Stock < request.Quantity)
-            return Error.Conflict("payment.insufficient_stock",
-                $"Only {product.Stock} unit(s) of '{product.Name}' are in stock.");
+            return Result.Failure<Response>(Error.Conflict("payment.insufficient_stock",
+                $"Only {product.Stock} unit(s) of '{product.Name}' are in stock."));
 
         var payment = new Payment(ownerId, product.Id, product.Name, request.Quantity, product.Price);
         dbContext.Payments.Add(payment);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new Response(payment.Id, payment.Amount, payment.Status.ToString());
+        return Result.Success(new Response(payment.Id, payment.Amount, payment.Status.ToString()));
     }
 }

@@ -44,13 +44,16 @@
     <None Include="$(MSBuildThisFileDirectory)src/PACKAGE.md" Pack="true" PackagePath="README.md" Visible="false" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(NovaCoreLibraryPackage)' == 'true'">
-    <!--
-      The public API baseline read by Microsoft.CodeAnalysis.PublicApiAnalyzers. The package doesn't add these itself
-      (checked in its buildTransitive files, R-037). Everything goes to Unshipped until a release is declared (F5.4).
-    -->
-    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
-    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  <!--
+    Banned APIs for the code under src/ (RS0030, docs/plan/DECISIONS.md D-066): src/BannedSymbols.txt everywhere, the
+    static clocks of BannedSymbols.Clock.txt everywhere but NovaCore.Abstractions, which holds the one exception (D-021).
+    The template package compiles nothing. PackageType comes from the .csproj, hence here and not in the props.
+  -->
+  <ItemGroup Condition="$(MSBuildProjectDirectory.StartsWith('$(MSBuildThisFileDirectory)src')) And '$(PackageType)' != 'Template'">
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)src/BannedSymbols.txt" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)src/BannedSymbols.Clock.txt"
+                     Condition="'$(MSBuildProjectName)' != 'NovaCore.Abstractions'" />
   </ItemGroup>
 
   <!--
@@ -63,8 +66,10 @@
   </Target>
 
   <!--
-    The PublicAPI.*.txt files above are only checked when the project references the analyzer. Without it, a new package
-    would silently ship an untracked public API, so a packable project without the reference fails the build (D-020).
+    The analyzer reads the project's PublicAPI.Shipped.txt and PublicAPI.Unshipped.txt (its buildTransitive targets add
+    them, docs/plan/RESEARCH.md R-118; everything goes to Unshipped until a release is declared, F5.4). Without the
+    reference, a new package would silently ship an untracked public API, so a packable project without it fails the
+    build (D-020).
   -->
   <Target Name="NovaCoreRequirePublicApiTracking" BeforeTargets="CoreCompile" Condition="'$(NovaCoreLibraryPackage)' == 'true'">
     <ItemGroup>

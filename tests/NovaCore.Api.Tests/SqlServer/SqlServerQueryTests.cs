@@ -83,13 +83,13 @@ public sealed class SqlServerQueryTests(SqlServerApiFactory factory) : IClassFix
                 .Append(new TableName(schema, "__EFMigrationsHistory"))
                 .Distinct();
 
-            Assert.Equal(InOrder(modelTables), InOrder(tables.Where(table => table.Schema == schema)));
+            Assert.Equal(InOrder(modelTables), InOrder(tables.Where(table => string.Equals(table.Schema, schema, StringComparison.Ordinal))));
         }
 
         // Nothing outside the three schemas (no dbo).
         Assert.Equal(
             contexts.Select(context => context.Model.GetDefaultSchema()).Order(StringComparer.Ordinal),
-            tables.Select(table => table.Schema).Distinct().Order(StringComparer.Ordinal));
+            tables.Select(table => table.Schema).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -98,8 +98,8 @@ public sealed class SqlServerQueryTests(SqlServerApiFactory factory) : IClassFix
         await AddProductsAsync("Blue Widget", "BLUE gadget", "Red widget", "Café crème");
         using var client = factory.CreateClientWithPermissions(CatalogPermissions.ProductsRead);
 
-        Assert.Equal(["BLUE gadget", "Blue Widget"], await SearchAsync(client, "blue"));
-        Assert.Equal(["Café crème"], await SearchAsync(client, "CAFÉ"));
+        Assert.Equal(["BLUE gadget", "Blue Widget"], await SearchAsync(client, "blue"), StringComparer.Ordinal);
+        Assert.Equal(["Café crème"], await SearchAsync(client, "CAFÉ"), StringComparer.Ordinal);
         Assert.Empty(await SearchAsync(client, "cafe"));
     }
 

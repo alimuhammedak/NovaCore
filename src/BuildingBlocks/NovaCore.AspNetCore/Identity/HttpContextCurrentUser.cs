@@ -47,8 +47,8 @@ public sealed class HttpContextCurrentUser(IHttpContextAccessor httpContextAcces
 
     /// <inheritdoc />
     public bool IsInRole(string role) =>
-        Roles.Contains(role) || (Principal?.IsInRole(role) ?? false);
+        Roles.Contains(role, StringComparer.Ordinal) || (Principal?.IsInRole(role) ?? false);
 
     /// <inheritdoc />
-    public bool HasPermission(string permission) => Permissions.Contains(permission);
+    public bool HasPermission(string permission) => Permissions.Contains(permission, StringComparer.Ordinal);
 }

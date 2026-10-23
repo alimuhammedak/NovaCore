@@ -37,7 +37,7 @@ public sealed class IdentityServerWiringTests(IdentityServerWiringTests.ApiFacto
             base.ConfigureWebHost(builder);
 
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["Jwt:Authority"] = IdentityServerTestHost.Authority }));
+                new Dictionary<string, string?>(StringComparer.Ordinal) { ["Jwt:Authority"] = IdentityServerTestHost.Authority }));
             builder.ConfigureServices(services => services.Configure<JwtBearerOptions>(
                 JwtBearerDefaults.AuthenticationScheme,
                 options => options.BackchannelHttpHandler = new ServerHandler(() => Server)));

@@ -13,10 +13,10 @@ public class WorkflowPinTests
 {
     // `uses: owner/repo[/path]@ref` in a step, quoted or not; a trailing "# vX.Y.Z" comment names the release the SHA
     // came from. Local actions (./...) have no ref and don't match.
-    private static readonly Regex Uses = new(@"^\s*(-\s*)?uses:\s*['""]?(?<action>[^@\s'""]+)@(?<ref>[^\s'""#]+)");
+    private static readonly Regex Uses = new(@"^\s*(-\s*)?uses:\s*['""]?(?<action>[^@\s'""]+)@(?<ref>[^\s'""#]+)", RegexOptions.ExplicitCapture, TimeSpan.FromSeconds(1));
 
     // A commit SHA, or the digest of a docker:// image.
-    private static readonly Regex Pinned = new("^([0-9a-f]{40}|sha256:[0-9a-f]{64})$");
+    private static readonly Regex Pinned = new("^([0-9a-f]{40}|sha256:[0-9a-f]{64})$", RegexOptions.ExplicitCapture, TimeSpan.FromSeconds(1));
 
     private static readonly string[] WorkflowDirectories =
     [
@@ -31,9 +31,8 @@ public class WorkflowPinTests
         Assert.NotEmpty(uses);
 
         var problems =
-            from use in uses
-            group use by use.Action into action
-            let refs = action.Select(use => use.Ref).Distinct().ToList()
+            from action in uses.GroupBy(use => use.Action, StringComparer.Ordinal)
+            let refs = action.Select(use => use.Ref).Distinct(StringComparer.Ordinal).ToList()
             where refs.Count > 1 || !Pinned.IsMatch(refs[0])
             select $"{action.Key}: {string.Join(", ", action.Select(use => $"{use.Ref} ({use.Location})"))}";
 

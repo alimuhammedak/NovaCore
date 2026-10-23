@@ -1,9 +1,12 @@
+using System.Runtime.InteropServices;
+
 namespace NovaCore.Abstractions.Pagination;
 
 /// <summary>
 /// A normalized paging request. Clamps page/size into sane bounds so a hostile or careless
 /// caller cannot ask for page 0 or 100 000 rows.
 /// </summary>
+[StructLayout(LayoutKind.Auto)]
 public readonly record struct PaginationRequest
 {
     /// <summary>The page size used when none (or a value below 1) is requested.</summary>

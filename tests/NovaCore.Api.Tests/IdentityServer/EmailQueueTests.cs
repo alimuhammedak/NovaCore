@@ -32,7 +32,7 @@ public sealed class EmailQueueTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         sender.Release();
-        await sender.Delivered.WaitForAsync(email => email.To == "queued-register@novacore.test");
+        await sender.Delivered.WaitForAsync(email => string.Equals(email.To, "queued-register@novacore.test", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -42,14 +42,14 @@ public sealed class EmailQueueTests
         await using var host = await StartAsync(sender);
         await host.CreateUserAsync("queued-reset@novacore.test", Password);
         using var browser = new OidcFlow(host);
-        var page = await browser.Browser.GetAsync("/account/forgot-password", TestContext.Current.CancellationToken);
+        var page = await browser.Browser.GetAsync(new Uri("/account/forgot-password", UriKind.Relative), TestContext.Current.CancellationToken);
 
-        var response = await browser.SubmitFormAsync(page, "/account/forgot-password", new() { ["Email"] = "queued-reset@novacore.test" })
+        var response = await browser.SubmitFormAsync(page, "/account/forgot-password", new(StringComparer.Ordinal) { ["Email"] = "queued-reset@novacore.test" })
             .WaitAsync(ResponseTimeout, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         sender.Release();
-        await sender.Delivered.WaitForAsync(email => email.To == "queued-reset@novacore.test");
+        await sender.Delivered.WaitForAsync(email => string.Equals(email.To, "queued-reset@novacore.test", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -58,8 +58,9 @@ public sealed class EmailQueueTests
         var sender = new HeldEmailSender();
         await using var host = await StartAsync(sender);
         var client = host.CreateClient();
-        var registered = client.PostAsJsonAsync("/api/v1/auth/register", new { email = "queued-resend@novacore.test", password = Password });
-        await registered.WaitAsync(ResponseTimeout, TestContext.Current.CancellationToken);
+        await client
+            .PostAsJsonAsync("/api/v1/auth/register", new { email = "queued-resend@novacore.test", password = Password })
+            .WaitAsync(ResponseTimeout, TestContext.Current.CancellationToken);
 
         var response = await client
             .PostAsJsonAsync("/api/v1/auth/resend-confirmation-email", new { email = "queued-resend@novacore.test" })
@@ -67,14 +68,14 @@ public sealed class EmailQueueTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         sender.Release();
-        await sender.Delivered.WaitForAsync(email => email.To == "queued-resend@novacore.test", count: 2);
+        await sender.Delivered.WaitForAsync(email => string.Equals(email.To, "queued-resend@novacore.test", StringComparison.Ordinal), count: 2);
     }
 
     [Fact]
     public async Task A_failed_send_is_logged_without_the_address_and_the_next_email_still_goes()
     {
         var sender = new FailingOnceEmailSender();
-        var log = new LogCapture();
+        using var log = new LogCapture();
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
         {
             builder.Services.AddSingleton<IEmailSender>(sender);
@@ -87,7 +88,7 @@ public sealed class EmailQueueTests
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
-        await sender.Delivered.WaitForAsync(email => email.To == "goes-second@novacore.test");
+        await sender.Delivered.WaitForAsync(email => string.Equals(email.To, "goes-second@novacore.test", StringComparison.Ordinal));
         var failure = Assert.Single(log.Messages, message => message.StartsWith("Sending an email failed", StringComparison.Ordinal));
         Assert.DoesNotContain("fails-first", failure, StringComparison.Ordinal);
     }
@@ -98,7 +99,7 @@ public sealed class EmailQueueTests
     public async Task A_full_queue_drops_the_email_instead_of_holding_the_response()
     {
         var sender = new HeldEmailSender();
-        var log = new LogCapture();
+        using var log = new LogCapture();
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
         {
             builder.Services.AddSingleton<IEmailSender>(sender);
@@ -106,13 +107,13 @@ public sealed class EmailQueueTests
         });
         await host.CreateUserAsync("queue-full@novacore.test", Password);
         using var browser = new OidcFlow(host);
-        var page = await browser.Browser.GetAsync("/account/forgot-password", TestContext.Current.CancellationToken);
+        var page = await browser.Browser.GetAsync(new Uri("/account/forgot-password", UriKind.Relative), TestContext.Current.CancellationToken);
 
         // One email held by the sender, a thousand waiting: the queue is full.
         for (var request = 0; request < 1001; request++)
-            await browser.SubmitFormAsync(page, "/account/forgot-password", new() { ["Email"] = "queue-full@novacore.test" });
+            await browser.SubmitFormAsync(page, "/account/forgot-password", new(StringComparer.Ordinal) { ["Email"] = "queue-full@novacore.test" });
 
-        var response = await browser.SubmitFormAsync(page, "/account/forgot-password", new() { ["Email"] = "queue-full@novacore.test" })
+        var response = await browser.SubmitFormAsync(page, "/account/forgot-password", new(StringComparer.Ordinal) { ["Email"] = "queue-full@novacore.test" })
             .WaitAsync(ResponseTimeout, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

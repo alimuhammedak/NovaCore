@@ -21,7 +21,7 @@ public class ModuleRegistrationTests(NovaCoreApiFactory factory) : IClassFixture
     {
         var modules = _factory.Services.GetServices<IModule>().Select(module => module.Name);
 
-        Assert.Equal(["Catalog", "Payments"], modules);
+        Assert.Equal(["Catalog", "Payments"], modules, StringComparer.Ordinal);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class ModuleRegistrationTests(NovaCoreApiFactory factory) : IClassFixture
             .Select(endpoint =>
                 $"{string.Join(',', endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? [])} {endpoint.RoutePattern.RawText}");
 
-        Assert.Equal(expected, endpoints);
+        Assert.Equal(expected, endpoints, StringComparer.Ordinal);
     }
 
     [Fact]
@@ -74,8 +74,8 @@ public class ModuleRegistrationTests(NovaCoreApiFactory factory) : IClassFixture
             .Select(descriptor => (DbContext)scope.ServiceProvider.GetRequiredService(descriptor.ContextType))
             .ToList();
 
-        Assert.Equal(["CatalogDbContext", "PaymentsDbContext"], moduleContexts.Select(context => context.GetType().Name));
+        Assert.Equal(["CatalogDbContext", "PaymentsDbContext"], moduleContexts.Select(context => context.GetType().Name), StringComparer.Ordinal);
         Assert.All(moduleContexts, context =>
-            Assert.Contains(context.Model.GetEntityTypes(), entityType => entityType.GetTableName() == "outbox_messages"));
+            Assert.Contains(context.Model.GetEntityTypes(), entityType => string.Equals(entityType.GetTableName(), "outbox_messages", StringComparison.Ordinal)));
     }
 }

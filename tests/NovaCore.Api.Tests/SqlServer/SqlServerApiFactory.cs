@@ -57,7 +57,7 @@ public sealed class SqlServerApiFactory : ApiFactory, IAsyncLifetime
         base.ConfigureWebHost(builder);
 
         builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
-            new Dictionary<string, string?>
+            new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["ConnectionStrings:Database"] = Database.ConnectionString,
                 ["Database:ApplyMigrations"] = "true"

@@ -1,8 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -66,37 +67,14 @@ public sealed class IdentityServerTestHost : IAsyncDisposable
         // isn't thread-safe (docs/plan/RESEARCH.md R-069). No pooling, so the database goes when the host does.
         var connection = new SqliteConnection(
             $"Data Source=identity-tests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared;Pooling=False");
-        connection.Open();
+        await connection.OpenAsync();
         WebApplication? app = null;
 
         try
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
 
-            // This host's own configuration only. The test project's output also holds the Api project's appsettings
-            // files, which a host of the core and the add-on wouldn't have: their Identity section names the Api's
-            // modules and clients. The options' defaults stand in for the rest.
-            foreach (var file in builder.Configuration.Sources.OfType<JsonConfigurationSource>().ToList())
-                builder.Configuration.Sources.Remove(file);
-
-            builder.Logging.ClearProviders();
-            builder.WebHost.UseTestServer(options => options.BaseAddress = new Uri(Authority));
-            builder.Host.UseDefaultServiceProvider(options =>
-            {
-                options.ValidateScopes = true;
-                options.ValidateOnBuild = true;
-            });
-
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Jwt:Authority"] = Authority,
-                ["Database:ApplyMigrations"] = "false",
-                ["RateLimiting:PermitLimit"] = "100000",
-                ["Identity:Seed:SeedOnStartup"] = "true",
-                ["Identity:Clients:0:ClientId"] = ClientId,
-                ["Identity:Clients:0:RedirectUris:0"] = RedirectUri,
-                ["Identity:Clients:0:PostLogoutRedirectUris:0"] = PostLogoutRedirectUri
-            });
+            UseTestDefaults(builder);
 
             builder.AddCoreWeb();
             builder.AddCorePersistence();
@@ -129,6 +107,36 @@ public sealed class IdentityServerTestHost : IAsyncDisposable
             await connection.DisposeAsync();
             throw;
         }
+    }
+
+    // What every test host has: only its own configuration, no log output, the test server at the authority, and DI
+    // scope validation.
+    private static void UseTestDefaults(WebApplicationBuilder builder)
+    {
+        // This host's own configuration only. The test project's output also holds the Api project's appsettings
+        // files, which a host of the core and the add-on wouldn't have: their Identity section names the Api's
+        // modules and clients. The options' defaults stand in for the rest.
+        foreach (var file in builder.Configuration.Sources.OfType<JsonConfigurationSource>().ToList())
+            builder.Configuration.Sources.Remove(file);
+
+        builder.Logging.ClearProviders();
+        builder.WebHost.UseTestServer(options => options.BaseAddress = new Uri(Authority));
+        builder.Host.UseDefaultServiceProvider(options =>
+        {
+            options.ValidateScopes = true;
+            options.ValidateOnBuild = true;
+        });
+
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["Jwt:Authority"] = Authority,
+            ["Database:ApplyMigrations"] = "false",
+            ["RateLimiting:PermitLimit"] = "100000",
+            ["Identity:Seed:SeedOnStartup"] = "true",
+            ["Identity:Clients:0:ClientId"] = ClientId,
+            ["Identity:Clients:0:RedirectUris:0"] = RedirectUri,
+            ["Identity:Clients:0:PostLogoutRedirectUris:0"] = PostLogoutRedirectUri
+        });
     }
 
     public HttpClient CreateClient() => Server.CreateClient();

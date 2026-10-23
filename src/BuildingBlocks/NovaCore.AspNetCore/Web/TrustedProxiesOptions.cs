@@ -24,7 +24,7 @@ internal sealed class TrustedProxiesOptions
     /// </summary>
     public static bool IsAddress(string value) =>
         IPAddress.TryParse(value, out var address)
-        && (address.AddressFamily != AddressFamily.InterNetwork || address.ToString() == value);
+        && (address.AddressFamily != AddressFamily.InterNetwork || string.Equals(address.ToString(), value, StringComparison.Ordinal));
 
     /// <summary>A network in CIDR notation, e.g. <c>10.0.0.0/8</c>, with no host bits set.</summary>
     public static bool IsNetwork(string value) => System.Net.IPNetwork.TryParse(value, out _);

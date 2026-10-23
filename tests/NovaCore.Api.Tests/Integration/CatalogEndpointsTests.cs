@@ -55,10 +55,10 @@ public sealed class CatalogEndpointsTests(NovaCoreApiFactory factory) : IClassFi
         using var client = CatalogClient();
         var id = await CreateProductAsync(client);
 
-        var deleted = await client.DeleteAsync($"/api/v1/products/{id}");
+        var deleted = await client.DeleteAsync(new Uri($"/api/v1/products/{id}", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
-        var read = await client.GetAsync($"/api/v1/products/{id}");
+        var read = await client.GetAsync(new Uri($"/api/v1/products/{id}", UriKind.Relative));
         Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
         var problem = await read.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("product.not_found", problem.GetProperty("code").GetString());

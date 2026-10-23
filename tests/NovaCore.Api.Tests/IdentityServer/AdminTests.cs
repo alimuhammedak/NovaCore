@@ -42,7 +42,7 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
 
         protected override void Configure(WebApplicationBuilder builder)
         {
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Identity:Seed:AdminEmail"] = AdminEmail,
                 ["Identity:Seed:AdminPassword"] = AdminPassword,
@@ -173,7 +173,7 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
     {
         // A host of its own: here the seeded administrator is the only one.
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Identity:Seed:AdminEmail"] = AdminEmail,
                 ["Identity:Seed:AdminPassword"] = AdminPassword
@@ -198,7 +198,7 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
     public async Task The_last_administrator_with_two_factor_authentication_keeps_the_role()
     {
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Identity:Seed:AdminEmail"] = AdminEmail,
                 ["Identity:Seed:AdminPassword"] = AdminPassword
@@ -282,7 +282,7 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
 
     private static async Task<string[]> PermissionsOfAsync(RoleManager<ApplicationRole> roles, string role) =>
         (await roles.GetClaimsAsync((await roles.FindByNameAsync(role))!))
-        .Where(claim => claim.Type == NovaClaims.Permission)
+        .Where(claim => string.Equals(claim.Type, NovaClaims.Permission, StringComparison.Ordinal))
         .Select(claim => claim.Value)
         .Order(StringComparer.Ordinal)
         .ToArray();

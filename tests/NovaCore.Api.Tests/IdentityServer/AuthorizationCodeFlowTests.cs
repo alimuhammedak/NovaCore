@@ -46,7 +46,7 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         Assert.Equal("RS256", accessToken.Alg);
         Assert.Equal("at+jwt", accessToken.Typ);
         Assert.Equal(IdentityServerTestHost.Authority + "/", accessToken.Issuer);
-        Assert.Equal(["novacore.api"], accessToken.Audiences);
+        Assert.Equal(["novacore.api"], accessToken.Audiences, StringComparer.Ordinal);
         Assert.Equal(user.Id.ToString(), accessToken.Subject);
         // Permissions are resolved on the server, never carried by the token.
         Assert.False(accessToken.TryGetClaim("permission", out _));
@@ -67,7 +67,7 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
     public async Task The_API_answers_an_anonymous_call_with_401_not_a_sign_in_redirect()
     {
         // The provider's cookie schemes sit next to the API's bearer default without replacing it.
-        var response = await _host.CreateClient().GetAsync("/probe");
+        var response = await _host.CreateClient().GetAsync(new Uri("/probe", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -104,7 +104,7 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         await _host.CreateUserAsync("redirect@novacore.test", Password);
         using var flow = new OidcFlow(_host);
 
-        var loginPage = await flow.Browser.GetAsync("/account/login?ReturnUrl=https%3A%2F%2Fevil.example%2F");
+        var loginPage = await flow.Browser.GetAsync(new Uri("/account/login?ReturnUrl=https%3A%2F%2Fevil.example%2F", UriKind.Relative));
         var response = await flow.SubmitLoginAsync(loginPage, "redirect@novacore.test", Password);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -117,12 +117,13 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         await _host.CreateUserAsync("csrf@novacore.test", Password);
         using var flow = new OidcFlow(_host);
 
-        var response = await flow.Browser.PostAsync("/account/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["Email"] = "csrf@novacore.test",
             ["Password"] = Password,
             ["ReturnUrl"] = "/"
-        }));
+        });
+        var response = await flow.Browser.PostAsync(new Uri("/account/login", UriKind.Relative), form);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -136,7 +137,7 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
 
         var refreshed = await OidcFlow.TokensFrom(await flow.RefreshAsync(tokens.RefreshToken));
 
-        Assert.NotEqual(tokens.RefreshToken, refreshed.RefreshToken);
+        Assert.NotEqual(tokens.RefreshToken, refreshed.RefreshToken, StringComparer.Ordinal);
         Assert.Equal(HttpStatusCode.OK, (await flow.CallApiAsync("/probe", refreshed.AccessToken)).StatusCode);
     }
 
@@ -164,12 +165,13 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         using var flow = new OidcFlow(_host);
         var tokens = await flow.SignInAsync("revoke@novacore.test", Password);
 
-        var revoke = await flow.Browser.PostAsync("/connect/revoke", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["token"] = tokens.RefreshToken,
             ["token_type_hint"] = "refresh_token",
             ["client_id"] = IdentityServerTestHost.ClientId
-        }));
+        });
+        var revoke = await flow.Browser.PostAsync(new Uri("/connect/revoke", UriKind.Relative), form);
         Assert.Equal(HttpStatusCode.OK, revoke.StatusCode);
 
         Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(await flow.RefreshAsync(tokens.RefreshToken)));
@@ -231,11 +233,12 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         await flow.SignInAsync("cross-site@novacore.test", Password);
 
         // What a form on another site can post: the parameters, but no antiforgery token.
-        var response = await flow.Browser.PostAsync("/connect/endsession", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["client_id"] = IdentityServerTestHost.ClientId,
             ["post_logout_redirect_uri"] = IdentityServerTestHost.PostLogoutRedirectUri
-        }));
+        });
+        var response = await flow.Browser.PostAsync(new Uri("/connect/endsession", UriKind.Relative), form);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.StartsWith(IdentityServerTestHost.RedirectUri, (await AuthorizeAsync(flow)).ToString(), StringComparison.Ordinal);
@@ -252,11 +255,13 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         Assert.StartsWith(IdentityServerTestHost.PostLogoutRedirectUri, response.Headers.Location!.ToString(), StringComparison.Ordinal);
     }
 
-    private static string EndSessionUri => QueryHelpers.AddQueryString("/connect/endsession", new Dictionary<string, string?>
-    {
-        ["client_id"] = IdentityServerTestHost.ClientId,
-        ["post_logout_redirect_uri"] = IdentityServerTestHost.PostLogoutRedirectUri
-    });
+    private static Uri EndSessionUri => new(
+        QueryHelpers.AddQueryString("/connect/endsession", new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["client_id"] = IdentityServerTestHost.ClientId,
+            ["post_logout_redirect_uri"] = IdentityServerTestHost.PostLogoutRedirectUri
+        }),
+        UriKind.Relative);
 
     // Where a new authorization request leads: the client's callback while the provider session lasts, else the sign-in page.
     private static async Task<Uri> AuthorizeAsync(OidcFlow flow)

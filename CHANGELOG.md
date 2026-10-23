@@ -97,6 +97,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Catalog: a product's price must fit its `decimal(18,2)` column: at most 2 decimal places and 16 digits before the
   point, else 400. SQL Server rounded the rest away, so a price of 0.001 was stored as 0.00 and 10.005 as 10.01 while
   the API answered 201.
+- The build runs every Security, Reliability, Performance and Usage analyzer rule (`AnalysisLevel<Category>=latest-all`),
+  taint analysis included. `NovaCore.EntityFrameworkCore` calls `ConfigureAwait(false)`, as a library that doesn't depend
+  on ASP.NET Core.
+- Dead private members, values never read, unused parameters, unnecessary usings (in the packages) and excessive
+  complexity or coupling (Microsoft's default code metric thresholds) fail the build. CI checks the formatting
+  (`dotnet format --verify-no-changes`); `.editorconfig` no longer sets `end_of_line`, and `.gitattributes` checks text
+  files out with the platform's line endings.
+- The code under `src/` can't call the static clocks (`DateTime.UtcNow` and the like, except `DomainEvent`'s default),
+  `Console`, `Environment.Exit`, `BuildServiceProvider` or an `HttpClient` constructor: BannedApiAnalyzers reports them
+  (`src/BannedSymbols*.txt`).
+- Meziantou.Analyzer runs in every project with its default severities (MA0048, MA0004 where CA2007 is off, and MA0051
+  in migrations excepted). String comparisons and string-keyed collections say `Ordinal`; the identity provider's
+  permission list (`GET /api/v1/admin/permissions`) is ordered by ordinal comparison instead of the server's culture.
+- A weekly report (`unused-code.yml`, `eng/find-unused.sh`, Roslynator CLI) lists the internal and private types,
+  fields, constants and events nothing references.
+- Template: the generated project runs the same Security, Reliability, Performance and Usage rules, the dead-code
+  rules and the code metric rules (CA2007, CA1812, and CA1506 in `Program.cs`, stay off: the project is ASP.NET Core
+  application code). Its tests pass `Uri` objects to `HttpClient`.
+
+### Removed
+
+- **Breaking:** `Result<T>` has no implicit conversions from `T` or `Error` any more. Their named alternates would have
+  to be public static members of the generic `Result<T>` (CA2225), which CA1000 forbids. **Upgrade:** write
+  `Result.Success(value)` and `Result.Failure<T>(error)` where a method returned a value or an `Error` as a `Result<T>`.
 
 ## [0.1.0-preview.1] - 2026-10-20
 

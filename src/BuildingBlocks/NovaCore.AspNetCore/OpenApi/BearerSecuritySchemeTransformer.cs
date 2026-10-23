@@ -29,7 +29,7 @@ public sealed class BearerSecuritySchemeTransformer : IOpenApiDocumentTransforme
         };
 
         document.Components ??= new OpenApiComponents();
-        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>(StringComparer.Ordinal);
         document.Components.SecuritySchemes[SchemeId] = scheme;
 
         return Task.CompletedTask;

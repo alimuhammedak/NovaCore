@@ -41,7 +41,7 @@ public class PackageDependencyTests
             from name in CorePackages
             from reference in Assembly.Load(name).GetReferencedAssemblies()
             let referenced = reference.Name!
-            where !IsMicrosoftOrBcl(referenced) && referenced != Abstractions
+            where !IsMicrosoftOrBcl(referenced) && !string.Equals(referenced, Abstractions, StringComparison.Ordinal)
             select $"{name} -> {referenced}";
 
         Assert.Empty(violations);
@@ -50,7 +50,7 @@ public class PackageDependencyTests
     [Fact]
     public void Core_packages_reference_no_first_party_project_but_Abstractions()
     {
-        var projects = CoreProjects().ToDictionary(project => project.Name);
+        var projects = CoreProjects().ToDictionary(project => project.Name, StringComparer.Ordinal);
 
         Assert.Empty(projects[Abstractions].ProjectReferences);
         Assert.Equal([Abstractions], projects[AspNetCore].ProjectReferences);
@@ -60,7 +60,7 @@ public class PackageDependencyTests
     [Fact]
     public void Abstractions_and_EntityFrameworkCore_do_not_depend_on_ASP_NET_Core()
     {
-        var projects = CoreProjects().ToDictionary(project => project.Name);
+        var projects = CoreProjects().ToDictionary(project => project.Name, StringComparer.Ordinal);
         Assert.Empty(projects[Abstractions].FrameworkReferences);
         Assert.Empty(projects[EntityFrameworkCore].FrameworkReferences);
 

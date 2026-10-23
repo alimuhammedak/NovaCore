@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
@@ -19,6 +20,8 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 namespace NovaCore.Identity.OpenIddict;
 
 /// <summary>Service registration for the OpenID Connect provider.</summary>
+[SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
+    Justification = "The provider's composition root registers ASP.NET Core Identity, OpenIddict, the cookies, CORS, options and the add-on's services, so it names their types; each registration stays a few lines (docs/plan/RESEARCH.md R-117).")]
 public static class IdentityServerHostingExtensions
 {
     /// <summary>
@@ -49,6 +52,50 @@ public static class IdentityServerHostingExtensions
     {
         var services = builder.Services;
 
+        AddAccountStore(services);
+        services.AddSingleton<SecurityAuditLogger>();
+        services.AddSingleton<DummyPasswordHash>();
+
+        AddEmail(services, builder.Environment);
+
+        // Built-in validation is generated per assembly, so the add-on registers it for its own requests (R-052).
+        services.AddValidation();
+
+        AddOpenIddictServer(services, builder.Environment);
+
+        // The issuer is the authority the core validates against (validated there: absolute, https outside Development),
+        // so the "iss" of every token and the discovery document match it, also behind a proxy. ValidateOnStart builds the
+        // options when the host starts, so missing keys (OpenIddict's own check) stop the host instead of the first sign-in.
+        services.AddOptions<OpenIddictServerOptions>()
+            .Configure<IOptions<JwtOptions>>((server, jwt) => server.Issuer = new Uri(jwt.Value.Authority, UriKind.Absolute))
+            .ValidateOnStart();
+
+        // This provider's access tokens are RFC 9068 JWTs ("typ": "at+jwt"), and §4 has the resource server check the
+        // type, so no other JWT signed with the same key (an identity token) passes for one. Here, not in the core: the
+        // core validates other providers too, and Microsoft Entra's access tokens say "JWT" (docs/plan/RESEARCH.md
+        // R-101). PostConfigure, because the core's Configure replaces the validation parameters whatever the order.
+        services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
+            options => options.TokenValidationParameters.ValidTypes = [JsonWebTokenTypes.AccessToken]);
+
+        AddSignInSession(services, builder.Environment);
+        AddIdentityServerOptions(services);
+
+        // Expired, revoked and redeemed tokens and their authorizations would stay in the store forever
+        // (docs/plan/RESEARCH.md R-088).
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddHostedService<ExpiredTokenPruner>();
+
+        services.AddScoped<IPermissionResolver, IdentityPermissionResolver>();
+        services.AddPermissionDefinitions<IdentityPermissionProvider>();
+
+        // Every OpenAPI document declares the sign-in flow, so an API explorer can get a token from this provider.
+        services.ConfigureAll<OpenApiOptions>(options => options.AddDocumentTransformer<OAuthSecuritySchemeTransformer>());
+
+        return builder;
+    }
+
+    private static void AddAccountStore(IServiceCollection services)
+    {
         services
             .AddIdentityCore<ApplicationUser>(options =>
             {
@@ -100,13 +147,13 @@ public static class IdentityServerHostingExtensions
                 + "volume>), .PersistKeysToDbContext<TContext>() (Microsoft.AspNetCore.DataProtection.EntityFrameworkCore) "
                 + "or a blob or Redis store.")
             .ValidateOnStart();
+    }
 
-        services.AddSingleton<SecurityAuditLogger>();
-        services.AddSingleton<DummyPasswordHash>();
-
+    private static void AddEmail(IServiceCollection services, IHostEnvironment environment)
+    {
         // LoggingEmailSender writes confirmation links to the log: Development only, and only when the host brings none.
         // Anywhere else the host registers a real sender, or EmailSenderStartupCheck stops the host.
-        if (builder.Environment.IsDevelopment())
+        if (environment.IsDevelopment())
             services.TryAddSingleton<IEmailSender, LoggingEmailSender>();
         services.AddHostedService<EmailSenderStartupCheck>();
 
@@ -114,10 +161,10 @@ public static class IdentityServerHostingExtensions
         // the background, so the response time doesn't reveal whether an address has an account (R-105).
         services.AddSingleton<EmailQueue>();
         services.AddHostedService(provider => provider.GetRequiredService<EmailQueue>());
+    }
 
-        // Built-in validation is generated per assembly, so the add-on registers it for its own requests (R-052).
-        services.AddValidation();
-
+    private static void AddOpenIddictServer(IServiceCollection services, IHostEnvironment environment)
+    {
         services.AddOpenIddict()
             .AddCore(core => core.UseEntityFrameworkCore().UseDbContext<IdentityServerDbContext>())
             .AddServer(server =>
@@ -152,7 +199,7 @@ public static class IdentityServerHostingExtensions
                 // lifetime, so one used before every expiry never ran out (measured, PLAN F6b.4e; R-103).
                 server.DisableSlidingRefreshTokenExpiration();
 
-                if (builder.Environment.IsDevelopment())
+                if (environment.IsDevelopment())
                     server.AddEphemeralEncryptionKey().AddEphemeralSigningKey();
 
                 server.UseAspNetCore()
@@ -160,21 +207,10 @@ public static class IdentityServerHostingExtensions
                     .EnableTokenEndpointPassthrough()
                     .EnableEndSessionEndpointPassthrough();
             });
+    }
 
-        // The issuer is the authority the core validates against (validated there: absolute, https outside Development),
-        // so the "iss" of every token and the discovery document match it, also behind a proxy. ValidateOnStart builds the
-        // options when the host starts, so missing keys (OpenIddict's own check) stop the host instead of the first sign-in.
-        services.AddOptions<OpenIddictServerOptions>()
-            .Configure<IOptions<JwtOptions>>((server, jwt) => server.Issuer = new Uri(jwt.Value.Authority, UriKind.Absolute))
-            .ValidateOnStart();
-
-        // This provider's access tokens are RFC 9068 JWTs ("typ": "at+jwt"), and §4 has the resource server check the
-        // type, so no other JWT signed with the same key (an identity token) passes for one. Here, not in the core: the
-        // core validates other providers too, and Microsoft Entra's access tokens say "JWT" (docs/plan/RESEARCH.md
-        // R-101). PostConfigure, because the core's Configure replaces the validation parameters whatever the order.
-        services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
-            options => options.TokenValidationParameters.ValidTypes = [JsonWebTokenTypes.AccessToken]);
-
+    private static void AddSignInSession(IServiceCollection services, IHostEnvironment environment)
+    {
         // The sign-in session at the provider: Identity's cookies, alongside the API's bearer default (the parameterless
         // AddAuthentication doesn't change the default scheme, docs/plan/RESEARCH.md R-061). Only /connect/* and
         // /account/* read it.
@@ -204,12 +240,15 @@ public static class IdentityServerHostingExtensions
         // Antiforgery's cookie has no Secure flag by default, not even over https. Microsoft's guidance: Always outside
         // Development (R-104). In Development it follows the request, since Always fails a plain-http page outright.
         services.AddAntiforgery(antiforgery => antiforgery.Cookie.SecurePolicy =
-            builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always);
+            environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always);
 
         // The cookie is read only at /connect/* and /account/*, so checking its security stamp on every read is cheap, and
         // a password change or "sign out everywhere" ends the provider session at once instead of within 30 minutes.
         services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.Zero);
+    }
 
+    private static void AddIdentityServerOptions(IServiceCollection services)
+    {
         services.AddOptions<IdentityServerOptions>()
             .BindConfiguration(IdentityServerOptions.SectionName)
             .Validate(
@@ -253,19 +292,6 @@ public static class IdentityServerHostingExtensions
             .ValidateOnStart();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<IdentityServerOptions>, IdentityServerOptionsValidator>());
         services.AddHostedService<IdentityServerSeeder>();
-
-        // Expired, revoked and redeemed tokens and their authorizations would stay in the store forever
-        // (docs/plan/RESEARCH.md R-088).
-        services.TryAddSingleton(TimeProvider.System);
-        services.AddHostedService<ExpiredTokenPruner>();
-
-        services.AddScoped<IPermissionResolver, IdentityPermissionResolver>();
-        services.AddPermissionDefinitions<IdentityPermissionProvider>();
-
-        // Every OpenAPI document declares the sign-in flow, so an API explorer can get a token from this provider.
-        services.ConfigureAll<OpenApiOptions>(options => options.AddDocumentTransformer<OAuthSecuritySchemeTransformer>());
-
-        return builder;
     }
 
     // An authorization code sent over plain http can be read on the way, except to a native app's own loopback listener,
@@ -273,7 +299,7 @@ public static class IdentityServerHostingExtensions
     // the absolute-URI rule's to report.
     private static bool IsSecureRedirect(Uri uri) =>
         !uri.IsAbsoluteUri
-        || uri.Scheme != Uri.UriSchemeHttp
+        || !string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal)
         || (uri.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6
             && IPAddress.TryParse(uri.DnsSafeHost, out var address)
             && IPAddress.IsLoopback(address));

@@ -22,18 +22,16 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
 {
     private const string ProtectedEndpoint = "/api/v1/products";
 
-    private readonly NovaCoreApiFactory _factory = factory;
-
-    public async ValueTask InitializeAsync() => await EnsureCatalogCreatedAsync(_factory);
+    public async ValueTask InitializeAsync() => await EnsureCatalogCreatedAsync(factory);
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task A_token_signed_by_the_authority_is_accepted()
     {
-        var token = _factory.IdentityProvider.CreateToken(Reader(_factory));
+        var token = factory.IdentityProvider.CreateToken(Reader(factory));
 
-        var response = await GetWithTokenAsync(_factory, token);
+        var response = await GetWithTokenAsync(factory, token);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -46,20 +44,20 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
     public async Task A_token_that_fails_validation_is_rejected(string defect)
     {
         using var foreignRsa = RSA.Create(2048);
-        var signingKey = _factory.IdentityProvider.SigningKey;
+        var signingKey = factory.IdentityProvider.SigningKey;
         var token = defect switch
         {
-            "wrong issuer" => TestIdentityProvider.CreateToken(Reader(_factory), signingKey, issuer: "https://attacker.example"),
-            "wrong audience" => TestIdentityProvider.CreateToken(Reader(_factory), signingKey, audience: "another.api"),
+            "wrong issuer" => TestIdentityProvider.CreateToken(Reader(factory), signingKey, issuer: "https://attacker.example"),
+            "wrong audience" => TestIdentityProvider.CreateToken(Reader(factory), signingKey, audience: "another.api"),
             // Same key id, different key: the signature cannot be verified with the published key.
             "foreign signing key" => TestIdentityProvider.CreateToken(
-                Reader(_factory), new RsaSecurityKey(foreignRsa) { KeyId = signingKey.KeyId }),
+                Reader(factory), new RsaSecurityKey(foreignRsa) { KeyId = signingKey.KeyId }),
             "expired" => TestIdentityProvider.CreateToken(
-                Reader(_factory), signingKey, expires: TimeProvider.System.GetUtcNow().AddMinutes(-10)),
+                Reader(factory), signingKey, expires: TimeProvider.System.GetUtcNow().AddMinutes(-10)),
             _ => throw new ArgumentOutOfRangeException(nameof(defect), defect, null)
         };
 
-        var response = await GetWithTokenAsync(_factory, token);
+        var response = await GetWithTokenAsync(factory, token);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -67,10 +65,10 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
     [Fact]
     public async Task Outside_development_the_authority_is_trusted_over_https_metadata()
     {
-        await using var factory = new ProductionApiFactory();
-        await EnsureCatalogCreatedAsync(factory);
+        await using var production = new ProductionApiFactory();
+        await EnsureCatalogCreatedAsync(production);
 
-        var accepted = await GetWithTokenAsync(factory, factory.IdentityProvider.CreateToken(Reader(factory)));
+        var accepted = await GetWithTokenAsync(production, production.IdentityProvider.CreateToken(Reader(production)));
 
         Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
     }
@@ -82,13 +80,13 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
     {
         // Only the authority's published asymmetric keys sign tokens (DECISIONS D-028): an HS256 token with the trusted
         // issuer and audience is still refused, in Development too.
-        await using var production = environment == "Production" ? new ProductionApiFactory() : null;
-        var factory = production ?? _factory;
-        await EnsureCatalogCreatedAsync(factory);
+        await using var production = string.Equals(environment, "Production", StringComparison.Ordinal) ? new ProductionApiFactory() : null;
+        var host = production ?? factory;
+        await EnsureCatalogCreatedAsync(host);
         var symmetricKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("a-symmetric-key-that-is-long-enough-0123456789"));
 
-        var response = await GetWithTokenAsync(factory,
-            TestIdentityProvider.CreateToken(Reader(factory), symmetricKey, SecurityAlgorithms.HmacSha256));
+        var response = await GetWithTokenAsync(host,
+            TestIdentityProvider.CreateToken(Reader(host), symmetricKey, SecurityAlgorithms.HmacSha256));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -107,7 +105,7 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
     {
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return await client.GetAsync(ProtectedEndpoint);
+        return await client.GetAsync(new Uri(ProtectedEndpoint, UriKind.Relative));
     }
 
     private static async Task EnsureCatalogCreatedAsync<TEntryPoint>(

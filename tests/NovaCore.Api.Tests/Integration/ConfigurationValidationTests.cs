@@ -42,7 +42,7 @@ public class ConfigurationValidationTests
             builder =>
             {
                 builder.AddCorePersistence();
-                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { [key] = value });
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal) { [key] = value });
             }));
 
         Assert.Contains(expectedInMessage, Messages(error), StringComparison.Ordinal);
@@ -51,7 +51,7 @@ public class ConfigurationValidationTests
     [Fact]
     public async Task App_configuration_reaches_the_options()
     {
-        await using var factory = new ConfiguredApiFactory(Environments.Development, new() { ["Jwt:Audience"] = "another.api" });
+        await using var factory = new ConfiguredApiFactory(Environments.Development, new(StringComparer.Ordinal) { ["Jwt:Audience"] = "another.api" });
 
         var jwt = factory.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
 
@@ -61,7 +61,7 @@ public class ConfigurationValidationTests
     [Fact]
     public async Task Cache_default_expiration_applies_to_hybrid_cache_entries()
     {
-        await using var factory = new ConfiguredApiFactory(Environments.Development, new() { ["Cache:DefaultExpiration"] = "00:07:00" });
+        await using var factory = new ConfiguredApiFactory(Environments.Development, new(StringComparer.Ordinal) { ["Cache:DefaultExpiration"] = "00:07:00" });
 
         var defaults = factory.Services.GetRequiredService<IOptions<HybridCacheOptions>>().Value.DefaultEntryOptions;
 

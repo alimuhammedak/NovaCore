@@ -22,6 +22,7 @@ public sealed class PermissionResolutionTests(FakeClockApiFactory factory)
 {
     // Cache:PermissionExpiration's default; the test host leaves it unset.
     private static readonly TimeSpan PermissionExpiration = TimeSpan.FromMinutes(5);
+    private static readonly Uri Products = new("/api/v1/products", UriKind.Relative);
 
     public async ValueTask InitializeAsync()
     {
@@ -37,14 +38,14 @@ public sealed class PermissionResolutionTests(FakeClockApiFactory factory)
         var subject = Guid.NewGuid().ToString();
         factory.GrantPermissions(subject, CatalogPermissions.ProductsRead);
         using var client = factory.CreateClientWithClaims(new Claim(NovaClaims.Subject, subject));
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(Products)).StatusCode);
 
         factory.GrantPermissions(subject);
         factory.Clock.Advance(PermissionExpiration - TimeSpan.FromSeconds(1));
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(Products)).StatusCode);
 
         factory.Clock.Advance(TimeSpan.FromSeconds(2));
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(Products)).StatusCode);
     }
 
     [Fact]
@@ -53,15 +54,15 @@ public sealed class PermissionResolutionTests(FakeClockApiFactory factory)
         var subject = Guid.NewGuid().ToString();
         factory.GrantPermissions(subject, CatalogPermissions.ProductsRead);
         using var before = ClientFor(subject, stamp: "stamp-1");
-        Assert.Equal(HttpStatusCode.OK, (await before.GetAsync("/api/v1/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await before.GetAsync(Products)).StatusCode);
 
         factory.GrantPermissions(subject);
 
         // A token carrying the old stamp still hits the cached entry; one issued after the change does not.
         using var sameStamp = ClientFor(subject, stamp: "stamp-1");
         using var newStamp = ClientFor(subject, stamp: "stamp-2");
-        Assert.Equal(HttpStatusCode.OK, (await sameStamp.GetAsync("/api/v1/products")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await newStamp.GetAsync("/api/v1/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await sameStamp.GetAsync(Products)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await newStamp.GetAsync(Products)).StatusCode);
     }
 
     [Fact]
@@ -73,16 +74,16 @@ public sealed class PermissionResolutionTests(FakeClockApiFactory factory)
         factory.GrantPermissions(other, CatalogPermissions.ProductsRead);
         using var client = ClientFor(subject, stamp: "stamp-1");
         using var otherClient = factory.CreateClientWithClaims(new Claim(NovaClaims.Subject, other));
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/products")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await otherClient.GetAsync("/api/v1/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(Products)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await otherClient.GetAsync(Products)).StatusCode);
 
         factory.GrantPermissions(subject);
         factory.GrantPermissions(other);
         await factory.Services.GetRequiredService<HybridCache>().RemovePermissionsAsync(subject, TestContext.Current.CancellationToken);
 
         // Whatever the stamp it was cached under; another subject's entry stays until it expires.
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/products")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await otherClient.GetAsync("/api/v1/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(Products)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await otherClient.GetAsync(Products)).StatusCode);
     }
 
     private HttpClient ClientFor(string subject, string stamp) =>

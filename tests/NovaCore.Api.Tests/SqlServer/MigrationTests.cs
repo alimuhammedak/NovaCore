@@ -33,7 +33,7 @@ public sealed class MigrationTests(SqlServerApiFactory factory) : IClassFixture<
                  })
         {
             Assert.NotEmpty(context.Database.GetMigrations());
-            Assert.Equal(context.Database.GetMigrations(), await context.Database.GetAppliedMigrationsAsync());
+            Assert.Equal(context.Database.GetMigrations(), await context.Database.GetAppliedMigrationsAsync(), StringComparer.Ordinal);
             Assert.Empty(await context.Database.GetPendingMigrationsAsync());
         }
     }

@@ -86,7 +86,7 @@ public sealed class TestIdentityProvider : IDisposable
             var path = request.RequestUri?.AbsolutePath;
             object? document = path switch
             {
-                "/.well-known/openid-configuration" => new Dictionary<string, object>
+                "/.well-known/openid-configuration" => new Dictionary<string, object>(StringComparer.Ordinal)
                 {
                     ["issuer"] = Issuer,
                     ["jwks_uri"] = Issuer + JwksPath
@@ -104,11 +104,11 @@ public sealed class TestIdentityProvider : IDisposable
         private static Dictionary<string, object> Jwks(RsaSecurityKey key)
         {
             var jwk = JsonWebKeyConverter.ConvertFromRSASecurityKey(key);
-            return new Dictionary<string, object>
+            return new Dictionary<string, object>(StringComparer.Ordinal)
             {
                 ["keys"] = new[]
                 {
-                    new Dictionary<string, string>
+                    new Dictionary<string, string>(StringComparer.Ordinal)
                     {
                         ["kty"] = jwk.Kty,
                         ["use"] = "sig",

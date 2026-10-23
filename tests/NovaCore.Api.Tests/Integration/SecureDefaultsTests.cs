@@ -28,11 +28,11 @@ public sealed class SecureDefaultsTests(NovaCoreApiFactory factory, ProductionAp
             app.MapGet("/open", () => "open").AllowAnonymous();
         });
 
-        Assert.Equal(HttpStatusCode.Unauthorized, (await host.CreateClient().GetAsync("/plain")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await host.CreateClient().GetAsync("/open")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await host.CreateClient().GetAsync(new Uri("/plain", UriKind.Relative))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await host.CreateClient().GetAsync(new Uri("/open", UriKind.Relative))).StatusCode);
 
         using var authenticated = host.CreateClientWithClaims(new Claim(NovaClaims.Subject, Guid.NewGuid().ToString()));
-        Assert.Equal(HttpStatusCode.OK, (await authenticated.GetAsync("/plain")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await authenticated.GetAsync(new Uri("/plain", UriKind.Relative))).StatusCode);
     }
 
     // The identity provider's protocol endpoints and sign-in page are exercised anonymously by the IdentityServer tests.
@@ -45,7 +45,7 @@ public sealed class SecureDefaultsTests(NovaCoreApiFactory factory, ProductionAp
     [InlineData("/account/forgot-password")]
     public async Task The_public_endpoints_of_the_host_stay_anonymous(string path)
     {
-        var response = await factory.CreateClient().GetAsync(path);
+        var response = await factory.CreateClient().GetAsync(new Uri(path, UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -55,8 +55,10 @@ public sealed class SecureDefaultsTests(NovaCoreApiFactory factory, ProductionAp
     {
         var client = production.CreateClient();
 
-        using var simple = await client.SendAsync(Request(HttpMethod.Get));
-        using var preflight = await client.SendAsync(Preflight());
+        using var simpleRequest = Request(HttpMethod.Get);
+        using var preflightRequest = Preflight();
+        using var simple = await client.SendAsync(simpleRequest);
+        using var preflight = await client.SendAsync(preflightRequest);
 
         Assert.False(simple.Headers.Contains(HeaderNames.AccessControlAllowOrigin));
         Assert.False(preflight.Headers.Contains(HeaderNames.AccessControlAllowOrigin));
@@ -67,7 +69,8 @@ public sealed class SecureDefaultsTests(NovaCoreApiFactory factory, ProductionAp
     {
         var client = factory.CreateClient();
 
-        using var simple = await client.SendAsync(Request(HttpMethod.Get));
+        using var request = Request(HttpMethod.Get);
+        using var simple = await client.SendAsync(request);
 
         Assert.Equal("*", Assert.Single(simple.Headers.GetValues(HeaderNames.AccessControlAllowOrigin)));
     }

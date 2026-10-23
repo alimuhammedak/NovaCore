@@ -78,14 +78,14 @@ public sealed class ForwardedHeadersTests
         var exception = await Assert.ThrowsAsync<OptionsValidationException>(() => CoreWebTestHost.StartAsync(
             _ => { },
             configure: builder => builder.Configuration.AddInMemoryCollection(
-                new Dictionary<string, string?> { [key] = value })));
+                new Dictionary<string, string?>(StringComparer.Ordinal) { [key] = value })));
 
         Assert.Contains("ForwardedHeaders", exception.Message, StringComparison.Ordinal);
     }
 
     private static Task<CoreWebTestHost> StartAsync(bool trusted)
     {
-        var settings = new Dictionary<string, string?> { ["RateLimiting:PermitLimit"] = "10" };
+        var settings = new Dictionary<string, string?>(StringComparer.Ordinal) { ["RateLimiting:PermitLimit"] = "10" };
         if (trusted)
         {
             settings["ForwardedHeaders:KnownProxies:0"] = Proxy;

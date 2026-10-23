@@ -18,7 +18,7 @@ public sealed class IdentityProviderTests(ApiFactory factory) : IClassFixture<Ap
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
 
         var discovery = await client.GetFromJsonAsync<JsonElement>(
-            "/.well-known/openid-configuration", TestContext.Current.CancellationToken);
+            new Uri("/.well-known/openid-configuration", UriKind.Relative), TestContext.Current.CancellationToken);
 
         Assert.Equal(TestIdentityProvider.Issuer + "/", discovery.GetProperty("issuer").GetString());
         Assert.True(discovery.TryGetProperty("authorization_endpoint", out _));

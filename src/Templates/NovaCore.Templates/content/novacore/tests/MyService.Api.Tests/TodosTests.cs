@@ -13,6 +13,8 @@ namespace MyService.Api.Tests;
 /// </summary>
 public sealed class TodosTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
+    private static readonly Uri TodosUri = new("/api/v1/todos", UriKind.Relative);
+
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -20,7 +22,7 @@ public sealed class TodosTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync("/api/v1/todos", Cancellation);
+        using var response = await client.GetAsync(TodosUri, Cancellation);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -30,7 +32,7 @@ public sealed class TodosTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         using var client = factory.CreateClientWithPermissions(TodosPermissions.ItemsRead);
 
-        using var response = await client.PostAsJsonAsync("/api/v1/todos", new { title = "Write the tests" }, Cancellation);
+        using var response = await client.PostAsJsonAsync(TodosUri, new { title = "Write the tests" }, Cancellation);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -40,7 +42,7 @@ public sealed class TodosTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         using var client = TodosClient();
 
-        using var created = await client.PostAsJsonAsync("/api/v1/todos", new { title = "Write the tests" }, Cancellation);
+        using var created = await client.PostAsJsonAsync(TodosUri, new { title = "Write the tests" }, Cancellation);
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var todo = await client.GetFromJsonAsync<TodoDto>(created.Headers.Location, Cancellation);
@@ -53,7 +55,7 @@ public sealed class TodosTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         using var client = TodosClient();
 
-        using var response = await client.PostAsJsonAsync("/api/v1/todos", new { title = "" }, Cancellation);
+        using var response = await client.PostAsJsonAsync(TodosUri, new { title = "" }, Cancellation);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>(Cancellation);
@@ -65,7 +67,7 @@ public sealed class TodosTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         using var client = TodosClient();
 
-        using var response = await client.GetAsync($"/api/v1/todos/{Guid.NewGuid()}", Cancellation);
+        using var response = await client.GetAsync(new Uri($"/api/v1/todos/{Guid.NewGuid()}", UriKind.Relative), Cancellation);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>(Cancellation);
@@ -78,12 +80,12 @@ public sealed class TodosTests(ApiFactory factory) : IClassFixture<ApiFactory>
         using var client = TodosClient();
         var id = await CreateTodoAsync(client, "Ship it");
 
-        using var first = await client.PostAsync($"/api/v1/todos/{id}/complete", content: null, Cancellation);
-        using var second = await client.PostAsync($"/api/v1/todos/{id}/complete", content: null, Cancellation);
+        using var first = await client.PostAsync(new Uri($"/api/v1/todos/{id}/complete", UriKind.Relative), content: null, Cancellation);
+        using var second = await client.PostAsync(new Uri($"/api/v1/todos/{id}/complete", UriKind.Relative), content: null, Cancellation);
 
         Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
-        var todo = await client.GetFromJsonAsync<TodoDto>($"/api/v1/todos/{id}", Cancellation);
+        var todo = await client.GetFromJsonAsync<TodoDto>(new Uri($"/api/v1/todos/{id}", UriKind.Relative), Cancellation);
         Assert.True(todo!.IsCompleted);
     }
 
@@ -94,7 +96,7 @@ public sealed class TodosTests(ApiFactory factory) : IClassFixture<ApiFactory>
         for (var i = 0; i < 3; i++)
             await CreateTodoAsync(client, $"Listed {i}");
 
-        var page = await client.GetFromJsonAsync<JsonElement>("/api/v1/todos?page=1&pageSize=2", Cancellation);
+        var page = await client.GetFromJsonAsync<JsonElement>(new Uri("/api/v1/todos?page=1&pageSize=2", UriKind.Relative), Cancellation);
 
         Assert.Equal(2, page.GetProperty("items").GetArrayLength());
         Assert.Equal(2, page.GetProperty("pageSize").GetInt32());
@@ -106,7 +108,7 @@ public sealed class TodosTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
     private static async Task<Guid> CreateTodoAsync(HttpClient client, string title)
     {
-        using var created = await client.PostAsJsonAsync("/api/v1/todos", new { title }, Cancellation);
+        using var created = await client.PostAsJsonAsync(TodosUri, new { title }, Cancellation);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         return (await created.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("id").GetGuid();
     }

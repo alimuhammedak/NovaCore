@@ -5,8 +5,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using NovaCore.Abstractions.Results;
-using NovaCore.AspNetCore.Http;
 using NovaCore.AspNetCore.Authorization;
+using NovaCore.AspNetCore.Http;
 using NovaCore.Modules.Catalog.Authorization;
 using NovaCore.Modules.Catalog.Infrastructure;
 

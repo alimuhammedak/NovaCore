@@ -52,7 +52,7 @@ public sealed class ProtocolHardeningTests(IdentityServerFixture fixture) : ICla
     {
         const string origin = "https://app.novacore.test";
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Cors:AllowedOrigins:0"] = origin }));
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal) { ["Cors:AllowedOrigins:0"] = origin }));
         using var client = host.CreateClient();
         using var preflight = new HttpRequestMessage(HttpMethod.Options, path);
         preflight.Headers.Add("Origin", origin);
@@ -74,7 +74,7 @@ public sealed class ProtocolHardeningTests(IdentityServerFixture fixture) : ICla
         Assert.Equal(CookieSecurePolicy.Always, cookies.Get(IdentityConstants.TwoFactorRememberMeScheme).Cookie.SecurePolicy);
 
         using var client = _host.CreateClient();
-        var page = await client.GetAsync("/account/login", TestContext.Current.CancellationToken);
+        var page = await client.GetAsync(new Uri("/account/login", UriKind.Relative), TestContext.Current.CancellationToken);
 
         var antiforgery = Assert.Single(page.Headers.GetValues("Set-Cookie"), cookie => cookie.StartsWith(".AspNetCore.Antiforgery", StringComparison.Ordinal));
         Assert.Contains("secure", antiforgery, StringComparison.OrdinalIgnoreCase);
@@ -86,18 +86,18 @@ public sealed class ProtocolHardeningTests(IdentityServerFixture fixture) : ICla
     public async Task Revocation_counts_toward_the_global_rate_limit()
     {
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["RateLimiting:PermitLimit"] = "3" }));
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal) { ["RateLimiting:PermitLimit"] = "3" }));
         using var client = host.CreateClient();
 
         var statuses = new List<HttpStatusCode>();
         for (var request = 0; request < 4; request++)
         {
-            using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+            using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["client_id"] = IdentityServerTestHost.ClientId,
                 ["token"] = "not-a-token"
             });
-            statuses.Add((await client.PostAsync("/connect/revoke", form, TestContext.Current.CancellationToken)).StatusCode);
+            statuses.Add((await client.PostAsync(new Uri("/connect/revoke", UriKind.Relative), form, TestContext.Current.CancellationToken)).StatusCode);
         }
 
         // RFC 7009 §2.2: an unknown token is answered like a revoked one, so the answers reveal nothing until the limit.

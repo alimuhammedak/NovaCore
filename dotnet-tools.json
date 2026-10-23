@@ -36,6 +36,13 @@
         "dotnet-stryker"
       ],
       "rollForward": false
+    },
+    "roslynator.dotnet.cli": {
+      "version": "1.0.1",
+      "commands": [
+        "roslynator"
+      ],
+      "rollForward": false
     }
   }
 }

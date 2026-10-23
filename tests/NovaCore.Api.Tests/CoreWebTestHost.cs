@@ -57,7 +57,7 @@ public sealed class CoreWebTestHost : IAsyncDisposable
                 options.ValidateOnBuild = true;
             });
 
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Jwt:Authority"] = TestIdentityProvider.Issuer,
                 ["RateLimiting:PermitLimit"] = "100000"

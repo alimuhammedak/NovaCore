@@ -37,7 +37,7 @@ public sealed class IdentityServerPermissionResolverTests(IdentityServerFixture 
 
         var permissions = await ResolveAsync(scope.ServiceProvider, user.Id.ToString());
 
-        Assert.Equal(["catalog:products:read", "payments:payments:read"], permissions.Order(StringComparer.Ordinal));
+        Assert.Equal(["catalog:products:read", "payments:payments:read"], permissions.Order(StringComparer.Ordinal), StringComparer.Ordinal);
     }
 
     [Fact]

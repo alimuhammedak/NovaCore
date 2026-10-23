@@ -64,16 +64,17 @@ internal sealed partial class OutboxDispatcher(
         do
         {
             foreach (var context in contexts)
-                await DispatchAsync(context.ContextType, stoppingToken);
+                await DispatchAsync(context.ContextType, stoppingToken).ConfigureAwait(false);
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
+        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }
 
     private async Task DispatchAsync(Type contextType, CancellationToken cancellationToken)
     {
         try
         {
-            await using var scope = scopeFactory.CreateAsyncScope();
+            var scope = scopeFactory.CreateAsyncScope();
+            await using var scopeDisposal = scope.ConfigureAwait(false);
             var outbox = (DbContext)scope.ServiceProvider.GetRequiredService(contextType);
             if (outbox.Model.FindEntityType(typeof(OutboxMessage)) is null)
                 return;
@@ -88,17 +89,18 @@ internal sealed partial class OutboxDispatcher(
                     .Where(message => message.ProcessedOnUtc == null && message.Attempts < MaxAttempts && message.Id > after)
                     .OrderBy(message => message.Id)
                     .Take(BatchSize)
-                    .ToListAsync(cancellationToken);
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
 
                 foreach (var message in batch)
                 {
-                    await DeliverAsync(outbox, message, cancellationToken);
+                    await DeliverAsync(outbox, message, cancellationToken).ConfigureAwait(false);
                     after = message.Id;
                 }
             }
             while (batch.Count == BatchSize);
 
-            await DeleteExpiredAsync(outbox, cancellationToken);
+            await DeleteExpiredAsync(outbox, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
@@ -119,41 +121,14 @@ internal sealed partial class OutboxDispatcher(
                 .AsNoTracking()
                 .Where(consumer => consumer.MessageId == message.Id)
                 .Select(consumer => consumer.Handler)
-                .ToListAsync(cancellationToken);
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
 
-            // The handlers' scope is not the bookkeeping context's: a handler's unsaved changes can't be saved with a record.
-            await using (var scope = scopeFactory.CreateAsyncScope())
-            {
-                foreach (var handler in invoker.GetHandlers(scope.ServiceProvider))
-                {
-                    var name = handler.GetType().FullName!;
-                    if (finished.Contains(name))
-                        continue;
-
-                    // The record is what keeps a retry from running the handler again: a handler that can't have one
-                    // doesn't run.
-                    if (name.Length > MaxHandlerLength)
-                        throw new InvalidOperationException(
-                            $"The handler type name '{name}' is longer than the {MaxHandlerLength} characters its outbox record keeps.");
-
-                    await invoker.InvokeAsync(handler, domainEvent, cancellationToken);
-
-                    outbox.Add(new OutboxConsumer
-                    {
-                        MessageId = message.Id,
-                        Handler = name,
-                        ProcessedOnUtc = timeProvider.GetUtcNow()
-                    });
-                    await outbox.SaveChangesAsync(cancellationToken);
-
-                    // The pass's context stays empty, and a second registration of the same handler type is skipped.
-                    outbox.ChangeTracker.Clear();
-                    finished.Add(name);
-                }
-            }
+            await RunHandlersAsync(outbox, message, domainEvent, invoker, finished, cancellationToken).ConfigureAwait(false);
 
             var processedOnUtc = timeProvider.GetUtcNow();
-            await row.ExecuteUpdateAsync(set => set.SetProperty(stored => stored.ProcessedOnUtc, processedOnUtc), cancellationToken);
+            await row.ExecuteUpdateAsync(set => set.SetProperty(stored => stored.ProcessedOnUtc, processedOnUtc), cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
@@ -165,13 +140,55 @@ internal sealed partial class OutboxDispatcher(
                 error = error[..MaxErrorLength];
             await row.ExecuteUpdateAsync(set => set
                 .SetProperty(stored => stored.Attempts, stored => stored.Attempts + 1)
-                .SetProperty(stored => stored.Error, error), cancellationToken);
+                .SetProperty(stored => stored.Error, error), cancellationToken)
+                .ConfigureAwait(false);
 
             var attempt = message.Attempts + 1;
             if (attempt < MaxAttempts)
                 LogDeliveryFailed(message.EventId, message.Type, attempt, MaxAttempts, exception);
             else
                 LogDeliveryAbandoned(message.EventId, message.Type, attempt, exception);
+        }
+    }
+
+    // The handlers' scope is not the bookkeeping context's: a handler's unsaved changes can't be saved with a record.
+    private async Task RunHandlersAsync(
+        DbContext outbox,
+        OutboxMessage message,
+        IDomainEvent domainEvent,
+        DomainEventHandlerInvoker invoker,
+        List<string> finished,
+        CancellationToken cancellationToken)
+    {
+        var scope = scopeFactory.CreateAsyncScope();
+        await using (scope.ConfigureAwait(false))
+        {
+            foreach (var handler in invoker.GetHandlers(scope.ServiceProvider))
+            {
+                var name = handler.GetType().FullName!;
+                if (finished.Contains(name))
+                    continue;
+
+                // The record is what keeps a retry from running the handler again: a handler that can't have one
+                // doesn't run.
+                if (name.Length > MaxHandlerLength)
+                    throw new InvalidOperationException(
+                        $"The handler type name '{name}' is longer than the {MaxHandlerLength} characters its outbox record keeps.");
+
+                await invoker.InvokeAsync(handler, domainEvent, cancellationToken).ConfigureAwait(false);
+
+                outbox.Add(new OutboxConsumer
+                {
+                    MessageId = message.Id,
+                    Handler = name,
+                    ProcessedOnUtc = timeProvider.GetUtcNow()
+                });
+                await outbox.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+                // The pass's context stays empty, and a second registration of the same handler type is skipped.
+                outbox.ChangeTracker.Clear();
+                finished.Add(name);
+            }
         }
     }
 
@@ -188,7 +205,8 @@ internal sealed partial class OutboxDispatcher(
                 .Where(message => message.ProcessedOnUtc < cutoff)
                 .OrderBy(message => message.ProcessedOnUtc)
                 .Take(BatchSize)
-                .ExecuteDeleteAsync(cancellationToken);
+                .ExecuteDeleteAsync(cancellationToken)
+                .ConfigureAwait(false);
         }
         while (deleted == BatchSize);
     }

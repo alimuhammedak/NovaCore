@@ -120,8 +120,6 @@ static NovaCore.Abstractions.Results.Result.Failure(NovaCore.Abstractions.Result
 static NovaCore.Abstractions.Results.Result.Failure<T>(NovaCore.Abstractions.Results.Error error) -> NovaCore.Abstractions.Results.Result<T>!
 static NovaCore.Abstractions.Results.Result.Success() -> NovaCore.Abstractions.Results.Result!
 static NovaCore.Abstractions.Results.Result.Success<T>(T value) -> NovaCore.Abstractions.Results.Result<T>!
-static NovaCore.Abstractions.Results.Result<T>.implicit operator NovaCore.Abstractions.Results.Result<T>!(NovaCore.Abstractions.Results.Error error) -> NovaCore.Abstractions.Results.Result<T>!
-static NovaCore.Abstractions.Results.Result<T>.implicit operator NovaCore.Abstractions.Results.Result<T>!(T value) -> NovaCore.Abstractions.Results.Result<T>!
 static readonly NovaCore.Abstractions.Results.Error.None -> NovaCore.Abstractions.Results.Error
 virtual NovaCore.Abstractions.Messaging.DomainEvent.EqualityContract.get -> System.Type!
 virtual NovaCore.Abstractions.Messaging.DomainEvent.Equals(NovaCore.Abstractions.Messaging.DomainEvent? other) -> bool

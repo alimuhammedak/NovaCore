@@ -8,6 +8,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Deterministic>true</Deterministic>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <!--
+      Every Security, Reliability, Performance and Usage rule, including the ones off by default (taint analysis among
+      them). AnalysisLevel<Category>, not AnalysisMode<Category>: a compound AnalysisLevel overrides the latter.
+    -->
+    <AnalysisLevelSecurity>latest-all</AnalysisLevelSecurity>
+    <AnalysisLevelReliability>latest-all</AnalysisLevelReliability>
+    <AnalysisLevelPerformance>latest-all</AnalysisLevelPerformance>
+    <AnalysisLevelUsage>latest-all</AnalysisLevelUsage>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <!-- Zero warnings is enforced: fix a warning instead of suppressing it. -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

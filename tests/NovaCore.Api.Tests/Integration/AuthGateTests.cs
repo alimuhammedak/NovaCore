@@ -25,7 +25,7 @@ public class AuthGateTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreA
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/v1/products");
+        var response = await client.GetAsync(new Uri("/api/v1/products", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -47,7 +47,8 @@ public class AuthGateTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreA
     {
         var client = _factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
 
-        var response = await client.PostAsync("/connect/token", new FormUrlEncodedContent(new Dictionary<string, string>()));
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal));
+        var response = await client.PostAsync(new Uri("/connect/token", UriKind.Relative), form);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("invalid_request", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);

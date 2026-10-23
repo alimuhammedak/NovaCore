@@ -68,7 +68,7 @@ public sealed class PaymentOwnershipTests(NovaCoreApiFactory factory) : IClassFi
     [Fact]
     public void Read_all_is_a_declared_permission()
     {
-        Assert.Contains(new PaymentsPermissionProvider().GetPermissions(), permission => permission.Name == "payments:read-all");
+        Assert.Contains(new PaymentsPermissionProvider().GetPermissions(), permission => string.Equals(permission.Name, "payments:read-all", StringComparison.Ordinal));
     }
 
     private async Task<Guid> AddPaymentAsync(string ownerId)

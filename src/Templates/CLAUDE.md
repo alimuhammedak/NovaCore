@@ -27,6 +27,10 @@ D-040/D-041 for why it is built this way (RESEARCH R-090…R-092).
 
 - It is a consumer's project, built with warnings as errors, analyzers and NuGet audit on. It follows the repo's
   standards (vertical slices, typed results, permissions, validated options, `TimeProvider`) because it teaches them.
+  Its analyzers are the repo's built-in ones (D-065 (4)): the four `AnalysisLevel<Category>=latest-all` categories, the
+  dead-code IDE rules and the code metrics; CA2007 and CA1812 are off for the whole solution (application code) and
+  CA1506 for its `Program.cs`. Not BannedApi or Meziantou (repository-only), and no format check in its CI: its usings
+  sort by the project's name, so a generated project isn't format-clean for every name.
 - It is under `src/`, so the architecture tests scan its `.cs` files too (TODO/FIXME, ambient clocks, assembly
   scanning). Fix the code, don't exempt it.
 - Nothing of this repository goes into it: no BuildingBlocks source, `docs/plan`, `.claude/`, `release.yml`, PublicAPI

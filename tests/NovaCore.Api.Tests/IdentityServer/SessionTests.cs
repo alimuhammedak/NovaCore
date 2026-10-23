@@ -31,13 +31,13 @@ public sealed class SessionTests(IdentityServerFixture fixture) : IClassFixture<
 
         Assert.Equal(user.Id.ToString(), me.GetProperty("userId").GetString());
         Assert.Equal("me@novacore.test", me.GetProperty("email").GetString());
-        Assert.Equal([IdentityServerTestHost.ProbePermission], me.GetProperty("permissions").EnumerateArray().Select(p => p.GetString()));
+        Assert.Equal([IdentityServerTestHost.ProbePermission], me.GetProperty("permissions").EnumerateArray().Select(p => p.GetString()), StringComparer.Ordinal);
     }
 
     [Fact]
     public async Task Me_needs_a_signed_in_caller()
     {
-        Assert.Equal(HttpStatusCode.Unauthorized, (await _host.CreateClient().GetAsync("/api/v1/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _host.CreateClient().GetAsync(new Uri("/api/v1/auth/me", UriKind.Relative))).StatusCode);
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore;
@@ -43,6 +44,8 @@ internal static class ConnectEndpoints
             .ExcludeFromDescription().AllowAnonymous();
     }
 
+    [SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
+        Justification = "The authorization endpoint is one linear OpenID Connect flow over the request, the session, the client, the user and the authorization; splitting it would scatter the protocol's steps (docs/plan/RESEARCH.md R-117).")]
     private static async Task<IResult> Authorize(
         HttpContext context,
         UserManager<ApplicationUser> users,
@@ -125,7 +128,7 @@ internal static class ConnectEndpoints
         // principal went through the core's claims transformation like every authenticated one, so it carries resolved
         // permissions; they stay out of the token (they are resolved per request).
         var identity = new ClaimsIdentity(
-            principal.Claims.Where(claim => claim.Type != NovaClaims.Permission),
+            principal.Claims.Where(claim => !string.Equals(claim.Type, NovaClaims.Permission, StringComparison.Ordinal)),
             TokenValidationParameters.DefaultAuthenticationType, Claims.Name, Claims.Role);
         SetUserClaims(identity, user, await users.GetRolesAsync(user));
         identity.SetDestinations(GetDestinations);
@@ -269,7 +272,7 @@ internal static class ConnectEndpoints
     }
 
     private static IResult Forbid(string error, string description) => Results.Forbid(
-        new AuthenticationProperties(new Dictionary<string, string?>
+        new AuthenticationProperties(new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             [OpenIddictServerAspNetCoreConstants.Properties.Error] = error,
             [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = description

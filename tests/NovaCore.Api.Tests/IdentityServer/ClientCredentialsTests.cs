@@ -22,7 +22,7 @@ public sealed class ClientCredentialsTests(ClientCredentialsTests.Fixture fixtur
     public sealed class Fixture : IdentityServerFixture
     {
         protected override void Configure(WebApplicationBuilder builder) =>
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Identity:Clients:1:ClientId"] = "worker",
                 ["Identity:Clients:1:ClientSecret"] = "worker-secret-for-tests-at-least-32-chars",
@@ -74,13 +74,14 @@ public sealed class ClientCredentialsTests(ClientCredentialsTests.Fixture fixtur
         return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("access_token").GetString()!;
     }
 
-    private Task<HttpResponseMessage> RequestTokenAsync(string clientId, string? secret)
+    private async Task<HttpResponseMessage> RequestTokenAsync(string clientId, string? secret)
     {
-        var parameters = new Dictionary<string, string> { ["grant_type"] = "client_credentials", ["client_id"] = clientId };
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal) { ["grant_type"] = "client_credentials", ["client_id"] = clientId };
         if (secret is not null)
             parameters["client_secret"] = secret;
 
-        return _host.CreateClient().PostAsync("/connect/token", new FormUrlEncodedContent(parameters));
+        using var form = new FormUrlEncodedContent(parameters);
+        return await _host.CreateClient().PostAsync(new Uri("/connect/token", UriKind.Relative), form);
     }
 
     private async Task<HttpResponseMessage> CallProbeAsync(string accessToken)

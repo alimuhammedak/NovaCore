@@ -41,7 +41,7 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         var link = await ConfirmationLinkAsync("new@novacore.test");
         Assert.StartsWith(IdentityServerTestHost.Authority + "/api/v1/auth/confirm-email?", link, StringComparison.Ordinal);
 
-        var confirm = await _host.CreateClient().GetAsync(new Uri(link).PathAndQuery);
+        var confirm = await _host.CreateClient().GetAsync(new Uri(new Uri(link).PathAndQuery, UriKind.Relative));
         Assert.Equal(HttpStatusCode.OK, confirm.StatusCode);
 
         using var flow = new OidcFlow(_host);
@@ -61,8 +61,8 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         Assert.Equal(await first.Content.ReadAsStringAsync(), await second.Content.ReadAsStringAsync());
         // The emails go out in the order queued: once a later one has gone, an earlier one would have too.
         await RegisterAsync(client, "after-twice@novacore.test");
-        await fixture.Emails.WaitForAsync(email => email.To == "after-twice@novacore.test");
-        Assert.Single(fixture.Emails.Sent, email => email.To == "twice@novacore.test");
+        await fixture.Emails.WaitForAsync(email => string.Equals(email.To, "after-twice@novacore.test", StringComparison.Ordinal));
+        Assert.Single(fixture.Emails.Sent, email => string.Equals(email.To, "twice@novacore.test", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var errors = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
-        Assert.Equal(["DisplayName", "Email", "Password"], errors.EnumerateObject().Select(error => error.Name).Order(StringComparer.Ordinal));
+        Assert.Equal(["DisplayName", "Email", "Password"], errors.EnumerateObject().Select(error => error.Name).Order(StringComparer.Ordinal), StringComparer.Ordinal);
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
     {
         var user = await _host.CreateUserAsync("token@novacore.test", Password);
 
-        var response = await _host.CreateClient().GetAsync($"/api/v1/auth/confirm-email?userId={user.Id}&token=bm90LWEtdG9rZW4");
+        var response = await _host.CreateClient().GetAsync(new Uri($"/api/v1/auth/confirm-email?userId={user.Id}&token=bm90LWEtdG9rZW4", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -119,8 +119,8 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         // The registration's link and the resent one. The emails go out in the order queued: once a later one has gone,
         // nothing queued before it is still pending.
         await RegisterAsync(client, "after-resend@novacore.test");
-        await fixture.Emails.WaitForAsync(email => email.To == "after-resend@novacore.test");
-        Assert.Equal(2, fixture.Emails.Sent.Count(email => email.To == "resend@novacore.test"));
+        await fixture.Emails.WaitForAsync(email => string.Equals(email.To, "after-resend@novacore.test", StringComparison.Ordinal));
+        Assert.Equal(2, fixture.Emails.Sent.Count(email => string.Equals(email.To, "resend@novacore.test", StringComparison.Ordinal)));
         Assert.DoesNotContain(fixture.Emails.Sent, email => email.To is "resend-confirmed@novacore.test" or "resend-nobody@novacore.test");
     }
 
@@ -131,11 +131,11 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         await RegisterAsync(client, "resend-link@novacore.test");
         await ResendAsync(client, "resend-link@novacore.test");
 
-        var sent = await fixture.Emails.WaitForAsync(email => email.To == "resend-link@novacore.test", count: 2);
+        var sent = await fixture.Emails.WaitForAsync(email => string.Equals(email.To, "resend-link@novacore.test", StringComparison.Ordinal), count: 2);
         Assert.Equal(2, sent.Count);
         var link = WebUtility.HtmlDecode(Href().Match(sent[1].HtmlBody).Groups["url"].Value);
 
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(new Uri(link).PathAndQuery)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(new Uri(new Uri(link).PathAndQuery, UriKind.Relative))).StatusCode);
     }
 
     [Fact]
@@ -145,14 +145,14 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         var emails = new CapturingEmailSender();
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
         {
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Identity:Seed:SeedOnStartup"] = "false" });
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal) { ["Identity:Seed:SeedOnStartup"] = "false" });
             builder.Services.AddSingleton<IEmailSender>(emails);
         });
 
         var response = await RegisterAsync(host.CreateClient(), "no-role@novacore.test");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Single(await emails.WaitForAsync(email => email.To == "no-role@novacore.test"));
+        Assert.Single(await emails.WaitForAsync(email => string.Equals(email.To, "no-role@novacore.test", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
 
     private async Task<string> ConfirmationLinkAsync(string email)
     {
-        var body = Assert.Single(await fixture.Emails.WaitForAsync(sent => sent.To == email)).HtmlBody;
+        var body = Assert.Single(await fixture.Emails.WaitForAsync(sent => string.Equals(sent.To, email, StringComparison.Ordinal))).HtmlBody;
         return WebUtility.HtmlDecode(Href().Match(body).Groups["url"].Value);
     }
 
@@ -198,7 +198,7 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         InMemoryKeyStore.AddTo(builder.Services);
     }
 
-    [GeneratedRegex("href=\"(?<url>[^\"]+)\"")]
+    [GeneratedRegex("href=\"(?<url>[^\"]+)\"", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
     private static partial Regex Href();
 }
 
@@ -213,7 +213,7 @@ public sealed class CapturingEmailSender : IEmailSender
     /// Waits until <paramref name="count"/> sent emails match. The provider sends them in the background, after the
     /// response (PLAN F6b.6a), one at a time in the order they were queued.
     /// </summary>
-    public async Task<List<SentEmail>> WaitForAsync(Func<SentEmail, bool> match, int count = 1)
+    public async Task<IReadOnlyList<SentEmail>> WaitForAsync(Func<SentEmail, bool> match, int count = 1)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         while (true)

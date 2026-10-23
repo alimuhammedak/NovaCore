@@ -42,7 +42,7 @@ public sealed class StockConcurrencyTests(StockRaceApiFactory factory) : IClassF
         using var client = factory.CreateClientWithPermissions(CatalogPermissions.ProductsDelete);
         factory.ChangeStockBeforeNextSave(productId, stock: 4);
 
-        var response = await client.DeleteAsync($"/api/v1/products/{productId}");
+        var response = await client.DeleteAsync(new Uri($"/api/v1/products/{productId}", UriKind.Relative));
 
         await AssertConflictAsync(response);
         Assert.Equal(4, await factory.StockAsync(productId));

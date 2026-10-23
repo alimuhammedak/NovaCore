@@ -95,7 +95,7 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
             _log.Calls);
         Assert.Equal(
             [typeof(FailsOnceHandler).FullName!, typeof(RecordingHandler).FullName!],
-            (await ConsumersAsync(placed)).Order(StringComparer.Ordinal));
+            (await ConsumersAsync(placed)).Order(StringComparer.Ordinal), StringComparer.Ordinal);
     }
 
     [Fact]
@@ -497,9 +497,9 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
             {
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException exception)
             {
-                throw new InvalidOperationException("The delivery was cut short.");
+                throw new InvalidOperationException("The delivery was cut short.", exception);
             }
         }
     }

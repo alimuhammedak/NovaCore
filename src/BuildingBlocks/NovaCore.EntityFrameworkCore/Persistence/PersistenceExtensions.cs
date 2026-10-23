@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using NovaCore.Abstractions.Messaging;
 using NovaCore.EntityFrameworkCore.Messaging;
 
 namespace NovaCore.EntityFrameworkCore.Persistence;

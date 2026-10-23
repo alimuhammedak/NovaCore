@@ -57,7 +57,7 @@ public static class ResultHttpExtensions
             statusCode: status,
             title: TitleFor(error.Type),
             type: $"https://httpstatuses.io/{status}",
-            extensions: new Dictionary<string, object?> { ["code"] = error.Code });
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = error.Code });
     }
 
     // Shared with the exception mapping, so an AppException and a failed Result of the same type answer alike.

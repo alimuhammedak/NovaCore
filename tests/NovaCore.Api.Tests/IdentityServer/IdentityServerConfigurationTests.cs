@@ -36,8 +36,8 @@ public sealed class IdentityServerConfigurationTests
         Assert.Equal(IdentityServerTestHost.Authority + "/connect/authorize", discovery.GetProperty("authorization_endpoint").GetString());
         Assert.Equal(IdentityServerTestHost.Authority + "/connect/token", discovery.GetProperty("token_endpoint").GetString());
         Assert.Equal(["S256"], Strings(discovery, "code_challenge_methods_supported"));
-        Assert.Contains("authorization_code", Strings(discovery, "grant_types_supported"));
-        Assert.Contains("refresh_token", Strings(discovery, "grant_types_supported"));
+        Assert.Contains("authorization_code", Strings(discovery, "grant_types_supported"), StringComparer.Ordinal);
+        Assert.Contains("refresh_token", Strings(discovery, "grant_types_supported"), StringComparer.Ordinal);
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class IdentityServerConfigurationTests
         // Behind a proxy the request host differs from the public URL; tokens must still carry the authority.
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
             builder.Configuration.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["Jwt:Authority"] = "https://idp.novacore.test" }));
+                new Dictionary<string, string?>(StringComparer.Ordinal) { ["Jwt:Authority"] = "https://idp.novacore.test" }));
 
         var discovery = await host.CreateClient().GetFromJsonAsync<JsonElement>("/.well-known/openid-configuration");
 
@@ -132,7 +132,7 @@ public sealed class IdentityServerConfigurationTests
                 .AddEphemeralEncryptionKey());
             builder.Services.AddSingleton<IEmailSender>(new CapturingEmailSender());
             InMemoryKeyStore.AddTo(builder.Services);
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Identity:Clients:1:ClientId"] = "worker",
                 ["Identity:Clients:1:ClientSecret"] = "worker-secret-for-tests-at-least-32-chars",
@@ -146,17 +146,18 @@ public sealed class IdentityServerConfigurationTests
 
         // The core accepts the ES256 token through the published key.
         var client = host.CreateClient();
-        var token = await client.PostAsync("/connect/token", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["grant_type"] = "client_credentials",
             ["client_id"] = "worker",
             ["client_secret"] = "worker-secret-for-tests-at-least-32-chars"
-        }));
+        });
+        var token = await client.PostAsync(new Uri("/connect/token", UriKind.Relative), form);
         var accessToken = (await token.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("access_token").GetString()!;
         Assert.Equal(SecurityAlgorithms.EcdsaSha256, new JsonWebToken(accessToken).Alg);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/probe")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(new Uri("/probe", UriKind.Relative))).StatusCode);
     }
 
     [Theory]
@@ -168,7 +169,7 @@ public sealed class IdentityServerConfigurationTests
         // Changes the host's user-facing client (Identity:Clients:0).
         var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
             configure: builder => builder.Configuration.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["Identity:Clients:0:" + key] = value })));
+                new Dictionary<string, string?>(StringComparer.Ordinal) { ["Identity:Clients:0:" + key] = value })));
 
         Assert.Contains(expectedInMessage, exception.Message, StringComparison.Ordinal);
     }
@@ -186,7 +187,7 @@ public sealed class IdentityServerConfigurationTests
         Task<IdentityServerTestHost> StartAsync() => IdentityServerTestHost.StartAsync(Environments.Production, builder =>
         {
             AddProductionServices(builder, keyStore: true);
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Identity:Clients:0:" + key] = uri });
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal) { ["Identity:Clients:0:" + key] = uri });
         });
 
         if (starts)
@@ -204,7 +205,7 @@ public sealed class IdentityServerConfigurationTests
     {
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
             builder.Configuration.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["Identity:Clients:0:RedirectUris:0"] = "http://client.novacore.test/callback" }));
+                new Dictionary<string, string?>(StringComparer.Ordinal) { ["Identity:Clients:0:RedirectUris:0"] = "http://client.novacore.test/callback" }));
     }
 
     // RFC 6749 §10.10: a secret that can be guessed is no secret; 32 characters hold 128 bits or more when generated.
@@ -214,7 +215,7 @@ public sealed class IdentityServerConfigurationTests
     public async Task A_client_secret_shorter_than_32_characters_stops_the_host(string index, string clientId, string secret)
     {
         var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
-            configure: builder => builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            configure: builder => builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 [$"Identity:Clients:{index}:ClientId"] = clientId,
                 [$"Identity:Clients:{index}:ClientSecret"] = secret
@@ -228,7 +229,7 @@ public sealed class IdentityServerConfigurationTests
     {
         var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
             configure: builder => builder.Configuration.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["Identity:Clients:1:ClientId"] = "worker" })));
+                new Dictionary<string, string?>(StringComparer.Ordinal) { ["Identity:Clients:1:ClientId"] = "worker" })));
 
         Assert.Contains("needs a ClientSecret", exception.Message, StringComparison.Ordinal);
     }
@@ -240,7 +241,7 @@ public sealed class IdentityServerConfigurationTests
     {
         var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
             configure: builder => builder.Configuration.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["Identity:Seed:UserPermissions:0"] = permission })));
+                new Dictionary<string, string?>(StringComparer.Ordinal) { ["Identity:Seed:UserPermissions:0"] = permission })));
 
         Assert.Contains(expectedInMessage, exception.Message, StringComparison.Ordinal);
     }
@@ -250,7 +251,7 @@ public sealed class IdentityServerConfigurationTests
     {
         var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(
             configure: builder => builder.Configuration.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["Jwt:Authority"] = "" })));
+                new Dictionary<string, string?>(StringComparer.Ordinal) { ["Jwt:Authority"] = "" })));
 
         // The core's own rule: the provider can't pick an issuer without it.
         Assert.Contains("Jwt:Authority must be the absolute URI of an OpenID Connect provider", exception.Message, StringComparison.Ordinal);

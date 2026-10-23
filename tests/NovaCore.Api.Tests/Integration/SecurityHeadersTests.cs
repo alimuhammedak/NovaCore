@@ -11,7 +11,7 @@ public class SecurityHeadersTests(NovaCoreApiFactory factory) : IClassFixture<No
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/health");
+        var response = await client.GetAsync(new Uri("/health", UriKind.Relative));
 
         Assert.Equal("nosniff", Single(response, "X-Content-Type-Options"));
         Assert.Equal("DENY", Single(response, "X-Frame-Options"));

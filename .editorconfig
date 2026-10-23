@@ -2,7 +2,6 @@ root = true
 
 [*]
 charset = utf-8
-end_of_line = crlf
 insert_final_newline = true
 trim_trailing_whitespace = true
 indent_style = space
@@ -14,15 +13,57 @@ csharp_style_namespace_declarations = file_scoped:suggestion
 csharp_style_prefer_primary_constructors = true:suggestion
 csharp_prefer_braces = when_multiline:silent
 dotnet_sort_system_directives_first = true
+# CA1812 (internal class never instantiated) looks for constructor calls only. Every internal class here is created by
+# DI, the options or EF Core configuration machinery, JSON deserialization or ASP.NET Core, the cases its documentation
+# recommends suppressing it for (docs/plan/RESEARCH.md R-117). Dead types show up in the Roslynator report instead.
+dotnet_diagnostic.CA1812.severity = none
+# Dead private members, values never read and unused parameters fail the build; by default they are only suggestions.
+dotnet_diagnostic.IDE0051.severity = warning
+dotnet_diagnostic.IDE0052.severity = warning
+dotnet_diagnostic.IDE0059.severity = warning
+dotnet_diagnostic.IDE0060.severity = warning
+# Code metrics, with Microsoft's default thresholds (off even in latest-all): cyclomatic complexity (CA1502),
+# maintainability index (CA1505) and class coupling (CA1506). A composition root or a protocol flow that is maintainable
+# despite its coupling says so with a justified [SuppressMessage], as CA1506's documentation allows (R-117).
+dotnet_diagnostic.CA1502.severity = warning
+dotnet_diagnostic.CA1505.severity = warning
+dotnet_diagnostic.CA1506.severity = warning
+# MA0048 (one type per file, named after it) is off: related types share a file on purpose here (an options type and its
+# validator, an exception family, an entity and its status enum), and migration files carry a timestamp. User-approved,
+# Meziantou isn't a Microsoft analyzer (docs/plan/DECISIONS.md Y-44, Q-50).
+dotnet_diagnostic.MA0048.severity = none
+
+[src/BuildingBlocks/**.cs]
+# Unnecessary usings. The build reports IDE0005 only where it generates XML documentation, which only the packages do;
+# elsewhere it would need GenerateDocumentationFile and then a CS1591 suppression for every undocumented public type.
+dotnet_diagnostic.IDE0005.severity = warning
 
 [tests/**.cs]
 # Test names are sentences (Refresh_rotates_the_refresh_token), as in Microsoft's unit-testing guidance (docs/plan/DECISIONS.md D-011).
 dotnet_diagnostic.CA1707.severity = none
 
+# CA2007 (ConfigureAwait on every await) is meant for libraries that may run under a SynchronizationContext. The host,
+# the modules and the tests are application code, and the two packages below run only inside ASP.NET Core, which has no
+# SynchronizationContext: the two cases its "When to suppress" section names (docs/plan/RESEARCH.md R-117). xUnit1030
+# also forbids ConfigureAwait(false) in tests. The packages that don't depend on ASP.NET Core keep the rule:
+# NovaCore.EntityFrameworkCore calls ConfigureAwait(false).
+[{src/Api/**.cs,src/Modules/**.cs,tests/**.cs}]
+dotnet_diagnostic.CA2007.severity = none
+# Meziantou's MA0004 is the same rule; off where CA2007 is, for the same reason (user-approved, Q-50).
+dotnet_diagnostic.MA0004.severity = none
+
+[{src/BuildingBlocks/NovaCore.AspNetCore/**.cs,src/BuildingBlocks/NovaCore.Identity.OpenIddict/**.cs}]
+dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.MA0004.severity = none
+
 [src/**/Migrations/*.cs]
 # EF Core migrations pass constant column arrays (composite indexes). Up/Down run once per database and the builder keeps
 # the arrays, the two cases CA1861's documentation allows suppressing (docs/plan/RESEARCH.md R-064).
 dotnet_diagnostic.CA1861.severity = none
+# dotnet ef writes migrations with a byte order mark; dotnet format checks the charset.
+charset = utf-8-bom
+# A migration's Up/Down is generated and as long as the model change (MA0051, user-approved, Q-50).
+dotnet_diagnostic.MA0051.severity = none
 
 [*.{csproj,props,targets}]
 indent_size = 2

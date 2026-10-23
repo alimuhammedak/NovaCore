@@ -72,5 +72,5 @@ public static class AuthenticationExtensions
     // Plain http only in Development (a local provider).
     private static bool IsValidAuthority(string authority, IHostEnvironment environment) =>
         Uri.TryCreate(authority, UriKind.Absolute, out var uri)
-        && (uri.Scheme == Uri.UriSchemeHttps || (uri.Scheme == Uri.UriSchemeHttp && environment.IsDevelopment()));
+        && (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal) || (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal) && environment.IsDevelopment()));
 }

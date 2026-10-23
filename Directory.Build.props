@@ -16,6 +16,15 @@
     -->
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <!--
+      These categories run every rule, including the ones that are off by default (taint analysis CA3001-CA3012, CA2100,
+      CA5394, CA5404). It takes AnalysisLevel<Category>: AnalysisMode<Category> is ignored next to a compound AnalysisLevel
+      such as latest-recommended (docs/plan/RESEARCH.md R-117). Design, Naming and the rest stay recommended.
+    -->
+    <AnalysisLevelSecurity>latest-all</AnalysisLevelSecurity>
+    <AnalysisLevelReliability>latest-all</AnalysisLevelReliability>
+    <AnalysisLevelPerformance>latest-all</AnalysisLevelPerformance>
+    <AnalysisLevelUsage>latest-all</AnalysisLevelUsage>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <!-- 0 warnings is enforced, not just aimed for. Suppressing a warning needs user approval (docs/plan/DECISIONS.md Y-44). -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
