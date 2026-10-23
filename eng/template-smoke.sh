@@ -39,8 +39,8 @@ for auth in BuiltIn External; do
   # The generated nuget.config maps BMD.NovaCore.* to the GitHub feed; here the same source name points at the local one.
   (cd "$project" && dotnet nuget update source novacore --source "$feed" --configfile nuget.config)
 
-  echo "== $name: build, test"
-  (cd "$project" && dotnet build -c Release && dotnet test -c Release --no-build)
+  echo "== $name: build, test, package licenses"
+  (cd "$project" && dotnet build -c Release && dotnet test -c Release --no-build && bash eng/check-licenses.sh)
 
   echo "== $name: migrations match the model"
   (

@@ -41,6 +41,11 @@ jobs:
           NuGetPackageSourceCredentials_novacore: Username=${{ github.actor }};Password=${{ secrets.NOVACORE_PACKAGES_TOKEN }}
         run: dotnet restore
 
+      # Every package, transitive ones included, is MIT or Apache-2.0 licensed or a named exception of this project
+      # (eng/check-licenses.sh).
+      - name: Package licenses
+        run: bash eng/check-licenses.sh
+
       - name: Build
         run: dotnet build -c Release --no-restore
 

@@ -40,7 +40,8 @@ jobs:
       - name: Restore
         run: dotnet restore NovaCore.slnx --locked-mode
 
-      # Every package in the restored graph, transitive ones included, has an allowed license (Y-06, D-052).
+      # Every package in the restored graph, transitive ones included, has an allowed license or is a named exception
+      # (Y-47: Polly transitively, D-052; the PostgreSQL test layer's provider and driver, D-068).
       - name: Package licenses
         run: bash eng/check-licenses.sh
 
@@ -110,7 +111,7 @@ jobs:
 
   # SonarQube Cloud's analysis (docs/plan/DECISIONS.md D-045): its scanner wraps a build, and build-and-test's coverage
   # goes with it. The scanner runs here only, never as a package reference (SonarAnalyzer.CSharp's license is not MIT or
-  # Apache, Y-06). The begin step also turns warnings-as-errors off, which is why this is a job of its own.
+  # Apache, Y-47). The begin step also turns warnings-as-errors off, which is why this is a job of its own.
   sonar:
     needs: [build-and-test, sonar-token]
     if: needs.sonar-token.outputs.present == 'true'

@@ -115,6 +115,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Template: the generated project runs the same Security, Reliability, Performance and Usage rules, the dead-code
   rules and the code metric rules (CA2007, CA1812, and CA1506 in `Program.cs`, stay off: the project is ASP.NET Core
   application code). Its tests pass `Uri` objects to `HttpClient`.
+- Template: the generated project checks the license of every package, transitive ones included
+  (`eng/check-licenses.sh`, a CI step after restore): MIT or Apache-2.0, Microsoft packages whatever their license, and
+  the exceptions the script names by their exact package IDs (`Polly.*` transitively, under
+  `Microsoft.Extensions.Http.Resilience`).
+- The license gate names a database provider and its driver as exceptions by their exact package IDs: here the
+  PostgreSQL test layer's `Npgsql` and `Npgsql.EntityFrameworkCore.PostgreSQL` (PostgreSQL license).
 
 ### Removed
 

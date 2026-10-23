@@ -945,7 +945,11 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
 | dotnet-sonarscanner | Yalnızca CI'daki `sonar` job'unda kurulur, hiçbir projeye referans değildir; indirdiği Sonar analizörleri SSALv1 (D-045, K4: kullanıcı onayı) | **LGPL-3.0** |
 
 CI'daki lisans kapısı (`eng/check-licenses.sh`) geçişliler dahil her paketi denetler: MIT ya da Apache-2.0 olmalı;
-Microsoft paketleri (`Microsoft.*`, `System.*`) lisansa bakılmadan geçer (Y-06), getirdikleri paketler yine denetlenir.
+Microsoft paketleri (`Microsoft.*`, `System.*`) lisansa bakılmadan geçer (Y-47), getirdikleri paketler yine denetlenir.
+Adlı istisnalar DECISIONS'taki kayıtlarla vardır: `Polly.*` yalnız geçişli olarak (D-052) ve projenin seçtiği veritabanı
+sağlayıcısıyla sürücüsü, tam paket adlarıyla (D-068): bu repo'da PostgreSQL test katmanınınkiler. Bir ad yalnız kendisini
+geçirir; aynı aileden başka bir paket (`Npgsql.NodaTime`) kapıda kalır. Şablonun ürettiği proje aynı kapıyı kendi
+`eng/check-licenses.sh`'ıyla taşır.
 
 > ⚠️ **MediatR (v13+) ve AutoMapper (v15+) artık ticari** (Lucky Penny). NovaCore bunları kullanmaz. Başka bir mediator
 > ya da request-dispatch soyutlaması da eklenmez (DECISIONS Y-01): handler'lar bağımlılıklarını minimal API DI'dan alır.
