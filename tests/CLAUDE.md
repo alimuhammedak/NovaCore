@@ -49,10 +49,11 @@ start or end). xUnit's options go after `--`; a solution goes through `--solutio
 ## How the test host works (and why)
 
 `ApiFactory` boots the real Program host with what every test host shares (the test issuer, server-side grants,
-environment, scope validation, production extras) and lets a subclass choose the databases. `NovaCoreApiFactory`, the
-default, swaps **every DbContext** (Catalog, Payments and the identity provider's) from SQL Server to its own
-**in-memory SQLite** connection (`ReplaceWithSqlite<TContext>`), so the full auth flow and the `/health` database
-checks run without a database. Two non-obvious requirements, both load-bearing:
+environment, scope validation, production extras) and lets a subclass choose the databases. Program gives every module
+context SQL Server (`AddModuleDatabase`); a later `AddModuleDatabase` replaces it, which is how the PostgreSQL layer
+points the contexts at its database. `NovaCoreApiFactory`, the default, swaps **every DbContext** (Catalog, Payments and
+the identity provider's) to its own **in-memory SQLite** connection (`ReplaceWithSqlite<TContext>`), so the full auth
+flow and the `/health` database checks run without a database. Two non-obvious requirements, both load-bearing:
 
 1. **Strip every registration generic over the context before re-adding it.** EF Core 10 registers
    the provider via additive `IDbContextOptionsConfiguration<TContext>`, so removing only
@@ -99,21 +100,33 @@ coverage, and commit it with the change. The architecture tests run in a step of
 instruments the built assemblies in place (an instrumented assembly references `netstandard`), and those tests read the
 built assemblies' references.
 
-## The SQL Server layer (`SqlServer/`)
+## The database layers (`SqlServer/`, `PostgreSql/`, `Databases/`)
 
-SQLite hides what only SQL Server does: migrations (the SQLite databases come from `EnsureCreated`) and their raw SQL,
-schemas, collations, `decimal` precision, `DateTimeOffset` ordering (docs/plan/DECISIONS.md D-043, D-056). The tests
-under `SqlServer/` run on a real SQL Server instead:
-- `TestSqlServer` starts one container for the whole run (Testcontainers, the image `docker-compose.yml` pins, which
-  `SqlServerImageTests` keeps equal), when the first test needs it. Fixtures can't depend on each other, so it is a
-  static `Lazy`; Testcontainers' resource reaper removes the container when the test process ends.
-- `SqlServerApiFactory` is the Api host (`ApiFactory`, like `NovaCoreApiFactory`) with Program's SQL Server
-  registrations kept, in a database of its own (`TestSqlServer.CreateDatabaseAsync`), and `Database:ApplyMigrations` on:
-  the host migrates the three contexts when it starts, the way production does. A test that needs an empty or a
-  half-migrated database creates its own (`MigrationTests` migrates step by step with `IMigrator`).
+SQLite hides what only a real database does: migrations (the SQLite databases come from `EnsureCreated`) and their raw
+SQL, schemas, collations, `decimal` precision, `DateTimeOffset` ordering (docs/plan/DECISIONS.md D-043, D-056). The
+packages are tested on SQL Server and PostgreSQL (D-068, D-074):
+- `TestSqlServer` and `TestPostgreSql` each start one container for the whole run (Testcontainers, the image
+  `docker-compose.yml` pins, which `DatabaseImageTests` keeps equal), when the first test needs it. Fixtures can't depend
+  on each other, so each is a static `Lazy`; Testcontainers' resource reaper removes the containers when the test
+  process ends.
+- `DatabaseApiFactory` is the Api host (`ApiFactory`) in a database of its own on the provider's server
+  (`CreateDatabaseAsync`), with `Database:ApplyMigrations` on: the host migrates the three contexts when it starts, the
+  way production does. `ResetAsync` empties the module tables between a class's tests (Respawn). `SqlServerApiFactory`
+  keeps Program's SQL Server and the host's migrations; `PostgreSqlApiFactory` gives every context PostgreSQL with the
+  PostgreSQL migrations of this project (`PostgreSql/<Module>/Migrations`, one set per provider, EF Core). The
+  `*AuthorityApiFactory` variants make the host its own `Jwt:Authority`, for signing in through its identity provider.
+- **The same scenarios run on both providers:** `Databases/` holds abstract generic classes (`MigrationScenarios`,
+  `OutboxScenarios`, `QueryScenarios`, `SignInScenarios`); `SqlServer…` and `PostgreSql…` classes derive from them with
+  their factory. A scenario that holds on every provider goes there; what one provider does differently (SQL Server's
+  migration data steps, each server's default collation in the product search) stays in that provider's class.
+- Raw SQL that runs on both quotes its names with the context's provider (`PortableSql`: `[catalog].[outbox_messages]`
+  vs `"catalog"."outbox_messages"`; an unquoted name folds to lower case on PostgreSQL) and passes values as parameters.
+  `COUNT(*)` is an `int` on SQL Server and a `bigint` on PostgreSQL: cast it (`CAST(COUNT(*) AS INTEGER)`).
+- A model change needs a migration in the PostgreSQL set too (root `CLAUDE.md`); `PostgreSqlModelTests` fails until it
+  has one, without Docker. A test that needs an empty or a half-migrated SQL Server database creates its own
+  (`MigrationTests` migrates step by step with `IMigrator`, on the host's design-time factories).
 - Without Docker these tests skip (`TestDatabase.SkipIfUnavailable()` first in each test). CI and release run
   `dotnet test ... -- --fail-skips on`, so there a skip fails the run.
-- Raw SQL names the schema (`[payments].[payments]`); SQL Server has no default schema for these tables.
 
 ## Background work: the outbox dispatcher
 
@@ -144,8 +157,9 @@ advances in the same class fixture. So:
 SQLite keeps `DateTimeOffset` as text and EF Core can't compare or order it there (R-068), so every SQLite test context
 stores it as UTC ticks instead (`UtcTicksModelCustomizer`: in `NovaCoreApiFactory`'s EF service provider, and through
 `ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>()` on the small hosts): production code compares and orders
-`DateTimeOffset` in SQL, as it should on SQL Server (the outbox retention, the payment list). Raw SQL against those
-columns writes and reads ticks (`OutboxDispatcherTests`). `SqlServerQueryTests` tests the payment list on SQL Server.
+`DateTimeOffset` in SQL, as it should on a real database (the outbox retention, the payment list). Raw SQL against those
+columns writes and reads ticks (`OutboxDispatcherTests`). `QueryScenarios` tests the payment list on SQL Server and
+PostgreSQL.
 
 `StockRaceApiFactory` (a `FakeClockApiFactory`) plays a concurrent writer for `StockConcurrencyTests`.
 `ChangeStockBeforeNextSave(productId, stock)` makes the next Catalog save that modifies or deletes the product first

@@ -6,13 +6,16 @@ Subtree rules for `src/Modules/`. See the repo-root `CLAUDE.md` for global stand
 
 1. `dotnet new classlib -o src/Modules/<M>/NovaCore.Modules.<M>` — the assembly name **must** start with
    `NovaCore.Modules.` (the architecture tests find modules by that prefix).
-2. Reference `NovaCore.AspNetCore` and `NovaCore.EntityFrameworkCore`. Add packages:
-   `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.EntityFrameworkCore.Design`, `Riok.Mapperly`.
+2. Reference `NovaCore.AspNetCore` and `NovaCore.EntityFrameworkCore`. Add `Riok.Mapperly`. **No database provider**
+   (and no `Microsoft.EntityFrameworkCore.Design`): the host chooses the database (`ModuleProviderTests`, D-073).
    Validation needs no package: the ASP.NET Core framework (via `NovaCore.AspNetCore`) brings it.
 3. Implement `IModule` (`<M>Module.cs`): `AddModule` registers the DbContext + permissions and calls
    `services.AddValidation()`; `MapEndpoints` maps a `MapGroup("/api/v1/<area>")`.
 4. Add a `ProjectReference` from `src/Api/NovaCore.Api` and one line to its `Program.cs`:
    `builder.AddModule<<M>Module>();` (modules map their endpoints in the order they are added).
+5. The migrations live in the host: add `src/Api/NovaCore.Api/<M>/<M>DbContextFactory.cs` (as Catalog's, on
+   `DesignTimeDatabase`), the first migration there (root `CLAUDE.md`), and the PostgreSQL test layer's factory and
+   migration (`tests/NovaCore.Api.Tests/PostgreSql`).
 
 Use `Catalog` as the reference implementation (full CRUD + contracts); `Payments` shows cross-module use. Together
 they show a cross-module write through events both ways (DECISIONS D-034): a payment is saved pending with
@@ -30,9 +33,9 @@ they show a cross-module write through events both ways (DECISIONS D-034): a pay
 - **`Domain/`** — entities derive from `AuditableEntity<Guid>` (Guid v7 keys — friendly to SQL Server
   clustering). Keep setters private; mutate through methods.
 - **`Infrastructure/`** — `<M>DbContext` (`public const string Schema`, `HasDefaultSchema(Schema)`,
-  `ApplyConfigurationsFromAssembly`, `modelBuilder.AddOutbox()`), `IEntityTypeConfiguration<>` per entity (each
-  ignores `DomainEvents`), and a `IDesignTimeDbContextFactory<>` (so `dotnet ef` works offline with the module as `-p`
-  and `-s`).
+  `ApplyConfigurationsFromAssembly`, `modelBuilder.AddOutbox()`) and an `IEntityTypeConfiguration<>` per entity (each
+  ignores `DomainEvents`). Provider-neutral: no provider-specific column types, SQL or functions. The migrations and the
+  design-time factory are the host's (they are the chosen provider's).
 - **`Contracts/`** — for a module others consume, expose a **separate `*.Contracts` project**
   (interfaces, DTOs and the events it publishes; `NovaCore.Abstractions` only, for `DomainEvent`). Consumers reference the
   Contracts project, **never** the module.
@@ -42,10 +45,10 @@ they show a cross-module write through events both ways (DECISIONS D-034): a pay
 
 ## Rules specific to modules
 
-- **DbContext registration:** `services.AddModuleDbContext<<M>DbContext>((sp, o) => { o.UseSqlServer(cfg
-  .GetConnectionString("Database"), sql => { sql.MigrationsHistoryTable("__EFMigrationsHistory", Schema);
-  sql.EnableRetryOnFailure(); }); o.AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>()); });`
-  `AddModuleDbContext` adds the `OutboxInterceptor` itself; the context maps the table with `modelBuilder.AddOutbox()`.
+- **DbContext registration:** `services.AddModuleDbContext<<M>DbContext>(<M>DbContext.Schema, (sp, o) =>
+  o.AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>()));` The host's `AddModuleDatabase` gives the
+  provider, connection, retry and migrations assembly; `AddModuleDbContext` keeps the migration history in the schema
+  and adds the `OutboxInterceptor` itself; the context maps the table with `modelBuilder.AddOutbox()`.
 - **Domain events:** an entity records one with `Raise(new SomethingHappened(...))` (a record deriving from
   `DomainEvent`). Saving the entity writes the event to the module's `outbox_messages` table in the same transaction.
   `ModuleRegistrationTests` checks that every module context maps the outbox.
@@ -73,4 +76,5 @@ they show a cross-module write through events both ways (DECISIONS D-034): a pay
 - **Don't reach across modules' data.** Need another module's data? Call its `*.Contracts` interface
   (resolved via DI at runtime) — like `Payments` calling `IProductCatalog`.
 - **`WithTags` on the group** requires `using Microsoft.AspNetCore.Http;`.
-- After adding/altering an entity, generate a migration for that module's context (see root `CLAUDE.md`).
+- After adding/altering an entity, generate a migration for that module's context in the host, and one in the
+  PostgreSQL test layer's set (see root `CLAUDE.md`).
