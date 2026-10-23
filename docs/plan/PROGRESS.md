@@ -23,7 +23,7 @@
 | 6b | ✅ tamam | `faz/6b-kimlik-guvenlik-siniri` | 2026-10-21 | 2026-10-22 | 2026-10-22 (kullanıcı onayı, `--no-ff`, `4909fe4`; push 2026-10-22, kullanıcı isteği) |
 | 6c | ✅ tamam | `faz/6c-test-altyapisi` | 2026-10-22 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `64b3ab6`; push 2026-10-23, kullanıcı isteği) |
 | 6d | ✅ tamam | `faz/6d-analizor-sikilastirma` | 2026-10-23 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `231b05f`; push 2026-10-23, kullanıcı isteği) |
-| 7a | ⏳ başlamadı | | | | |
+| 7a | 🔄 devam ediyor | `faz/7a-veritabani-ozgurlugu` | 2026-10-23 | | |
 | 7b | ⏳ başlamadı | | | | |
 | 6e | ⏳ başlamadı | | | | |
 
@@ -1124,6 +1124,18 @@ Başlangıç 2026-10-23, `main` @ `1841d6f`, 389 test. Kullanıcı "6d izinsiz d
 - Faz doğrulaması (2026-10-23, `0857887` + review düzeltmeleri; PLAN 6d'de ayrı liste yok, 6c'ninki kullanıldı): `restore --force` ve `--locked-mode` exit 0; `build -c Release` 0 uyarı / 0 hata; `dotnet format --verify-no-changes` temiz; `eng/check-coverage.sh Release` 365/365 (Docker'la, SQL Server dahil, atlanan yok) satır %95,7 / dal %82,8 (baseline %95,8 / %82,9, tolerans içinde; operatör testleri ve bölünen metotlar); mimari testler 22/22 (toplam 387); lisans kapısı exit 0; açık paket yok; `has-pending-model-changes` üç context'te temiz; `eng/check-openapi.sh` kırılım yok; `eng/lint-workflows.sh` temiz; `eng/find-unused.sh` 2 beklenen girdi; `eng/mutation.sh` %79,07 / %61,11 / %70,00 (değişmedi; ilk denemede Payments hedefi kilitli bir DLL yüzünden düştü, build sunucusu kapatılıp yeniden koşuldu); `bash eng/template-smoke.sh` BuiltIn 8/8, External 7/7. GitHub: her push'ta CI (build-and-test, api-contract, template-smoke, secret-scan, workflow-lint, sonar-token) ve CodeQL yeşil; `sonar` token olmadığı için atlandı.
 - Code review (`code-review` skill'i, high, `main...faz/6d-analizor-sikilastirma`, 6 bulgu): düzeltilen: #2 D-065 (2)'deki 5 CA1506 bastırması 3'e indiği halde işaretsizdi (revizyon işareti), #3 README ve `.editorconfig` `NovaCore.Abstractions`'ın `ConfigureAwait(false)` çağırdığını söylüyordu (await'i yok), #4 kök CLAUDE.md komut listesinde `eng/find-unused.sh` ve `dotnet format` yoktu. Değişiklik yapılmayan: #1 `Directory.Build.targets`'taki yol öneki koşulu (iki değer de aynı proje yolundan türüyor), #5 `OidcFlow` kurucusunda sabit bir `Uri` hatası olursa handler sızıntısı (yalnız test, ihmal edilebilir), #6 Sonar job'unun ikinci Release build'i (tarayıcının begin/end sarmalaması gerektiriyor).
 
+### Faz 7a
+Başlangıç 2026-10-23, `main` @ `af5ce0b` (plan commit'i henüz push edilmemişti, branch'le gider), 387 test. Plan onaylandı (plan modu). Faz branch'i her adımdan sonra push edilir (Q-59), main'e dokunulmaz; faz sonunda PR (D-067). Q-40 sürüyor. Kararlar D-072'den, araştırmalar R-125'ten başlayarak yazılır.
+
+**Plan özeti ve kendi kararlarım (D-016):**
+- F7a.1 Lisans kapısı Y-47'yi uygular: adlı sağlayıcı istisnaları tam paket adıyla (desen değil), iki geçişte; şablonun ürettiği projeye kendi `eng/check-licenses.sh`'ı ve CI adımı.
+- F7a.2 Sağlayıcıyı host seçer: `AddModuleDatabase` (host, bir kez; sonraki çağrı yerini alır; yoksa açılış durur) ve `AddModuleDbContext<T>(schema, configure)` (migration geçmişi tablosunu çekirdek şemaya koyar). Sağlayıcıya özgü her şey (migration'lar, design-time factory'ler, sağlayıcı paketi, Pkcs pini) modüllerden host'a taşınır (D-026 (2)'nin kalıbı, MS "separate migrations assembly"); migration ID'leri ve operasyonları aynı kalır. Design-time factory'ler kalır, çünkü `--auth External` projesi resolver'ı yazılana kadar Development'ta `Build` edemiyor (D-024 (7)).
+- F7a.3 PostgreSQL test katmanı: PG migration setleri test assembly'sinde (yeni proje yok, Y-17), aynı senaryolar soyut taban sınıflarla iki sağlayıcıda, sağlayıcıya özgü testler ayrı.
+- F7a.4 Şablon `--db SqlServer|PostgreSql`; compose eklenmez (D-040 (4), PLAN'daki "compose servisi"nden sapma).
+- F7a.5 Belgeler.
+
+**Bu fazda yapılmayacaklar:** çok kiracılılık (7b); kurum başına veritabanı; MySQL/Oracle testleri (yalnız belgelenir); RLS; `.claude/hooks/` düzenlemesi (kullanıcıda); repo'nun `NovaCoreApiFactory`'sindeki strip yaklaşımını sadeleştirmek (Y-09); token pruning'in gerçek veritabanında testi.
+
 ## Açık sorular (Q)
 
 Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa DECISIONS'a D-kaydı olarak eklenir.
@@ -1187,6 +1199,7 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-56 | Sırada ne var: önce CRM spike'ı mı, önce NovaCore fazı mı? | CRM geçişi | Kullanıcı: önce eksiğin NovaCore'da olup olmadığına karar verilir, eksik varsa tamamlanır; CRM'in altyapısı değil, iş mantığı ve validasyonların mantığı taşınır (2026-10-23) → D-070 (2), (4) |
 | Q-57 | NovaCore üzerinde hangi tür projeler kurulacak? (birçok kuruma satılan ürün / tek kurumun iç uygulaması / son kullanıcı uygulaması / bilinmiyor) | CRM geçişi | **Birçok kuruma satılan ürün** (2026-10-23, kullanıcı) → D-069 (1) |
 | Q-58 | Y-14 açılıp çok kiracılılık NovaCore'a alınsın mı? (evet, isteğe bağlı paket / hayır, ikinci proje gelene kadar) | CRM geçişi | **Evet, isteğe bağlı paket** (2026-10-23, kullanıcı; önerilen) → D-069, Y-48. Ardından kullanıcı: "Kararları DECISIONS'a revizyon kuralıyla işle (Y-06 ve Y-14), iki yeni fazı (veritabanı özgürlüğü, çok kiracılılık) PLAN'a ekle ve PROGRESS'i güncelle." → D-071, Faz 7a ve 7b |
+| Q-59 | Faz 7a branch'i her adımdan sonra push edilsin mi? (her adımda / yalnız faz sonunda) | Faz 7a başı | **Her adımda** (2026-10-23, kullanıcı; önerilen). PostgreSQL katmanı ve şablonun dört bileşimi CI'da doğrulanır; main'e dokunulmaz |
 
 ## Sonraya bırakılanlar
 
