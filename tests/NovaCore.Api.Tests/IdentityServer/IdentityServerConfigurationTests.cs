@@ -146,12 +146,13 @@ public sealed class IdentityServerConfigurationTests
 
         // The core accepts the ES256 token through the published key.
         var client = host.CreateClient();
-        var token = await client.PostAsync("/connect/token", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "client_credentials",
             ["client_id"] = "worker",
             ["client_secret"] = "worker-secret-for-tests-at-least-32-chars"
-        }));
+        });
+        var token = await client.PostAsync("/connect/token", form);
         var accessToken = (await token.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("access_token").GetString()!;
         Assert.Equal(SecurityAlgorithms.EcdsaSha256, new JsonWebToken(accessToken).Alg);
 

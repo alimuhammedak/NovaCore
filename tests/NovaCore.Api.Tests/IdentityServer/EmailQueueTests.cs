@@ -58,8 +58,9 @@ public sealed class EmailQueueTests
         var sender = new HeldEmailSender();
         await using var host = await StartAsync(sender);
         var client = host.CreateClient();
-        var registered = client.PostAsJsonAsync("/api/v1/auth/register", new { email = "queued-resend@novacore.test", password = Password });
-        await registered.WaitAsync(ResponseTimeout, TestContext.Current.CancellationToken);
+        await client
+            .PostAsJsonAsync("/api/v1/auth/register", new { email = "queued-resend@novacore.test", password = Password })
+            .WaitAsync(ResponseTimeout, TestContext.Current.CancellationToken);
 
         var response = await client
             .PostAsJsonAsync("/api/v1/auth/resend-confirmation-email", new { email = "queued-resend@novacore.test" })
@@ -74,7 +75,7 @@ public sealed class EmailQueueTests
     public async Task A_failed_send_is_logged_without_the_address_and_the_next_email_still_goes()
     {
         var sender = new FailingOnceEmailSender();
-        var log = new LogCapture();
+        using var log = new LogCapture();
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
         {
             builder.Services.AddSingleton<IEmailSender>(sender);
@@ -98,7 +99,7 @@ public sealed class EmailQueueTests
     public async Task A_full_queue_drops_the_email_instead_of_holding_the_response()
     {
         var sender = new HeldEmailSender();
-        var log = new LogCapture();
+        using var log = new LogCapture();
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
         {
             builder.Services.AddSingleton<IEmailSender>(sender);

@@ -22,6 +22,7 @@
       such as latest-recommended (docs/plan/RESEARCH.md R-117). Design, Naming and the rest stay recommended.
     -->
     <AnalysisLevelSecurity>latest-all</AnalysisLevelSecurity>
+    <AnalysisLevelReliability>latest-all</AnalysisLevelReliability>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <!-- 0 warnings is enforced, not just aimed for. Suppressing a warning needs user approval (docs/plan/DECISIONS.md Y-44). -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

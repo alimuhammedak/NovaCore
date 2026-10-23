@@ -110,7 +110,7 @@ public sealed class ExceptionMappingTests
     [Fact]
     public async Task Server_errors_are_logged_and_client_errors_are_not()
     {
-        var log = new LogCapture();
+        using var log = new LogCapture();
         await using var host = await StartAsync(builder => builder.Logging.AddProvider(log));
 
         await host.CreateClient().GetAsync("/throw/not-found");
@@ -127,8 +127,8 @@ public sealed class ExceptionMappingTests
         await using var factory = new NovaCoreApiFactory();
         using var client = factory.CreateClientWithPermissions(CatalogPermissions.ProductsCreate);
 
-        var response = await client.PostAsync("/api/v1/products",
-            new StringContent("{ \"name\": ", Encoding.UTF8, "application/json"));
+        using var body = new StringContent("{ \"name\": ", Encoding.UTF8, "application/json");
+        var response = await client.PostAsync("/api/v1/products", body);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);

@@ -74,13 +74,14 @@ public sealed class ClientCredentialsTests(ClientCredentialsTests.Fixture fixtur
         return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("access_token").GetString()!;
     }
 
-    private Task<HttpResponseMessage> RequestTokenAsync(string clientId, string? secret)
+    private async Task<HttpResponseMessage> RequestTokenAsync(string clientId, string? secret)
     {
         var parameters = new Dictionary<string, string> { ["grant_type"] = "client_credentials", ["client_id"] = clientId };
         if (secret is not null)
             parameters["client_secret"] = secret;
 
-        return _host.CreateClient().PostAsync("/connect/token", new FormUrlEncodedContent(parameters));
+        using var form = new FormUrlEncodedContent(parameters);
+        return await _host.CreateClient().PostAsync("/connect/token", form);
     }
 
     private async Task<HttpResponseMessage> CallProbeAsync(string accessToken)

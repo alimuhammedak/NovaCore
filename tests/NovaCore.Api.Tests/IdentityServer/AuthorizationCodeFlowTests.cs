@@ -117,12 +117,13 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         await _host.CreateUserAsync("csrf@novacore.test", Password);
         using var flow = new OidcFlow(_host);
 
-        var response = await flow.Browser.PostAsync("/account/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["Email"] = "csrf@novacore.test",
             ["Password"] = Password,
             ["ReturnUrl"] = "/"
-        }));
+        });
+        var response = await flow.Browser.PostAsync("/account/login", form);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -164,12 +165,13 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         using var flow = new OidcFlow(_host);
         var tokens = await flow.SignInAsync("revoke@novacore.test", Password);
 
-        var revoke = await flow.Browser.PostAsync("/connect/revoke", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["token"] = tokens.RefreshToken,
             ["token_type_hint"] = "refresh_token",
             ["client_id"] = IdentityServerTestHost.ClientId
-        }));
+        });
+        var revoke = await flow.Browser.PostAsync("/connect/revoke", form);
         Assert.Equal(HttpStatusCode.OK, revoke.StatusCode);
 
         Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(await flow.RefreshAsync(tokens.RefreshToken)));
@@ -231,11 +233,12 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
         await flow.SignInAsync("cross-site@novacore.test", Password);
 
         // What a form on another site can post: the parameters, but no antiforgery token.
-        var response = await flow.Browser.PostAsync("/connect/endsession", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["client_id"] = IdentityServerTestHost.ClientId,
             ["post_logout_redirect_uri"] = IdentityServerTestHost.PostLogoutRedirectUri
-        }));
+        });
+        var response = await flow.Browser.PostAsync("/connect/endsession", form);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.StartsWith(IdentityServerTestHost.RedirectUri, (await AuthorizeAsync(flow)).ToString(), StringComparison.Ordinal);

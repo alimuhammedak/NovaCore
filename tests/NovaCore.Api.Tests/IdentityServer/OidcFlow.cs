@@ -18,6 +18,8 @@ namespace NovaCore.Api.Tests.IdentityServer;
 /// </summary>
 internal sealed partial class OidcFlow : IDisposable
 {
+    private readonly CookieContainerHandler _cookies;
+
     public OidcFlow(IdentityServerTestHost host)
         : this(host.Server)
     {
@@ -26,7 +28,8 @@ internal sealed partial class OidcFlow : IDisposable
     /// <summary>Drives the provider of any TestServer at <see cref="IdentityServerTestHost.Authority"/>, e.g. the Api host.</summary>
     public OidcFlow(TestServer server)
     {
-        Browser = new HttpClient(new CookieContainerHandler { InnerHandler = server.CreateHandler() })
+        _cookies = new CookieContainerHandler { InnerHandler = server.CreateHandler() };
+        Browser = new HttpClient(_cookies, disposeHandler: false)
         {
             BaseAddress = new Uri(IdentityServerTestHost.Authority)
         };
@@ -69,12 +72,13 @@ internal sealed partial class OidcFlow : IDisposable
         Assert.Equal(HttpStatusCode.OK, codePage.StatusCode);
         var html = await codePage.Content.ReadAsStringAsync();
 
-        return await Browser.PostAsync("/account/login/2fa", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["__RequestVerificationToken"] = HiddenValue(html, "__RequestVerificationToken"),
             ["ReturnUrl"] = HiddenValue(html, "ReturnUrl"),
             ["Code"] = code
-        }));
+        });
+        return await Browser.PostAsync("/account/login/2fa", form);
     }
 
     /// <summary>
@@ -123,13 +127,14 @@ internal sealed partial class OidcFlow : IDisposable
         Assert.Equal(HttpStatusCode.OK, loginPage.StatusCode);
         var html = await loginPage.Content.ReadAsStringAsync();
 
-        return await Browser.PostAsync("/account/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["__RequestVerificationToken"] = HiddenValue(html, "__RequestVerificationToken"),
             ["ReturnUrl"] = HiddenValue(html, "ReturnUrl"),
             ["Email"] = email,
             ["Password"] = password
-        }));
+        });
+        return await Browser.PostAsync("/account/login", form);
     }
 
     /// <summary>Exchanges an authorization code (with its PKCE verifier) at the token endpoint.</summary>
@@ -152,10 +157,11 @@ internal sealed partial class OidcFlow : IDisposable
         ["refresh_token"] = refreshToken
     });
 
-    public Task<HttpResponseMessage> TokenRequestAsync(Dictionary<string, string> parameters)
+    public async Task<HttpResponseMessage> TokenRequestAsync(Dictionary<string, string> parameters)
     {
         parameters.TryAdd("client_id", IdentityServerTestHost.ClientId);
-        return Browser.PostAsync("/connect/token", new FormUrlEncodedContent(parameters));
+        using var form = new FormUrlEncodedContent(parameters);
+        return await Browser.PostAsync("/connect/token", form);
     }
 
     /// <summary>Calls <paramref name="path"/> with <paramref name="accessToken"/> as the bearer token.</summary>
@@ -199,7 +205,11 @@ internal sealed partial class OidcFlow : IDisposable
         return (verifier, Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(verifier))));
     }
 
-    public void Dispose() => Browser.Dispose();
+    public void Dispose()
+    {
+        Browser.Dispose();
+        _cookies.Dispose();
+    }
 
     public static string HiddenValue(string html, string name)
     {

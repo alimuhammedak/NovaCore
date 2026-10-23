@@ -27,11 +27,12 @@ internal sealed partial class DatabaseMigrationService(
 
         foreach (var descriptor in contexts)
         {
-            await using var scope = serviceProvider.CreateAsyncScope();
+            var scope = serviceProvider.CreateAsyncScope();
+            await using var scopeDisposal = scope.ConfigureAwait(false);
             var context = (DbContext)scope.ServiceProvider.GetRequiredService(descriptor.ContextType);
 
             LogApplyingMigrations(descriptor.ContextType.Name);
-            await context.Database.MigrateAsync(cancellationToken);
+            await context.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
             LogMigrationsApplied(descriptor.ContextType.Name);
         }
     }

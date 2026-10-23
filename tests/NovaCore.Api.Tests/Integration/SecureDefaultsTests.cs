@@ -55,8 +55,10 @@ public sealed class SecureDefaultsTests(NovaCoreApiFactory factory, ProductionAp
     {
         var client = production.CreateClient();
 
-        using var simple = await client.SendAsync(Request(HttpMethod.Get));
-        using var preflight = await client.SendAsync(Preflight());
+        using var simpleRequest = Request(HttpMethod.Get);
+        using var preflightRequest = Preflight();
+        using var simple = await client.SendAsync(simpleRequest);
+        using var preflight = await client.SendAsync(preflightRequest);
 
         Assert.False(simple.Headers.Contains(HeaderNames.AccessControlAllowOrigin));
         Assert.False(preflight.Headers.Contains(HeaderNames.AccessControlAllowOrigin));
@@ -67,7 +69,8 @@ public sealed class SecureDefaultsTests(NovaCoreApiFactory factory, ProductionAp
     {
         var client = factory.CreateClient();
 
-        using var simple = await client.SendAsync(Request(HttpMethod.Get));
+        using var request = Request(HttpMethod.Get);
+        using var simple = await client.SendAsync(request);
 
         Assert.Equal("*", Assert.Single(simple.Headers.GetValues(HeaderNames.AccessControlAllowOrigin)));
     }
