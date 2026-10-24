@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -41,19 +42,24 @@ public class ObservabilityTests
         using var host = builder.Build();
         _ = host.Services.GetRequiredService<TracerProvider>();
 
-        // The source the outbox dispatcher starts a handler's span from (NovaCore.EntityFrameworkCore, internal).
+        // The source the outbox dispatcher starts a handler's span from (NovaCore.EntityFrameworkCore, internal). Listeners
+        // are process-wide: the dispatchers of the tests running alongside end spans of that source too, so this test
+        // counts its own trace only.
         using var outbox = new ActivitySource("NovaCore.EntityFrameworkCore");
-        outbox.StartActivity("process", ActivityKind.Consumer)?.Dispose();
+        var trace = ActivityTraceId.CreateRandom();
+        var parent = new ActivityContext(trace, ActivitySpanId.CreateRandom(), ActivityTraceFlags.Recorded);
+        outbox.StartActivity("process", ActivityKind.Consumer, parent)?.Dispose();
 
-        Assert.Equal(["process"], ended.Names);
+        Assert.Equal(["process"], ended.In(trace));
     }
 
     private sealed class EndedSpans : BaseProcessor<Activity>
     {
-        private readonly List<string> _names = [];
+        private readonly ConcurrentQueue<(ActivityTraceId Trace, string Name)> _spans = new();
 
-        public IReadOnlyList<string> Names => _names;
+        public string[] In(ActivityTraceId trace) =>
+            [.. _spans.Where(span => span.Trace == trace).Select(span => span.Name)];
 
-        public override void OnEnd(Activity data) => _names.Add(data.DisplayName);
+        public override void OnEnd(Activity data) => _spans.Enqueue((data.TraceId, data.DisplayName));
     }
 }
