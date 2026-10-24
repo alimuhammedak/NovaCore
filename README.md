@@ -172,7 +172,7 @@ tamamlayabilir mi" sorusu kaydın kendisine bakar ve projenindir. OWASP API Secu
 budur (API1:2023 Broken Object Level Authorization). Microsoft'un yolu resource-based authorization'dır:
 
 ```csharp
-// Kaydın sahibi: oluşturan handler ICurrentUser.UserId'yi (token'daki sub) yazar. CreatedBy kullanıcı adını tutar,
+// Kaydın sahibi: oluşturan handler ICurrentUser.UserId'yi (token'daki sub) yazar. CreatedBy de sub'ı tutar, ama
 // denetim içindir; sahiplik için değil.
 public sealed class TodoOwnerRequirement : IAuthorizationRequirement;
 

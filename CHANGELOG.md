@@ -145,6 +145,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   project: the provider package, `AddModuleDatabase` in `Program.cs`, the design-time database, the connection string,
   the migrations of each context and, for PostgreSQL, the license gate's named exception. The test project replaces the
   host's database with SQLite through `AddModuleDatabase`, whichever was chosen.
+- **Breaking:** `AuditableEntityInterceptor` stamps `CreatedBy`/`ModifiedBy` with the caller's subject
+  (`ICurrentUser.UserId`, the token's `sub`) instead of the user name, which the identity provider sets to the email
+  address: a subject never changes, and it is a pseudonymous id rather than a name that identifies the person directly.
+  Without a caller it is still `system`. Rows saved before keep the user name they were stamped with.
+- The host doesn't start when an `IClaimsTransformation` other than NovaCore's is registered. ASP.NET Core runs only one:
+  a project's registered after `AddCoreWeb` switched permission resolution off without an error (every protected
+  endpoint 403, the token's own `permission` claims kept), one registered before it never ran. **Upgrade:** move what
+  the transformation adds into an `IPermissionResolver`.
 
 ### Removed
 

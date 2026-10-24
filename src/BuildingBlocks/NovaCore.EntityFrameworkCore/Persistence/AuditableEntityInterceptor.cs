@@ -9,7 +9,9 @@ namespace NovaCore.EntityFrameworkCore.Persistence;
 /// <summary>
 /// Stamps <see cref="IAuditableEntity"/> rows with who/when on every save, in one place, so no
 /// handler ever has to remember to set CreatedBy/ModifiedAt. Wire it into each module's DbContext.
-/// The time comes from the injected <see cref="TimeProvider"/>.
+/// The time comes from the injected <see cref="TimeProvider"/>. "Who" is the caller's subject
+/// (<see cref="ICurrentUser.UserId"/>, the token's <c>sub</c>), or <c>system</c> without a caller: the subject never
+/// changes, and it is a pseudonymous id rather than a user name, which can be an email address.
 /// </summary>
 public sealed class AuditableEntityInterceptor(ICurrentUser currentUser, TimeProvider timeProvider) : SaveChangesInterceptor
 {
@@ -35,7 +37,7 @@ public sealed class AuditableEntityInterceptor(ICurrentUser currentUser, TimePro
             return;
 
         var now = timeProvider.GetUtcNow();
-        var user = currentUser.UserName ?? currentUser.UserId ?? "system";
+        var user = currentUser.UserId ?? "system";
 
         foreach (EntityEntry<IAuditableEntity> entry in context.ChangeTracker.Entries<IAuditableEntity>())
         {

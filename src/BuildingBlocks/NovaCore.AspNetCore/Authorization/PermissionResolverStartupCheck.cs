@@ -15,7 +15,7 @@ internal sealed class PermissionResolverStartupCheck(IServiceProviderIsService s
             ? Task.CompletedTask
             : throw new InvalidOperationException(
                 $"No {nameof(IPermissionResolver)} is registered. Permissions are resolved on the server, so register "
-                + "the identity integration's resolver (e.g. the Identity module's) or your own.");
+                + "the identity provider add-on's (AddCoreIdentityServer) or your own.");
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

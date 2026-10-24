@@ -16,14 +16,15 @@ public static class AuthorizationExtensions
     /// discarded. Secure by default: an endpoint without authorization metadata, and a request that matches no endpoint,
     /// requires an authenticated caller (the fallback policy); a public endpoint says so with <c>AllowAnonymous</c>.
     /// Needs <c>AddCoreAuthentication</c>, <c>AddCoreCaching</c> and a registered <see cref="IPermissionResolver"/> (the
-    /// identity integration brings it; without one the host does not start); it replaces any other
-    /// <see cref="IClaimsTransformation"/>.
+    /// identity integration brings it; without one the host does not start). ASP.NET Core runs one
+    /// <see cref="IClaimsTransformation"/>, so the host does not start with another one registered either.
     /// </summary>
     public static IServiceCollection AddCoreAuthorization(this IServiceCollection services)
     {
         services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
         services.AddScoped<IClaimsTransformation, PermissionClaimsTransformation>();
         services.AddHostedService<PermissionResolverStartupCheck>();
+        services.AddHostedService<ClaimsTransformationStartupCheck>();
 
         // A forgotten RequirePermission must not publish an endpoint (OWASP API5, docs/plan/RESEARCH.md R-073).
         services.AddAuthorization(options =>
