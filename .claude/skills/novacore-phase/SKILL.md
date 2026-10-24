@@ -39,7 +39,7 @@ Ardından şunları kontrol et. Biri başarısızsa **dur ve kullanıcıya bildi
 - **Bağımlılık:** Önceki fazların hepsi `✅ tamam` mı? Sıra PLAN.md'deki "Faz sırası ve bağımlılıklar" bölümündedir, buraya kopyalanmaz. Koşullu bir faz atlandıysa `✅ tamam (atlandı)` sayılır.
 - **Açık sorular:** Bu fazın ihtiyaç duyduğu Q-kayıtları cevaplanmış mı? Cevaplanmamışsa `AskUserQuestion` ile şimdi sor.
 - **Çalışma ağacı:** Temiz mi? Değilse neyin değiştiğini göster ve ne yapılacağını sor.
-- **Devam eden faz:** Faz `🔄 devam ediyor` veya `⏸ duraklatıldı` durumundaysa bu bir devamdır. Son devir notunu ve işaretlenmemiş ilk adımı esas al, tamamlanmış adımları tekrar yapma. Plan fazın ilk oturumunda onaylandı: §2'yi atla, doğrudan §3'e geç.
+- **Devam eden faz:** Faz `🔄 devam ediyor` veya `⏸ duraklatıldı` durumundaysa bu bir devamdır. Son devir notunu esas al ve tamamlanmış adımları tekrar yapma. Plan fazın ilk oturumunda onaylandı: §2'yi atla. İşaretlenmemiş adım varsa ilkinden §3'e geç; kalmadıysa doğrudan §5'e (faz sonu) geç.
 
 ## 2. Kapsamı yazılı olarak onaylat (plan modu)
 
@@ -67,7 +67,7 @@ Her adım için aynı döngü:
 1. **Başlat:** PROGRESS'te adıma "devam ediyor" notu düş.
 2. **Test:** Adım bir hata düzeltmesi veya yeni davranış içeriyorsa önce testi yaz ve kırmızı olduğunu gör.
 3. **Uygula:** Yalnızca o adımın kapsamı. Aynı dosyada yan bir şey gözüne çarparsa dokunma, §4'ü uygula.
-4. **Doğrula:** `dotnet build NovaCore.slnx` ve `dotnet test NovaCore.slnx`. Paket değiştiyse `dotnet restore NovaCore.slnx --force` da çalıştır; sürüm değiştiyse `--force-evaluate` ile lock dosyalarını yeniden yaz ve onları da commit'le. Kırmızıysa düzelt. Düzeltme kapsam dışına taşıyorsa §4. Çıktının tamamını bağlama alma: özeti ve hata satırlarını oku (ör. `dotnet build -v q`, testlerde yalnız başarısızlar ve toplam). CodeRabbit CLI adımda çalışmaz, faz sonunda bir kez çalışır (§5, D-076).
+4. **Doğrula:** `dotnet build NovaCore.slnx` ve `dotnet test NovaCore.slnx`. Paket değiştiyse `dotnet restore NovaCore.slnx --force` da çalıştır; sürüm değiştiyse `--force-evaluate` ile lock dosyalarını yeniden yaz ve onları da commit'le. Kırmızıysa düzelt. Düzeltme kapsam dışına taşıyorsa §4. Çıktının tamamını bağlama alma: özeti ve hata satırlarını oku (ör. `dotnet build -v q`, testlerde yalnız başarısızlar ve toplam). CodeRabbit CLI adımda çalışmaz, faz sonunda bir kez çalışır (§5.4, D-076).
 5. **Commit:** `faz<id>(<adım-id>): <özet>`, sonuna oturumun attribution satırını ekle. Sadece o adımın dosyalarını stage'le (`git add <yol>`); `git add -A` kullanma.
 6. **Kaydet:** PROGRESS'te `- [x] <adım-id> (<kısa-hash>): <kısa not>`.
 7. **Bilgilendir:** Kullanıcıya tek satır yaz, ör. "F0.3 tamam: strict limiter IP bazlı, 2 yeni test." Adımda kendi aldığın bir karar varsa aynı satıra ekle. Plan onaylandığı için adımlar arasında onay bekleme. Yalnızca §4'teki "sor" durumunda dur.
@@ -120,8 +120,8 @@ Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'
 
 1. PLAN'daki "Faz doğrulaması" komutlarını çalıştır. Her komutun sonucunu rapora koy (geçti/kaldı ve özet).
 2. `code-review` skill'ini (Skill aracıyla) bu branch'in değişiklikleri üzerinde çalıştır. Bulguları rapora ekle. Kapsam dışı bulguları **düzeltme**, "Sonraya bırakılanlar" listesine yaz. Kapsam içi gerçek hataları düzelt ve yeniden doğrula.
-3. **CodeRabbit CLI, fazda bir kez (D-076):** çalışma ağacı commit'lenmişken faz branch'inin tamamını incelet: `coderabbit review --agent --base main`. İnceleme uzun sürebilir; arka planda çalıştır ve bitmesini bekle, poll etme. Kapsam içi gerçek bulguyu düzelt, build ile testleri (paket değiştiyse restore'u da) yeniden çalıştır ve commit'le (`faz<id>: address the CodeRabbit CLI review`); kapsam dışını §4'e göre "Sonraya bırakılanlar"a yaz; yanlış pozitifi raporda tek cümleyle belirt. CLI kurulu ya da oturum açık değilse (`coderabbit auth status`) ya da rate limit'e takılırsa fazı bekletme: raporda "CLI incelemesi yok: <neden>" de, PR incelemesi yine yakalar.
-4. PROGRESS'i güncelle: faz `✅ tamam`, bitiş tarihi, **son devir notu** (yapılanlar, sürprizler, bekleyen sorular, sonraki fazın bilmesi gerekenler). Ardından arşivle (D-076): bir önceki fazın "Adımlar" bölümünü, son üç devir notundan eskilerini ve üstü çizilmiş (kapanmış) "Sonraya bırakılanlar" maddelerini değiştirmeden `PROGRESS-ARSIV.md`'nin ilgili bölümlerine taşı. PROGRESS'te biten fazın adımları kalır.
+3. PROGRESS'i güncelle: faz `✅ tamam`, bitiş tarihi, **son devir notu** (yapılanlar, sürprizler, bekleyen sorular, sonraki fazın bilmesi gerekenler). Ardından arşivle (D-076): bir önceki fazın "Adımlar" bölümünü, son üç devir notundan eskilerini ve üstü çizilmiş (kapanmış) "Sonraya bırakılanlar" maddelerini değiştirmeden `PROGRESS-ARSIV.md`'nin ilgili bölümlerine taşı. PROGRESS'te biten fazın adımları kalır. Bu güncellemeleri commit'le.
+4. **CodeRabbit CLI, fazda bir kez (D-076):** 3'teki commit'ten sonra, çalışma ağacı temizken faz branch'inin tamamını incelet: `coderabbit review --agent --base main`. İnceleme uzun sürebilir; arka planda çalıştır ve bitmesini bekle, poll etme. Kapsam içi gerçek bulguyu düzelt, build ile testleri (paket değiştiyse restore'u da) yeniden çalıştır ve commit'le (`faz<id>: address the CodeRabbit CLI review`); kapsam dışını §4'e göre "Sonraya bırakılanlar"a yaz; yanlış pozitifi raporda tek cümleyle belirt. CLI kurulu ya da oturum açık değilse (`coderabbit auth status`) ya da rate limit'e takılırsa fazı bekletme: raporda "CLI incelemesi yok: <neden>" de, PR incelemesi yine yakalar.
 5. Faz bir konvansiyonu değiştirdiyse README, CLAUDE.md dosyaları ve memory'nin güncellendiğini doğrula (Genel kurallar).
 6. **PR ve CodeRabbit (D-067):** 2–5'teki düzeltmeleri ve PROGRESS güncellemesini (son adımın `[x]` kaydı dahil) doğrulayıp commit'le; çalışma ağacı temizken branch'i push et ve `gh pr create --base main --head faz/<id>-<kısa-ad>` ile PR aç (başlık `faz<id>: <faz adı>`, gövde: son devir notunun özeti). PR'ı açmak bu sürecin parçasıdır, ayrıca sorulmaz; merge sorulur. CodeRabbit kendiliğinden inceler. İncelemeyi bekle (poll etme; PR araçları CI'ı ve yorumları bildirir), sonra her yorumu sınıflandır: kapsam içi gerçek hata → düzelt, doğrula, aynı branch'e commit ve push; kapsam dışı → "Sonraya bırakılanlar"; yanlış pozitif ya da bir D/Y kaydıyla çelişen öneri → yorumu gerekçesi ve kaydın ID'siyle yanıtla. Pre-merge check'lerin uyarılarını da aynı şekilde ele al. Sonucu PROGRESS'e yaz, commit'le ve aynı branch'e push et; merge'ten önce PR'da commit'lenmemiş bir şey kalmasın. CodeRabbit inceleme yapmadıysa (rate limit, kesinti) bunu raporda söyle; merge'ü engellemez (danışman, D-067 (2)).
 7. Aşağıdaki rapor şablonuyla raporla.
@@ -155,7 +155,7 @@ Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'
 - ...
 
 ### CodeRabbit
-- CLI (faz sonu, §5.3): bulgu sayısı; düzeltilen / Sonraya bırakılan / yanlış pozitif. Çalışmadıysa nedeni.
+- CLI (faz sonu, §5.4): bulgu sayısı; düzeltilen / Sonraya bırakılan / yanlış pozitif. Çalışmadıysa nedeni.
 - PR #N: düzeltilen / Sonraya bırakılan / yanıtlanan yorumlar; pre-merge check sonuçları.
 
 ### Sonraki adım

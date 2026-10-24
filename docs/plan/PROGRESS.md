@@ -248,7 +248,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 ## Son devir notu
 
-> Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
+> Her oturumun sonunda (faz bitmese bile) en üste yeni bir not eklenir; öncekilerin üzerine yazılmaz, son üç notu aşanlar faz sonunda arşive taşınır (D-076). Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
 **2026-10-24, Faz 7a: Veritabanı özgürlüğü (✅ tamam, PR #11 ile `main`'e merge edildi).** Kullanıcı onayı: "PR #11'i merge commit'le main'e al"; merge `cf895d8` (`gh pr merge 11 --merge`), yerel `main` `--ff-only` ile güncellendi. Merge anında `1816cd2`'de `build-and-test` (iki koşu) ve CodeRabbit hâlâ koşuyordu, diğer bütün kontroller (template-smoke, CodeQL, api-contract, secret-scan, workflow-lint) yeşildi; `f8c637f`'ten sonraki commit'ler yalnız belge ve yapılandırma (`CLAUDE.md`, `README.md`, `.coderabbit.yaml`, PROGRESS) ve `f8c637f`'te `build-and-test` yeşildi. main'deki CI sonucu henüz kontrol edilmedi. Branch `faz/7a-veritabani-ozgurlugu`, her adımdan sonra push edildi (Q-59). F7a.1–F7a.5 önceki oturumda; bu oturumda faz sonu: hook mesajı commit'i (kullanıcının değişikliği, onun seçimiyle), doğrulama baştan (Docker'la, 410/410, smoke dört bileşimde), coverage baseline satır %96,6, code review (2 düzeltme, 1 geri alınan, 2 Sonraya bırakılanlar'a) ve PR. Ayrıntı: Faz 7a adımlarının "Faz sonu" satırı.
 
