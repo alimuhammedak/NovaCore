@@ -53,10 +53,31 @@ const newest = Math.max(
   rootFilesMtime()
 );
 
-let lastVerified = 0;
-try { lastVerified = fs.statSync(stampFile).mtimeMs; } catch { /* ilk çalışma */ }
+// Damga son *kontrolü* tutar, sonucu yeşil olsun kırmızı olsun: kırmızı bir ağaçta her sohbet turu (ör. "merhaba")
+// build + test'i baştan çalıştırmasın. Dosyalar o kontrolden beri değişmediyse yeniden çalıştırmaz, kırmızıysa uyarır.
+let checked = 0;
+let green = true;
+try {
+  const text = fs.readFileSync(stampFile, 'utf8');
+  try {
+    ({ checked, green } = JSON.parse(text));
+  } catch {
+    checked = fs.statSync(stampFile).mtimeMs; // eski biçim: yalnızca yeşil bir doğrulamanın zaman damgası
+  }
+} catch { /* ilk çalışma */ }
 
-if (newest <= lastVerified) process.exit(0);
+if (newest <= checked) {
+  if (!green) {
+    process.stdout.write(JSON.stringify({
+      systemMessage: '⚠ NovaCore: son doğrulama kırmızıydı ve o zamandan beri kaynak dosya değişmedi; tekrar çalıştırılmadı.'
+    }));
+  }
+  process.exit(0);
+}
+
+function record(result) {
+  fs.writeFileSync(stampFile, JSON.stringify({ checked: newest, green: result, at: new Date().toISOString() }) + '\n');
+}
 
 function run(args) {
   return spawnSync('dotnet', args, {
@@ -76,6 +97,7 @@ function summarize(res) {
 }
 
 function fail(stage, res) {
+  record(false);
   const msg = `Doğrulama başarısız (${stage}). Kaynak dosyalar değişti ama ${stage} kırmızı:\n${summarize(res)}`;
   if (input.stop_hook_active) {
     // Sonsuz döngüyü önle: ikinci denemede durmaya izin ver ama kullanıcıyı uyar.
@@ -99,5 +121,5 @@ if (build.status !== 0) fail('build', build);
 const test = run(['test', '--solution', solution, '--no-build']);
 if (test.status !== 0) fail('test', test);
 
-fs.writeFileSync(stampFile, new Date().toISOString() + '\n');
+record(true);
 process.exit(0);
