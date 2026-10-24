@@ -6,13 +6,14 @@ using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Identity.OpenIddict;
 using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Payments.Infrastructure;
+using NovaCore.MultiTenancy;
 
 namespace NovaCore.Api.Tests;
 
 /// <summary>
-/// The test host (<see cref="ApiFactory"/>) on in-memory SQLite: every DbContext (the modules' and the identity
-/// provider's) gets its own in-memory SQLite database through <c>AddModuleDatabase</c>, so the database health checks and
-/// the provider's flows run without a real SQL Server, and every context is still registered by
+/// The test host (<see cref="ApiFactory"/>) on in-memory SQLite: every DbContext (the modules', the identity provider's
+/// and the tenancy store's) gets its own in-memory SQLite database through <c>AddModuleDatabase</c>, so the database
+/// health checks and the provider's flows run without a real SQL Server, and every context is still registered by
 /// <c>AddModuleDbContext</c>, with its interceptors and tenant isolation. The module databases start with their schema,
 /// as after the migrations, because the host's outbox dispatcher reads their outboxes from the start.
 /// </summary>
@@ -25,6 +26,7 @@ public class NovaCoreApiFactory : ApiFactory
     private readonly SqliteConnection _identityDatabase = OpenSharedInMemoryDatabase();
     private readonly SqliteConnection _catalogDatabase = OpenSharedInMemoryDatabase();
     private readonly SqliteConnection _paymentsDatabase = OpenSharedInMemoryDatabase();
+    private readonly SqliteConnection _tenancyDatabase = OpenSharedInMemoryDatabase();
 
     public NovaCoreApiFactory()
     {
@@ -57,6 +59,7 @@ public class NovaCoreApiFactory : ApiFactory
         var database = contextType == typeof(CatalogDbContext) ? _catalogDatabase
             : contextType == typeof(PaymentsDbContext) ? _paymentsDatabase
             : contextType == typeof(IdentityServerDbContext) ? _identityDatabase
+            : contextType == typeof(MultiTenancyDbContext) ? _tenancyDatabase
             : throw new InvalidOperationException($"The test host has no database for {contextType.Name}.");
 
         UseSqlite(options, database.ConnectionString);
@@ -76,6 +79,7 @@ public class NovaCoreApiFactory : ApiFactory
             _identityDatabase.Dispose();
             _catalogDatabase.Dispose();
             _paymentsDatabase.Dispose();
+            _tenancyDatabase.Dispose();
         }
 
         base.Dispose(disposing);

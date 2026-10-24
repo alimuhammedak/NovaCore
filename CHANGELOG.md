@@ -79,6 +79,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fails on a context with tenant entities, so another filter is turned off by its name and the tenant filter stays on; a
   read across tenants turns it off by its name, explicitly. Work outside a request gives its scope a tenant with
   `TenantContext.Use(tenantId)`; a scope works in one tenant. A context without tenant entities is unaffected.
+- `BMD.NovaCore.MultiTenancy`, an optional add-on: the tenants and their members, and which tenant a request works in.
+  `builder.AddCoreMultiTenancy()` reads the tenant from the `tenant` route value (`/api/v1/tenants/{tenant}/...`; an
+  overload reads it from anywhere else, such as a header), and the request works in it only when the caller (`sub`) is a
+  member of it and it is active, decided on the server for every request and cached with the caller's permissions.
+  Otherwise the request has no tenant: its tenant entities stay out of reach and `RequireTenant()` (an endpoint
+  convention in `NovaCore.AspNetCore`) answers 403, the same for a tenant that doesn't exist. `TenantDirectory` opens
+  tenants, adds members and suspends a tenant, which takes effect on this server's next request. The store is
+  `MultiTenancyDbContext` (schema `tenancy`): the host registers it with `AddModuleDbContext` and keeps its migrations.
+- `ITenantResolver` (`NovaCore.AspNetCore`): the core asks it which tenant a request names and whether the caller may
+  work in it, while it resolves the caller's permissions; the add-on implements it. The cached permissions are kept
+  per tenant too, and `HybridCache.RemoveTenantPermissionsAsync(tenantId)` drops a tenant's.
 
 ### Changed
 

@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using NovaCore.EntityFrameworkCore.MultiTenancy;
 using Xunit;
@@ -5,9 +7,10 @@ using Xunit;
 namespace NovaCore.Api.Tests.Databases;
 
 /// <summary>
-/// Tenant isolation in a module context (docs/plan/PLAN.md F7b.3, DECISIONS D-076 (5), (6)), the same on every
-/// provider: a scope reads and writes only its tenant's rows, and none without a tenant. Every test works with tenants
-/// of its own, so the tests of a class share one database.
+/// Tenant isolation, the same on every provider: a scope reads and writes only its tenant's rows, and none without a
+/// tenant (docs/plan/PLAN.md F7b.3, DECISIONS D-076 (5), (6)); a request works in the tenant it names only when the caller
+/// is a member of it and it is active (F7b.2, D-076 (3)). Every test works with tenants and subjects of its own, so the
+/// tests of a class share one database.
 /// </summary>
 public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixture<TFixture>
     where TFixture : TenancyFixture
@@ -166,6 +169,89 @@ public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixtu
         Assert.Empty(await TextsAsync(mine));
         Assert.Equal(["theirs"], await TextsAsync(theirs));
     }
+
+    [Fact]
+    public async Task A_member_works_in_their_tenant()
+    {
+        var alice = Subject();
+        var tenant = await Fixture.AddTenantAsync(alice);
+        using var client = Fixture.ClientFor(alice);
+
+        var created = await client.PostAsJsonAsync(NotesOf(tenant), new { text = "alice's" }, Cancellation);
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal(["alice's"], (await client.GetFromJsonAsync<string[]>(NotesOf(tenant), Cancellation))!);
+    }
+
+    [Fact]
+    public async Task A_caller_who_is_not_a_member_gets_403_and_none_of_the_tenants_data()
+    {
+        var (alice, bob) = (Subject(), Subject());
+        var bobs = await Fixture.AddTenantAsync(bob);
+        await AddNoteAsync(bobs, "bob's");
+        using var client = Fixture.ClientFor(alice);
+
+        var response = await client.GetAsync(NotesOf(bobs), Cancellation);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.DoesNotContain("bob's", await response.Content.ReadAsStringAsync(Cancellation), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Another_tenant_in_the_path_with_a_valid_token_gives_no_access()
+    {
+        var (alice, bob) = (Subject(), Subject());
+        await Fixture.AddTenantAsync(alice);
+        var bobs = await Fixture.AddTenantAsync(bob);
+        using var client = Fixture.ClientFor(alice);
+
+        var write = await client.PostAsJsonAsync(NotesOf(bobs), new { text = "planted" }, Cancellation);
+
+        Assert.Equal(HttpStatusCode.Forbidden, write.StatusCode);
+        Assert.Empty(await TextsAsync(bobs));
+    }
+
+    [Fact]
+    public async Task A_tenant_that_doesnt_exist_gets_the_same_403()
+    {
+        using var client = Fixture.ClientFor(Subject());
+
+        var response = await client.GetAsync(NotesOf(Guid.NewGuid()), Cancellation);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_suspended_tenant_shows_no_data_even_after_a_cached_access()
+    {
+        var alice = Subject();
+        var tenant = await Fixture.AddTenantAsync(alice);
+        await AddNoteAsync(tenant, "alice's");
+        using var client = Fixture.ClientFor(alice);
+        Assert.Equal(["alice's"], (await client.GetFromJsonAsync<string[]>(NotesOf(tenant), Cancellation))!);
+
+        await Fixture.InDirectoryAsync(async directory =>
+            Assert.True((await directory.SuspendAsync(tenant, Cancellation)).IsSuccess));
+        var response = await client.GetAsync(NotesOf(tenant), Cancellation);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.DoesNotContain("alice's", await response.Content.ReadAsStringAsync(Cancellation), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_anonymous_request_gets_no_tenant()
+    {
+        var tenant = await Fixture.AddTenantAsync(Subject());
+        using var client = Fixture.Host.CreateClient();
+
+        var response = await client.GetAsync(NotesOf(tenant), Cancellation);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    private static string Subject() => Guid.NewGuid().ToString();
+
+    private static Uri NotesOf(Guid tenant) => new($"/api/v1/tenants/{tenant}/notes", UriKind.Relative);
 
     private Task<Guid> AddNoteAsync(Guid? tenant, string text, bool archived = false) =>
         Fixture.InScopeAsync(tenant, async notes =>

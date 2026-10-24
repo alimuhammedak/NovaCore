@@ -85,13 +85,13 @@ dotnet test -- --filter-method "*.AuthorizationCodeFlowTests.Refresh_rotates_the
 # Run (Development opens Scalar UI at /scalar/v1)
 dotnet run --project src/Api/NovaCore.Api
 
-# EF Core migrations — THREE separate DbContexts: one per module, plus the identity provider's. The host chooses the
-# database (AddModuleDatabase) and keeps every context's SQL Server migrations and design-time factory (D-073), so the
+# EF Core migrations — FOUR separate DbContexts: one per module, the identity provider's and the tenancy store's. The
+# host chooses the database (AddModuleDatabase) and keeps every context's SQL Server migrations and design-time factory (D-073), so the
 # Api is BOTH -p and -s. Restore tools first.
 dotnet tool restore
 dotnet ef migrations add <Name> --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context <C>DbContext --output-dir <F>/Migrations
 dotnet ef database update     --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context <C>DbContext
-#   <C>/<F> ∈ { Catalog/Catalog, Payments/Payments, IdentityServer/Identity }.
+#   <C>/<F> ∈ { Catalog/Catalog, Payments/Payments, IdentityServer/Identity, MultiTenancy/MultiTenancy }.
 # A model change needs a migration in each provider's set (D-074): the PostgreSQL test layer's lives in the test project.
 dotnet ef migrations add <Name> --project tests/NovaCore.Api.Tests --startup-project tests/NovaCore.Api.Tests --context <C>DbContext --output-dir PostgreSql/<F>/Migrations
 
@@ -256,7 +256,7 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   argument must be computed (CA1873), wrap the call in an `IsEnabled` guard and declare the methods as `this ILogger`
   extensions: CA1873 only accepts a guard on the same receiver (`SecurityAuditLogger`, RESEARCH R-047).
 
-- **Packable projects are NuGet packages** (the three core packages and the four add-ons in `src/BuildingBlocks`):
+- **Packable projects are NuGet packages** (the three core packages and the five add-ons in `src/BuildingBlocks`):
   - Every public member needs an XML doc comment (CS1591).
   - The `.csproj` sets `<GenerateDocumentationFile>true</GenerateDocumentationFile>` next to `IsPackable` and references
     `Microsoft.CodeAnalysis.PublicApiAnalyzers` (`PrivateAssets="all"`); `Directory.Build.targets` fails the build

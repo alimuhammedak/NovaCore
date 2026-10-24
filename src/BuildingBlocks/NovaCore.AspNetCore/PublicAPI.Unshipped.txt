@@ -11,6 +11,9 @@ NovaCore.AspNetCore.Authorization.IPermissionDefinitionProvider
 NovaCore.AspNetCore.Authorization.IPermissionDefinitionProvider.GetPermissions() -> System.Collections.Generic.IReadOnlyCollection<NovaCore.AspNetCore.Authorization.PermissionDefinition!>!
 NovaCore.AspNetCore.Authorization.IPermissionResolver
 NovaCore.AspNetCore.Authorization.IPermissionResolver.GetPermissionsAsync(System.Security.Claims.ClaimsPrincipal! user, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyCollection<string!>!>!
+NovaCore.AspNetCore.Authorization.ITenantResolver
+NovaCore.AspNetCore.Authorization.ITenantResolver.CanAccessAsync(System.Security.Claims.ClaimsPrincipal! user, System.Guid tenantId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<bool>!
+NovaCore.AspNetCore.Authorization.ITenantResolver.RequestedTenant(Microsoft.AspNetCore.Http.HttpContext! context) -> System.Guid?
 NovaCore.AspNetCore.Authorization.PermissionAuthorizationHandler
 NovaCore.AspNetCore.Authorization.PermissionAuthorizationHandler.PermissionAuthorizationHandler() -> void
 NovaCore.AspNetCore.Authorization.PermissionDefinition
@@ -83,6 +86,8 @@ static NovaCore.AspNetCore.Auth.AuthenticationExtensions.AddCoreAuthentication(t
 static NovaCore.AspNetCore.Authorization.AuthorizationExtensions.AddCoreAuthorization(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static NovaCore.AspNetCore.Authorization.AuthorizationExtensions.AddPermissionDefinitions<TProvider>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static NovaCore.AspNetCore.Authorization.AuthorizationExtensions.RequirePermission<TBuilder>(this TBuilder builder, string! permission) -> TBuilder
+static NovaCore.AspNetCore.Authorization.AuthorizationExtensions.RequireTenant<TBuilder>(this TBuilder builder) -> TBuilder
+static NovaCore.AspNetCore.Authorization.PermissionCacheExtensions.RemoveTenantPermissionsAsync(this Microsoft.Extensions.Caching.Hybrid.HybridCache! cache, System.Guid tenantId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 static NovaCore.AspNetCore.Authorization.PermissionDefinition.operator !=(NovaCore.AspNetCore.Authorization.PermissionDefinition? left, NovaCore.AspNetCore.Authorization.PermissionDefinition? right) -> bool
 static NovaCore.AspNetCore.Authorization.PermissionDefinition.operator ==(NovaCore.AspNetCore.Authorization.PermissionDefinition? left, NovaCore.AspNetCore.Authorization.PermissionDefinition? right) -> bool
 static NovaCore.AspNetCore.DependencyInjection.InfrastructureServiceCollectionExtensions.AddCoreCaching(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

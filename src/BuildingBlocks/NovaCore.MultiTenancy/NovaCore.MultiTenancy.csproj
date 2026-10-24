@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NovaCore.MultiTenancy: optional add-on. The tenants and their members, and the core's tenant resolution from them:
+    which tenant a request names and whether the caller may work in it (docs/plan/DECISIONS.md D-069, D-076). The host
+    picks the database provider and owns the migrations of its store.
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>NovaCore add-on: tenants, memberships and the per-request tenant resolution of a multi-tenant host.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NovaCore.AspNetCore\NovaCore.AspNetCore.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using NovaCore.Identity.OpenIddict;
 using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Payments.Infrastructure;
+using NovaCore.MultiTenancy;
 
 namespace NovaCore.Api.Tests.PostgreSql;
 
@@ -47,4 +48,11 @@ public sealed class IdentityServerPostgreSqlFactory : IDesignTimeDbContextFactor
 {
     public IdentityServerDbContext CreateDbContext(string[] args) =>
         new(PostgreSqlDesignTime.Options<IdentityServerDbContext>(IdentityServerDbContext.Schema));
+}
+
+/// <summary>The tenancy store's PostgreSQL migrations (<see cref="PostgreSqlDesignTime"/>).</summary>
+public sealed class MultiTenancyPostgreSqlFactory : IDesignTimeDbContextFactory<MultiTenancyDbContext>
+{
+    public MultiTenancyDbContext CreateDbContext(string[] args) =>
+        new(PostgreSqlDesignTime.Options<MultiTenancyDbContext>(MultiTenancyDbContext.Schema));
 }

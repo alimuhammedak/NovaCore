@@ -16,7 +16,7 @@ namespace NovaCore.Api.Tests.Databases;
 /// The test host (<see cref="ApiFactory"/>) on a real database server in a container, in a database of its own: SQL
 /// Server (<c>SqlServerApiFactory</c>) or PostgreSQL (<c>PostgreSqlApiFactory</c>). The host applies the migrations when it
 /// starts, as production does (<c>Database:ApplyMigrations</c>, <c>DatabaseMigrationService</c>): every migration of the
-/// three contexts runs, its SQL steps included. Without Docker the host isn't built; the tests skip through
+/// four contexts runs, its SQL steps included. Without Docker the host isn't built; the tests skip through
 /// <see cref="Database"/>. <see cref="ResetAsync"/> empties the module tables between the tests of a class.
 /// </summary>
 public abstract class DatabaseApiFactory : ApiFactory, IAsyncLifetime

@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using NovaCore.Abstractions.MultiTenancy;
 
 namespace NovaCore.AspNetCore.Authorization;
 
@@ -17,12 +19,17 @@ public static class AuthorizationExtensions
     /// requires an authenticated caller (the fallback policy); a public endpoint says so with <c>AllowAnonymous</c>.
     /// Needs <c>AddCoreAuthentication</c>, <c>AddCoreCaching</c> and a registered <see cref="IPermissionResolver"/> (the
     /// identity integration brings it; without one the host does not start). ASP.NET Core runs one
-    /// <see cref="IClaimsTransformation"/>, so the host does not start with another one registered either.
+    /// <see cref="IClaimsTransformation"/>, so the host does not start with another one registered either. With an
+    /// <see cref="ITenantResolver"/> (the multi-tenancy add-on), the same transformation decides the request's tenant
+    /// (<see cref="TenantContext"/>, registered here) and caches the permissions per tenant too.
     /// </summary>
     public static IServiceCollection AddCoreAuthorization(this IServiceCollection services)
     {
         services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, TenantAuthorizationHandler>();
         services.AddScoped<IClaimsTransformation, PermissionClaimsTransformation>();
+        services.AddHttpContextAccessor();
+        services.TryAddScoped<TenantContext>();
         services.AddHostedService<PermissionResolverStartupCheck>();
         services.AddHostedService<ClaimsTransformationStartupCheck>();
 
@@ -47,4 +54,32 @@ public static class AuthorizationExtensions
     public static TBuilder RequirePermission<TBuilder>(this TBuilder builder, string permission)
         where TBuilder : IEndpointConventionBuilder =>
         builder.RequireAuthorization(new RequirePermissionAttribute(permission));
+
+    /// <summary>
+    /// Guards an endpoint (or group) that works in a tenant: the request must have a tenant the caller may work in, as
+    /// <see cref="ITenantResolver"/> decides (the scope's <see cref="TenantContext"/>), e.g. a group under
+    /// <c>/api/v1/tenants/{tenant}</c>. Anonymous callers get 401; a caller without that tenant gets 403, whether the
+    /// tenant the request names exists or not.
+    /// </summary>
+    public static TBuilder RequireTenant<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder =>
+        builder.RequireAuthorization(policy => policy.RequireAuthenticatedUser().AddRequirements(new TenantRequirement()));
+}
+
+/// <summary>Requires the request to have a validated tenant (<see cref="AuthorizationExtensions.RequireTenant"/>).</summary>
+internal sealed class TenantRequirement : IAuthorizationRequirement;
+
+/// <summary>
+/// Grants <see cref="TenantRequirement"/> when the scope has a tenant. The core sets it while it resolves the caller's
+/// permissions, only for a tenant the caller may work in (<see cref="PermissionClaimsTransformation"/>).
+/// </summary>
+internal sealed class TenantAuthorizationHandler(TenantContext tenantContext) : AuthorizationHandler<TenantRequirement>
+{
+    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, TenantRequirement requirement)
+    {
+        if (tenantContext.TenantId is not null)
+            context.Succeed(requirement);
+
+        return Task.CompletedTask;
+    }
 }

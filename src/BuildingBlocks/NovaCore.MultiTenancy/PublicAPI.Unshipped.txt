@@ -1,0 +1,16 @@
+#nullable enable
+const NovaCore.MultiTenancy.MultiTenancyDbContext.Schema = "tenancy" -> string!
+const NovaCore.MultiTenancy.MultiTenancyHostingExtensions.TenantRouteValue = "tenant" -> string!
+NovaCore.MultiTenancy.MultiTenancyDbContext
+NovaCore.MultiTenancy.MultiTenancyDbContext.MultiTenancyDbContext(Microsoft.EntityFrameworkCore.DbContextOptions<NovaCore.MultiTenancy.MultiTenancyDbContext!>! options) -> void
+NovaCore.MultiTenancy.MultiTenancyHostingExtensions
+NovaCore.MultiTenancy.TenantDirectory
+NovaCore.MultiTenancy.TenantDirectory.AddMemberAsync(System.Guid tenantId, string! subject, System.Collections.Generic.IReadOnlyCollection<string!>! roles, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<NovaCore.Abstractions.Results.Result!>!
+NovaCore.MultiTenancy.TenantDirectory.CreateAsync(string! name, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Guid>!
+NovaCore.MultiTenancy.TenantDirectory.SuspendAsync(System.Guid tenantId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<NovaCore.Abstractions.Results.Result!>!
+NovaCore.MultiTenancy.TenantDirectory.TenantDirectory(NovaCore.MultiTenancy.MultiTenancyDbContext! store, Microsoft.Extensions.Caching.Hybrid.HybridCache! cache, System.TimeProvider! timeProvider) -> void
+NovaCore.MultiTenancy.TenantStatus
+NovaCore.MultiTenancy.TenantStatus.Active = 0 -> NovaCore.MultiTenancy.TenantStatus
+NovaCore.MultiTenancy.TenantStatus.Suspended = 1 -> NovaCore.MultiTenancy.TenantStatus
+static NovaCore.MultiTenancy.MultiTenancyHostingExtensions.AddCoreMultiTenancy(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
+static NovaCore.MultiTenancy.MultiTenancyHostingExtensions.AddCoreMultiTenancy(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder, System.Func<Microsoft.AspNetCore.Http.HttpContext!, string?>! tenantOf) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
