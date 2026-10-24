@@ -36,8 +36,8 @@ regexes = [
 ]
 
 [[allowlists]]
-description = "The test token above, quoted in the plan notes (docs/plan/PROGRESS.md, F6a.5)"
+description = "The test token above, quoted in the plan notes (F6a.5; moved to docs/plan/PROGRESS-ARSIV.md by D-076)"
 condition = "AND"
-paths = ['''^docs/plan/PROGRESS\.md$''']
+paths = ['''^docs/plan/PROGRESS(-ARSIV)?\.md$''']
 regexTarget = "secret"
 regexes = ['''^bm90LWEtdG9rZW4$''']
