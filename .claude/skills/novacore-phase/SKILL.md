@@ -66,7 +66,7 @@ Her adım için aynı döngü:
 
 1. **Başlat:** PROGRESS'te adıma "devam ediyor" notu düş.
 2. **Test:** Adım bir hata düzeltmesi veya yeni davranış içeriyorsa önce testi yaz ve kırmızı olduğunu gör.
-3. **Uygula:** Yalnızca o adımın kapsamı. Aynı dosyada yan bir şey gözüne çarparsa dokunma, §4'ü uygula.
+3. **Uygula:** Yalnızca o adımın kapsamı. Aynı dosyada yan bir şey gözüne çarparsa dokunma, §4'ü uygula. Bir sembole dokunmadan önce çağıranlarını LSP'yle bul (`findReferences`, `incomingCalls`, `goToImplementation`); metin, yapılandırma ve şablon içeriği için grep (D-079). Adımın konusuna uyan .NET skill'ini (`dotnet-data`, `dotnet-test`, `dotnet-aspnetcore`, `dotnet`) kontrol listesi olarak aç; DECISIONS, PLAN ya da CLAUDE.md ile çelişirse onlar geçerlidir.
 4. **Doğrula:** `dotnet build NovaCore.slnx` ve `dotnet test NovaCore.slnx`. Paket değiştiyse `dotnet restore NovaCore.slnx --force` da çalıştır. Kırmızıysa düzelt. Düzeltme kapsam dışına taşıyorsa §4. Ardından adımın değişikliklerini CodeRabbit CLI'a incelet (D-067): `coderabbit review --agent --uncommitted --include-untracked`. Kapsam içi gerçek bulguyu düzelt ve build ile testleri (paket değiştiyse restore'u da) commit'ten önce yeniden çalıştır, kapsam dışını §4'e göre "Sonraya bırakılanlar"a yaz, yanlış pozitifi tek cümleyle commit notuna ekle. CLI kurulu ya da oturum açık değilse (`coderabbit auth status`) ya da rate limit'e takılırsa adımı bekletme: PROGRESS notuna "CLI incelemesi yok: <neden>" yaz, PR incelemesi yine yakalar.
 5. **Commit:** `faz<id>(<adım-id>): <özet>`, sonuna oturumun attribution satırını ekle. Sadece o adımın dosyalarını stage'le (`git add <yol>`); `git add -A` kullanma.
 6. **Kaydet:** PROGRESS'te `- [x] <adım-id> (<kısa-hash>): <kısa not>`.
@@ -87,9 +87,10 @@ Faz tek oturuma sığmayacak kadar büyükse bir adım sınırında dur. PROGRES
 
 **Ne yapılır:**
 1. **Tahminle ilerleme.** Uydurma bir API, paket sürümü ya da davranış, sessiz bir hatadan daha pahalıdır.
-2. **Araştır.** Birincil kaynağa git:
-   - Microsoft teknolojileri için Microsoft Learn MCP: önce `microsoft_docs_search`, sayfa önemliyse `microsoft_docs_fetch`, kod örneği için `microsoft_code_sample_search`. Araçlar yüklü değilse ToolSearch ile yükle.
-   - Diğer paketler için resmi repo veya doküman (WebFetch).
+2. **Araştır.** Birincil kaynağa git; kaynağı konu seçer (D-079):
+   - Microsoft teknolojileri için yalnızca Microsoft Learn MCP: önce `microsoft_docs_search`, sayfa önemliyse `microsoft_docs_fetch`, kod örneği için `microsoft_code_sample_search`. Context7'ye gitme. Araçlar yüklü değilse ToolSearch ile yükle.
+   - Üçüncü taraf paketler için konuyu Context7 ile bul, R-kaydına paketin resmî repo ya da doküman URL'sini yaz (Context7'yi değil). Context7 yoksa ya da oturumu açık değilse resmî repoyu WebFetch ile oku.
+   - Paket sürümü, güvenlik açığı ve tedarik zinciri için NuGet MCP'nin okuyan araçları: `get_latest_package_version`, `get_package_context`, `review_supply_chain_security`. Paket değiştiren araçlarını kullanma; sürüm `Directory.Packages.props`'ta değişir.
    - SDK davranışı için SDK'nın kendi dosyalarına ve `dotnet msbuild -pp`/`-getProperty` çıktısına bak (R-040 böyle bulundu).
    - Kaynak bulamazsan bunu açıkça söyle.
    - Konu başka bir fazsa o fazın PLAN bölümünü ve PROGRESS'teki durumunu oku.

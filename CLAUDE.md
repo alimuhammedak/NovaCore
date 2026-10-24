@@ -27,9 +27,12 @@ completed phases update this file.
   anything (design, naming, even a color), offer 2–3 genuinely different options with trade-offs and a
   project-specific recommendation. "Best practice"/"commonly done" is never a reason on its own. Never
   re-propose a rejected approach under a new name; say "I propose reopening Y-xx" instead.
-- **Make technical decisions yourself (DECISIONS D-016).** Don't guess: research the primary source
-  (Microsoft Learn MCP: `microsoft_docs_search` / `microsoft_docs_fetch` / `microsoft_code_sample_search`;
-  SDK files and `dotnet msbuild -pp`). If Microsoft's docs say how to do it, do it that way. If they don't,
+- **Make technical decisions yourself (DECISIONS D-016).** Don't guess: research the primary source, chosen by
+  topic (D-079). Microsoft technology: Microsoft Learn MCP only (`microsoft_docs_search` / `microsoft_docs_fetch` /
+  `microsoft_code_sample_search`), plus SDK files and `dotnet msbuild -pp`. A third-party package: find it with
+  Context7, then cite the package's official repo or docs in the R-entry, not Context7 (WebFetch the repo when
+  Context7 is unavailable). Package versions, advisories and supply chain: NuGet MCP's read-only tools, never its
+  update tools. If Microsoft's docs say how to do it, do it that way. If they don't,
   weigh cost (implementation + maintenance + risk) and pick the sensible option. Then log it (RESEARCH R-entry,
   a new DECISIONS D-entry if it lasts, PROGRESS note) and report it; don't ask. Writing plan docs needs no
   permission.
@@ -50,10 +53,15 @@ completed phases update this file.
 
 ### Working habits (from the Ponytail skill, DECISIONS D-048 (4))
 
-- **Before an edit, list every place it must reach**: the callers (grep them), the tests and fixtures, the
+- **Use the .NET tooling while coding (D-079)**: find a symbol's callers with the C# LSP (`findReferences`,
+  `incomingCalls`, `goToImplementation`) and keep grep for text, configuration and the uncompiled template content.
+  Open the matching .NET skill (`dotnet-data`, `dotnet-test`, `dotnet-aspnetcore`, `dotnet`) as a checklist;
+  DECISIONS, PLAN and this file win over a skill. The `dotnet-test` agents only run self-contained audits (test gaps,
+  test quality), never phase code.
+- **Before an edit, list every place it must reach**: the callers (LSP, see above), the tests and fixtures, the
   configuration, the docs that describe it, and the template's copies under `src/Templates/.../content`, which this
   repository doesn't compile (only `bash eng/template-smoke.sh` does).
-- **A bug fix starts with the callers**: grep every caller of the code you touch and fix the root cause once, in the
+- **A bug fix starts with the callers**: find every caller of the code you touch (LSP, grep for text) and fix the root cause once, in the
   shared code, instead of at each call site.
 - **End a report with what you skipped or did not check**, and any risk the user must know, in a line or two.
 
