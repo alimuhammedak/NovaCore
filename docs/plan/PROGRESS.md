@@ -23,7 +23,7 @@
 | 6b | ✅ tamam | `faz/6b-kimlik-guvenlik-siniri` | 2026-10-21 | 2026-10-22 | 2026-10-22 (kullanıcı onayı, `--no-ff`, `4909fe4`; push 2026-10-22, kullanıcı isteği) |
 | 6c | ✅ tamam | `faz/6c-test-altyapisi` | 2026-10-22 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `64b3ab6`; push 2026-10-23, kullanıcı isteği) |
 | 6d | ✅ tamam | `faz/6d-analizor-sikilastirma` | 2026-10-23 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `231b05f`; push 2026-10-23, kullanıcı isteği) |
-| 7a | ✅ tamam | `faz/7a-veritabani-ozgurlugu` | 2026-10-23 | 2026-10-24 | PR bekliyor (merge kullanıcı onayıyla) |
+| 7a | ✅ tamam | `faz/7a-veritabani-ozgurlugu` | 2026-10-23 | 2026-10-24 | 2026-10-24 (kullanıcı onayı, PR #11 merge commit'i `cf895d8`) |
 | 7b | ⏳ başlamadı | | | | |
 | 6e | ⏳ başlamadı | | | | |
 
@@ -1384,7 +1384,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) üzerine yazılır. Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-24, Faz 7a: Veritabanı özgürlüğü (✅ tamam; PR açıldı, merge kullanıcı onayı bekliyor).** Branch `faz/7a-veritabani-ozgurlugu`, her adımdan sonra push edildi (Q-59). F7a.1–F7a.5 önceki oturumda; bu oturumda faz sonu: hook mesajı commit'i (kullanıcının değişikliği, onun seçimiyle), doğrulama baştan (Docker'la, 410/410, smoke dört bileşimde), coverage baseline satır %96,6, code review (2 düzeltme, 1 geri alınan, 2 Sonraya bırakılanlar'a) ve PR. Ayrıntı: Faz 7a adımlarının "Faz sonu" satırı.
+**2026-10-24, Faz 7a: Veritabanı özgürlüğü (✅ tamam, PR #11 ile `main`'e merge edildi).** Kullanıcı onayı: "PR #11'i merge commit'le main'e al"; merge `cf895d8` (`gh pr merge 11 --merge`), yerel `main` `--ff-only` ile güncellendi. Merge anında `1816cd2`'de `build-and-test` (iki koşu) ve CodeRabbit hâlâ koşuyordu, diğer bütün kontroller (template-smoke, CodeQL, api-contract, secret-scan, workflow-lint) yeşildi; `f8c637f`'ten sonraki commit'ler yalnız belge ve yapılandırma (`CLAUDE.md`, `README.md`, `.coderabbit.yaml`, PROGRESS) ve `f8c637f`'te `build-and-test` yeşildi. main'deki CI sonucu henüz kontrol edilmedi. Branch `faz/7a-veritabani-ozgurlugu`, her adımdan sonra push edildi (Q-59). F7a.1–F7a.5 önceki oturumda; bu oturumda faz sonu: hook mesajı commit'i (kullanıcının değişikliği, onun seçimiyle), doğrulama baştan (Docker'la, 410/410, smoke dört bileşimde), coverage baseline satır %96,6, code review (2 düzeltme, 1 geri alınan, 2 Sonraya bırakılanlar'a) ve PR. Ayrıntı: Faz 7a adımlarının "Faz sonu" satırı.
 
 - **Yapılanlar:** lisans kapısı adlı sağlayıcı istisnasını tam paket adıyla tanıyor, şablonun ürettiği projede de bir kapı var (F7a.1); sağlayıcıyı host seçiyor (`AddModuleDatabase`), modüller sağlayıcıya bağlanmıyor, migration'lar ve design-time factory'ler host'ta (F7a.2); paketler PostgreSQL'de de test ediliyor, aynı senaryolar iki sağlayıcıda (F7a.3); şablonda `--db SqlServer|PostgreSql` (F7a.4); belgeler (F7a.5).
 - **Kararlar:** D-072 (lisans istisnası tam adla), D-073 (`AddModuleDatabase` + `AddModuleDbContext(schema, ...)`, migration'lar ve design-time factory'ler host'ta), D-074 (PG test katmanı, ortak senaryolar), D-075 (şablon `--db`); R-125…R-128; Q-59. Faz sonunda yeni D/R kaydı yok.
