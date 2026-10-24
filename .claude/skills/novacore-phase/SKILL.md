@@ -74,7 +74,7 @@ Her adım için aynı döngü:
 
 Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'yi ve PLAN'daki faz bölümünü **yeniden oku**. Kapsam için konuşma özetine güvenme.
 
-**Oturum bütçesi (D-076):** bir oturumda en fazla 3 adım commit'le; adımlar büyükse ya da uzun bir hata ayıklama olduysa daha önce dur. Model her araç çağrısında bütün bağlamı yeniden okur, bu yüzden uzayan oturumun her adımı bir öncekinden pahalıdır ve kullanıcının kotasını eritir. Durunca PROGRESS'e devir notu yaz (nerede kalındı, sıradaki adım, yarım kalan bir şey varsa ne), fazı `⏸ duraklatıldı` yap, commit'le ve kullanıcıya yeni bir oturumda aynı komutla devam etmesini söyle. Yeni oturum §1'deki "Devam eden faz" kuralıyla sürer, plan yeniden onaylatılmaz.
+**Oturum bütçesi (D-076):** bir oturumda en fazla 3 adım commit'le; adımlar büyükse ya da uzun bir hata ayıklama olduysa daha önce dur. Model her araç çağrısında bütün bağlamı yeniden okur, bu yüzden uzayan oturumun her adımı bir öncekinden pahalıdır ve kullanıcının kotasını eritir. Durunca PROGRESS'e devir notu yaz (nerede kalındı, sıradaki adım, yarım kalan bir şey varsa ne), fazı `⏸ duraklatıldı` yap ve commit'le. Mesajının son satırı kopyalanacak komut olsun: "Devam: `/clear`, ardından `/novacore-phase <id>`" (`/clear` bağlamı sıfırlar; maliyet açısından yeni oturumla aynıdır). Yeni oturum §1'deki "Devam eden faz" kuralıyla sürer, plan yeniden onaylatılmaz.
 
 ## 4. Sapma protokolü
 
