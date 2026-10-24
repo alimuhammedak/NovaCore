@@ -71,45 +71,56 @@ public abstract class OutboxScenarios<TFactory>(TFactory factory) : IClassFixtur
             await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
     }
 
-    // A message processed at processedOnUtc, with one handler's record, as an earlier pass would have left it.
-    private async Task<Guid> AddProcessedMessageAsync(DateTimeOffset processedOnUtc)
+    // A message processed at processedOnUtc, with one handler's record, as an earlier pass would have left it. Returns
+    // the message's key, which its records keep after the message is gone. One transaction, run through the context's
+    // execution strategy (SQL Server's retries): the dispatcher's sweep would otherwise delete an expired message before
+    // its record is written.
+    private async Task<long> AddProcessedMessageAsync(DateTimeOffset processedOnUtc)
     {
-        var eventId = Guid.NewGuid();
         await using var scope = Factory.Services.CreateAsyncScope();
         var catalog = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
         var sql = new PortableSql(catalog);
+        var cancellation = TestContext.Current.CancellationToken;
 
-        var message = $"INSERT INTO {sql.Table("outbox_messages")} ({sql.Column("EventId")}, {sql.Column("Type")}, " +
-                      $"{sql.Column("Content")}, {sql.Column("OccurredOnUtc")}, {sql.Column("ProcessedOnUtc")}, " +
-                      $"{sql.Column("Attempts")}) VALUES ({{0}}, {{1}}, {{2}}, {{3}}, {{3}}, 0)";
-        await catalog.Database.ExecuteSqlRawAsync(message,
-            [eventId, "System.String, System.Private.CoreLib", "\"text\"", processedOnUtc],
-            TestContext.Current.CancellationToken);
+        return await catalog.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            var eventId = Guid.NewGuid();
+            await using var transaction = await catalog.Database.BeginTransactionAsync(cancellation);
 
-        var record = $"INSERT INTO {sql.Table("outbox_consumers")} ({sql.Column("MessageId")}, {sql.Column("Handler")}, " +
-                     $"{sql.Column("ProcessedOnUtc")}) SELECT {sql.Column("Id")}, {{1}}, {{2}} " +
-                     $"FROM {sql.Table("outbox_messages")} WHERE {sql.Column("EventId")} = {{0}}";
-        await catalog.Database.ExecuteSqlRawAsync(record,
-            [eventId, "Sample.Handler", processedOnUtc], TestContext.Current.CancellationToken);
-        return eventId;
+            var message = $"INSERT INTO {sql.Table("outbox_messages")} ({sql.Column("EventId")}, {sql.Column("Type")}, " +
+                          $"{sql.Column("Content")}, {sql.Column("OccurredOnUtc")}, {sql.Column("ProcessedOnUtc")}, " +
+                          $"{sql.Column("Attempts")}) VALUES ({{0}}, {{1}}, {{2}}, {{3}}, {{3}}, 0)";
+            await catalog.Database.ExecuteSqlRawAsync(message,
+                [eventId, "System.String, System.Private.CoreLib", "\"text\"", processedOnUtc], cancellation);
+
+            var key = $"SELECT {sql.Column("Id")} AS {sql.Column("Value")} FROM {sql.Table("outbox_messages")} " +
+                      $"WHERE {sql.Column("EventId")} = {{0}}";
+            var messageId = await catalog.Database.SqlQueryRaw<long>(key, eventId).SingleAsync(cancellation);
+
+            var record = $"INSERT INTO {sql.Table("outbox_consumers")} ({sql.Column("MessageId")}, " +
+                         $"{sql.Column("Handler")}, {sql.Column("ProcessedOnUtc")}) VALUES ({{0}}, {{1}}, {{2}})";
+            await catalog.Database.ExecuteSqlRawAsync(record, [messageId, "Sample.Handler", processedOnUtc], cancellation);
+
+            await transaction.CommitAsync(cancellation);
+            return messageId;
+        });
     }
 
-    // The handler records of the message with eventId (none once it is deleted).
-    private Task<int> RecordsAsync(Guid eventId) => CountAsync(sql =>
-        $"FROM {sql.Table("outbox_consumers")} c JOIN {sql.Table("outbox_messages")} m " +
-        $"ON m.{sql.Column("Id")} = c.{sql.Column("MessageId")} WHERE m.{sql.Column("EventId")} = {{0}}", eventId);
+    // The handler records of the message, read on their own: a record left without its message still counts.
+    private Task<int> RecordsAsync(long messageId) => CountAsync(sql =>
+        $"FROM {sql.Table("outbox_consumers")} WHERE {sql.Column("MessageId")} = {{0}}", messageId);
 
-    private Task<int> MessagesAsync(Guid eventId) => CountAsync(sql =>
-        $"FROM {sql.Table("outbox_messages")} WHERE {sql.Column("EventId")} = {{0}}", eventId);
+    private Task<int> MessagesAsync(long messageId) => CountAsync(sql =>
+        $"FROM {sql.Table("outbox_messages")} WHERE {sql.Column("Id")} = {{0}}", messageId);
 
     // COUNT(*) is an int on SQL Server and a bigint on PostgreSQL; INTEGER is both servers' name for an int.
-    private async Task<int> CountAsync(Func<PortableSql, string> from, Guid eventId)
+    private async Task<int> CountAsync(Func<PortableSql, string> from, long messageId)
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var catalog = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
         var sql = new PortableSql(catalog);
         var query = $"SELECT CAST(COUNT(*) AS INTEGER) AS {sql.Column("Value")} {from(sql)}";
-        return await catalog.Database.SqlQueryRaw<int>(query, eventId).SingleAsync(TestContext.Current.CancellationToken);
+        return await catalog.Database.SqlQueryRaw<int>(query, messageId).SingleAsync(TestContext.Current.CancellationToken);
     }
 
     private sealed record CreatedPayment(Guid PaymentId);
