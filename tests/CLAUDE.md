@@ -122,6 +122,8 @@ packages are tested on SQL Server and PostgreSQL (D-068, D-074):
   over HTTP raises `NoteAdded`; the host's outbox dispatcher runs its handler on the real clock (a pass every five
   seconds), and `TenancyFixture.HandledAsync(text)` waits for what it saw (its tenant, the tenant's notes, its trace). A
   test that needs the request's trace sends a `traceparent` and listens to that trace only: listeners are process-wide.
+  A `Reminder` points at a note through an optional relationship, which the database doesn't cascade: the tenant
+  deletion scenario shows that a dependent goes first. A deleted tenant is gone, so a deletion test opens its own.
   Each test works with tenants of its own (`Guid.NewGuid()`), so a class shares one database without resets. `TenantConvention`
   is the convention test: an entity with a `TenantId` column must carry the tenant filter (`ModuleRegistrationTests`
   runs it on the Api host's contexts). `TenantPermissionTests` (under `IdentityServer/`) runs the identity provider and

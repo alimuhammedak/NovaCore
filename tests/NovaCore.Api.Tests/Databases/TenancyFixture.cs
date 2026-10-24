@@ -157,6 +157,17 @@ public abstract class TenancyFixture : IAsyncLifetime
         return handling;
     }
 
+    /// <summary>The tenant of each message in the notes context's outbox; skips the test without Docker.</summary>
+    public Task<IReadOnlyList<Guid?>> OutboxTenantsAsync() =>
+        InScopeAsync<IReadOnlyList<Guid?>>(tenant: null, async notes =>
+        {
+            // The outbox's types are the package's own; its table is read with SQL every provider runs. Only names, quoted
+            // by the provider, go into the text.
+            var sql = new PortableSql(notes);
+            var query = $"SELECT {sql.Column("TenantId")} AS {sql.Column("Value")} FROM {sql.Table("outbox_messages")}";
+            return await notes.Database.SqlQueryRaw<Guid?>(query).ToListAsync(TestContext.Current.CancellationToken);
+        });
+
     // A module's tenant endpoints: the notes of the request's tenant, and what the caller may do there.
     private static void MapNotes(WebApplication app)
     {
@@ -211,6 +222,8 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options) : D
 
     public DbSet<Note> Notes => Set<Note>();
 
+    public DbSet<Reminder> Reminders => Set<Reminder>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -222,7 +235,31 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options) : D
             note.Property(n => n.Text).HasMaxLength(200);
             note.HasQueryFilter(Unarchived, n => !n.Archived);
         });
+        modelBuilder.Entity<Reminder>(reminder =>
+        {
+            reminder.ToTable("reminders");
+            reminder.Ignore(r => r.DomainEvents);
+            reminder.HasOne<Note>().WithMany().HasForeignKey(r => r.NoteId);
+        });
     }
+}
+
+/// <summary>
+/// A reminder of one tenant, about one of its notes: an optional relationship, which the database doesn't cascade, so a
+/// note goes only after its reminders. Its name sorts after <see cref="Note"/>'s, the order of the model's entity types.
+/// </summary>
+public sealed class Reminder : Entity<Guid>, ITenantEntity
+{
+    public Reminder(Guid noteId)
+        : base(Guid.CreateVersion7()) => NoteId = noteId;
+
+    private Reminder()
+    {
+    }
+
+    public Guid TenantId { get; set; }
+
+    public Guid? NoteId { get; private set; }
 }
 
 /// <summary>A note of one tenant.</summary>

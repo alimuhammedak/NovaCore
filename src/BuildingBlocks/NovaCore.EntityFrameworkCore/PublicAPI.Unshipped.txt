@@ -3,6 +3,8 @@ const NovaCore.EntityFrameworkCore.MultiTenancy.TenantQueryFilter.Name = "NovaCo
 NovaCore.EntityFrameworkCore.Messaging.OutboxInterceptor
 NovaCore.EntityFrameworkCore.Messaging.OutboxInterceptor.OutboxInterceptor() -> void
 NovaCore.EntityFrameworkCore.Messaging.OutboxModelBuilderExtensions
+NovaCore.EntityFrameworkCore.MultiTenancy.TenantData
+NovaCore.EntityFrameworkCore.MultiTenancy.TenantData.DeleteAsync(System.Guid tenantId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 NovaCore.EntityFrameworkCore.MultiTenancy.TenantQueryFilter
 NovaCore.EntityFrameworkCore.Persistence.AuditableEntityInterceptor
 NovaCore.EntityFrameworkCore.Persistence.AuditableEntityInterceptor.AuditableEntityInterceptor(NovaCore.Abstractions.Identity.ICurrentUser! currentUser, System.TimeProvider! timeProvider) -> void

@@ -149,7 +149,8 @@ targets a **local SQL Server via Windows auth** (`appsettings.json`).
 
 - **Dependency direction (one way):** `Api` → `Modules.*` → `NovaCore.AspNetCore` / `NovaCore.EntityFrameworkCore`
   → `NovaCore.Abstractions` → BCL. AspNetCore and EntityFrameworkCore never reference each other; add-ons reference
-  at most AspNetCore/Abstractions. Enforced by `PackageDependencyTests`.
+  the core packages only, never another add-on (`NovaCore.MultiTenancy` uses both AspNetCore and EntityFrameworkCore,
+  D-076 (2)). Enforced by `PackageDependencyTests`.
 
 - **The host composes everything explicitly** (`src/Api/NovaCore.Api/Program.cs`): the add-ons (`AddCoreLogging`,
   `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`), the identity provider

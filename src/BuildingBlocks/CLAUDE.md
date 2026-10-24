@@ -44,14 +44,18 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   store `DateTimeOffset` as ticks so they can run it too. It opens no transaction, so every query and write is a retriable unit of the context's execution strategy.
   The interval, batch size, 10 attempts and the retention are constants: no consumer needs them configurable yet (Y-19).
 
-**Add-ons** (optional, one third-party library each; they may reference AspNetCore/Abstractions only):
+**Add-ons** (optional; they reference the core packages only, never another add-on, D-076 (2)):
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`: `ILogger` logs with their
 message and scopes, metrics and traces, all over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; a Serilog host keeps
-its logs in Serilog, which doesn't write to other providers), `NovaCore.Scalar`
+its logs in Serilog, which doesn't write to other providers; the outbox handlers' spans by the source name
+`NovaCore.EntityFrameworkCore`), `NovaCore.Scalar`
 (`MapCoreScalar`), `NovaCore.Identity.OpenIddict` (`AddCoreIdentityServer`: an OpenID Connect provider on ASP.NET Core
-Identity + OpenIddict, D-026). A new third-party integration becomes a new add-on, not a dependency of the core.
+Identity + OpenIddict, D-026), `NovaCore.MultiTenancy` (`AddCoreMultiTenancy`: tenants, memberships, their roles and the
+life cycle, with no third-party library; it uses AspNetCore for the tenant resolution and EntityFrameworkCore for
+`TenantData`, which deletes a closed tenant's rows from every module context). A new third-party integration becomes a
+new add-on, not a dependency of the core.
 
-`NovaCore.Identity.OpenIddict` owns `IdentityServerDbContext` but no migrations: it can't reference
+`NovaCore.Identity.OpenIddict` owns `IdentityServerDbContext` but no migrations: it doesn't reference
 NovaCore.EntityFrameworkCore, so the host registers the context with `AddModuleDbContext` (its database, provider and
 `MigrationsAssembly` from `AddModuleDatabase`, like every module context's) and keeps the migrations (R-060, D-073).
 No package references a database provider (D-068). Its issuer is `Jwt:Authority` and its access tokens are unencrypted signed JWTs, so

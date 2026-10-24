@@ -101,6 +101,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in a consumer span of their own, `process <event type>`, a child of the saving activity and linked to it.
   `AddCoreObservability` collects those spans (source `NovaCore.EntityFrameworkCore`). **Upgrade:** a module context with
   an outbox needs a migration for the two new nullable columns of `outbox_messages` (`TenantId`, `TraceParent`).
+- Multi-tenancy add-on: the tenant life cycle. `TenantDirectory.CloseAsync` offboards a tenant (`TenantStatus.Closed`):
+  its members lose access as with a suspension, its data is kept, and `ActivateAsync` reopens it, as it does a suspended
+  one; a closed tenant can't be suspended (`tenant.closed`). `DeleteAsync` deletes a closed tenant (`tenant.not_closed`
+  otherwise): its rows in every module context, the outbox messages its scopes saved, its memberships and the tenant.
+  `ClosedBeforeAsync(cutoff)` lists the tenants closed before a time, for the product's own retention: NovaCore
+  schedules no deletion. The add-on now references `NovaCore.EntityFrameworkCore`.
+- `TenantData` (`NovaCore.EntityFrameworkCore`): deletes a tenant's rows from every module context, a transaction per
+  context, a dependent before its principal, and the tenant's outbox messages.
 
 ### Changed
 

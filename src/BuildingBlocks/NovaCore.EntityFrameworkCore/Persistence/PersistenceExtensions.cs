@@ -87,7 +87,8 @@ public static class PersistenceExtensions
     /// a query reads only the scope's tenant's rows (<see cref="TenantQueryFilter"/>), none without a tenant; a new row
     /// gets the scope's tenant; a save that would write another tenant's row, move a row to another tenant or write a
     /// tenant row without a tenant fails; and <c>IgnoreQueryFilters()</c> without names fails on a context that has
-    /// tenant entities. A context without tenant entities is unaffected.
+    /// tenant entities. A context without tenant entities is unaffected. <see cref="TenantData"/> (registered here)
+    /// deletes a tenant's rows from every module context.
     /// Also registers <see cref="AuditableEntityInterceptor"/> (and the <see cref="TimeProvider"/> it stamps with), which
     /// module contexts add to their options, so the context resolves whether or not the host has called
     /// <see cref="AddCorePersistence"/> yet.
@@ -130,6 +131,9 @@ public static class PersistenceExtensions
         });
         services.AddSingleton(new ModuleDbContextDescriptor(typeof(TContext)));
         services.TryAddScoped<TenantContext>();
+        services.TryAddSingleton(provider => new TenantData(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            provider.GetServices<ModuleDbContextDescriptor>()));
         services.TryAddSingleton<TenantWriteGuard>();
         services.TryAddSingleton<OutboxInterceptor>();
         services.TryAddScoped<AuditableEntityInterceptor>();

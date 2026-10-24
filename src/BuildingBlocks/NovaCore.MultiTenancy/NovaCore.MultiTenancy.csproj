@@ -1,14 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    NovaCore.MultiTenancy: optional add-on. The tenants and their members, and the core's tenant resolution from them:
-    which tenant a request names and whether the caller may work in it (docs/plan/DECISIONS.md D-069, D-076). The host
-    picks the database provider and owns the migrations of its store.
+    NovaCore.MultiTenancy: optional add-on. The tenants, their members and their life cycle, and the core's tenant
+    resolution from them: which tenant a request names and whether the caller may work in it (docs/plan/DECISIONS.md
+    D-069, D-076). The host picks the database provider and owns the migrations of its store.
   -->
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>NovaCore add-on: tenants, memberships and the per-request tenant resolution of a multi-tenant host.</Description>
+    <Description>NovaCore add-on: tenants, memberships, the tenant life cycle and the per-request tenant resolution of a multi-tenant host.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NovaCore.AspNetCore\NovaCore.AspNetCore.csproj" />
+    <!-- A tenant's deletion reaches every module context (TenantData, D-076 (2)). -->
+    <ProjectReference Include="..\NovaCore.EntityFrameworkCore\NovaCore.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
 </Project>

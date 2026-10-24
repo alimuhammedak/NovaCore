@@ -3,27 +3,35 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
 using NovaCore.Abstractions.Results;
 using NovaCore.AspNetCore.Authorization;
+using NovaCore.EntityFrameworkCore.MultiTenancy;
 
 namespace NovaCore.MultiTenancy;
 
 /// <summary>
-/// The tenants and their members: what a product's own endpoints build on (who may open a tenant, how members are
-/// invited, are the product's). A change that narrows access takes effect on the next request on this server: it drops
+/// The tenants, their members and their life cycle (active, suspended, closed, deleted): what a product's own endpoints
+/// build on (who may open a tenant, how members are invited, how long a closed tenant's data is kept, are the
+/// product's). A change of a tenant's access takes effect on the next request on this server: it drops
 /// the cached decisions (<see cref="PermissionCacheExtensions"/>); another server's memory keeps its own until
 /// <c>Cache:PermissionExpiration</c> passes. Resolve it from DI (scoped; <c>AddCoreMultiTenancy</c>).
 /// </summary>
 public sealed class TenantDirectory
 {
     private readonly MultiTenancyDbContext store;
+    private readonly TenantData tenantData;
     private readonly HybridCache cache;
     private readonly IOptions<MultiTenancyOptions> options;
     private readonly TimeProvider timeProvider;
 
     // Internal, as the options are: DI builds it through a factory (AddCoreMultiTenancy).
     internal TenantDirectory(
-        MultiTenancyDbContext store, HybridCache cache, IOptions<MultiTenancyOptions> options, TimeProvider timeProvider)
+        MultiTenancyDbContext store,
+        TenantData tenantData,
+        HybridCache cache,
+        IOptions<MultiTenancyOptions> options,
+        TimeProvider timeProvider)
     {
         this.store = store;
+        this.tenantData = tenantData;
         this.cache = cache;
         this.options = options;
         this.timeProvider = timeProvider;
@@ -131,20 +139,99 @@ public sealed class TenantDirectory
 
     /// <summary>
     /// Suspends an active tenant: it is no longer resolved for a request, so its members lose all access to it, until
-    /// it is reactivated. A suspended tenant stays suspended.
+    /// it is reactivated (<see cref="ActivateAsync"/>). A suspended tenant stays suspended; a closed one stays closed.
     /// </summary>
     /// <param name="tenantId">The tenant.</param>
     /// <param name="cancellationToken">Cancels the save.</param>
-    /// <returns>Success, or <c>tenant.not_found</c>.</returns>
-    public Task<Result> SuspendAsync(Guid tenantId, CancellationToken cancellationToken) =>
-        ChangeStatusAsync(tenantId, TenantStatus.Suspended, cancellationToken);
-
-    private async Task<Result> ChangeStatusAsync(Guid tenantId, TenantStatus status, CancellationToken cancellationToken)
+    /// <returns>Success, <c>tenant.not_found</c>, or <c>tenant.closed</c>.</returns>
+    public async Task<Result> SuspendAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         var tenant = await store.Tenants.FindAsync([tenantId], cancellationToken).ConfigureAwait(false);
         if (tenant is null)
             return NotFound(tenantId);
 
+        // Closing is the later stage: a closed tenant's retention runs from its closing, which a suspension would hide.
+        if (tenant.Status == TenantStatus.Closed)
+            return Result.Failure(Error.Conflict("tenant.closed", $"Tenant '{tenantId}' is closed; reopen it first."));
+
+        return await ChangeStatusAsync(tenant, TenantStatus.Suspended, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Closes (offboards) a tenant, active or suspended: its members lose all access to it, as with a suspension, and its
+    /// data is kept until <see cref="DeleteAsync"/> deletes it, after a retention the product chooses
+    /// (<see cref="ClosedBeforeAsync"/>). Until then it can be reopened (<see cref="ActivateAsync"/>).
+    /// </summary>
+    /// <param name="tenantId">The tenant.</param>
+    /// <param name="cancellationToken">Cancels the save.</param>
+    /// <returns>Success, or <c>tenant.not_found</c>.</returns>
+    public async Task<Result> CloseAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var tenant = await store.Tenants.FindAsync([tenantId], cancellationToken).ConfigureAwait(false);
+        return tenant is null
+            ? NotFound(tenantId)
+            : await ChangeStatusAsync(tenant, TenantStatus.Closed, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Makes a suspended or closed tenant active again: its members work in it from their next request on this server,
+    /// with its data as it was. An active tenant stays active.
+    /// </summary>
+    /// <param name="tenantId">The tenant.</param>
+    /// <param name="cancellationToken">Cancels the save.</param>
+    /// <returns>Success, or <c>tenant.not_found</c>.</returns>
+    public async Task<Result> ActivateAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var tenant = await store.Tenants.FindAsync([tenantId], cancellationToken).ConfigureAwait(false);
+        return tenant is null
+            ? NotFound(tenantId)
+            : await ChangeStatusAsync(tenant, TenantStatus.Active, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The tenants closed before <paramref name="cutoff"/>, the first closed first: the ones whose retention has passed
+    /// when it is the time of the call minus the retention. NovaCore schedules no deletion; the product runs it.
+    /// </summary>
+    /// <param name="cutoff">The latest closing time to include, exclusive.</param>
+    /// <param name="cancellationToken">Cancels the query.</param>
+    /// <returns>The tenants' ids.</returns>
+    public async Task<IReadOnlyList<Guid>> ClosedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken) =>
+        await store.Tenants
+            .Where(tenant => tenant.Status == TenantStatus.Closed && tenant.StatusChangedOnUtc < cutoff)
+            .OrderBy(tenant => tenant.StatusChangedOnUtc)
+            .Select(tenant => tenant.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <summary>
+    /// Deletes a closed tenant: its rows in every module context and the outbox messages its scopes saved
+    /// (<see cref="TenantData"/>), then its memberships and the tenant itself. It can't be reopened afterwards. A call
+    /// that failed half way leaves the tenant closed with the rest of its data; repeat it.
+    /// </summary>
+    /// <param name="tenantId">The tenant.</param>
+    /// <param name="cancellationToken">Cancels the deletion.</param>
+    /// <returns>Success, <c>tenant.not_found</c>, or <c>tenant.not_closed</c>.</returns>
+    public async Task<Result> DeleteAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var tenant = await store.Tenants.FindAsync([tenantId], cancellationToken).ConfigureAwait(false);
+        if (tenant is null)
+            return NotFound(tenantId);
+
+        if (tenant.Status != TenantStatus.Closed)
+            return Result.Failure(Error.Conflict(
+                "tenant.not_closed", $"Tenant '{tenantId}' is {tenant.Status}; only a closed tenant is deleted."));
+
+        await tenantData.DeleteAsync(tenantId, cancellationToken).ConfigureAwait(false);
+
+        // The tenant last, its memberships with it (cascade): until then a failed deletion can be repeated.
+        store.Tenants.Remove(tenant);
+        await store.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await cache.RemoveTenantPermissionsAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    private async Task<Result> ChangeStatusAsync(Tenant tenant, TenantStatus status, CancellationToken cancellationToken)
+    {
         if (tenant.Status != status)
         {
             tenant.Status = status;
@@ -152,7 +239,7 @@ public sealed class TenantDirectory
             await store.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        await cache.RemoveTenantPermissionsAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        await cache.RemoveTenantPermissionsAsync(tenant.Id, cancellationToken).ConfigureAwait(false);
         return Result.Success();
     }
 

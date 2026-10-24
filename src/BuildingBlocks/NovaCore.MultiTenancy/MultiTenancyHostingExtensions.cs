@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NovaCore.AspNetCore.Authorization;
+using NovaCore.EntityFrameworkCore.MultiTenancy;
 
 namespace NovaCore.MultiTenancy;
 
@@ -23,7 +24,7 @@ public static class MultiTenancyHostingExtensions
     /// also holds what their roles there grant: <c>MultiTenancy:Roles:&lt;role&gt;</c> lists a role's permissions, each
     /// one a module declares (the host doesn't start otherwise). A request that names the tenant holds them on whatever
     /// endpoint it calls, so a role grants the permissions of the tenant's endpoints only, never the platform's (the
-    /// identity provider's <c>identity:*</c>). <see cref="TenantDirectory"/> manages the tenants and members. The store is
+    /// identity provider's <c>identity:*</c>). <see cref="TenantDirectory"/> manages the tenants, their members and their life cycle. The store is
     /// <see cref="MultiTenancyDbContext"/>: the host registers it with <c>AddModuleDbContext</c> and keeps its migrations.
     /// </summary>
     /// <param name="builder">The host application builder.</param>
@@ -58,6 +59,7 @@ public static class MultiTenancyHostingExtensions
         services.AddScoped<IPermissionResolver, MembershipPermissionResolver>();
         services.AddScoped(provider => new TenantDirectory(
             provider.GetRequiredService<MultiTenancyDbContext>(),
+            provider.GetRequiredService<TenantData>(),
             provider.GetRequiredService<HybridCache>(),
             provider.GetRequiredService<IOptions<MultiTenancyOptions>>(),
             provider.GetRequiredService<TimeProvider>()));

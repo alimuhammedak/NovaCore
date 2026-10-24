@@ -5,8 +5,12 @@ NovaCore.MultiTenancy.MultiTenancyDbContext
 NovaCore.MultiTenancy.MultiTenancyDbContext.MultiTenancyDbContext(Microsoft.EntityFrameworkCore.DbContextOptions<NovaCore.MultiTenancy.MultiTenancyDbContext!>! options) -> void
 NovaCore.MultiTenancy.MultiTenancyHostingExtensions
 NovaCore.MultiTenancy.TenantDirectory
+NovaCore.MultiTenancy.TenantDirectory.ActivateAsync(System.Guid tenantId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<NovaCore.Abstractions.Results.Result!>!
 NovaCore.MultiTenancy.TenantDirectory.AddMemberAsync(System.Guid tenantId, string! subject, System.Collections.Generic.IReadOnlyCollection<string!>! roles, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<NovaCore.Abstractions.Results.Result!>!
+NovaCore.MultiTenancy.TenantDirectory.CloseAsync(System.Guid tenantId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<NovaCore.Abstractions.Results.Result!>!
+NovaCore.MultiTenancy.TenantDirectory.ClosedBeforeAsync(System.DateTimeOffset cutoff, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.Guid>!>!
 NovaCore.MultiTenancy.TenantDirectory.CreateAsync(string! name, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Guid>!
+NovaCore.MultiTenancy.TenantDirectory.DeleteAsync(System.Guid tenantId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<NovaCore.Abstractions.Results.Result!>!
 NovaCore.MultiTenancy.TenantDirectory.RemoveMemberAsync(System.Guid tenantId, string! subject, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<NovaCore.Abstractions.Results.Result!>!
 NovaCore.MultiTenancy.TenantDirectory.SuspendAsync(System.Guid tenantId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<NovaCore.Abstractions.Results.Result!>!
 NovaCore.MultiTenancy.TenantDirectory.TenantsOfAsync(string! subject, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<NovaCore.MultiTenancy.TenantMembershipSummary!>!>!
@@ -23,6 +27,7 @@ NovaCore.MultiTenancy.TenantMembershipSummary.TenantId.init -> void
 NovaCore.MultiTenancy.TenantMembershipSummary.TenantMembershipSummary(System.Guid TenantId, string! Name, System.Collections.Generic.IReadOnlyList<string!>! Roles) -> void
 NovaCore.MultiTenancy.TenantStatus
 NovaCore.MultiTenancy.TenantStatus.Active = 0 -> NovaCore.MultiTenancy.TenantStatus
+NovaCore.MultiTenancy.TenantStatus.Closed = 2 -> NovaCore.MultiTenancy.TenantStatus
 NovaCore.MultiTenancy.TenantStatus.Suspended = 1 -> NovaCore.MultiTenancy.TenantStatus
 override NovaCore.MultiTenancy.TenantMembershipSummary.Equals(object? obj) -> bool
 override NovaCore.MultiTenancy.TenantMembershipSummary.GetHashCode() -> int
