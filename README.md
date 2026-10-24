@@ -323,7 +323,8 @@ git config core.hooksPath .githooks
   `#if` satırları yüzünden Dependabot'un okuyabileceği bir YAML değil. `WorkflowPinTests`, şablondaki SHA'ların repo'yla
   aynı olduğunu doğrular; Dependabot repo'yu güncelleyince test, şablon da güncellenene kadar kırmızı kalır.
 - **Test kimlik bilgileri** `.betterleaks.toml`'da değer listesiyle muaf tutulur: değer tam eşleşmeli ve `tests/` altında
-  olmalı. Yeni bir test değeri bu listeye eklenir; yol bazlı muafiyet yoktur.
+  olmalı. Yeni bir test değeri bu listeye eklenir; yol bazlı muafiyet yoktur. Tek istisna plan notlarında alıntılanan
+  F6a.5 test token'ı: yalnız bu değer, yalnız `docs/plan/PROGRESS.md` ve `docs/plan/PROGRESS-ARSIV.md`'de.
 - **Repo ayarları:** secret scanning ve push protection açık, Dependabot uyarıları ve güvenlik güncellemeleri açık.
   `main`'de force push ve silme kapalı. `v*` tag'lerini yalnızca admin oluşturur, taşır, siler.
 - **Yayınlanan paketin doğrulanması:** her `.nupkg`, `.snupkg` ve SBOM (`*.cdx.json`, workflow artifact'inde) imzalı
