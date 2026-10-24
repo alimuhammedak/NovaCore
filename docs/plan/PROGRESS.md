@@ -24,7 +24,7 @@
 | 6c | ✅ tamam | `faz/6c-test-altyapisi` | 2026-10-22 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `64b3ab6`; push 2026-10-23, kullanıcı isteği) |
 | 6d | ✅ tamam | `faz/6d-analizor-sikilastirma` | 2026-10-23 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `231b05f`; push 2026-10-23, kullanıcı isteği) |
 | 7a | ✅ tamam | `faz/7a-veritabani-ozgurlugu` | 2026-10-23 | 2026-10-24 | 2026-10-24 (kullanıcı onayı, PR #11 merge commit'i `cf895d8`) |
-| 7b | ⏳ başlamadı | | | | |
+| 7b | 🔄 devam ediyor | `faz/7b-cok-kiracililik` | 2026-10-24 | | |
 | 6e | ⏳ başlamadı | | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
@@ -1146,6 +1146,20 @@ Başlangıç 2026-10-23, `main` @ `af5ce0b` (plan commit'i henüz push edilmemi�
 - PR #11 (2026-10-24): CI'ın bütün job'ları, CodeQL, Sonar ve Greptile yeşil (Greptile bulgu vermedi). **CodeRabbit:** 2 satır yorumu, 3 pre-merge uyarısı. (1) `docker-compose.yml:32` `POSTGRES_DB` yok, örnek bağlantının `NovaCore` veritabanı oluşmuyor → yanıtlandı: EF'in migrator'ı eksik veritabanını kendisi oluşturuyor (PG katmanı her sınıfta var olmayan bir veritabanı adıyla tam buna dayanıyor; compose'daki SQL Server servisi de `NovaCore`'u önceden oluşturmuyor). (2) `NovaCoreApiFactory` `AddModuleDatabase`'e geçsin → kapsam dışı (Y-09, faz notu), Sonraya bırakılanlar, yanıtlandı. (3) Başlık İngilizce ve emir kipinde olmalı (`.coderabbit.yaml`, D-067 (5); PR #10 da böyleydi) → başlık `faz7a: let each project choose its database` oldu. (4) Y-46 kontrolü PG migration'larının `*.Designer.cs`/`*ModelSnapshot.cs`'indeki `#pragma warning disable 612, 618`'i bastırma saydı → yanlış pozitif: EF bu satırı ürettiği her designer ve snapshot dosyasına yazıyor (host'un SQL Server setinde de var), path filter'lar bu dosyaları zaten dışarıda bırakıyor; kontrolün metnine araçların ürettiği dosyalar istisnası eklendi. (5) Belgeler: `CLAUDE.md:70` ve `README.md:310`'daki lisans kapısı komut açıklamaları yalnız Polly'yi sayıyordu → Npgsql istisnası eklendi. Biome'un şablonun `appsettings.Development.json`'ını (şablon koşullu JSONC) ayrıştıramaması bir araç hatası, bulgu değil. İkinci inceleme (`ceda48d`, diff dışı 1 bulgu): `.coderabbit.yaml`'ın Y-47 kontrolü sağlayıcı istisnasını yalnız "projenin sağlayıcısı" diye anıyordu → D-072'nin iki tam paket adı ve ailenin diğer paketlerinin istisna olmadığı yazıldı.
 - Faz doğrulaması (kısmi, 2026-10-24, önceki oturum): `build -c Release` 0 uyarı; `dotnet test` 410/410 (SQLite, SQL Server, PostgreSQL, Docker'la, atlanan yok); `eng/check-coverage.sh Release` satır %96,6 / dal %82,7 (baseline %95,8 / %82,9, tolerans içinde; baseline `--update` henüz yapılmadı); `has-pending-model-changes` üç context'te temiz + `PostgreSqlModelTests`; lisans kapısı yeşil; `eng/check-openapi.sh` değişiklik yok; `eng/lint-workflows.sh` temiz; `dotnet format` temiz; smoke dört bileşimde yeşil. CI: F7a.3'e kadar her push yeşil (PG katmanı Linux'ta).
 
+### Faz 7b
+Başlangıç 2026-10-24, `main` @ `6204b04` (7a'nın merge kaydı, başka bir oturumdan). Plan onaylandı (plan modu). Branch yalnız faz sonunda push edilir (Q-60), main'e dokunulmaz; faz sonunda PR (D-067). Q-40 sürüyor. Kararlar D-076'dan, araştırmalar R-129'dan başlayarak yazılır.
+
+**Plan özeti ve kendi kararlarım (D-016; ayrıntı D-076):**
+- Uygulama sırası F7b.1 → F7b.7 → F7b.3 → F7b.2 → F7b.4 → F7b.5 → F7b.6 → F7b.8 → F7b.9, ID'ler sabit (D-031 (1) emsali).
+- Finbuckle değil, Microsoft'un yapı taşları (EF adlı filtre + interceptor'lar); Microsoft dışı yeni paket yok.
+- Abstractions: `TenantContext`, `ITenantEntity`. AspNetCore: `ITenantResolver`, kurum bölümlü izin önbelleği, resolver birleşimi, `RequireTenant()`, ikinci `IClaimsTransformation` koruması. EF: her `ITenantEntity` köküne otomatik adlı filtre, yazma koruması, parametresiz `IgnoreQueryFilters()` koruması, outbox'ta kurum ve trace, kurum verisini silme. Yeni isteğe bağlı `NovaCore.MultiTenancy`: store (`tenants`, `memberships` + roller), çözüm ve doğrulama, üyelik izinleri, yaşam döngüsü servisi; iki çekirdek pakete bağlanır (add-on kuralı değişir).
+- Kurum `tenant` route değerinden (Guid), delege overload'uyla başka yerden; doğrulama izinlerle aynı önbellek girdisinde. "Hepsini gör" bayrağı yok: sistem işi bir kurum scope'unda, kurumlar arası okuma filtreyi adıyla kapatır.
+- Eklentide HTTP ucu yok; saklama süresini ürün seçer; şablonda `--multitenancy` varsayılan kapalı; Api host eklentiyi bağlar, repo modülleri kurum kapsamlı olmaz.
+
+**Bu fazda yapılmayacaklar:** şube kapsamı ve CRM'in rolleri; kurum başına veritabanı; RLS'in paketlere girmesi (belgelenmiş örnek); token'da kurum claim'i; kurum başına istek sınırı; CRM'in geçişi; `UseCoreWeb`'e middleware yeri; yerleşik rol ya da hiyerarşi; eklentide HTTP uçları; kurum slug'ı; saklama zamanlayıcısı; `.claude/hooks/` düzenlemesi (kullanıcıda).
+
+- F7b.1 devam ediyor.
+
 ## Açık sorular (Q)
 
 Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa DECISIONS'a D-kaydı olarak eklenir.
@@ -1210,6 +1224,7 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-57 | NovaCore üzerinde hangi tür projeler kurulacak? (birçok kuruma satılan ürün / tek kurumun iç uygulaması / son kullanıcı uygulaması / bilinmiyor) | CRM geçişi | **Birçok kuruma satılan ürün** (2026-10-23, kullanıcı) → D-069 (1) |
 | Q-58 | Y-14 açılıp çok kiracılılık NovaCore'a alınsın mı? (evet, isteğe bağlı paket / hayır, ikinci proje gelene kadar) | CRM geçişi | **Evet, isteğe bağlı paket** (2026-10-23, kullanıcı; önerilen) → D-069, Y-48. Ardından kullanıcı: "Kararları DECISIONS'a revizyon kuralıyla işle (Y-06 ve Y-14), iki yeni fazı (veritabanı özgürlüğü, çok kiracılılık) PLAN'a ekle ve PROGRESS'i güncelle." → D-071, Faz 7a ve 7b |
 | Q-59 | Faz 7a branch'i her adımdan sonra push edilsin mi? (her adımda / yalnız faz sonunda) | Faz 7a başı | **Her adımda** (2026-10-23, kullanıcı; önerilen). PostgreSQL katmanı ve şablonun dört bileşimi CI'da doğrulanır; main'e dokunulmaz |
+| Q-60 | Faz 7b branch'i her adımdan sonra push edilsin mi? (her adımda / yalnız faz sonunda) | Faz 7b başı | **Yalnız faz sonunda** (2026-10-24, kullanıcı; önerilen "her adımda"ydı). Branch yerelde kalır, PR açılırken bir kez push edilir; o güne kadar Docker'lı yerel koşular tek doğrulama |
 
 ## Sonraya bırakılanlar
 
