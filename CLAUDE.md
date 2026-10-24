@@ -73,7 +73,7 @@ bash eng/check-openapi.sh [base-revision]     # breaking changes in docs/openapi
 bash eng/mutation.sh                          # Stryker.NET on the abstractions and domain code, a report (D-063)
 bash eng/lint-workflows.sh [dir ...]          # actionlint + zizmor on .github (Docker; GH_TOKEN enables online audits)
 bash eng/find-unused.sh                       # unused internal/private types, fields, constants (Roslynator, D-066)
-coderabbit review --agent --uncommitted --include-untracked   # CodeRabbit CLI review of local changes (D-067; `coderabbit auth login` first)
+coderabbit review --agent --base main         # CodeRabbit CLI review of the phase branch, once at phase end (D-067, D-076; `coderabbit auth login` first)
 dotnet format NovaCore.slnx                   # fixes what CI's `dotnet format --verify-no-changes` reports
 git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release
