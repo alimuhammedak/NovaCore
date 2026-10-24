@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,8 @@ namespace NovaCore.Api.Tests.Databases;
 /// Tenant isolation, the same on every provider: a scope reads and writes only its tenant's rows, and none without a
 /// tenant (docs/plan/PLAN.md F7b.3, DECISIONS D-076 (5), (6)); a request works in the tenant it names only when the caller
 /// is a member of it and it is active (F7b.2, D-076 (3)), and holds there what its roles there grant, per tenant (F7b.4,
-/// D-076 (7)). Every test works with tenants and subjects of its own, so the tests of a class share one database.
+/// D-076 (7)); an event's handler works in the tenant that saved the event, in the trace of the request that saved it
+/// (F7b.5, D-076 (8)). Every test works with tenants and subjects of its own, so the tests of a class share one database.
 /// </summary>
 public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixture<TFixture>
     where TFixture : TenancyFixture
@@ -346,7 +348,48 @@ public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixtu
         Assert.Equal([TenancyFixture.Reader, TenancyFixture.Writer], memberships[1].Roles);
     }
 
+    [Fact]
+    public async Task An_event_handler_works_in_the_tenant_that_saved_the_event_and_continues_the_requests_trace()
+    {
+        var alice = Subject();
+        var (mine, theirs) = (await Fixture.AddTenantAsync(alice), await Fixture.AddTenantAsync());
+        await AddNoteAsync(mine, "mine");
+        await AddNoteAsync(theirs, "theirs");
+        var trace = ActivityTraceId.CreateRandom();
+        using var listener = ListenToTrace(trace);
+        using var client = Fixture.ClientFor(alice);
+        var text = $"added {Guid.NewGuid()}";
+        using var request = new HttpRequestMessage(HttpMethod.Post, NotesOf(mine));
+        request.Content = JsonContent.Create(new { text });
+        request.Headers.Add("traceparent", $"00-{trace}-{ActivitySpanId.CreateRandom()}-01");
+
+        using var created = await client.SendAsync(request, Cancellation);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var handled = await Fixture.HandledAsync(text);
+
+        Assert.Equal(mine, handled.Tenant);
+        Assert.Equal([text, "mine"], handled.Texts);
+        Assert.Equal(trace, handled.Trace);
+    }
+
     private static string Subject() => Guid.NewGuid().ToString();
+
+    // Records the activities of one trace only, the request's (ASP.NET Core) and the outbox handler's: listeners are
+    // process-wide, and the other tests' requests and handlers stay as they were.
+    private static ActivityListener ListenToTrace(ActivityTraceId trace)
+    {
+        var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name is "Microsoft.AspNetCore" or OutboxDispatcherSource,
+            Sample = (ref ActivityCreationOptions<ActivityContext> options) =>
+                options.Parent.TraceId == trace ? ActivitySamplingResult.AllDataAndRecorded : ActivitySamplingResult.None
+        };
+        ActivitySource.AddActivityListener(listener);
+        return listener;
+    }
+
+    // The ActivitySource of the outbox handlers' spans (NovaCore.EntityFrameworkCore, internal).
+    private const string OutboxDispatcherSource = "NovaCore.EntityFrameworkCore";
 
     private static Uri NotesOf(Guid tenant) => new($"/api/v1/tenants/{tenant}/notes", UriKind.Relative);
 

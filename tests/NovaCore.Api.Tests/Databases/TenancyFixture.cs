@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -8,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Abstractions.Entities;
+using NovaCore.Abstractions.Messaging;
 using NovaCore.Abstractions.MultiTenancy;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
+using NovaCore.EntityFrameworkCore.Messaging;
 using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.MultiTenancy;
 using Xunit;
@@ -18,14 +23,16 @@ using Xunit;
 namespace NovaCore.Api.Tests.Databases;
 
 /// <summary>
-/// The core web host (<see cref="CoreWebTestHost"/>) with the multi-tenancy add-on and a module context of tenant entities
-/// (<see cref="NotesDbContext"/>), registered the way a module registers its own (<c>AddModuleDbContext</c>), on a
-/// database of its own: SQLite in memory, or a database on the SQL Server or PostgreSQL test server. A tenant's notes are
-/// served under <c>/api/v1/tenants/{tenant}/notes</c> (<c>RequireTenant()</c>), to a member whose role there grants the
-/// permission (<see cref="Writer"/>, <see cref="Reader"/>); <c>/api/v1/tenants/{tenant}/permissions</c> shows the
-/// caller's. The callers' tokens grant nothing else (<see cref="CoreWebTestHost"/>'s resolver). The tables come from
-/// <c>EnsureCreated</c>: the model, not a migration, is what these tests are about. Without Docker the host isn't built;
-/// the tests skip through <see cref="Database"/>.
+/// The core web host (<see cref="CoreWebTestHost"/>) with the multi-tenancy add-on, the persistence services and a module
+/// context of tenant entities (<see cref="NotesDbContext"/>), registered the way a module registers its own
+/// (<c>AddModuleDbContext</c>), on a database of its own: SQLite in memory, or a database on the SQL Server or PostgreSQL
+/// test server. A tenant's notes are served under <c>/api/v1/tenants/{tenant}/notes</c> (<c>RequireTenant()</c>), to a
+/// member whose role there grants the permission (<see cref="Writer"/>, <see cref="Reader"/>);
+/// <c>/api/v1/tenants/{tenant}/permissions</c> shows the caller's. The callers' tokens grant nothing else
+/// (<see cref="CoreWebTestHost"/>'s resolver). A note added over HTTP raises <see cref="NoteAdded"/>, whose handler the
+/// outbox dispatcher runs on its real clock (a pass every five seconds): it records what it saw (<see cref="HandledAsync"/>).
+/// The tables come from <c>EnsureCreated</c>: the model, not a migration, is what these tests are about. Without Docker the
+/// host isn't built; the tests skip through <see cref="Database"/>.
 /// </summary>
 public abstract class TenancyFixture : IAsyncLifetime
 {
@@ -66,9 +73,12 @@ public abstract class TenancyFixture : IAsyncLifetime
             });
             builder.Services.AddPermissionDefinitions<NotesPermissions>();
             builder.AddCoreMultiTenancy();
+            builder.AddCorePersistence();
             builder.Services.AddModuleDatabase((_, options) => UseDatabase(options, connectionString));
             builder.Services.AddModuleDbContext<NotesDbContext>(NotesDbContext.Schema, (_, _) => { });
             builder.Services.AddModuleDbContext<MultiTenancyDbContext>(MultiTenancyDbContext.Schema, (_, _) => { });
+            builder.Services.AddSingleton<NoteHandlings>();
+            builder.Services.AddScoped<IDomainEventHandler<NoteAdded>, ReadTheTenantsNotes>();
         });
 
         // Both contexts in one database: the first creates it, the second adds its tables.
@@ -131,6 +141,22 @@ public abstract class TenancyFixture : IAsyncLifetime
     /// <summary>A client signed in as <paramref name="subject"/>.</summary>
     public HttpClient ClientFor(string subject) => Host.CreateClientWithClaims(new Claim(NovaClaims.Subject, subject));
 
+    /// <summary>
+    /// Waits until the handler of the <see cref="NoteAdded"/> of the note <paramref name="text"/> has run, and returns what
+    /// it saw; skips the test without Docker.
+    /// </summary>
+    public async Task<NoteHandling> HandledAsync(string text)
+    {
+        var handlings = Host.Services.GetRequiredService<NoteHandlings>();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        NoteHandling? handling;
+        while (!handlings.TryGet(text, out handling))
+            await Task.Delay(TimeSpan.FromMilliseconds(50), timeout.Token);
+
+        return handling;
+    }
+
     // A module's tenant endpoints: the notes of the request's tenant, and what the caller may do there.
     private static void MapNotes(WebApplication app)
     {
@@ -144,7 +170,7 @@ public abstract class TenancyFixture : IAsyncLifetime
             .RequirePermission(NotesPermissions.Read);
         notes.MapPost("/", async (NoteRequest request, NotesDbContext context, CancellationToken cancellationToken) =>
             {
-                context.Notes.Add(new Note(request.Text));
+                context.Notes.Add(Note.Announced(request.Text));
                 await context.SaveChangesAsync(cancellationToken);
                 return Results.Created();
             })
@@ -188,6 +214,7 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options) : D
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.AddOutbox();
         modelBuilder.Entity<Note>(note =>
         {
             note.ToTable("notes");
@@ -219,4 +246,39 @@ public sealed class Note : Entity<Guid>, ITenantEntity
     public string Text { get; set; } = string.Empty;
 
     public bool Archived { get; set; }
+
+    /// <summary>A new note that raises <see cref="NoteAdded"/>, as one added over HTTP does.</summary>
+    public static Note Announced(string text)
+    {
+        var note = new Note(text);
+        note.Raise(new NoteAdded(text));
+        return note;
+    }
+}
+
+/// <summary>A note was added; its handler runs in the outbox dispatcher.</summary>
+public sealed record NoteAdded(string Text) : DomainEvent;
+
+/// <summary>What the handler of a <see cref="NoteAdded"/> saw: its scope's tenant, that tenant's notes and its trace.</summary>
+public sealed record NoteHandling(Guid? Tenant, IReadOnlyList<string> Texts, ActivityTraceId? Trace);
+
+/// <summary>The handlings of <see cref="NoteAdded"/> events, by the note's text.</summary>
+public sealed class NoteHandlings
+{
+    private readonly ConcurrentDictionary<string, NoteHandling> _byText = new(StringComparer.Ordinal);
+
+    public void Record(string text, NoteHandling handling) => _byText[text] = handling;
+
+    public bool TryGet(string text, [NotNullWhen(true)] out NoteHandling? handling) => _byText.TryGetValue(text, out handling);
+}
+
+/// <summary>Reads the notes of the tenant its scope works in, and the span it runs in.</summary>
+public sealed class ReadTheTenantsNotes(NotesDbContext notes, TenantContext tenant, NoteHandlings handlings)
+    : IDomainEventHandler<NoteAdded>
+{
+    public async Task HandleAsync(NoteAdded domainEvent, CancellationToken cancellationToken = default)
+    {
+        var texts = await notes.Notes.OrderBy(note => note.Text).Select(note => note.Text).ToListAsync(cancellationToken);
+        handlings.Record(domainEvent.Text, new NoteHandling(tenant.TenantId, texts, Activity.Current?.TraceId));
+    }
 }

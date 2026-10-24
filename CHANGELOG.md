@@ -96,6 +96,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no built-in role. `TenantDirectory.AddMemberAsync` takes roles of that list (`tenant.unknown_role` otherwise),
   `RemoveMemberAsync` ends a membership, and `TenantsOfAsync` lists a subject's active tenants with their roles there,
   for a tenant picker. A change takes effect on the member's next request on this server.
+- Outbox: a message keeps the tenant of the scope that saved it and the W3C trace context of the activity it was saved
+  in (a request's, say). Its handlers run in that tenant (`TenantContext`), or in none when it was saved without one, and
+  in a consumer span of their own, `process <event type>`, a child of the saving activity and linked to it.
+  `AddCoreObservability` collects those spans (source `NovaCore.EntityFrameworkCore`). **Upgrade:** a module context with
+  an outbox needs a migration for the two new nullable columns of `outbox_messages` (`TenantId`, `TraceParent`).
 
 ### Changed
 

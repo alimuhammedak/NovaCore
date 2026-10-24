@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Data.Common;
+using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -10,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using NovaCore.Abstractions.Entities;
 using NovaCore.Abstractions.Messaging;
+using NovaCore.Abstractions.MultiTenancy;
 using NovaCore.EntityFrameworkCore.Messaging;
 using NovaCore.EntityFrameworkCore.Persistence;
 using Xunit;
@@ -20,7 +23,8 @@ namespace NovaCore.Api.Tests.Unit;
 /// PLAN F4a.2: the outbox dispatcher hands every saved event to each of its handlers once. It records every handler
 /// that finished (<c>outbox_consumers</c>, keyed by the message), retries the others on later passes, gives up after ten
 /// attempts and opens no transaction of its own, so it works under a retrying execution strategy. PLAN F4c.7: a processed
-/// message is deleted, with its handlers' records, once it is older than the retention. The clock is a
+/// message is deleted, with its handlers' records, once it is older than the retention. PLAN F7b.5: a handler runs in the
+/// tenant of the scope that saved the event, and its span continues the trace that saved it. The clock is a
 /// <see cref="FakeTimeProvider"/>: the dispatcher runs a pass when the host starts and whenever the clock moves past the
 /// polling interval.
 /// </summary>
@@ -297,6 +301,57 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
         Assert.Equal([typeof(RecordingHandler).FullName!], await ConsumersAsync(placed));
     }
 
+    [Fact]
+    public async Task A_handler_runs_in_the_tenant_of_the_scope_that_saved_the_event_or_in_none()
+    {
+        var contexts = new HandlerContexts();
+        using var host = await CreateHostAsync(services => services
+            .AddSingleton(contexts)
+            .AddScoped<IDomainEventHandler<OrderPlaced>, ContextRecordingHandler>());
+        var tenant = Guid.NewGuid();
+        var inTenant = await SaveOrderAsync(host, tenant);
+        var inNone = await SaveOrderAsync(host);
+
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => Task.FromResult(contexts.Has(inTenant) && contexts.Has(inNone)));
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(tenant, contexts.Of(inTenant).Tenant);
+        Assert.Null(contexts.Of(inNone).Tenant);
+    }
+
+    [Fact]
+    public async Task A_handlers_span_continues_the_trace_that_saved_the_event()
+    {
+        using var listener = ListenToTheOutbox();
+        var contexts = new HandlerContexts();
+        using var host = await CreateHostAsync(services => services
+            .AddSingleton(contexts)
+            .AddScoped<IDomainEventHandler<OrderPlaced>, ContextRecordingHandler>());
+        using var request = new Activity("request");
+        request.SetIdFormat(ActivityIdFormat.W3C).Start();
+        var saving = request.Context;
+        var traced = await SaveOrderAsync(host);
+        request.Stop();
+        var untraced = await SaveOrderAsync(host);
+
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => Task.FromResult(contexts.Has(traced) && contexts.Has(untraced)));
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        var span = contexts.Of(traced).Span!;
+        Assert.Equal(OutboxActivitySource, span.Source);
+        Assert.Equal(ActivityKind.Consumer, span.Kind);
+        Assert.Equal(saving.TraceId, span.TraceId);
+        Assert.Equal(saving.SpanId, span.ParentSpanId);
+        Assert.Contains(span.Links, link => link.TraceId == saving.TraceId && link.SpanId == saving.SpanId);
+
+        // Nothing to continue: the span starts a trace of its own.
+        var root = contexts.Of(untraced).Span!;
+        Assert.Equal(default, root.ParentSpanId);
+        Assert.Empty(root.Links);
+    }
+
     private async Task<IHost> CreateHostAsync(
         Action<IServiceCollection> registerHandlers,
         Action<SqliteDbContextOptionsBuilder>? sqlite = null,
@@ -323,9 +378,12 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
         return host;
     }
 
-    private static async Task<Guid> SaveOrderAsync(IHost host)
+    private static async Task<Guid> SaveOrderAsync(IHost host, Guid? tenant = null)
     {
         await using var scope = host.Services.CreateAsyncScope();
+        if (tenant is { } id)
+            scope.ServiceProvider.GetRequiredService<TenantContext>().Use(id);
+
         var context = scope.ServiceProvider.GetRequiredService<ShopDbContext>();
         var order = new Order(Guid.CreateVersion7());
         var eventId = order.DomainEvents.Single().EventId;
@@ -399,6 +457,20 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
         while (!await condition())
             await Task.Delay(TimeSpan.FromMilliseconds(20), timeout.Token);
+    }
+
+    // The ActivitySource the dispatcher starts a handler's span from, which the test listens to.
+    private const string OutboxActivitySource = "NovaCore.EntityFrameworkCore";
+
+    private static ActivityListener ListenToTheOutbox()
+    {
+        var listener = new ActivityListener
+        {
+            ShouldListenTo = source => string.Equals(source.Name, OutboxActivitySource, StringComparison.Ordinal),
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded
+        };
+        ActivitySource.AddActivityListener(listener);
+        return listener;
     }
 
     private sealed record OrderPlaced(Guid OrderId) : DomainEvent;
@@ -502,6 +574,33 @@ public sealed class OutboxDispatcherTests : IAsyncDisposable
             {
                 throw new InvalidOperationException("The delivery was cut short.", exception);
             }
+        }
+    }
+
+    // The tenant and the span a handler ran in, by event.
+    private sealed class HandlerContexts
+    {
+        private readonly ConcurrentDictionary<Guid, (Guid? Tenant, SpanSeen? Span)> _seen = new();
+
+        public bool Has(Guid eventId) => _seen.ContainsKey(eventId);
+
+        public (Guid? Tenant, SpanSeen? Span) Of(Guid eventId) => _seen[eventId];
+
+        public void Record(Guid eventId, Guid? tenant, Activity? span) =>
+            _seen[eventId] = (tenant, span is null
+                ? null
+                : new SpanSeen(span.Source.Name, span.Kind, span.TraceId, span.ParentSpanId, [.. span.Links.Select(link => link.Context)]));
+    }
+
+    private sealed record SpanSeen(
+        string Source, ActivityKind Kind, ActivityTraceId TraceId, ActivitySpanId ParentSpanId, ActivityContext[] Links);
+
+    private sealed class ContextRecordingHandler(TenantContext tenant, HandlerContexts contexts) : IDomainEventHandler<OrderPlaced>
+    {
+        public Task HandleAsync(OrderPlaced domainEvent, CancellationToken cancellationToken = default)
+        {
+            contexts.Record(domainEvent.EventId, tenant.TenantId, Activity.Current);
+            return Task.CompletedTask;
         }
     }
 

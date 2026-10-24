@@ -24,6 +24,18 @@ internal sealed class OutboxMessage
     /// <summary>The event's <see cref="Abstractions.Messaging.IDomainEvent.OccurredOnUtc"/>.</summary>
     public required DateTimeOffset OccurredOnUtc { get; init; }
 
+    /// <summary>
+    /// The tenant of the scope that saved the event (<see cref="Abstractions.MultiTenancy.TenantContext"/>), which its
+    /// handlers run in; null when that scope had none, and they run in none.
+    /// </summary>
+    public Guid? TenantId { get; init; }
+
+    /// <summary>
+    /// The W3C <c>traceparent</c> of the activity the event was saved in (a request's, say), which the handlers' span
+    /// continues; null when there was none.
+    /// </summary>
+    public string? TraceParent { get; init; }
+
     /// <summary>When every handler had handled the event; null while it waits in the outbox.</summary>
     public DateTimeOffset? ProcessedOnUtc { get; init; }
 

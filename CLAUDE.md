@@ -182,7 +182,8 @@ targets a **local SQL Server via Windows auth** (`appsettings.json`).
 - **Domain events go through a transactional outbox.** An entity `Raise`s a `DomainEvent` record; the save that saves
   the entity writes it to the module's `outbox_messages` in the same transaction (`OutboxInterceptor`, added by
   `AddModuleDbContext`; the context calls `modelBuilder.AddOutbox()`). `OutboxDispatcher`, a `BackgroundService` from
-  `AddCorePersistence`, delivers the events to their `IDomainEventHandler<T>`s: each message in its own DI scope, each
+  `AddCorePersistence`, delivers the events to their `IDomainEventHandler<T>`s: each message in its own DI scope (in the
+  tenant of the scope that saved it, or in none) and its own consumer span (continuing the saving trace, D-081), each
   handler once (`outbox_consumers` records the finished ones, keyed by the message row), retried on later passes, left
   for inspection after 10 failures; processed messages are deleted with their records after 7 days. Delivery is at
   least once, so handlers must be idempotent; one dispatcher per database (D-031, D-036 (7), R-068). The outbox is the

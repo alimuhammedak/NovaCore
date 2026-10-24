@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace NovaCore.Api.Tests.Databases;
 
@@ -27,6 +28,7 @@ public sealed class SqliteTenancyFixture : TenancyFixture
         return new TestDatabase("SQLite", _database.ConnectionString, null);
     }
 
+    // DateTimeOffset as UTC ticks, which SQLite compares: the outbox dispatcher deletes processed messages by their age.
     protected override void UseDatabase(DbContextOptionsBuilder options, string connectionString) =>
-        options.UseSqlite(connectionString);
+        options.UseSqlite(connectionString).ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>();
 }

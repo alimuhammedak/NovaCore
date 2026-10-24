@@ -7,7 +7,8 @@ public static class OutboxModelBuilderExtensions
 {
     /// <summary>
     /// Maps the outbox in the context's default schema: <c>outbox_messages</c>, where <see cref="OutboxInterceptor"/>
-    /// writes the domain events raised on the context's entities in the save that saves the entities, and
+    /// writes the domain events raised on the context's entities in the save that saves the entities, with the saving
+    /// scope's tenant and trace context, and
     /// <c>outbox_consumers</c>, where the outbox dispatcher records the handlers that have handled each message (deleted
     /// with the message). Call it from <c>OnModelCreating</c> of every module DbContext, then add a migration.
     /// </summary>
@@ -24,6 +25,7 @@ public static class OutboxModelBuilderExtensions
             message.HasIndex(m => new { m.ProcessedOnUtc, m.Id });
             message.Property(m => m.Type).HasMaxLength(512);
             message.Property(m => m.Error).HasMaxLength(OutboxDispatcher.MaxErrorLength);
+            message.Property(m => m.TraceParent).HasMaxLength(OutboxInterceptor.MaxTraceParentLength);
         });
 
         modelBuilder.Entity<OutboxConsumer>(consumer =>
