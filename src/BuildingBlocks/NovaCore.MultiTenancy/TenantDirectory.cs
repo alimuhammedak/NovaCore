@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Options;
 using NovaCore.Abstractions.Results;
 using NovaCore.AspNetCore.Authorization;
 
@@ -9,13 +10,25 @@ namespace NovaCore.MultiTenancy;
 /// The tenants and their members: what a product's own endpoints build on (who may open a tenant, how members are
 /// invited, are the product's). A change that narrows access takes effect on the next request on this server: it drops
 /// the cached decisions (<see cref="PermissionCacheExtensions"/>); another server's memory keeps its own until
-/// <c>Cache:PermissionExpiration</c> passes.
+/// <c>Cache:PermissionExpiration</c> passes. Resolve it from DI (scoped; <c>AddCoreMultiTenancy</c>).
 /// </summary>
-/// <param name="store">The tenancy store.</param>
-/// <param name="cache">The cache of the core's access decisions.</param>
-/// <param name="timeProvider">The clock status changes are stamped with.</param>
-public sealed class TenantDirectory(MultiTenancyDbContext store, HybridCache cache, TimeProvider timeProvider)
+public sealed class TenantDirectory
 {
+    private readonly MultiTenancyDbContext store;
+    private readonly HybridCache cache;
+    private readonly IOptions<MultiTenancyOptions> options;
+    private readonly TimeProvider timeProvider;
+
+    // Internal, as the options are: DI builds it through a factory (AddCoreMultiTenancy).
+    internal TenantDirectory(
+        MultiTenancyDbContext store, HybridCache cache, IOptions<MultiTenancyOptions> options, TimeProvider timeProvider)
+    {
+        this.store = store;
+        this.cache = cache;
+        this.options = options;
+        this.timeProvider = timeProvider;
+    }
+
     /// <summary>Opens a tenant, active, with no members.</summary>
     /// <param name="name">The tenant's name, at most 200 characters.</param>
     /// <param name="cancellationToken">Cancels the save.</param>
@@ -37,18 +50,24 @@ public sealed class TenantDirectory(MultiTenancyDbContext store, HybridCache cac
         return tenant.Id;
     }
 
-    /// <summary>Makes <paramref name="subject"/> a member of the tenant with <paramref name="roles"/>, or sets the roles of a member.</summary>
+    /// <summary>
+    /// Makes <paramref name="subject"/> a member of the tenant with <paramref name="roles"/>, or sets the roles of a
+    /// member. The member's next request works with them.
+    /// </summary>
     /// <param name="tenantId">The tenant.</param>
     /// <param name="subject">The member's subject (the access token's <c>sub</c>).</param>
-    /// <param name="roles">The roles the member holds in the tenant.</param>
+    /// <param name="roles">The roles the member holds in the tenant, each one of <c>MultiTenancy:Roles</c>.</param>
     /// <param name="cancellationToken">Cancels the save.</param>
-    /// <returns>Success, or <c>tenant.not_found</c>.</returns>
+    /// <returns>Success, <c>tenant.not_found</c>, or <c>tenant.unknown_role</c>.</returns>
     public async Task<Result> AddMemberAsync(
         Guid tenantId, string subject, IReadOnlyCollection<string> roles, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(subject);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(subject.Length, TenantMembership.MaxSubjectLength, nameof(subject));
         ArgumentNullException.ThrowIfNull(roles);
+
+        if (roles.FirstOrDefault(role => !options.Value.Roles.ContainsKey(role)) is { } unknown)
+            return Result.Failure(Error.Validation("tenant.unknown_role", $"'{unknown}' is not a role of MultiTenancy:Roles."));
 
         if (!await store.Tenants.AnyAsync(tenant => tenant.Id == tenantId, cancellationToken).ConfigureAwait(false))
             return NotFound(tenantId);
@@ -62,6 +81,52 @@ public sealed class TenantDirectory(MultiTenancyDbContext store, HybridCache cac
 
         await cache.RemovePermissionsAsync(subject, cancellationToken).ConfigureAwait(false);
         return Result.Success();
+    }
+
+    /// <summary>Ends <paramref name="subject"/>'s membership of the tenant, effective on their next request.</summary>
+    /// <param name="tenantId">The tenant.</param>
+    /// <param name="subject">The member's subject.</param>
+    /// <param name="cancellationToken">Cancels the save.</param>
+    /// <returns>Success, or <c>tenant.member_not_found</c>.</returns>
+    public async Task<Result> RemoveMemberAsync(Guid tenantId, string subject, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(subject);
+
+        var removed = await store.Memberships
+            .Where(membership => membership.TenantId == tenantId && membership.Subject == subject)
+            .ExecuteDeleteAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (removed == 0)
+            return Result.Failure(Error.NotFound(
+                "tenant.member_not_found", $"'{subject}' is not a member of tenant '{tenantId}'."));
+
+        await cache.RemovePermissionsAsync(subject, cancellationToken).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// The active tenants <paramref name="subject"/> is a member of, with the roles held in each, by name: what a tenant
+    /// picker shows a signed-in caller.
+    /// </summary>
+    /// <param name="subject">The caller's subject (the access token's <c>sub</c>).</param>
+    /// <param name="cancellationToken">Cancels the query.</param>
+    /// <returns>The memberships, ordered by the tenant's name.</returns>
+    public async Task<IReadOnlyList<TenantMembershipSummary>> TenantsOfAsync(string subject, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(subject);
+
+        // Ordered before the record is made: EF translates a member of an anonymous type, not of a record's constructor.
+        return await store.Memberships
+            .Where(membership => membership.Subject == subject)
+            .Join(
+                store.Tenants.Where(tenant => tenant.Status == TenantStatus.Active),
+                membership => membership.TenantId,
+                tenant => tenant.Id,
+                (membership, tenant) => new { tenant.Id, tenant.Name, membership.Roles })
+            .OrderBy(joined => joined.Name)
+            .Select(joined => new TenantMembershipSummary(joined.Id, joined.Name, joined.Roles))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>
@@ -94,3 +159,9 @@ public sealed class TenantDirectory(MultiTenancyDbContext store, HybridCache cac
     private static Result NotFound(Guid tenantId) =>
         Result.Failure(Error.NotFound("tenant.not_found", $"Tenant '{tenantId}' was not found."));
 }
+
+/// <summary>A caller's membership of an active tenant.</summary>
+/// <param name="TenantId">The tenant's id, which the caller's requests name.</param>
+/// <param name="Name">The tenant's name.</param>
+/// <param name="Roles">The roles the caller holds there.</param>
+public sealed record TenantMembershipSummary(Guid TenantId, string Name, IReadOnlyList<string> Roles);

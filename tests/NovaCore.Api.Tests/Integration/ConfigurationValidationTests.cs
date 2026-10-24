@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NovaCore.AspNetCore.Auth;
 using NovaCore.EntityFrameworkCore.Persistence;
+using NovaCore.MultiTenancy;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -46,6 +48,28 @@ public class ConfigurationValidationTests
             }));
 
         Assert.Contains(expectedInMessage, Messages(error), StringComparison.Ordinal);
+    }
+
+    // A tenant's role names permissions a module declares, like the identity provider's seed (DECISIONS D-076 (7)): a typo
+    // would grant nothing, silently.
+    [Fact]
+    public async Task A_tenant_role_that_grants_a_permission_no_module_declares_stops_the_host_at_startup()
+    {
+        var error = await Assert.ThrowsAnyAsync<Exception>(() => CoreWebTestHost.StartAsync(
+            _ => { },
+            configure: builder =>
+            {
+                builder.AddCorePersistence();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
+                {
+                    ["MultiTenancy:Roles:Writer:0"] = "notes:notes:wirte"
+                });
+                builder.AddCoreMultiTenancy();
+                builder.Services.AddModuleDatabase((_, options) => options.UseSqlite("Data Source=:memory:"));
+                builder.Services.AddModuleDbContext<MultiTenancyDbContext>(MultiTenancyDbContext.Schema, (_, _) => { });
+            }));
+
+        Assert.Contains("MultiTenancy:Roles must list permissions a module declares", Messages(error), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -13,10 +13,11 @@ public static class AuthorizationExtensions
     /// <summary>
     /// Enables permission-based authorization: the handler that checks the <see cref="PermissionRequirement"/> a
     /// <see cref="RequirePermissionAttribute"/> carries, and the claims transformation that gives every authenticated
-    /// caller the permissions <see cref="IPermissionResolver"/> resolves on the server, cached in HybridCache per
-    /// subject and security stamp for <c>Cache:PermissionExpiration</c>. Permission claims in the access token are
-    /// discarded. Secure by default: an endpoint without authorization metadata, and a request that matches no endpoint,
-    /// requires an authenticated caller (the fallback policy); a public endpoint says so with <c>AllowAnonymous</c>.
+    /// caller the permissions the registered <see cref="IPermissionResolver"/>s resolve on the server (what any of them
+    /// grants), cached in HybridCache per subject and security stamp for <c>Cache:PermissionExpiration</c>. Permission
+    /// claims in the access token are discarded. Secure by default: an endpoint without authorization metadata, and a
+    /// request that matches no endpoint, requires an authenticated caller (the fallback policy); a public endpoint says
+    /// so with <c>AllowAnonymous</c>.
     /// Needs <c>AddCoreAuthentication</c>, <c>AddCoreCaching</c> and a registered <see cref="IPermissionResolver"/> (the
     /// identity integration brings it; without one the host does not start). ASP.NET Core runs one
     /// <see cref="IClaimsTransformation"/>, so the host does not start with another one registered either. With an

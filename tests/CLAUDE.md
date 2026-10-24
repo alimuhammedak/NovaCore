@@ -62,14 +62,14 @@ Each context gets a **named, shareable in-memory database** (`Mode=Memory;Cache=
 per factory). Each context instance opens its own connection to it, and the factory holds one connection open so the
 database lives as long as the factory. One connection object shared by every context would break: the host's outbox
 dispatcher reads the module databases in the background while requests use them, and a `SqliteConnection` isn't
-thread-safe (docs/plan/RESEARCH.md R-069). The Catalog and Payments schemas are created in the factory ctor, as after the
-migrations, so the dispatcher's passes find their outboxes. A test that needs another schema (the identity store's)
-creates it (`EnsureCreated`). Outside Development the factory also brings what a production host must: ephemeral
-signing/encryption keys for the identity provider (standing in for certificates), an email sender and a Data
-Protection key store (`InMemoryKeyStore.AddTo(services)`). A test that expects another startup failure outside
-Development adds the key store too, or the missing store is what stops the host. `HealthEndpointsTests` points one
-context at a missing file with `Mode=ReadWrite`: the dispatcher opens it too, and the default mode would create the
-file.
+thread-safe (docs/plan/RESEARCH.md R-069). The Catalog, Payments and identity store schemas are created in the factory
+ctor, as after the migrations: the dispatcher's passes read the outboxes, and the identity provider's permission resolver
+reads its store for every caller. A test that needs the tenancy store's schema creates it. Outside Development the
+factory also brings what a production host must: ephemeral signing/encryption keys for the identity provider (standing
+in for certificates), an email sender and a Data Protection key store (`InMemoryKeyStore.AddTo(services)`). A test that
+expects another startup failure outside Development adds the key store too, or the missing store is what stops the host.
+`HealthEndpointsTests` points one context at a missing file with `Mode=ReadWrite`: the dispatcher opens it too, and the
+default mode would create the file.
 
 ## The API contract
 
@@ -117,10 +117,12 @@ packages are tested on SQL Server and PostgreSQL (D-068, D-074):
   migration data steps, each server's default collation in the product search) stays in that provider's class.
 - **Tenant isolation** (`TenancyScenarios`) runs on SQLite too (`SqliteTenancyTests`, no Docker). Its host is
   `CoreWebTestHost` with a module context of tenant entities (`TenancyFixture`'s `NotesDbContext`, tables from
-  `EnsureCreated`), not the Api host, whose modules have none. Each test works with tenants of its own
-  (`Guid.NewGuid()`), so a class shares one database without resets. `TenantConvention` is the convention test: an
-  entity with a `TenantId` column must carry the tenant filter (`ModuleRegistrationTests` runs it on the Api host's
-  contexts).
+  `EnsureCreated`), not the Api host, whose modules have none. Its roles (`Writer`, `Reader`) grant the notes module's
+  permissions in the member's tenant, and `/api/v1/tenants/{tenant}/permissions` echoes the caller's there. Each test
+  works with tenants of its own (`Guid.NewGuid()`), so a class shares one database without resets. `TenantConvention`
+  is the convention test: an entity with a `TenantId` column must carry the tenant filter (`ModuleRegistrationTests`
+  runs it on the Api host's contexts). `TenantPermissionTests` (under `IdentityServer/`) runs the identity provider and
+  the add-on on one host: the Administrator rule with a membership.
 - Raw SQL that runs on both quotes its names with the context's provider (`PortableSql`: `[catalog].[outbox_messages]`
   vs `"catalog"."outbox_messages"`; an unquoted name folds to lower case on PostgreSQL) and passes values as parameters.
   `COUNT(*)` is an `int` on SQL Server and a `bigint` on PostgreSQL: cast it (`CAST(COUNT(*) AS INTEGER)`).
@@ -179,10 +181,11 @@ So tokens go through the real Authority → metadata → JWKS path with no netwo
 - `factory.IdentityProvider.CreateToken(claims)` signs with the published key.
 - `TestIdentityProvider.CreateToken(claims, key, algorithm, issuer, audience, expires)` breaks one property at a time
   for rejection tests (`JwtValidationTests`).
-- **Permissions** are resolved on the server (`IPermissionResolver`). The factory wraps the host's resolver: a subject
-  of `IdentityProvider`'s tokens holds what `factory.GrantPermissions(subject, ...)` gave it (nothing by default), and
-  every other token (the identity provider add-on's) goes to the host's resolver. `CreateClientWithPermissions(...)`
-  does both for a fresh subject.
+- **Permissions** are resolved on the server (`IPermissionResolver`), and the core asks every registered resolver. The
+  factory adds one: a subject of `IdentityProvider`'s tokens holds what `factory.GrantPermissions(subject, ...)` gave it
+  (nothing by default), on top of what the host's resolvers grant it (nothing: the identity provider's store doesn't
+  know it). The add-on's own tokens hold what its store says. `CreateClientWithPermissions(...)` does both for a fresh
+  subject.
 - Resolved permissions are cached (`Cache:PermissionExpiration`). `FakeClockApiFactory` drives the memory cache's
   clock too (`MemoryCacheOptions.Clock`: HybridCache's local entries expire by it, not by `TimeProvider`, R-057), so
   `PermissionResolutionTests` moves the clock past the lifetime instead of waiting. **Gotcha:** the identity provider

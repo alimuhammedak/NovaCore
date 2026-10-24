@@ -4,12 +4,16 @@ namespace NovaCore.AspNetCore.Authorization;
 
 /// <summary>
 /// Resolves, on the server, the permissions an authenticated caller holds: the access token says who the caller is, not
-/// what they may do. The identity provider's integration implements it, e.g. from the user's roles in its store.
+/// what they may do. The identity provider's integration implements it, e.g. from the user's roles in its store. Every
+/// registered resolver is asked and the caller holds what any of them grants: the identity provider's platform
+/// permissions and, in a request that works in a tenant (<c>TenantContext</c>), what the caller's membership there
+/// grants.
 /// </summary>
 /// <remarks>
 /// The result is cached per subject (<c>sub</c>) and security stamp for <c>Cache:PermissionExpiration</c>, and served to
-/// every token of that subject in the meantime. So it must depend on who the caller is, not on which token they present:
-/// permissions narrowed by a token's scopes, client or audience would leak from one token to another.
+/// every token of that subject in the meantime, per tenant. So it must depend on who the caller is (and the scope's
+/// tenant), not on which token they present: permissions narrowed by a token's scopes, client or audience would leak
+/// from one token to another.
 /// </remarks>
 public interface IPermissionResolver
 {

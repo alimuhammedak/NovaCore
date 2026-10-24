@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Abstractions.Entities;
 using NovaCore.Abstractions.MultiTenancy;
@@ -20,12 +21,20 @@ namespace NovaCore.Api.Tests.Databases;
 /// The core web host (<see cref="CoreWebTestHost"/>) with the multi-tenancy add-on and a module context of tenant entities
 /// (<see cref="NotesDbContext"/>), registered the way a module registers its own (<c>AddModuleDbContext</c>), on a
 /// database of its own: SQLite in memory, or a database on the SQL Server or PostgreSQL test server. A tenant's notes are
-/// served under <c>/api/v1/tenants/{tenant}/notes</c> (<c>RequireTenant()</c>). The tables come from
+/// served under <c>/api/v1/tenants/{tenant}/notes</c> (<c>RequireTenant()</c>), to a member whose role there grants the
+/// permission (<see cref="Writer"/>, <see cref="Reader"/>); <c>/api/v1/tenants/{tenant}/permissions</c> shows the
+/// caller's. The callers' tokens grant nothing else (<see cref="CoreWebTestHost"/>'s resolver). The tables come from
 /// <c>EnsureCreated</c>: the model, not a migration, is what these tests are about. Without Docker the host isn't built;
 /// the tests skip through <see cref="Database"/>.
 /// </summary>
 public abstract class TenancyFixture : IAsyncLifetime
 {
+    /// <summary>A member's role that reads and writes the tenant's notes (<c>MultiTenancy:Roles</c>).</summary>
+    public const string Writer = "Writer";
+
+    /// <summary>A member's role that only reads them.</summary>
+    public const string Reader = "Reader";
+
     private CoreWebTestHost? _host;
 
     internal TestDatabase Database { get; private set; } = new("a database", null, "not initialized");
@@ -49,6 +58,13 @@ public abstract class TenancyFixture : IAsyncLifetime
         var connectionString = Database.ConnectionString;
         _host = await CoreWebTestHost.StartAsync(MapNotes, configure: builder =>
         {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                [$"MultiTenancy:Roles:{Writer}:0"] = NotesPermissions.Read,
+                [$"MultiTenancy:Roles:{Writer}:1"] = NotesPermissions.Write,
+                [$"MultiTenancy:Roles:{Reader}:0"] = NotesPermissions.Read
+            });
+            builder.Services.AddPermissionDefinitions<NotesPermissions>();
             builder.AddCoreMultiTenancy();
             builder.Services.AddModuleDatabase((_, options) => UseDatabase(options, connectionString));
             builder.Services.AddModuleDbContext<NotesDbContext>(NotesDbContext.Schema, (_, _) => { });
@@ -83,7 +99,7 @@ public abstract class TenancyFixture : IAsyncLifetime
         return await work(scope.ServiceProvider.GetRequiredService<NotesDbContext>());
     }
 
-    /// <summary>Opens a tenant with <paramref name="members"/> (subjects), without roles; skips the test without Docker.</summary>
+    /// <summary>Opens a tenant with <paramref name="members"/> (subjects) as writers; skips the test without Docker.</summary>
     public async Task<Guid> AddTenantAsync(params string[] members)
     {
         Database.SkipIfUnavailable();
@@ -91,33 +107,48 @@ public abstract class TenancyFixture : IAsyncLifetime
         var directory = scope.ServiceProvider.GetRequiredService<TenantDirectory>();
         var tenant = await directory.CreateAsync("Tenant", TestContext.Current.CancellationToken);
         foreach (var member in members)
-            Assert.True((await directory.AddMemberAsync(tenant, member, [], TestContext.Current.CancellationToken)).IsSuccess);
+            Assert.True((await directory.AddMemberAsync(tenant, member, [Writer], TestContext.Current.CancellationToken)).IsSuccess);
 
         return tenant;
     }
 
-    /// <summary>Runs <paramref name="change"/> on the tenant directory of a scope of its own.</summary>
-    public async Task InDirectoryAsync(Func<TenantDirectory, Task> change)
+    /// <summary>Runs <paramref name="change"/> on the tenant directory of a scope of its own; skips the test without Docker.</summary>
+    public Task InDirectoryAsync(Func<TenantDirectory, Task> change) =>
+        InDirectoryAsync(async directory =>
+        {
+            await change(directory);
+            return true;
+        });
+
+    /// <summary>Runs <paramref name="work"/> on the tenant directory of a scope of its own; skips the test without Docker.</summary>
+    public async Task<T> InDirectoryAsync<T>(Func<TenantDirectory, Task<T>> work)
     {
+        Database.SkipIfUnavailable();
         await using var scope = Host.Services.CreateAsyncScope();
-        await change(scope.ServiceProvider.GetRequiredService<TenantDirectory>());
+        return await work(scope.ServiceProvider.GetRequiredService<TenantDirectory>());
     }
 
     /// <summary>A client signed in as <paramref name="subject"/>.</summary>
     public HttpClient ClientFor(string subject) => Host.CreateClientWithClaims(new Claim(NovaClaims.Subject, subject));
 
-    // A module's tenant endpoints: the notes of the request's tenant.
+    // A module's tenant endpoints: the notes of the request's tenant, and what the caller may do there.
     private static void MapNotes(WebApplication app)
     {
-        var notes = app.MapGroup("/api/v1/tenants/{tenant:guid}/notes").RequireTenant();
+        var tenant = app.MapGroup("/api/v1/tenants/{tenant:guid}").RequireTenant();
+        tenant.MapGet("/permissions", (ClaimsPrincipal user) =>
+            user.FindAll(NovaClaims.Permission).Select(claim => claim.Value).Order(StringComparer.Ordinal).ToArray());
+
+        var notes = tenant.MapGroup("/notes");
         notes.MapGet("/", async (NotesDbContext context, CancellationToken cancellationToken) =>
-            await context.Notes.OrderBy(note => note.Text).Select(note => note.Text).ToListAsync(cancellationToken));
+                await context.Notes.OrderBy(note => note.Text).Select(note => note.Text).ToListAsync(cancellationToken))
+            .RequirePermission(NotesPermissions.Read);
         notes.MapPost("/", async (NoteRequest request, NotesDbContext context, CancellationToken cancellationToken) =>
-        {
-            context.Notes.Add(new Note(request.Text));
-            await context.SaveChangesAsync(cancellationToken);
-            return Results.Created();
-        });
+            {
+                context.Notes.Add(new Note(request.Text));
+                await context.SaveChangesAsync(cancellationToken);
+                return Results.Created();
+            })
+            .RequirePermission(NotesPermissions.Write);
     }
 
     /// <summary>A database of its own on the provider's test server, or an in-memory one.</summary>
@@ -129,6 +160,20 @@ public abstract class TenancyFixture : IAsyncLifetime
 
 /// <summary>A note to add over HTTP.</summary>
 public sealed record NoteRequest(string Text);
+
+/// <summary>The notes module's permissions, which the tenant's roles grant.</summary>
+public sealed class NotesPermissions : IPermissionDefinitionProvider
+{
+    public const string Read = "notes:notes:read";
+
+    public const string Write = "notes:notes:write";
+
+    public IReadOnlyCollection<PermissionDefinition> GetPermissions() =>
+    [
+        new(Read, "Read the tenant's notes", "Notes"),
+        new(Write, "Write the tenant's notes", "Notes")
+    ];
+}
 
 /// <summary>A module context of tenant entities, for the tenant isolation tests.</summary>
 public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options) : DbContext(options)

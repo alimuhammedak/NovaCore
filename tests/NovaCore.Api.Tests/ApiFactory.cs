@@ -24,8 +24,8 @@ namespace NovaCore.Api.Tests;
 /// </summary>
 public abstract class ApiFactory : WebApplicationFactory<Program>
 {
-    // Permissions granted on the server to subjects of IdentityProvider's tokens (none unless granted). Other tokens, the
-    // identity provider add-on's, are resolved by the host's resolver from its store.
+    // Permissions granted on the server to subjects of IdentityProvider's tokens (none unless granted), on top of what the
+    // host's resolvers grant: the identity provider add-on's tokens hold what its store says.
     private readonly ConcurrentDictionary<string, string[]> _grants = new(StringComparer.Ordinal);
 
     /// <summary>The host environment the app boots in. Override to test environment-specific wiring.</summary>
@@ -97,11 +97,9 @@ public abstract class ApiFactory : WebApplicationFactory<Program>
             services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
                 options => options.BackchannelHttpHandler = IdentityProvider.Handler);
 
-            // IdentityProvider's subjects resolve to their grants; the add-on's tokens to the host's resolver.
-            var hostResolver = services.Single(d => d.ServiceType == typeof(IPermissionResolver));
-            services.Remove(hostResolver);
-            services.AddScoped<IPermissionResolver>(provider => new GrantingPermissionResolver(
-                _grants, (IPermissionResolver)ActivatorUtilities.CreateInstance(provider, hostResolver.ImplementationType!)));
+            // The core asks every resolver: IdentityProvider's subjects also hold their grants. The host's resolvers answer
+            // every token, the add-on's from its store, where these subjects aren't.
+            services.AddScoped<IPermissionResolver>(_ => new GrantingPermissionResolver(_grants));
 
             // A production host brings keys (certificates, stood in for by ephemeral keys), a real email sender and a
             // Data Protection key store.
@@ -127,18 +125,14 @@ public abstract class ApiFactory : WebApplicationFactory<Program>
         base.Dispose(disposing);
     }
 
-    private sealed class GrantingPermissionResolver(
-        IReadOnlyDictionary<string, string[]> grants, IPermissionResolver hostResolver) : IPermissionResolver
+    private sealed class GrantingPermissionResolver(IReadOnlyDictionary<string, string[]> grants) : IPermissionResolver
     {
-        public Task<IReadOnlyCollection<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken cancellationToken)
-        {
-            if (!string.Equals(user.FindFirstValue(JwtRegisteredClaimNames.Iss), TestIdentityProvider.Issuer, StringComparison.Ordinal))
-                return hostResolver.GetPermissionsAsync(user, cancellationToken);
-
-            return Task.FromResult<IReadOnlyCollection<string>>(
-                user.FindFirstValue(NovaClaims.Subject) is { } subject && grants.TryGetValue(subject, out var granted)
+        public Task<IReadOnlyCollection<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyCollection<string>>(
+                string.Equals(user.FindFirstValue(JwtRegisteredClaimNames.Iss), TestIdentityProvider.Issuer, StringComparison.Ordinal)
+                && user.FindFirstValue(NovaClaims.Subject) is { } subject
+                && grants.TryGetValue(subject, out var granted)
                     ? granted
                     : []);
-        }
     }
 }

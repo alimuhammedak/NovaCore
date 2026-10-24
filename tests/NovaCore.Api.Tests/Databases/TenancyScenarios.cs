@@ -9,8 +9,8 @@ namespace NovaCore.Api.Tests.Databases;
 /// <summary>
 /// Tenant isolation, the same on every provider: a scope reads and writes only its tenant's rows, and none without a
 /// tenant (docs/plan/PLAN.md F7b.3, DECISIONS D-076 (5), (6)); a request works in the tenant it names only when the caller
-/// is a member of it and it is active (F7b.2, D-076 (3)). Every test works with tenants and subjects of its own, so the
-/// tests of a class share one database.
+/// is a member of it and it is active (F7b.2, D-076 (3)), and holds there what its roles there grant, per tenant (F7b.4,
+/// D-076 (7)). Every test works with tenants and subjects of its own, so the tests of a class share one database.
 /// </summary>
 public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixture<TFixture>
     where TFixture : TenancyFixture
@@ -249,9 +249,113 @@ public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixtu
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task A_subject_holds_the_permissions_of_its_role_in_each_tenant_and_no_other()
+    {
+        var alice = Subject();
+        var (writes, reads) = (await Fixture.AddTenantAsync(alice), await Fixture.AddTenantAsync());
+        await AddMemberAsync(reads, alice, TenancyFixture.Reader);
+        using var client = Fixture.ClientFor(alice);
+
+        // Each tenant in turn, then the first again: a tenant's cached permissions never answer for another.
+        Assert.Equal([NotesPermissions.Read, NotesPermissions.Write], await PermissionsAsync(client, writes));
+        Assert.Equal([NotesPermissions.Read], await PermissionsAsync(client, reads));
+        Assert.Equal([NotesPermissions.Read, NotesPermissions.Write], await PermissionsAsync(client, writes));
+
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(NotesOf(writes), new { text = "a" }, Cancellation)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync(NotesOf(reads), new { text = "b" }, Cancellation)).StatusCode);
+        Assert.Empty(await TextsAsync(reads));
+    }
+
+    [Fact]
+    public async Task A_role_change_takes_effect_on_the_next_request()
+    {
+        var alice = Subject();
+        var tenant = await Fixture.AddTenantAsync(alice);
+        using var client = Fixture.ClientFor(alice);
+        Assert.Equal([NotesPermissions.Read, NotesPermissions.Write], await PermissionsAsync(client, tenant));
+
+        await AddMemberAsync(tenant, alice, TenancyFixture.Reader);
+
+        Assert.Equal([NotesPermissions.Read], await PermissionsAsync(client, tenant));
+    }
+
+    [Fact]
+    public async Task An_ended_membership_loses_the_tenant_on_the_next_request()
+    {
+        var alice = Subject();
+        var tenant = await Fixture.AddTenantAsync(alice);
+        await AddNoteAsync(tenant, "alice's");
+        using var client = Fixture.ClientFor(alice);
+        Assert.Equal(["alice's"], (await client.GetFromJsonAsync<string[]>(NotesOf(tenant), Cancellation))!);
+
+        await Fixture.InDirectoryAsync(async directory =>
+            Assert.True((await directory.RemoveMemberAsync(tenant, alice, Cancellation)).IsSuccess));
+        var response = await client.GetAsync(NotesOf(tenant), Cancellation);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.DoesNotContain("alice's", await response.Content.ReadAsStringAsync(Cancellation), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_member_without_a_role_works_in_the_tenant_with_no_permission()
+    {
+        var alice = Subject();
+        var tenant = await Fixture.AddTenantAsync();
+        await AddMemberAsync(tenant, alice);
+        using var client = Fixture.ClientFor(alice);
+
+        Assert.Empty(await PermissionsAsync(client, tenant));
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(NotesOf(tenant), Cancellation)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_role_outside_the_configuration_is_refused()
+    {
+        var alice = Subject();
+        var tenant = await Fixture.AddTenantAsync();
+
+        var result = await Fixture.InDirectoryAsync(directory =>
+            directory.AddMemberAsync(tenant, alice, [TenancyFixture.Reader, "Owner"], Cancellation));
+
+        Assert.Equal("tenant.unknown_role", result.Error.Code);
+        Assert.Empty(await Fixture.InDirectoryAsync(directory => directory.TenantsOfAsync(alice, Cancellation)));
+    }
+
+    [Fact]
+    public async Task The_tenants_of_a_subject_are_its_active_memberships_with_their_roles_by_name()
+    {
+        var alice = Subject();
+        // Opened in another order than their names': the list goes by name.
+        var (beta, alpha, suspended) = await Fixture.InDirectoryAsync(async directory => (
+            await directory.CreateAsync("Beta", Cancellation),
+            await directory.CreateAsync("Alpha", Cancellation),
+            await directory.CreateAsync("Suspended", Cancellation)));
+        await AddMemberAsync(beta, alice, TenancyFixture.Reader, TenancyFixture.Writer);
+        await AddMemberAsync(alpha, alice, TenancyFixture.Reader);
+        await AddMemberAsync(alpha, Subject(), TenancyFixture.Writer);
+        await AddMemberAsync(suspended, alice, TenancyFixture.Writer);
+        await Fixture.InDirectoryAsync(async directory =>
+            Assert.True((await directory.SuspendAsync(suspended, Cancellation)).IsSuccess));
+
+        var memberships = await Fixture.InDirectoryAsync(directory => directory.TenantsOfAsync(alice, Cancellation));
+
+        Assert.Equal([alpha, beta], memberships.Select(membership => membership.TenantId));
+        Assert.Equal(["Alpha", "Beta"], memberships.Select(membership => membership.Name), StringComparer.Ordinal);
+        Assert.Equal([TenancyFixture.Reader], memberships[0].Roles);
+        Assert.Equal([TenancyFixture.Reader, TenancyFixture.Writer], memberships[1].Roles);
+    }
+
     private static string Subject() => Guid.NewGuid().ToString();
 
     private static Uri NotesOf(Guid tenant) => new($"/api/v1/tenants/{tenant}/notes", UriKind.Relative);
+
+    private Task AddMemberAsync(Guid tenant, string subject, params string[] roles) =>
+        Fixture.InDirectoryAsync(async directory =>
+            Assert.True((await directory.AddMemberAsync(tenant, subject, roles, Cancellation)).IsSuccess));
+
+    private static async Task<string[]> PermissionsAsync(HttpClient client, Guid tenant) =>
+        (await client.GetFromJsonAsync<string[]>(new Uri($"/api/v1/tenants/{tenant}/permissions", UriKind.Relative), Cancellation))!;
 
     private Task<Guid> AddNoteAsync(Guid? tenant, string text, bool archived = false) =>
         Fixture.InScopeAsync(tenant, async notes =>

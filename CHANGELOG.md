@@ -90,9 +90,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ITenantResolver` (`NovaCore.AspNetCore`): the core asks it which tenant a request names and whether the caller may
   work in it, while it resolves the caller's permissions; the add-on implements it. The cached permissions are kept
   per tenant too, and `HybridCache.RemoveTenantPermissionsAsync(tenantId)` drops a tenant's.
+- Multi-tenancy add-on: a member holds roles in a tenant, and in a request that works in that tenant the permissions
+  their roles grant there, on top of the identity provider's. The roles are the product's: `MultiTenancy:Roles:<role>`
+  lists the permissions a role grants, and the host doesn't start when one is a permission no module declares; there is
+  no built-in role. `TenantDirectory.AddMemberAsync` takes roles of that list (`tenant.unknown_role` otherwise),
+  `RemoveMemberAsync` ends a membership, and `TenantsOfAsync` lists a subject's active tenants with their roles there,
+  for a tenant picker. A change takes effect on the member's next request on this server.
 
 ### Changed
 
+- `NovaCore.AspNetCore`: the core asks every registered `IPermissionResolver`, and the caller holds what any of them
+  grants; before, the last registration answered alone. **Upgrade:** a host that registered its own resolver to replace
+  the identity provider's now gets both; remove the registration it doesn't want.
 - Template: the generated CI workflow pins its actions to commit SHAs, narrows its permissions and doesn't persist the
   checkout token. A `.github/dependabot.yml` keeps the pins up to date.
 - Tests run on Microsoft.Testing.Platform with xUnit v3 4.0.2 (`global.json` `test.runner`); `Microsoft.NET.Test.Sdk`

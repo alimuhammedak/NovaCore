@@ -110,18 +110,9 @@ public class ApiFactory : WebApplicationFactory<Program>
             services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
                 options => options.BackchannelHttpHandler = IdentityProvider.Handler);
 
-#if (BuiltInAuth)
-            // The test issuer's subjects hold what CreateClientWithPermissions granted; the identity provider's own
-            // tokens go to the host's resolver, which reads its store.
-            var hostResolver = services.Single(d => d.ServiceType == typeof(IPermissionResolver));
-            services.Remove(hostResolver);
-            services.AddScoped<IPermissionResolver>(provider => new GrantingPermissionResolver(
-                _grants, (IPermissionResolver)ActivatorUtilities.CreateInstance(provider, hostResolver.ImplementationType!)));
-#else
-            // The test issuer's subjects hold what CreateClientWithPermissions granted. Registered last, this resolver is
-            // the one the host uses, also once the project registers its own.
-            services.AddScoped<IPermissionResolver>(_ => new GrantingPermissionResolver(_grants, fallback: null));
-#endif
+            // The core asks every IPermissionResolver: the test issuer's subjects also hold what CreateClientWithPermissions
+            // granted. The host's resolvers answer every token, the identity provider's from its store.
+            services.AddScoped<IPermissionResolver>(_ => new GrantingPermissionResolver(_grants));
 
             // Every module context on its own SQLite database, in place of the host's: a later AddModuleDatabase replaces
             // the earlier one, so the host's provider is never configured and the contexts have one provider each.
@@ -159,17 +150,14 @@ public class ApiFactory : WebApplicationFactory<Program>
         return connection;
     }
 
-    private sealed class GrantingPermissionResolver(
-        IReadOnlyDictionary<string, string[]> grants, IPermissionResolver? fallback) : IPermissionResolver
+    private sealed class GrantingPermissionResolver(IReadOnlyDictionary<string, string[]> grants) : IPermissionResolver
     {
         // By subject, not by issuer: the host's own provider (BuiltIn) issues its tokens as Jwt:Authority, which here is the
         // test issuer too, so only a subject CreateClientWithPermissions made is answered from the grants.
-        public Task<IReadOnlyCollection<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken cancellationToken)
-        {
-            if (user.FindFirstValue(NovaClaims.Subject) is { } subject && grants.TryGetValue(subject, out var granted))
-                return Task.FromResult<IReadOnlyCollection<string>>(granted);
-
-            return fallback?.GetPermissionsAsync(user, cancellationToken) ?? Task.FromResult<IReadOnlyCollection<string>>([]);
-        }
+        public Task<IReadOnlyCollection<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyCollection<string>>(
+                user.FindFirstValue(NovaClaims.Subject) is { } subject && grants.TryGetValue(subject, out var granted)
+                    ? granted
+                    : []);
     }
 }

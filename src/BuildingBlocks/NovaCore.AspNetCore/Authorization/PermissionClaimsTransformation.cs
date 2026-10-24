@@ -10,16 +10,17 @@ using NovaCore.AspNetCore.Identity;
 namespace NovaCore.AspNetCore.Authorization;
 
 /// <summary>
-/// Replaces whatever permissions an access token claims with those <see cref="IPermissionResolver"/> resolves on the
-/// server, cached in <see cref="HybridCache"/> per subject and security stamp for <c>Cache:PermissionExpiration</c>. A
-/// role change therefore reaches a signed-in caller within that lifetime, and a token with a new stamp skips the cache.
+/// Replaces whatever permissions an access token claims with those the <see cref="IPermissionResolver"/>s resolve on the
+/// server (all of them: the identity provider's and the tenancy's, say), cached in <see cref="HybridCache"/> per subject
+/// and security stamp for <c>Cache:PermissionExpiration</c>. A role change therefore reaches a signed-in caller within
+/// that lifetime, and a token with a new stamp skips the cache.
 /// With an <see cref="ITenantResolver"/>, the request's tenant is decided here too, before authorization: the tenant the
 /// request names becomes the scope's (<see cref="TenantContext"/>) only when the resolver lets the caller work in it, and
 /// that decision is cached with the permissions, per tenant. The entries carry the subject's tag and the tenant's, so
 /// whoever changes the permissions or the tenant drops them at once (<see cref="PermissionCacheExtensions"/>).
 /// </summary>
 internal sealed class PermissionClaimsTransformation(
-    IPermissionResolver resolver,
+    IEnumerable<IPermissionResolver> resolvers,
     HybridCache cache,
     IOptions<CacheOptions> cacheOptions,
     TenantContext tenantContext,
@@ -54,19 +55,22 @@ internal sealed class PermissionClaimsTransformation(
 
         var grant = await cache.GetOrCreateAsync(
             CacheKey(subject, transformed.FindFirstValue(NovaClaims.SecurityStamp), requested),
-            (resolver, tenantResolver, tenantContext, transformed, requested),
+            (resolvers, tenantResolver, tenantContext, transformed, requested),
             static async (state, cancellationToken) =>
             {
                 Guid? tenant = null;
                 if (state.requested is { } tenantId
                     && await state.tenantResolver!.CanAccessAsync(state.transformed, tenantId, cancellationToken))
                 {
-                    // The tenant-aware resolvers read the scope's tenant.
+                    // The tenant's resolvers read the scope's tenant.
                     state.tenantContext.Use(tenantId);
                     tenant = tenantId;
                 }
 
-                var permissions = await state.resolver.GetPermissionsAsync(state.transformed, cancellationToken);
+                var permissions = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var resolver in state.resolvers)
+                    permissions.UnionWith(await resolver.GetPermissionsAsync(state.transformed, cancellationToken));
+
                 return new PermissionGrant(tenant, [.. permissions]);
             },
             _entryOptions,

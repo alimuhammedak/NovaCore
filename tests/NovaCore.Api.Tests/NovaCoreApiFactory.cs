@@ -14,8 +14,9 @@ namespace NovaCore.Api.Tests;
 /// The test host (<see cref="ApiFactory"/>) on in-memory SQLite: every DbContext (the modules', the identity provider's
 /// and the tenancy store's) gets its own in-memory SQLite database through <c>AddModuleDatabase</c>, so the database
 /// health checks and the provider's flows run without a real SQL Server, and every context is still registered by
-/// <c>AddModuleDbContext</c>, with its interceptors and tenant isolation. The module databases start with their schema,
-/// as after the migrations, because the host's outbox dispatcher reads their outboxes from the start.
+/// <c>AddModuleDbContext</c>, with its interceptors and tenant isolation. The module databases and the identity
+/// provider's start with their schema, as after the migrations: the host's outbox dispatcher reads the outboxes from the
+/// start, and the identity provider's permission resolver reads its store for every caller.
 /// </summary>
 public class NovaCoreApiFactory : ApiFactory
 {
@@ -39,6 +40,12 @@ public class NovaCoreApiFactory : ApiFactory
         UseSqlite(paymentsOptions, _paymentsDatabase.ConnectionString);
         using var payments = new PaymentsDbContext(paymentsOptions.Options);
         payments.Database.EnsureCreated();
+
+        // The identity provider's resolver looks every caller up in its store, IdentityProvider's subjects too.
+        var identityOptions = new DbContextOptionsBuilder<IdentityServerDbContext>();
+        UseSqlite(identityOptions, _identityDatabase.ConnectionString);
+        using var identity = new IdentityServerDbContext(identityOptions.Options);
+        identity.Database.EnsureCreated();
     }
 
     /// <summary>The Catalog database, for a subclass that writes to it on a connection of its own.</summary>

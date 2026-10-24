@@ -29,10 +29,3 @@ internal sealed class TenantResolver(MultiTenancyDbContext store, IOptions<Multi
             cancellationToken).ConfigureAwait(false);
     }
 }
-
-/// <summary>How the add-on reads the tenant a request names.</summary>
-internal sealed class MultiTenancyOptions
-{
-    /// <summary>The tenant identifier in the request, a Guid; anything else names no tenant.</summary>
-    public Func<HttpContext, string?> TenantOf { get; set; } = _ => null;
-}

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using NovaCore.AspNetCore.Authorization;
 
 namespace NovaCore.MultiTenancy;
@@ -17,9 +19,12 @@ public static class MultiTenancyHostingExtensions
     /// Adds multi-tenancy, reading the tenant from the <see cref="TenantRouteValue"/> route value. A request works in the
     /// tenant it names only when the caller is a member of it and it is active, decided on the server for every request
     /// (<see cref="ITenantResolver"/>, cached with the caller's permissions): otherwise it has no tenant, its tenant
-    /// entities are out of reach and <c>RequireTenant()</c> answers 403. <see cref="TenantDirectory"/> manages the tenants
-    /// and members. The store is <see cref="MultiTenancyDbContext"/>: the host registers it with <c>AddModuleDbContext</c>
-    /// and keeps its migrations.
+    /// entities are out of reach and <c>RequireTenant()</c> answers 403. In a request that works in a tenant, the caller
+    /// also holds what their roles there grant: <c>MultiTenancy:Roles:&lt;role&gt;</c> lists a role's permissions, each
+    /// one a module declares (the host doesn't start otherwise). A request that names the tenant holds them on whatever
+    /// endpoint it calls, so a role grants the permissions of the tenant's endpoints only, never the platform's (the
+    /// identity provider's <c>identity:*</c>). <see cref="TenantDirectory"/> manages the tenants and members. The store is
+    /// <see cref="MultiTenancyDbContext"/>: the host registers it with <c>AddModuleDbContext</c> and keeps its migrations.
     /// </summary>
     /// <param name="builder">The host application builder.</param>
     /// <returns><paramref name="builder"/>, for chaining.</returns>
@@ -41,9 +46,21 @@ public static class MultiTenancyHostingExtensions
         ArgumentNullException.ThrowIfNull(tenantOf);
 
         var services = builder.Services;
-        services.AddOptions<MultiTenancyOptions>().Configure(options => options.TenantOf = tenantOf);
+        services.AddOptions<MultiTenancyOptions>()
+            .BindConfiguration(MultiTenancyOptions.SectionName)
+            .Configure(options => options.TenantOf = tenantOf)
+            .Validate<IEnumerable<IPermissionDefinitionProvider>>(
+                (options, providers) => options.Roles.Values.SelectMany(permissions => permissions).All(
+                    providers.SelectMany(provider => provider.GetPermissions()).Select(permission => permission.Name).Contains),
+                "MultiTenancy:Roles must list permissions a module declares.")
+            .ValidateOnStart();
         services.AddScoped<ITenantResolver, TenantResolver>();
-        services.AddScoped<TenantDirectory>();
+        services.AddScoped<IPermissionResolver, MembershipPermissionResolver>();
+        services.AddScoped(provider => new TenantDirectory(
+            provider.GetRequiredService<MultiTenancyDbContext>(),
+            provider.GetRequiredService<HybridCache>(),
+            provider.GetRequiredService<IOptions<MultiTenancyOptions>>(),
+            provider.GetRequiredService<TimeProvider>()));
         services.TryAddSingleton(TimeProvider.System);
         return builder;
     }
