@@ -1330,3 +1330,11 @@ Bağlam: CRM-Nominal (çok kiracılı eğitim kurumu CRM'i, PostgreSQL) NovaCore
 - Ölçüm: isteğe bağlı bir ilişkiyle (`Reminder.NoteId`, EF varsayılanı `ClientSetNull` → veritabanında cascade yok) modelin sırasıyla (`Note` önce) silme üç veritabanında FK hatası verdi (SQLite 19, PostgreSQL 23503, SQL Server REFERENCE); bağımlı-önce sırasıyla yeşil.
 - Kaynak: https://learn.microsoft.com/azure/architecture/guide/multitenant/considerations/tenant-life-cycle · https://learn.microsoft.com/ef/core/what-is-new/ef-core-7.0/whatsnew#executeupdate-and-executedelete-bulk-updates · https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.entityframeworkqueryableextensions.executedelete?view=efcore-10.0 · ölçüm
 - Sonuç: D-083.
+
+### R-133: Şablonda `--multitenancy` ve seçeneğe göre migration setleri (2026-10-25, faz 7b, F7b.8; kaynak + ölçüm)
+- Soru: Şablona bool bir seçenek nasıl eklenir; Todos'un modeli seçeneğe göre değiştiğinde sağlayıcı × seçenek başına üretilmiş migration setleri üretilen projede tek `Migrations` klasörüne nasıl düşer?
+- MS Learn, ".NET templates for authors": `datatype` `"bool"` olabilir, her sembol `dotnet new`'de bir seçenek olur. `fileRename` için: "the template engine replaces ... every occurrence of the `fileRename` string in file names". Değiştirme yolun her geçişinde yapılır, yani bir klasör belirteci bir başkasını içerirse (`MigrationsPostgreSqlTenants` ⊃ `MigrationsPostgreSql`) sonuç kuralların sırasına bağlı kalır.
+- Ölçüm: fazın ilk smoke koşusu (F7b.8 başı, şablon değişmeden) ilk bileşimde kırmızı: Todos için "Changes have been made to the model since the last migration". F7b.5'in outbox kolonları (`TenantId`, `TraceParent`) şablonun Todos migration'larına girmemişti; smoke faz boyunca hiç koşmamıştı. Kimlik context'i temiz.
+- Ölçüm: dört üretim projesinde (`--auth BuiltIn`, iki `--db` × iki `--multitenancy`) `dotnet ef migrations add Initial` Todos ve store setlerini üretti; kimlik context'inde `has-pending-model-changes` dördünde de temiz.
+- Kaynak: https://learn.microsoft.com/dotnet/core/tools/templates#template-parameters-symbols · ölçüm
+- Sonuç: D-084.

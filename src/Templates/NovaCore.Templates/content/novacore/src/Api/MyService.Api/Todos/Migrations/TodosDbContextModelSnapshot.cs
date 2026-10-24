@@ -103,6 +103,13 @@ namespace MyService.Api.Todos.Migrations
                     b.Property<DateTimeOffset?>("ProcessedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(55)
+                        .HasColumnType("nvarchar(55)");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(512)

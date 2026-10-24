@@ -109,6 +109,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schedules no deletion. The add-on now references `NovaCore.EntityFrameworkCore`.
 - `TenantData` (`NovaCore.EntityFrameworkCore`): deletes a tenant's rows from every module context, a transaction per
   context, a dependent before its principal, and the tenant's outbox messages.
+- Template: `dotnet new novacore --multitenancy` (off by default) adds the multi-tenancy add-on to the generated host
+  (`AddCoreMultiTenancy`, the tenant store's context and migrations, example `Editor` and `Viewer` roles in
+  `MultiTenancy:Roles`) and makes the Todos module's todos tenant entities under `/api/v1/tenants/{tenant}/todos`
+  (`RequireTenant()`, an index on the tenant and title). Its tests open tenants and members through `TenantDirectory`
+  and show that another tenant's todos are out of reach. The template's Todos migrations carry the outbox's tenant and
+  trace columns too; the smoke test builds all eight `--auth` × `--db` × `--multitenancy` projects.
 
 ### Changed
 

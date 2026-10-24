@@ -17,6 +17,9 @@ using NovaCore.EntityFrameworkCore.Persistence;
 #if (BuiltInAuth)
 using NovaCore.Identity.OpenIddict;
 #endif
+#if (multitenancy)
+using NovaCore.MultiTenancy;
+#endif
 
 namespace MyService.Api.Tests;
 
@@ -25,6 +28,10 @@ namespace MyService.Api.Tests;
 /// in-memory OpenID Connect issuer (<see cref="IdentityProvider"/>), and every DbContext runs on its own in-memory SQLite
 /// database, so the tests need no database server and no network. Permissions are resolved on the server, never read from the
 /// token: <see cref="CreateClientWithPermissions"/> grants them to a fresh subject.
+#if (multitenancy)
+/// A tenant's endpoints also need the caller to be a member of that tenant: <see cref="CreateMemberClientAsync"/> makes a
+/// fresh subject a member, whose role there grants the permissions.
+#endif
 /// </summary>
 public class ApiFactory : WebApplicationFactory<Program>
 {
@@ -34,6 +41,9 @@ public class ApiFactory : WebApplicationFactory<Program>
     private readonly SqliteConnection _todosDatabase = OpenSharedInMemoryDatabase();
 #if (BuiltInAuth)
     private readonly SqliteConnection _identityDatabase = OpenSharedInMemoryDatabase();
+#endif
+#if (multitenancy)
+    private readonly SqliteConnection _tenancyDatabase = OpenSharedInMemoryDatabase();
 #endif
 
     private readonly ConcurrentDictionary<string, string[]> _grants = new();
@@ -50,6 +60,12 @@ public class ApiFactory : WebApplicationFactory<Program>
         using var identity = new IdentityServerDbContext(new DbContextOptionsBuilder<IdentityServerDbContext>()
             .UseSqlite(_identityDatabase).ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>().Options);
         identity.Database.EnsureCreated();
+#endif
+#if (multitenancy)
+
+        using var tenancy = new MultiTenancyDbContext(new DbContextOptionsBuilder<MultiTenancyDbContext>()
+            .UseSqlite(_tenancyDatabase).ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>().Options);
+        tenancy.Database.EnsureCreated();
 #endif
     }
 
@@ -75,6 +91,36 @@ public class ApiFactory : WebApplicationFactory<Program>
         _grants[subject] = permissions;
         return CreateClientWithClaims(new Claim(NovaClaims.Subject, subject));
     }
+#if (multitenancy)
+
+    /// <summary>Opens a tenant through the host's <see cref="TenantDirectory"/>.</summary>
+    public async Task<Guid> CreateTenantAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<TenantDirectory>().CreateAsync("Tenant", cancellationToken);
+    }
+
+    /// <summary>
+    /// A client for a fresh subject that is a member of each of <paramref name="tenants"/> with <paramref name="role"/>, a
+    /// role of MultiTenancy:Roles (appsettings.json): what the role grants is all the subject holds, in those tenants only.
+    /// </summary>
+    public async Task<HttpClient> CreateMemberClientAsync(string role, IEnumerable<Guid> tenants, CancellationToken cancellationToken)
+    {
+        var subject = Guid.NewGuid().ToString();
+        await using (var scope = Services.CreateAsyncScope())
+        {
+            var directory = scope.ServiceProvider.GetRequiredService<TenantDirectory>();
+            foreach (var tenant in tenants)
+            {
+                var added = await directory.AddMemberAsync(tenant, subject, [role], cancellationToken);
+                if (added.IsFailure)
+                    throw new InvalidOperationException(added.Error.Message);
+            }
+        }
+
+        return CreateClientWithClaims(new Claim(NovaClaims.Subject, subject));
+    }
+#endif
 
     // Captive dependencies and scoped services resolved from the root fail the host build in every environment.
     protected override IHost CreateHost(IHostBuilder builder)
@@ -120,6 +166,9 @@ public class ApiFactory : WebApplicationFactory<Program>
 #if (BuiltInAuth)
                 options.Options.ContextType == typeof(IdentityServerDbContext) ? _identityDatabase.ConnectionString :
 #endif
+#if (multitenancy)
+                options.Options.ContextType == typeof(MultiTenancyDbContext) ? _tenancyDatabase.ConnectionString :
+#endif
                 _todosDatabase.ConnectionString));
         });
     }
@@ -135,6 +184,9 @@ public class ApiFactory : WebApplicationFactory<Program>
             _todosDatabase.Dispose();
 #if (BuiltInAuth)
             _identityDatabase.Dispose();
+#endif
+#if (multitenancy)
+            _tenancyDatabase.Dispose();
 #endif
             IdentityProvider.Dispose();
         }

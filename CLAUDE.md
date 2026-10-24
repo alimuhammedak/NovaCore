@@ -106,11 +106,11 @@ dotnet ef database update     --project src/Api/NovaCore.Api --startup-project s
 dotnet ef migrations add <Name> --project tests/NovaCore.Api.Tests --startup-project tests/NovaCore.Api.Tests --context <C>DbContext --output-dir PostgreSql/<F>/Migrations
 
 # The template package (src/Templates/NovaCore.Templates, package BMD.NovaCore.Templates) and its smoke test: packs every
-# package into a local feed, creates a project for each --auth (BuiltIn, External) and --db (SqlServer, PostgreSql),
-# builds, tests, runs its license gate and checks its migrations.
+# package into a local feed, creates a project for each --auth (BuiltIn, External), --db (SqlServer, PostgreSql) and
+# --multitenancy (false, true), builds, tests, runs its license gate and checks its migrations.
 bash eng/template-smoke.sh [work-dir]
 dotnet new install BMD.NovaCore.Templates::<version>    # from the GitHub Packages feed
-dotnet new novacore -n MyProject [--auth BuiltIn|External] [--db SqlServer|PostgreSql]
+dotnet new novacore -n MyProject [--auth BuiltIn|External] [--db SqlServer|PostgreSql] [--multitenancy]
 
 # NuGet packages (the seven building blocks + the template, IDs BMD.NovaCore.*) → artifacts/ (git-ignored). Version: VersionPrefix.
 dotnet pack NovaCore.slnx -c Release -o artifacts [--version-suffix preview.1]

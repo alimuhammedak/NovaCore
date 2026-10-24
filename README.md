@@ -54,6 +54,7 @@ dotnet new install BMD.NovaCore.Templates::0.1.0-preview.1
 dotnet new novacore -n SiparisServisi                    # kimlik sağlayıcı host'un içinde (--auth BuiltIn), SQL Server (--db SqlServer)
 dotnet new novacore -n SiparisServisi --auth External    # harici sağlayıcı (Entra ID, Keycloak): yalnızca token doğrulanır
 dotnet new novacore -n SiparisServisi --db PostgreSql    # PostgreSQL
+dotnet new novacore -n SiparisServisi --multitenancy     # birçok kuruma satılan ürün: kurumlar, üyelik, kurum kapsamlı Todos
 cd SiparisServisi && dotnet build && dotnet test         # veritabanı sunucusu gerekmez: testler SQLite kullanır
 ```
 
@@ -71,6 +72,10 @@ cd SiparisServisi && dotnet build && dotnet test         # veritabanı sunucusu 
   ve her context'in migration'larını Api projesinde tutar; modüller veritabanı seçmez. PostgreSQL'in sağlayıcısı ve
   sürücüsü `PostgreSQL` lisanslıdır, üretilen projenin lisans kapısında (`eng/check-licenses.sh`) adıyla istisnadır.
   Sonradan değiştirmek için bkz. [Veritabanı & Migration](#veritabanı--migration).
+- `--multitenancy` (varsayılan kapalı): host'a `NovaCore.MultiTenancy` eklentisini bağlar (`AddCoreMultiTenancy`, kurum
+  store'unun context'i ve migration'ları, `MultiTenancy:Roles`'ta örnek `Editor` ve `Viewer` rolleri). Todos'un kayıtları
+  kuruma aittir ve `/api/v1/tenants/{tenant}/todos` altında yalnız o kurumun üyesine açılır (`RequireTenant()`); izni
+  üyenin o kurumdaki rolü verir. Testler kurumu ve üyeyi `TenantDirectory` ile açar.
 
 ### Şablon ne üretir
 
@@ -280,8 +285,8 @@ Açılınca tarayıcı **Scalar API arayüzünü** (`/scalar/v1`) açar. Bağlan
 > `HealthChecks:ProbePort`'ta yapar.
 
 Şablondan yeni proje açmak için bkz. [Yeni Proje (Tüketici Rehberi)](#yeni-proje-tüketici-rehberi). Şablonu bu
-repodan denemek: `bash eng/template-smoke.sh` (bütün paketleri yerel bir feed'e pack eder, iki kimlik seçeneğiyle proje
-üretip derler ve test eder).
+repodan denemek: `bash eng/template-smoke.sh` (bütün paketleri yerel bir feed'e pack eder, kimlik, veritabanı ve çok
+kiracılılık seçeneklerinin sekiz bileşimiyle proje üretip derler ve test eder).
 
 ### CI, tedarik zinciri ve güvenlik taramaları
 
@@ -417,7 +422,7 @@ NovaCore.slnx
 ├── docker-compose.yml             # opsiyonel SQL Server + PostgreSQL + Seq + Jaeger (imaj sürümleri pinli)
 ├── docker-compose.keycloak.yml    # opsiyonel harici IdP: Keycloak + örnek realm (deploy/keycloak/)
 ├── .env.example                   # compose parolaları için şablon (.env git-ignored)
-├── eng/template-smoke.sh          # şablonu paketlerden kurup her kimlik ve veritabanı seçeneğiyle build/test eden smoke testi
+├── eng/template-smoke.sh          # şablonu paketlerden kurup her kimlik, veritabanı ve çok kiracılılık seçeneğiyle build/test eden smoke testi
 │
 ├── src/
 │   ├── BuildingBlocks/
@@ -922,7 +927,8 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
   de testle sabitlenmiştir. `WorkflowPinTests` her GitHub Action'ın bütün workflow'larda (şablonunki dahil) tek ve tam
   bir commit SHA'sına sabitlendiğini doğrular.
 - **Şablon (tüketici smoke testi):** `bash eng/template-smoke.sh` ve CI'daki `template-smoke` job'ı bütün paketleri yerel
-  bir feed'e pack eder, şablonu kendi hive'ına kurar, `--auth BuiltIn` ve `External` ile birer proje üretir; projeler
+  bir feed'e pack eder, şablonu kendi hive'ına kurar, `--auth`, `--db` ve `--multitenancy`'nin her bileşimiyle (sekiz)
+  birer proje üretir; projeler
   paketleri o feed'den alarak (repo'nun projelerinden değil) uyarılar hata sayılarak derlenir, testleri ve
   `has-pending-model-changes` çalışır, içlerinde repo'ya özgü dosya olmadığı kontrol edilir.
 
