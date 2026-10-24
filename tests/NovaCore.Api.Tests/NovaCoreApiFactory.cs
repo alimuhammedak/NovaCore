@@ -2,8 +2,6 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using NovaCore.EntityFrameworkCore.Messaging;
 using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Identity.OpenIddict;
 using NovaCore.Modules.Catalog.Infrastructure;
@@ -13,9 +11,10 @@ namespace NovaCore.Api.Tests;
 
 /// <summary>
 /// The test host (<see cref="ApiFactory"/>) on in-memory SQLite: every DbContext (the modules' and the identity
-/// provider's) is swapped to its own in-memory SQLite database, so the database health checks and the provider's flows
-/// run without a real SQL Server. The module databases start with their schema, as after the migrations, because the
-/// host's outbox dispatcher reads their outboxes from the start.
+/// provider's) gets its own in-memory SQLite database through <c>AddModuleDatabase</c>, so the database health checks and
+/// the provider's flows run without a real SQL Server, and every context is still registered by
+/// <c>AddModuleDbContext</c>, with its interceptors and tenant isolation. The module databases start with their schema,
+/// as after the migrations, because the host's outbox dispatcher reads their outboxes from the start.
 /// </summary>
 public class NovaCoreApiFactory : ApiFactory
 {
@@ -27,62 +26,48 @@ public class NovaCoreApiFactory : ApiFactory
     private readonly SqliteConnection _catalogDatabase = OpenSharedInMemoryDatabase();
     private readonly SqliteConnection _paymentsDatabase = OpenSharedInMemoryDatabase();
 
-    // The SQLite contexts get their own EF internal provider: Program still gives every module context SQL Server
-    // (AddModuleDatabase), and EF forbids two providers in one container. It stores DateTimeOffset as UTC ticks, which
-    // SQLite can compare and order.
-    private readonly ServiceProvider _sqliteServices = new ServiceCollection()
-        .AddEntityFrameworkSqlite()
-        .Replace(ServiceDescriptor.Singleton<IModelCustomizer, UtcTicksModelCustomizer>())
-        .BuildServiceProvider();
-
     public NovaCoreApiFactory()
     {
-        using var catalog = new CatalogDbContext(new DbContextOptionsBuilder<CatalogDbContext>()
-            .UseSqlite(_catalogDatabase).UseInternalServiceProvider(_sqliteServices).Options);
+        var catalogOptions = new DbContextOptionsBuilder<CatalogDbContext>();
+        UseSqlite(catalogOptions, _catalogDatabase.ConnectionString);
+        using var catalog = new CatalogDbContext(catalogOptions.Options);
         catalog.Database.EnsureCreated();
 
-        using var payments = new PaymentsDbContext(new DbContextOptionsBuilder<PaymentsDbContext>()
-            .UseSqlite(_paymentsDatabase).UseInternalServiceProvider(_sqliteServices).Options);
+        var paymentsOptions = new DbContextOptionsBuilder<PaymentsDbContext>();
+        UseSqlite(paymentsOptions, _paymentsDatabase.ConnectionString);
+        using var payments = new PaymentsDbContext(paymentsOptions.Options);
         payments.Database.EnsureCreated();
     }
 
-    /// <summary>The Catalog database, for a subclass that registers the Catalog context again (<c>ReplaceWithSqlite</c>).</summary>
+    /// <summary>The Catalog database, for a subclass that writes to it on a connection of its own.</summary>
     protected string CatalogConnectionString => _catalogDatabase.ConnectionString;
 
-    protected override void ConfigureDatabases(IServiceCollection services)
+    // A later AddModuleDatabase replaces Program's, so Program's SQL Server is never configured and every context has one
+    // provider.
+    protected override void ConfigureDatabases(IServiceCollection services) =>
+        services.AddModuleDatabase((_, options) => UseDatabase(options));
+
+    /// <summary>
+    /// Gives a module context (<c>options.Options.ContextType</c>) its SQLite database. A subclass points one context
+    /// elsewhere or adds an interceptor to it, and calls this for the others.
+    /// </summary>
+    protected virtual void UseDatabase(DbContextOptionsBuilder options)
     {
-        ReplaceWithSqlite<IdentityServerDbContext>(services, options => options.UseSqlite(_identityDatabase.ConnectionString));
-        ReplaceWithSqlite<CatalogDbContext>(services, options => options.UseSqlite(_catalogDatabase.ConnectionString));
-        ReplaceWithSqlite<PaymentsDbContext>(services, options => options.UseSqlite(_paymentsDatabase.ConnectionString));
+        var contextType = options.Options.ContextType;
+        var database = contextType == typeof(CatalogDbContext) ? _catalogDatabase
+            : contextType == typeof(PaymentsDbContext) ? _paymentsDatabase
+            : contextType == typeof(IdentityServerDbContext) ? _identityDatabase
+            : throw new InvalidOperationException($"The test host has no database for {contextType.Name}.");
+
+        UseSqlite(options, database.ConnectionString);
     }
 
     /// <summary>
-    /// Replaces the registration of <typeparamref name="TContext"/>, on the host's SQL Server (<c>AddModuleDatabase</c>),
-    /// with SQLite, keeping the interceptors of the original registration: the audit interceptor the module adds and the
-    /// outbox interceptor <c>AddModuleDbContext</c> adds. EF Core 10 registers the provider via additive
-    /// <c>IDbContextOptionsConfiguration&lt;TContext&gt;</c>, so EVERY registration generic over the context (options,
-    /// configuration, the context) is removed first.
+    /// SQLite at <paramref name="connectionString"/>, storing <see cref="DateTimeOffset"/> as UTC ticks, which SQLite can
+    /// compare and order.
     /// </summary>
-    protected void ReplaceWithSqlite<TContext>(IServiceCollection services, Action<DbContextOptionsBuilder> useSqlite)
-        where TContext : DbContext
-    {
-        var toRemove = services
-            .Where(d => d.ServiceType == typeof(TContext)
-                        || (d.ServiceType.IsGenericType && d.ServiceType.GetGenericArguments().Contains(typeof(TContext))))
-            .ToList();
-        foreach (var descriptor in toRemove)
-            services.Remove(descriptor);
-
-        services.AddDbContext<TContext>((provider, options) =>
-        {
-            useSqlite(options);
-            options
-                .UseInternalServiceProvider(_sqliteServices)
-                .AddInterceptors(
-                    provider.GetRequiredService<AuditableEntityInterceptor>(),
-                    provider.GetRequiredService<OutboxInterceptor>());
-        });
-    }
+    protected static DbContextOptionsBuilder UseSqlite(DbContextOptionsBuilder options, string connectionString) =>
+        options.UseSqlite(connectionString).ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>();
 
     protected override void Dispose(bool disposing)
     {
@@ -91,7 +76,6 @@ public class NovaCoreApiFactory : ApiFactory
             _identityDatabase.Dispose();
             _catalogDatabase.Dispose();
             _paymentsDatabase.Dispose();
-            _sqliteServices.Dispose();
         }
 
         base.Dispose(disposing);

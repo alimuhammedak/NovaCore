@@ -4,7 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using NovaCore.Abstractions.MultiTenancy;
 using NovaCore.EntityFrameworkCore.Messaging;
+using NovaCore.EntityFrameworkCore.MultiTenancy;
 
 namespace NovaCore.EntityFrameworkCore.Persistence;
 
@@ -81,6 +83,11 @@ public static class PersistenceExtensions
     /// It always gets <see cref="OutboxInterceptor"/>, which writes the domain events its entities raise to its
     /// outbox; the module maps that with <see cref="OutboxModelBuilderExtensions.AddOutbox"/>. The dispatcher that
     /// delivers them comes from <see cref="AddCorePersistence"/>: without it, events are written and never delivered.
+    /// Its <see cref="ITenantEntity"/> types are isolated by tenant (<see cref="TenantContext"/>, scoped, registered here):
+    /// a query reads only the scope's tenant's rows (<see cref="TenantQueryFilter"/>), none without a tenant; a new row
+    /// gets the scope's tenant; a save that would write another tenant's row, move a row to another tenant or write a
+    /// tenant row without a tenant fails; and <c>IgnoreQueryFilters()</c> without names fails on a context that has
+    /// tenant entities. A context without tenant entities is unaffected.
     /// Also registers <see cref="AuditableEntityInterceptor"/> (and the <see cref="TimeProvider"/> it stamps with), which
     /// module contexts add to their options, so the context resolves whether or not the host has called
     /// <see cref="AddCorePersistence"/> yet.
@@ -107,17 +114,23 @@ public static class PersistenceExtensions
             ServiceDescriptor.Singleton<IValidateOptions<ModuleDatabaseOptions>, ModuleDatabaseOptionsValidator>());
         services.AddOptions<ModuleDatabaseOptions>().ValidateOnStart();
 
-        // The history table and the outbox interceptor are added here rather than by each module: a module that forgot
-        // the first would share one history table with the others, and one that forgot the second would lose its events,
-        // without an error.
+        // The history table, the tenant isolation and the outbox interceptor are added here rather than by each module: a
+        // module that forgot the first would share one history table with the others, one that forgot the second would
+        // read and write every tenant's rows, and one that forgot the third would lose its events, without an error.
         services.AddDbContext<TContext>((provider, options) =>
         {
             provider.GetRequiredService<IOptions<ModuleDatabaseOptions>>().Value.Configure!(provider, options);
             KeepMigrationHistoryIn(options, schema);
             configure(provider, options);
-            options.AddInterceptors(provider.GetRequiredService<OutboxInterceptor>());
+            ((IDbContextOptionsBuilderInfrastructure)options).AddOrUpdateExtension(new TenantIsolationExtension());
+            options.AddInterceptors(
+                provider.GetRequiredService<TenantWriteGuard>(),
+                TenantQueryGuard.Instance,
+                provider.GetRequiredService<OutboxInterceptor>());
         });
         services.AddSingleton(new ModuleDbContextDescriptor(typeof(TContext)));
+        services.TryAddScoped<TenantContext>();
+        services.TryAddSingleton<TenantWriteGuard>();
         services.TryAddSingleton<OutboxInterceptor>();
         services.TryAddScoped<AuditableEntityInterceptor>();
         services.TryAddSingleton(TimeProvider.System);

@@ -71,6 +71,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `HybridCache.RemovePermissionsAsync(subject)` (`NovaCore.AspNetCore`): drops the permissions cached for a subject, so
   a change takes effect on its next request instead of after `Cache:PermissionExpiration`.
+- Tenant isolation in every module context. An entity that implements `ITenantEntity` (`NovaCore.Abstractions`,
+  `Guid TenantId`) belongs to one tenant, and `AddModuleDbContext` isolates it with nothing for the module to do. A query
+  reads only the rows of the scope's tenant (`TenantContext`, scoped), and none without one: a named query filter,
+  `TenantQueryFilter.Name`. A new row gets the scope's tenant. A save fails when it would add, change or delete another
+  tenant's row, move a row to another tenant or write a tenant row without a tenant. `IgnoreQueryFilters()` without names
+  fails on a context with tenant entities, so another filter is turned off by its name and the tenant filter stays on; a
+  read across tenants turns it off by its name, explicitly. Work outside a request gives its scope a tenant with
+  `TenantContext.Use(tenantId)`; a scope works in one tenant. A context without tenant entities is unaffected.
 
 ### Changed
 

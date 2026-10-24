@@ -289,8 +289,9 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   `ILike`); the host's `AddModuleDatabase` (and its design-time factories) is the only `UseSqlServer`/`UseNpgsql`. Text
   comparison follows the database's collation: SQL Server's default ignores case, PostgreSQL's doesn't.
 - **Two EF providers can't coexist** on one context. A test host points the module contexts at its own database with a
-  later `AddModuleDatabase` (the PostgreSQL layer, the template's test factory); `NovaCoreApiFactory` still swaps every
-  DbContext to SQLite with its own internal service provider (see `tests/CLAUDE.md`).
+  later `AddModuleDatabase` (`NovaCoreApiFactory`'s SQLite, the PostgreSQL layer, the template's test factory), so
+  Program's SQL Server is never configured and every context still goes through `AddModuleDbContext` (see
+  `tests/CLAUDE.md`).
 - **Suppressed-by-design warnings** (all user-approved, DECISIONS D-011):
   - `Directory.Build.props`: `NoWarn` `RMG020` (Mapperly intentional source-member drops). `WarningsNotAsErrors`
     `NU1901;NU1902` (low/moderate advisories stay warnings; high/critical fail restore; CI fails on any).

@@ -88,6 +88,29 @@ public class ModuleDbContextRegistrationTests
         Assert.Contains("AddModuleDatabase", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Many_hosts_share_one_EF_internal_service_provider(bool withMemoryCache)
+    {
+        // EF Core caches its internal service providers by the options, singleton interceptors included, and fails once a
+        // process holds more than twenty (ManyServiceProvidersCreatedWarning). What AddModuleDbContext adds must be the
+        // same for every host, or each host would build one of its own. A host's own IMemoryCache (HybridCache registers
+        // one) doesn't split them (measured, docs/plan/RESEARCH.md R-130).
+        for (var host = 0; host < 25; host++)
+        {
+            var services = new ServiceCollection()
+                .AddModuleDatabase((_, options) => options.UseSqlite("DataSource=:memory:"))
+                .AddModuleDbContext<SampleDbContext>("sample", (_, _) => { });
+            if (withMemoryCache)
+                services.AddMemoryCache();
+
+            using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+            using var scope = provider.CreateScope();
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<SampleDbContext>().Model);
+        }
+    }
+
     private sealed class SampleDbContext(DbContextOptions<SampleDbContext> options) : DbContext(options);
 
     private sealed class AnonymousUser : ICurrentUser

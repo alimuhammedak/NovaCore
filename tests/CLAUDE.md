@@ -50,17 +50,13 @@ start or end). xUnit's options go after `--`; a solution goes through `--solutio
 
 `ApiFactory` boots the real Program host with what every test host shares (the test issuer, server-side grants,
 environment, scope validation, production extras) and lets a subclass choose the databases. Program gives every module
-context SQL Server (`AddModuleDatabase`); a later `AddModuleDatabase` replaces it, which is how the PostgreSQL layer
-points the contexts at its database. `NovaCoreApiFactory`, the default, swaps **every DbContext** (Catalog, Payments and
-the identity provider's) to its own **in-memory SQLite** connection (`ReplaceWithSqlite<TContext>`), so the full auth
-flow and the `/health` database checks run without a database. Two non-obvious requirements, both load-bearing:
-
-1. **Strip every registration generic over the context before re-adding it.** EF Core 10 registers
-   the provider via additive `IDbContextOptionsConfiguration<TContext>`, so removing only
-   `DbContextOptions<TContext>` leaves the SQL Server config applied → "multiple providers".
-2. **Give the SQLite contexts their own internal service provider** (`new ServiceCollection()
-   .AddEntityFrameworkSqlite().BuildServiceProvider()` + `.UseInternalServiceProvider(...)`). The app still
-   registers SQL Server, and EF forbids two providers in one container.
+context SQL Server (`AddModuleDatabase`); a later `AddModuleDatabase` replaces it, which is how the test hosts point the
+contexts at their databases. Program's SQL Server is then never configured, so each context has one provider, and every
+context still goes through `AddModuleDbContext` (its interceptors, the tenant isolation). `NovaCoreApiFactory`, the
+default, gives **every DbContext** (Catalog, Payments and the identity provider's) its own **in-memory SQLite** database
+(`UseDatabase`, by context type), so the full auth flow and the `/health` database checks run without a database server.
+A subclass overrides `UseDatabase` to point one context elsewhere (`HealthEndpointsTests`) or add an interceptor to it
+(`StockRaceApiFactory`), and calls the base method for the others.
 
 Each context gets a **named, shareable in-memory database** (`Mode=Memory;Cache=Shared;Pooling=False`, a unique name
 per factory). Each context instance opens its own connection to it, and the factory holds one connection open so the
@@ -71,9 +67,9 @@ migrations, so the dispatcher's passes find their outboxes. A test that needs an
 creates it (`EnsureCreated`). Outside Development the factory also brings what a production host must: ephemeral
 signing/encryption keys for the identity provider (standing in for certificates), an email sender and a Data
 Protection key store (`InMemoryKeyStore.AddTo(services)`). A test that expects another startup failure outside
-Development adds the key store too, or the missing store is what stops the host. A subclass can
-call `ReplaceWithSqlite` again to point one context elsewhere. `HealthEndpointsTests` points one at a missing file with
-`Mode=ReadWrite`: the dispatcher opens it too, and the default mode would create the file.
+Development adds the key store too, or the missing store is what stops the host. `HealthEndpointsTests` points one
+context at a missing file with `Mode=ReadWrite`: the dispatcher opens it too, and the default mode would create the
+file.
 
 ## The API contract
 
@@ -119,6 +115,12 @@ packages are tested on SQL Server and PostgreSQL (D-068, D-074):
   `OutboxScenarios`, `QueryScenarios`, `SignInScenarios`); `SqlServer…` and `PostgreSql…` classes derive from them with
   their factory. A scenario that holds on every provider goes there; what one provider does differently (SQL Server's
   migration data steps, each server's default collation in the product search) stays in that provider's class.
+- **Tenant isolation** (`TenancyScenarios`) runs on SQLite too (`SqliteTenancyTests`, no Docker). Its host is
+  `CoreWebTestHost` with a module context of tenant entities (`TenancyFixture`'s `NotesDbContext`, tables from
+  `EnsureCreated`), not the Api host, whose modules have none. Each test works with tenants of its own
+  (`Guid.NewGuid()`), so a class shares one database without resets. `TenantConvention` is the convention test: an
+  entity with a `TenantId` column must carry the tenant filter (`ModuleRegistrationTests` runs it on the Api host's
+  contexts).
 - Raw SQL that runs on both quotes its names with the context's provider (`PortableSql`: `[catalog].[outbox_messages]`
   vs `"catalog"."outbox_messages"`; an unquoted name folds to lower case on PostgreSQL) and passes values as parameters.
   `COUNT(*)` is an `int` on SQL Server and a `bigint` on PostgreSQL: cast it (`CAST(COUNT(*) AS INTEGER)`).
@@ -155,8 +157,8 @@ advances in the same class fixture. So:
   POSTs against that pass.
 
 SQLite keeps `DateTimeOffset` as text and EF Core can't compare or order it there (R-068), so every SQLite test context
-stores it as UTC ticks instead (`UtcTicksModelCustomizer`: in `NovaCoreApiFactory`'s EF service provider, and through
-`ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>()` on the small hosts): production code compares and orders
+stores it as UTC ticks instead (`UtcTicksModelCustomizer`, through `ReplaceService<IModelCustomizer,
+UtcTicksModelCustomizer>()` in `NovaCoreApiFactory.UseSqlite` and on the small hosts): production code compares and orders
 `DateTimeOffset` in SQL, as it should on a real database (the outbox retention, the payment list). Raw SQL against those
 columns writes and reads ticks (`OutboxDispatcherTests`). `QueryScenarios` tests the payment list on SQL Server and
 PostgreSQL.

@@ -56,6 +56,13 @@ NovaCore.Abstractions.Messaging.IDomainEvent.EventId.get -> System.Guid
 NovaCore.Abstractions.Messaging.IDomainEvent.OccurredOnUtc.get -> System.DateTimeOffset
 NovaCore.Abstractions.Messaging.IDomainEventHandler<TEvent>
 NovaCore.Abstractions.Messaging.IDomainEventHandler<TEvent>.HandleAsync(TEvent domainEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+NovaCore.Abstractions.MultiTenancy.ITenantEntity
+NovaCore.Abstractions.MultiTenancy.ITenantEntity.TenantId.get -> System.Guid
+NovaCore.Abstractions.MultiTenancy.ITenantEntity.TenantId.set -> void
+NovaCore.Abstractions.MultiTenancy.TenantContext
+NovaCore.Abstractions.MultiTenancy.TenantContext.TenantContext() -> void
+NovaCore.Abstractions.MultiTenancy.TenantContext.TenantId.get -> System.Guid?
+NovaCore.Abstractions.MultiTenancy.TenantContext.Use(System.Guid tenantId) -> void
 NovaCore.Abstractions.Pagination.PagedList<T>
 NovaCore.Abstractions.Pagination.PagedList<T>.HasNextPage.get -> bool
 NovaCore.Abstractions.Pagination.PagedList<T>.HasPreviousPage.get -> bool

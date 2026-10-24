@@ -63,6 +63,19 @@ public class ModuleRegistrationTests(NovaCoreApiFactory factory) : IClassFixture
     }
 
     [Fact]
+    public void Every_entity_a_context_maps_with_a_tenant_column_is_filtered_by_tenant()
+    {
+        // A TenantId column holds a tenant's rows; without ITenantEntity nothing would filter it (PLAN F7b.3).
+        using var scope = _factory.Services.CreateScope();
+        var contexts = scope.ServiceProvider.GetServices<ModuleDbContextDescriptor>()
+            .Select(descriptor => (DbContext)scope.ServiceProvider.GetRequiredService(descriptor.ContextType))
+            .ToList();
+
+        Assert.NotEmpty(contexts);
+        Assert.All(contexts, context => Assert.Empty(TenantConvention.UnfilteredTenantEntities(context.Model)));
+    }
+
+    [Fact]
     public void Every_module_DbContext_maps_the_outbox()
     {
         // A module's entities write their events to its outbox (PLAN F4a.1). Without modelBuilder.AddOutbox() the first

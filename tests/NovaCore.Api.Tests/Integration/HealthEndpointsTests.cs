@@ -85,13 +85,14 @@ public class HealthEndpointsTests(NovaCoreApiFactory factory) : IClassFixture<No
     /// </summary>
     private sealed class UnreachableCatalogApiFactory : NovaCoreApiFactory
     {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            base.ConfigureWebHost(builder);
+        private readonly string _missingFile = Path.Combine(Path.GetTempPath(), $"novacore-missing-{Guid.NewGuid():N}.db");
 
-            var missingFile = Path.Combine(Path.GetTempPath(), $"novacore-missing-{Guid.NewGuid():N}.db");
-            builder.ConfigureServices(services => ReplaceWithSqlite<CatalogDbContext>(services,
-                options => options.UseSqlite($"Data Source={missingFile};Mode=ReadWrite")));
+        protected override void UseDatabase(DbContextOptionsBuilder options)
+        {
+            if (options.Options.ContextType == typeof(CatalogDbContext))
+                UseSqlite(options, $"Data Source={_missingFile};Mode=ReadWrite");
+            else
+                base.UseDatabase(options);
         }
     }
 }
