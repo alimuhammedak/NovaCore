@@ -6,7 +6,7 @@ namespace MyService.Api.Tests;
 
 /// <summary>
 /// Stores every <see cref="DateTimeOffset"/> of the SQLite test databases as UTC ticks. SQLite keeps them as text and EF
-/// Core can't compare or order them there, while the host compares them in SQL, as it should on SQL Server (the outbox
+/// Core can't compare or order them there, while the host compares them in SQL, as it should on its database (the outbox
 /// dispatcher deletes processed messages by age). The values are UTC, so dropping the offset loses nothing.
 /// </summary>
 public sealed class UtcTicksModelCustomizer(ModelCustomizerDependencies dependencies) : RelationalModelCustomizer(dependencies)

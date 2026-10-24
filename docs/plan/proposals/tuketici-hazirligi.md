@@ -203,7 +203,7 @@ Bu liste bugünkü koda göre hazırlandı. E-maddeleri kapandıkça kısalır.
 
 - **API sürümleme:** Şablon `/api/v1` önekini kullanıyor. İkinci bir sürüm gerçekten gerekene kadar bu yeterli (Y-19). Sürümleme gerekirse projenin kararı.
 - **Frontend kimliği:** Bkz. K3.
-- **Çok kiracılılık, arka plan işleri, dosya depolama, yerelleştirme:** Projenin işi. İkinci bir proje aynı ihtiyacı duyarsa çekirdek değerlendirilir (Y-14).
+- **Çok kiracılılık, arka plan işleri, dosya depolama, yerelleştirme:** Projenin işi. İkinci bir proje aynı ihtiyacı duyarsa çekirdek değerlendirilir (Y-14). **[2026-10-23: çok kiracılılık için D-069 ile değişti; NovaCore'a isteğe bağlı bir paketle girer (Y-48, Faz 7b). Diğerleri için kural aynı.]**
 
 ---
 

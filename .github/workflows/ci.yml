@@ -40,7 +40,8 @@ jobs:
       - name: Restore
         run: dotnet restore NovaCore.slnx --locked-mode
 
-      # Every package in the restored graph, transitive ones included, has an allowed license (Y-06, D-052).
+      # Every package in the restored graph, transitive ones included, has an allowed license or is a named exception
+      # (Y-47: Polly transitively, D-052; the PostgreSQL test layer's provider and driver, D-068).
       - name: Package licenses
         run: bash eng/check-licenses.sh
 
@@ -69,20 +70,16 @@ jobs:
       - name: Architecture tests
         run: dotnet test --project tests/NovaCore.Api.Tests -c Release --no-build -- --filter-namespace NovaCore.Api.Tests.Architecture
 
-      # Each module owns a DbContext, and the host owns the identity provider's; a model change without a migration
-      # fails here.
+      # Each module owns a DbContext, and the host owns the identity provider's; the host keeps every context's SQL Server
+      # migrations (docs/plan/DECISIONS.md D-073). A model change without a migration fails here.
       - name: EF Core model matches migrations
         run: |
           dotnet tool restore
-          for module in Catalog Payments; do
-            project="src/Modules/$module/NovaCore.Modules.$module"
+          for context in CatalogDbContext PaymentsDbContext IdentityServerDbContext; do
             dotnet ef migrations has-pending-model-changes \
-              --project "$project" --startup-project "$project" --context "${module}DbContext" \
+              --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context "$context" \
               --configuration Release --no-build
           done
-          dotnet ef migrations has-pending-model-changes \
-            --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context IdentityServerDbContext \
-            --configuration Release --no-build
 
       # `dotnet list package --vulnerable` exits 0 even when it finds advisories (docs/plan/RESEARCH.md R-027),
       # so its JSON output is checked instead. Any severity fails the build.
@@ -110,7 +107,7 @@ jobs:
 
   # SonarQube Cloud's analysis (docs/plan/DECISIONS.md D-045): its scanner wraps a build, and build-and-test's coverage
   # goes with it. The scanner runs here only, never as a package reference (SonarAnalyzer.CSharp's license is not MIT or
-  # Apache, Y-06). The begin step also turns warnings-as-errors off, which is why this is a job of its own.
+  # Apache, Y-47). The begin step also turns warnings-as-errors off, which is why this is a job of its own.
   sonar:
     needs: [build-and-test, sonar-token]
     if: needs.sonar-token.outputs.present == 'true'

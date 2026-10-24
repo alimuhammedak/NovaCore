@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-#if (BuiltInAuth)
 using Microsoft.EntityFrameworkCore;
-#endif
 using MyService.Modules.Todos;
 using NovaCore.AspNetCore.Hosting;
 using NovaCore.AspNetCore.Modules;
@@ -23,18 +21,24 @@ builder.AddCoreDefaults();                         // health checks + resilient 
 builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth (Jwt:Authority), permissions, rate limiting, CORS
 builder.AddCorePersistence();                      // audit stamping, the outbox dispatcher, opt-in startup migrations
 
+// The database of every module context, chosen here and nowhere else. Their migrations live in this project (one folder
+// per context), as does what `dotnet ef` builds them with (DesignTimeDatabase.cs): change the two together.
+#if (DbSqlServer)
+builder.Services.AddModuleDatabase((services, db) => db.UseSqlServer(
+    services.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
+    sql => sql.MigrationsAssembly(typeof(Program).Assembly).EnableRetryOnFailure()));
+#else
+builder.Services.AddModuleDatabase((services, db) => db.UseNpgsql(
+    services.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
+    npgsql => npgsql.MigrationsAssembly(typeof(Program).Assembly).EnableRetryOnFailure()));
+#endif
+
 #if (BuiltInAuth)
-// The OpenID Connect provider issuing the tokens Jwt:Authority points at: this host. Its store is the host's choice of
-// provider and keeps its migrations here (Identity/Migrations). After AddCorePersistence, so migrations run before seeding.
+// The OpenID Connect provider issuing the tokens Jwt:Authority points at: this host. Its store is a context of the
+// database above, with its migrations in Identity/Migrations. After AddCorePersistence, so migrations run before seeding.
 builder.AddCoreIdentityServer();
-builder.Services.AddModuleDbContext<IdentityServerDbContext>((services, db) => db
-    .UseSqlServer(
-        services.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
-        sql => sql
-            .MigrationsAssembly(typeof(Program).Assembly.GetName().Name)
-            .MigrationsHistoryTable("__EFMigrationsHistory", IdentityServerDbContext.Schema)
-            .EnableRetryOnFailure())
-    .AddInterceptors(services.GetRequiredService<AuditableEntityInterceptor>()));
+builder.Services.AddModuleDbContext<IdentityServerDbContext>(IdentityServerDbContext.Schema,
+    (services, db) => db.AddInterceptors(services.GetRequiredService<AuditableEntityInterceptor>()));
 #else
 // The tokens come from an external OpenID Connect provider (Jwt:Authority). Permissions are resolved on the server, never
 // read from the token: register the IPermissionResolver that answers them for that provider's users, e.g.

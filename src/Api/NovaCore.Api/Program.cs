@@ -23,17 +23,17 @@ builder.AddCoreDefaults();                         // health checks + resilient 
 builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth, rate limiting, CORS
 builder.AddCorePersistence();                      // audit interceptor, domain events + outbox dispatcher, opt-in startup migrations
 
-// The OpenID Connect provider (add-on), issuing the tokens Jwt:Authority points at. Its store lives in this host: the
-// provider and the migrations are the host's choice. After AddCorePersistence, so migrations run before its seeding.
+// The database of every module context, chosen here and nowhere else. Their SQL Server migrations live in this host
+// (Catalog/, Payments/, Identity/), as do the design-time factories `dotnet ef` uses.
+builder.Services.AddModuleDatabase((services, db) => db.UseSqlServer(
+    services.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
+    sql => sql.MigrationsAssembly(typeof(Program).Assembly).EnableRetryOnFailure()));
+
+// The OpenID Connect provider (add-on), issuing the tokens Jwt:Authority points at. Its store is a context of this
+// host's database. After AddCorePersistence, so migrations run before its seeding.
 builder.AddCoreIdentityServer();
-builder.Services.AddModuleDbContext<IdentityServerDbContext>((services, db) => db
-    .UseSqlServer(
-        services.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
-        sql => sql
-            .MigrationsAssembly(typeof(Program).Assembly.GetName().Name)
-            .MigrationsHistoryTable("__EFMigrationsHistory", IdentityServerDbContext.Schema)
-            .EnableRetryOnFailure())
-    .AddInterceptors(services.GetRequiredService<AuditableEntityInterceptor>()));
+builder.Services.AddModuleDbContext<IdentityServerDbContext>(IdentityServerDbContext.Schema,
+    (services, db) => db.AddInterceptors(services.GetRequiredService<AuditableEntityInterceptor>()));
 
 // Modules, after AddCorePersistence so migrations start before module hosted services. Endpoints map in this order.
 builder.AddModule<CatalogModule>();

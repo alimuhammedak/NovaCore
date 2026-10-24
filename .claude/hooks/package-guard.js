@@ -96,7 +96,7 @@ function checkPackages(ids, where) {
   }
   const unknown = ids.filter(id => !isAllowed(id));
   if (unknown.length) {
-    respond('ask', `Onaylanmamış yeni paket: ${unknown.join(', ')} (${where}). DECISIONS D-003/Y-06: çekirdek yalnızca Microsoft/BCL; üçüncü taraf paket yalnızca eklenti paketlerinde ve MIT/Apache lisanslı olabilir. Onaylarsan paketi .claude/hooks/package-policy.json allowlist'ine de ekle ve DECISIONS'a D-kaydı yaz.`);
+    respond('ask', `Onaylanmamış yeni paket: ${unknown.join(', ')} (${where}). DECISIONS D-003/Y-47: çekirdek yalnızca Microsoft/BCL; üçüncü taraf paket yalnızca eklenti paketlerinde ve MIT/Apache lisanslı olabilir. Onaylarsan paketi .claude/hooks/package-policy.json allowlist'ine de ekle ve DECISIONS'a D-kaydı yaz.`);
   }
 }
 

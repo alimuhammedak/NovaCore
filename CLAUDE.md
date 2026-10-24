@@ -67,7 +67,7 @@ dotnet build                                  # whole solution (NovaCore.slnx); 
 dotnet restore NovaCore.slnx --force          # incremental builds skip restore, so NuGet audit (NU19xx) stays hidden without this
 dotnet restore NovaCore.slnx --force-evaluate # after changing a package version: rewrites the packages.lock.json files
 dotnet restore NovaCore.slnx --locked-mode    # what CI runs: fails if the package graph differs from the lock files
-bash eng/check-licenses.sh                    # license gate: every package MIT/Apache-2.0 (Microsoft and Polly.*: D-052)
+bash eng/check-licenses.sh                    # license gate: every package MIT/Apache-2.0; exceptions: Microsoft, Polly.* (transitive, D-052), Npgsql and Npgsql.EntityFrameworkCore.PostgreSQL (D-072)
 bash eng/check-coverage.sh [Debug] [--update] # tests with coverage, held to eng/coverage-baseline.txt (D-060); build first
 bash eng/check-openapi.sh [base-revision]     # breaking changes in docs/openapi/v1.json since main (oasdiff, Docker; D-061)
 bash eng/mutation.sh                          # Stryker.NET on the abstractions and domain code, a report (D-063)
@@ -77,7 +77,7 @@ coderabbit review --agent --uncommitted --include-untracked   # CodeRabbit CLI r
 dotnet format NovaCore.slnx                   # fixes what CI's `dotnet format --verify-no-changes` reports
 git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release
-dotnet test                                   # all tests: SQLite, plus the SQL Server layer in a Docker container (skips without Docker)
+dotnet test                                   # all tests: SQLite, plus the SQL Server and PostgreSQL layers in Docker containers (skip without Docker)
 dotnet test -- --filter-method "*.AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"   # single test (--filter-class for a class)
 #   `dotnet test` runs on Microsoft.Testing.Platform (global.json): the solution goes through --solution, xUnit's own
 #   options come after `--`, and -nologo isn't accepted before .NET 11 (exit code 5).
@@ -85,19 +85,22 @@ dotnet test -- --filter-method "*.AuthorizationCodeFlowTests.Refresh_rotates_the
 # Run (Development opens Scalar UI at /scalar/v1)
 dotnet run --project src/Api/NovaCore.Api
 
-# EF Core migrations — THREE separate DbContexts: one per module, plus the identity provider's in the host. Restore tools first.
+# EF Core migrations — THREE separate DbContexts: one per module, plus the identity provider's. The host chooses the
+# database (AddModuleDatabase) and keeps every context's SQL Server migrations and design-time factory (D-073), so the
+# Api is BOTH -p and -s. Restore tools first.
 dotnet tool restore
-dotnet ef migrations add <Name> --project src/Modules/<M>/NovaCore.Modules.<M> --startup-project src/Modules/<M>/NovaCore.Modules.<M> --context <M>DbContext --output-dir Infrastructure/Migrations
-dotnet ef database update     --project src/Modules/<M>/NovaCore.Modules.<M> --startup-project src/Modules/<M>/NovaCore.Modules.<M> --context <M>DbContext
-#   <M> ∈ { Catalog, Payments }. The module is BOTH -p and -s (each has a design-time factory).
-# The identity provider's context comes from the NovaCore.Identity.OpenIddict package; its migrations live in the Api (R-060):
-dotnet ef migrations add <Name> --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context IdentityServerDbContext --output-dir Identity/Migrations
+dotnet ef migrations add <Name> --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context <C>DbContext --output-dir <F>/Migrations
+dotnet ef database update     --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context <C>DbContext
+#   <C>/<F> ∈ { Catalog/Catalog, Payments/Payments, IdentityServer/Identity }.
+# A model change needs a migration in each provider's set (D-074): the PostgreSQL test layer's lives in the test project.
+dotnet ef migrations add <Name> --project tests/NovaCore.Api.Tests --startup-project tests/NovaCore.Api.Tests --context <C>DbContext --output-dir PostgreSql/<F>/Migrations
 
 # The template package (src/Templates/NovaCore.Templates, package BMD.NovaCore.Templates) and its smoke test: packs every
-# package into a local feed, creates a project with --auth BuiltIn and External, builds, tests and checks its migrations.
+# package into a local feed, creates a project for each --auth (BuiltIn, External) and --db (SqlServer, PostgreSql),
+# builds, tests, runs its license gate and checks its migrations.
 bash eng/template-smoke.sh [work-dir]
 dotnet new install BMD.NovaCore.Templates::<version>    # from the GitHub Packages feed
-dotnet new novacore -n MyProject [--auth BuiltIn|External]
+dotnet new novacore -n MyProject [--auth BuiltIn|External] [--db SqlServer|PostgreSql]
 
 # NuGet packages (the seven building blocks + the template, IDs BMD.NovaCore.*) → artifacts/ (git-ignored). Version: VersionPrefix.
 dotnet pack NovaCore.slnx -c Release -o artifacts [--version-suffix preview.1]
@@ -112,7 +115,8 @@ on a `v*` tag that must match `VersionPrefix` (GitHub Packages): a read-only `bu
 `release` environment (owner approval) that signs build provenance and pushes. CI also runs CodeQL (`codeql.yml`),
 Scorecard (`scorecard.yml`), a Betterleaks history scan and the workflow linters; the SDK is pinned exactly
 (`global.json` `rollForward: disable`, D-048).
-The connection string targets a **local SQL Server via Windows auth** (`appsettings.json`).
+The Api host chooses **SQL Server** for every module context (`AddModuleDatabase` in `Program.cs`); its connection string
+targets a **local SQL Server via Windows auth** (`appsettings.json`).
 
 ---
 
@@ -139,8 +143,9 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
 
 - **The host composes everything explicitly** (`src/Api/NovaCore.Api/Program.cs`): the add-ons (`AddCoreLogging`,
   `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`), the identity provider
-  (`AddCoreIdentityServer` + `AddModuleDbContext<IdentityServerDbContext>` with its SQL Server store), then one
-  `builder.AddModule<TModule>()` per module; after `Build`,
+  the database of every module context (`AddModuleDatabase`: SQL Server, the host's migrations), the identity provider
+  (`AddCoreIdentityServer` + `AddModuleDbContext<IdentityServerDbContext>`), then one `builder.AddModule<TModule>()` per
+  module; after `Build`,
   `UseSerilogRequestLogging`, `UseCoreWeb`, `MapCoreScalar`, `MapCoreIdentityServer`, `MapModules`,
   `MapDefaultEndpoints` (health endpoints, Development only, D-022). Nothing is found by
   assembly scanning (Y-20, `ExplicitRegistrationTests`).
@@ -154,11 +159,15 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
   `AddCoreWeb`/`UseCoreWeb` (ProblemDetails + exception handlers, OpenAPI document, JWT auth, permission authz, rate
   limiter, CORS, security headers) in `NovaCore.AspNetCore`; logging, tracing and the Scalar UI are add-ons.
 
-- **Persistence:** each module owns a `DbContext` pinned to its own SQL Server schema
-  (`catalog` / `payments` / `identity`, via `HasDefaultSchema`). Register through
-  `services.AddModuleDbContext<TContext>(...)` (`NovaCore.EntityFrameworkCore`) — this also enrolls the context for
-  generic startup migration (`DatabaseMigrationService`, registered by `AddCorePersistence`; it migrates only when
-  `Database:ApplyMigrations` is true).
+- **Persistence:** each module owns a `DbContext` pinned to its own schema (`catalog` / `payments` / `identity`, via
+  `HasDefaultSchema`). Register through `services.AddModuleDbContext<TContext>(schema, configure)`
+  (`NovaCore.EntityFrameworkCore`): it keeps the context's migration history in its schema, adds the outbox interceptor and
+  enrolls the context for generic startup migration (`DatabaseMigrationService`, registered by `AddCorePersistence`; it
+  migrates only when `Database:ApplyMigrations` is true). **No module chooses a database:** the host gives every module
+  context its provider once, `services.AddModuleDatabase((sp, options) => options.UseSqlServer(...))` (a later call
+  replaces it; without one the host doesn't start), and keeps the provider-specific migrations and design-time factories
+  (`src/Api/NovaCore.Api/{Catalog,Payments,Identity}`, D-068, D-073). `ModuleProviderTests` checks that no module
+  references a provider. The packages are tested on SQL Server and PostgreSQL (D-074).
 
 - **Domain events go through a transactional outbox.** An entity `Raise`s a `DomainEvent` record; the save that saves
   the entity writes it to the module's `outbox_messages` in the same transaction (`OutboxInterceptor`, added by
@@ -187,7 +196,8 @@ The connection string targets a **local SQL Server via Windows auth** (`appsetti
 
 These are hard rules. Breaking them defeats the point of the project or fails an architecture test.
 
-- **Packages: MIT/Apache (or Microsoft built-in) ONLY.** **Never add MediatR, AutoMapper, or
+- **Packages: MIT/Apache (or Microsoft built-in) ONLY**, plus the named exceptions DECISIONS records (Y-47: `Polly.*`
+  transitively; a project's database provider and driver by exact package ID, `eng/check-licenses.sh`). **Never add MediatR, AutoMapper, or
   FluentAssertions** — they are now commercial. Use: Mapperly (mapping), .NET 10's built-in validation
   (validation), Scalar (OpenAPI UI). No other mediator or request-dispatch abstraction either (DECISIONS Y-01).
 
@@ -275,21 +285,24 @@ These are hard rules. Breaking them defeats the point of the project or fails an
 ## Gotchas (learned the hard way)
 
 - **`WithTags` on a route group** needs `using Microsoft.AspNetCore.Http;` (not just `...Builder`).
-- **SQL Server, not Postgres:** use `EF.Functions.Like` (not `ILike`); `UseSqlServer`, not `UseNpgsql`.
-- **Two EF providers can't coexist** in one container. The test host swaps every DbContext to SQLite and must
-  give them their own internal service provider (see `tests/CLAUDE.md`).
+- **Provider-neutral code:** modules and packages use EF Core's provider-neutral API (`EF.Functions.Like`, not Npgsql's
+  `ILike`); the host's `AddModuleDatabase` (and its design-time factories) is the only `UseSqlServer`/`UseNpgsql`. Text
+  comparison follows the database's collation: SQL Server's default ignores case, PostgreSQL's doesn't.
+- **Two EF providers can't coexist** on one context. A test host points the module contexts at its own database with a
+  later `AddModuleDatabase` (the PostgreSQL layer, the template's test factory); `NovaCoreApiFactory` still swaps every
+  DbContext to SQLite with its own internal service provider (see `tests/CLAUDE.md`).
 - **Suppressed-by-design warnings** (all user-approved, DECISIONS D-011):
   - `Directory.Build.props`: `NoWarn` `RMG020` (Mapperly intentional source-member drops). `WarningsNotAsErrors`
     `NU1901;NU1902` (low/moderate advisories stay warnings; high/critical fail restore; CI fails on any).
   - Allowed by Microsoft's "When to suppress" section (DECISIONS Y-46): `.editorconfig` CA1861 off for
-    `src/**/Migrations/*.cs` (EF migrations, R-064); `[SuppressMessage]` CA5350 on the test TOTP generator (R-063).
+    `{src,tests}/**/Migrations/*.cs` (EF migrations, R-064); `[SuppressMessage]` CA5350 on the test TOTP generator (R-063).
   - `.editorconfig`: CA1707 is off for `tests/**.cs` (test names are sentences).
   - Allowed by Microsoft's "When to suppress" (D-064, D-065): CA2007 off for the host, the modules, the tests and the
     two packages that run only inside ASP.NET Core (`NovaCore.AspNetCore`, `NovaCore.Identity.OpenIddict`); the other
     packages call `ConfigureAwait(false)`. CA1812 off everywhere (DI and framework-created classes). CA1506 with a
     justified `[SuppressMessage]` on three composition roots and protocol flows (the template: its `Program.cs`).
   - Meziantou, user-approved (Q-50): MA0048 off (related types share a file), MA0004 off where CA2007 is, MA0051 off
-    for migrations.
+    for migrations (the PostgreSQL test set's included).
   - `[SuppressMessage]` with justification on `Error` (CA1716) and `IDomainEventHandler<T>` (CA1711).
 - **`Directory.Build.targets` is too late for some properties.** The SDK computes `DocumentationFile` (from
   `GenerateDocumentationFile`) and Roslyn `DeterministicSourcePaths` (from `ContinuousIntegrationBuild`) before it is

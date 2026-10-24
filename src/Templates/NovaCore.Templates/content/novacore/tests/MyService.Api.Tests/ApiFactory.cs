@@ -9,12 +9,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using MyService.Modules.Todos.Infrastructure;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
-using NovaCore.EntityFrameworkCore.Messaging;
 using NovaCore.EntityFrameworkCore.Persistence;
 #if (BuiltInAuth)
 using NovaCore.Identity.OpenIddict;
@@ -25,7 +23,7 @@ namespace MyService.Api.Tests;
 /// <summary>
 /// Starts the real host (Program.cs) in memory, in Development, with startup migrations off. JWT validation points at an
 /// in-memory OpenID Connect issuer (<see cref="IdentityProvider"/>), and every DbContext runs on its own in-memory SQLite
-/// database, so the tests need no SQL Server and no network. Permissions are resolved on the server, never read from the
+/// database, so the tests need no database server and no network. Permissions are resolved on the server, never read from the
 /// token: <see cref="CreateClientWithPermissions"/> grants them to a fresh subject.
 /// </summary>
 public class ApiFactory : WebApplicationFactory<Program>
@@ -38,13 +36,6 @@ public class ApiFactory : WebApplicationFactory<Program>
     private readonly SqliteConnection _identityDatabase = OpenSharedInMemoryDatabase();
 #endif
 
-    // The SQLite contexts get their own EF Core internal service provider: the host registers SQL Server, and EF Core
-    // allows one provider per container. It stores DateTimeOffset as UTC ticks, which SQLite can compare and order.
-    private readonly ServiceProvider _sqliteServices = new ServiceCollection()
-        .AddEntityFrameworkSqlite()
-        .Replace(ServiceDescriptor.Singleton<IModelCustomizer, UtcTicksModelCustomizer>())
-        .BuildServiceProvider();
-
     private readonly ConcurrentDictionary<string, string[]> _grants = new();
 
     public ApiFactory()
@@ -52,12 +43,12 @@ public class ApiFactory : WebApplicationFactory<Program>
         // The schemas exist from the start, as after the migrations: the host's background services (the outbox
         // dispatcher, the identity provider's pruning) read them as soon as it starts.
         using var todos = new TodosDbContext(new DbContextOptionsBuilder<TodosDbContext>()
-            .UseSqlite(_todosDatabase).UseInternalServiceProvider(_sqliteServices).Options);
+            .UseSqlite(_todosDatabase).ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>().Options);
         todos.Database.EnsureCreated();
 #if (BuiltInAuth)
 
         using var identity = new IdentityServerDbContext(new DbContextOptionsBuilder<IdentityServerDbContext>()
-            .UseSqlite(_identityDatabase).UseInternalServiceProvider(_sqliteServices).Options);
+            .UseSqlite(_identityDatabase).ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>().Options);
         identity.Database.EnsureCreated();
 #endif
     }
@@ -126,39 +117,25 @@ public class ApiFactory : WebApplicationFactory<Program>
             services.Remove(hostResolver);
             services.AddScoped<IPermissionResolver>(provider => new GrantingPermissionResolver(
                 _grants, (IPermissionResolver)ActivatorUtilities.CreateInstance(provider, hostResolver.ImplementationType!)));
-
-            ReplaceWithSqlite<IdentityServerDbContext>(services, _identityDatabase.ConnectionString);
 #else
             // The test issuer's subjects hold what CreateClientWithPermissions granted. Registered last, this resolver is
             // the one the host uses, also once the project registers its own.
             services.AddScoped<IPermissionResolver>(_ => new GrantingPermissionResolver(_grants, fallback: null));
 #endif
-            ReplaceWithSqlite<TodosDbContext>(services, _todosDatabase.ConnectionString);
+
+            // Every module context on its own SQLite database, in place of the host's: a later AddModuleDatabase replaces
+            // the earlier one, so the host's provider is never configured and the contexts have one provider each.
+            services.AddModuleDatabase((_, options) => UseSqlite(options,
+#if (BuiltInAuth)
+                options.Options.ContextType == typeof(IdentityServerDbContext) ? _identityDatabase.ConnectionString :
+#endif
+                _todosDatabase.ConnectionString));
         });
     }
 
-    /// <summary>
-    /// Replaces the SQL Server registration of <typeparamref name="TContext"/> with SQLite, keeping the audit and outbox
-    /// interceptors. EF Core registers the provider through several services generic over the context, so all of them
-    /// are removed first; leaving one behind configures two providers.
-    /// </summary>
-    private void ReplaceWithSqlite<TContext>(IServiceCollection services, string connectionString)
-        where TContext : DbContext
-    {
-        var registrations = services
-            .Where(d => d.ServiceType == typeof(TContext)
-                        || (d.ServiceType.IsGenericType && d.ServiceType.GetGenericArguments().Contains(typeof(TContext))))
-            .ToList();
-        foreach (var registration in registrations)
-            services.Remove(registration);
-
-        services.AddDbContext<TContext>((provider, options) => options
-            .UseSqlite(connectionString)
-            .UseInternalServiceProvider(_sqliteServices)
-            .AddInterceptors(
-                provider.GetRequiredService<AuditableEntityInterceptor>(),
-                provider.GetRequiredService<OutboxInterceptor>()));
-    }
+    // Stores DateTimeOffset as UTC ticks, which SQLite can compare and order.
+    private static DbContextOptionsBuilder UseSqlite(DbContextOptionsBuilder options, string connectionString) =>
+        options.UseSqlite(connectionString).ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>();
 
     protected override void Dispose(bool disposing)
     {
@@ -168,7 +145,6 @@ public class ApiFactory : WebApplicationFactory<Program>
 #if (BuiltInAuth)
             _identityDatabase.Dispose();
 #endif
-            _sqliteServices.Dispose();
             IdentityProvider.Dispose();
         }
 

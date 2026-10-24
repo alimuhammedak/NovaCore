@@ -27,8 +27,9 @@ public class NovaCoreApiFactory : ApiFactory
     private readonly SqliteConnection _catalogDatabase = OpenSharedInMemoryDatabase();
     private readonly SqliteConnection _paymentsDatabase = OpenSharedInMemoryDatabase();
 
-    // The SQLite contexts get their own EF internal provider: the app still registers SQL Server, and EF forbids two
-    // providers in one container. It stores DateTimeOffset as UTC ticks, which SQLite can compare and order.
+    // The SQLite contexts get their own EF internal provider: Program still gives every module context SQL Server
+    // (AddModuleDatabase), and EF forbids two providers in one container. It stores DateTimeOffset as UTC ticks, which
+    // SQLite can compare and order.
     private readonly ServiceProvider _sqliteServices = new ServiceCollection()
         .AddEntityFrameworkSqlite()
         .Replace(ServiceDescriptor.Singleton<IModelCustomizer, UtcTicksModelCustomizer>())
@@ -56,9 +57,9 @@ public class NovaCoreApiFactory : ApiFactory
     }
 
     /// <summary>
-    /// Replaces a module's SQL Server registration of <typeparamref name="TContext"/> with SQLite, keeping the interceptors
-    /// of the original registration: the audit interceptor the module adds and the outbox interceptor
-    /// <c>AddModuleDbContext</c> adds. EF Core 10 registers the provider via additive
+    /// Replaces the registration of <typeparamref name="TContext"/>, on the host's SQL Server (<c>AddModuleDatabase</c>),
+    /// with SQLite, keeping the interceptors of the original registration: the audit interceptor the module adds and the
+    /// outbox interceptor <c>AddModuleDbContext</c> adds. EF Core 10 registers the provider via additive
     /// <c>IDbContextOptionsConfiguration&lt;TContext&gt;</c>, so EVERY registration generic over the context (options,
     /// configuration, the context) is removed first.
     /// </summary>

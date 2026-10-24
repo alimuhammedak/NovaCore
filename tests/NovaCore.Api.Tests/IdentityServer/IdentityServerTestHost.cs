@@ -79,9 +79,9 @@ public sealed class IdentityServerTestHost : IAsyncDisposable
             builder.AddCoreWeb();
             builder.AddCorePersistence();
             builder.AddCoreIdentityServer();
-            builder.Services.AddModuleDbContext<IdentityServerDbContext>((provider, db) => db
-                .UseSqlite(connection.ConnectionString)
-                .AddInterceptors(provider.GetRequiredService<AuditableEntityInterceptor>()));
+            builder.Services.AddModuleDatabase((_, db) => db.UseSqlite(connection.ConnectionString));
+            builder.Services.AddModuleDbContext<IdentityServerDbContext>(IdentityServerDbContext.Schema,
+                (provider, db) => db.AddInterceptors(provider.GetRequiredService<AuditableEntityInterceptor>()));
 
             // JwtBearer reads the authority's metadata and keys from this very server (docs/plan/RESEARCH.md R-056).
             builder.Services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
@@ -170,7 +170,8 @@ public sealed class IdentityServerTestHost : IAsyncDisposable
     }
 
     // The backchannel is configured before the server exists, so it resolves the server's handler on first use.
-    private sealed class TestServerHandler(Func<TestServer> server) : HttpMessageHandler
+    /// <summary>Sends JwtBearer's backchannel requests (discovery, keys) to a host's own in-memory server.</summary>
+    internal sealed class TestServerHandler(Func<TestServer> server) : HttpMessageHandler
     {
         private HttpMessageInvoker? _invoker;
 

@@ -41,21 +41,27 @@ jobs:
           NuGetPackageSourceCredentials_novacore: Username=${{ github.actor }};Password=${{ secrets.NOVACORE_PACKAGES_TOKEN }}
         run: dotnet restore
 
+      # Every package, transitive ones included, is MIT or Apache-2.0 licensed or a named exception of this project
+      # (eng/check-licenses.sh).
+      - name: Package licenses
+        run: bash eng/check-licenses.sh
+
       - name: Build
         run: dotnet build -c Release --no-restore
 
       - name: Test
         run: dotnet test -c Release --no-build
 
-      # Each module owns a DbContext and its migrations; a model change without a migration fails here.
+      # Each module owns a DbContext; the host keeps every context's migrations. A model change without a migration fails
+      # here.
       - name: Migrations match the model
         run: |
           dotnet tool restore
-          module=src/Modules/Todos/MyService.Modules.Todos
-          dotnet ef migrations has-pending-model-changes --project "$module" --startup-project "$module" \
+          api=src/Api/MyService.Api
+          dotnet ef migrations has-pending-model-changes --project "$api" --startup-project "$api" \
             --context TodosDbContext --configuration Release --no-build
 #if (BuiltInAuth)
-          dotnet ef migrations has-pending-model-changes --project src/Api/MyService.Api --startup-project src/Api/MyService.Api \
+          dotnet ef migrations has-pending-model-changes --project "$api" --startup-project "$api" \
             --context IdentityServerDbContext --configuration Release --no-build
 #endif
 
@@ -70,13 +76,12 @@ jobs:
           ASPNETCORE_ENVIRONMENT: Production
           NuGetPackageSourceCredentials_novacore: Username=${{ github.actor }};Password=${{ secrets.NOVACORE_PACKAGES_TOKEN }}
         run: |
-          module=src/Modules/Todos/MyService.Modules.Todos
-          dotnet ef migrations bundle --project "$module" --startup-project "$module" --context TodosDbContext \
+          api=src/Api/MyService.Api
+          dotnet ef migrations bundle --project "$api" --startup-project "$api" --context TodosDbContext \
             --configuration Release --target-runtime linux-x64 --output artifacts/migrations/todos/efbundle
 #if (BuiltInAuth)
-          dotnet ef migrations bundle --project src/Api/MyService.Api --startup-project src/Api/MyService.Api \
-            --context IdentityServerDbContext --configuration Release --target-runtime linux-x64 \
-            --output artifacts/migrations/identity/efbundle
+          dotnet ef migrations bundle --project "$api" --startup-project "$api" --context IdentityServerDbContext \
+            --configuration Release --target-runtime linux-x64 --output artifacts/migrations/identity/efbundle
 #endif
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

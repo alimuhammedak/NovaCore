@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Abstractions.Messaging;
@@ -25,18 +24,9 @@ public sealed class PaymentsModule : IModule
 
     public IServiceCollection AddModule(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddModuleDbContext<PaymentsDbContext>((serviceProvider, options) =>
-        {
-            options.UseSqlServer(
-                configuration.GetConnectionString("Database"),
-                sql =>
-                {
-                    sql.MigrationsHistoryTable("__EFMigrationsHistory", PaymentsDbContext.Schema);
-                    sql.EnableRetryOnFailure();
-                });
-
-            options.AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>());
-        });
+        // The database is the host's choice (AddModuleDatabase); the module brings its schema and its interceptors.
+        services.AddModuleDbContext<PaymentsDbContext>(PaymentsDbContext.Schema, (serviceProvider, options) =>
+            options.AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>()));
 
         services.AddPermissionDefinitions<PaymentsPermissionProvider>();
 

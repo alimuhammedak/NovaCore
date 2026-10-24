@@ -56,7 +56,7 @@ dotnet_diagnostic.MA0004.severity = none
 dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.MA0004.severity = none
 
-[src/**/Migrations/*.cs]
+[{src,tests}/**/Migrations/*.cs]
 # EF Core migrations pass constant column arrays (composite indexes). Up/Down run once per database and the builder keeps
 # the arrays, the two cases CA1861's documentation allows suppressing (docs/plan/RESEARCH.md R-064).
 dotnet_diagnostic.CA1861.severity = none

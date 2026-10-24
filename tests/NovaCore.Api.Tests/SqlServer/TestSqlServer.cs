@@ -1,8 +1,7 @@
-using System.Diagnostics.CodeAnalysis;
 using DotNet.Testcontainers.Builders;
 using Microsoft.Data.SqlClient;
+using NovaCore.Api.Tests.Databases;
 using Testcontainers.MsSql;
-using Xunit;
 
 namespace NovaCore.Api.Tests.SqlServer;
 
@@ -14,9 +13,11 @@ namespace NovaCore.Api.Tests.SqlServer;
 /// </summary>
 internal static class TestSqlServer
 {
-    /// <summary>The image docker-compose.yml runs, digest included (<c>SqlServerImageTests</c> keeps the two equal).</summary>
+    /// <summary>The image docker-compose.yml runs, digest included (<c>DatabaseImageTests</c> keeps the two equal).</summary>
     public const string Image =
         "mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04@sha256:4402d880dd4c34bfa7d8705e56a86cd6c88da80a1f6bbbe741f999e76264a090";
+
+    private const string Provider = "SQL Server";
 
     // xUnit fixtures can't depend on one another, so the class fixtures share the container through this field. It is
     // never disposed here: Testcontainers' resource reaper removes it when the test process ends.
@@ -27,8 +28,9 @@ internal static class TestSqlServer
     {
         var server = await Shared.Value;
         return server.Container is null
-            ? new TestDatabase(null, server.Unavailable)
+            ? new TestDatabase(Provider, null, server.Unavailable)
             : new TestDatabase(
+                Provider,
                 new SqlConnectionStringBuilder(server.Container.GetConnectionString())
                 {
                     InitialCatalog = $"novacore_{Guid.NewGuid():N}"
@@ -51,18 +53,4 @@ internal static class TestSqlServer
     }
 
     private sealed record Instance(MsSqlContainer? Container, string? Unavailable);
-}
-
-/// <summary>A database on the test SQL Server, or why there is none (no Docker).</summary>
-internal sealed record TestDatabase(string? ConnectionString, string? Unavailable)
-{
-    [MemberNotNullWhen(true, nameof(ConnectionString))]
-    public bool IsAvailable => ConnectionString is not null;
-
-    /// <summary>Skips the calling test when there is no database, naming why.</summary>
-    [MemberNotNull(nameof(ConnectionString))]
-    public void SkipIfUnavailable()
-    {
-        Assert.SkipUnless(IsAvailable, $"The SQL Server tests need Docker: {Unavailable}");
-    }
 }

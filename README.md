@@ -51,9 +51,10 @@ dotnet nuget add source https://nuget.pkg.github.com/alimuhammedak/index.json -n
 dotnet new install BMD.NovaCore.Templates::0.1.0-preview.1
 
 # 3) Proje
-dotnet new novacore -n SiparisServisi                    # kimlik sağlayıcı host'un içinde (varsayılan: --auth BuiltIn)
+dotnet new novacore -n SiparisServisi                    # kimlik sağlayıcı host'un içinde (--auth BuiltIn), SQL Server (--db SqlServer)
 dotnet new novacore -n SiparisServisi --auth External    # harici sağlayıcı (Entra ID, Keycloak): yalnızca token doğrulanır
-cd SiparisServisi && dotnet build && dotnet test         # SQL Server gerekmez: testler SQLite kullanır
+dotnet new novacore -n SiparisServisi --db PostgreSql    # PostgreSQL
+cd SiparisServisi && dotnet build && dotnet test         # veritabanı sunucusu gerekmez: testler SQLite kullanır
 ```
 
 - Linux ve macOS'ta token'ı saklamak için `--store-password-in-clear-text` gerekir; Windows'ta şifreli saklanır.
@@ -66,17 +67,21 @@ cd SiparisServisi && dotnet build && dotnet test         # SQL Server gerekmez: 
   (https profili). Scalar (`/scalar/v1`) Authorization Code + PKCE ile giriş yapar.
 - `--auth External`: kimlik sağlayıcı yoktur. `Jwt:Authority`'ye sağlayıcının issuer adresini yazın ve o sağlayıcının
   kullanıcıları için bir `IPermissionResolver` kaydedin; izinler sunucuda çözüldüğü için host onsuz açılmaz.
+- `--db SqlServer|PostgreSql`: bütün modül context'lerinin veritabanı. Host seçer (`Program.cs`'te `AddModuleDatabase`)
+  ve her context'in migration'larını Api projesinde tutar; modüller veritabanı seçmez. PostgreSQL'in sağlayıcısı ve
+  sürücüsü `PostgreSQL` lisanslıdır, üretilen projenin lisans kapısında (`eng/check-licenses.sh`) adıyla istisnadır.
+  Sonradan değiştirmek için bkz. [Veritabanı & Migration](#veritabanı--migration).
 
 ### Şablon ne üretir
 
 | Yol | İçerik |
 |---|---|
-| `src/Api/<Ad>.Api` | `Program.cs` (kompozisyon kökü), üretim kontrol listesini yorum olarak taşıyan `appsettings.json`, Development dışı health probe örneği; BuiltIn'de kimlik sağlayıcının migration'ları |
-| `src/Modules/Todos/<Ad>.Modules.Todos` | Örnek modül: dört slice (oluştur, oku, sayfalı listele, tamamla), izinler, validation, `Result` → ProblemDetails, `todos` şeması, migration, outbox. Kendi modülünüzü yanına ekleyin (bkz. [Yeni Modül Ekleme](#yeni-modül-ekleme)), örneği silin |
+| `src/Api/<Ad>.Api` | `Program.cs` (kompozisyon kökü, veritabanı seçimi dahil), üretim kontrol listesini yorum olarak taşıyan `appsettings.json`, Development dışı health probe örneği; seçilen veritabanında her context'in migration'ları (`Todos/`, BuiltIn'de `Identity/`) ve `dotnet ef`'in onları kurduğu `DesignTimeDatabase` |
+| `src/Modules/Todos/<Ad>.Modules.Todos` | Örnek modül: dört slice (oluştur, oku, sayfalı listele, tamamla), izinler, validation, `Result` → ProblemDetails, `todos` şeması, outbox. Veritabanı seçmez. Kendi modülünüzü yanına ekleyin (bkz. [Yeni Modül Ekleme](#yeni-modül-ekleme)), örneği silin |
 | `tests/<Ad>.Api.Tests` | `WebApplicationFactory` + in-memory SQLite + bellek içi OpenID Connect issuer; izinler `CreateClientWithPermissions(...)` ile verilir |
-| `.github/workflows/ci.yml` | Restore (NuGet audit), build, test, context başına migration kontrolü, varsayılan dalda migration bundle'ları, açık paket kontrolü. Repo secret'ı `NOVACORE_PACKAGES_TOKEN` (read:packages) gerekir. Action'lar commit SHA'sına sabit, job izinleri en az düzeyde |
+| `.github/workflows/ci.yml` | Restore (NuGet audit), lisans kapısı, build, test, context başına migration kontrolü, varsayılan dalda migration bundle'ları, açık paket kontrolü. Repo secret'ı `NOVACORE_PACKAGES_TOKEN` (read:packages) gerekir. Action'lar commit SHA'sına sabit, job izinleri en az düzeyde |
 | `.github/dependabot.yml` | Action SHA'larını haftalık günceller (7 gün bekleme). NuGet güncellemeleri yok: GitHub Packages için Dependabot'a özel registry ve secret gerekir |
-| Kök | `nuget.config`, `Directory.Build.props` (uyarılar hata, analyzer'lar, NuGet audit), `Directory.Packages.props` (merkezi sürümler, `NovaCoreVersion`), `global.json`, `.editorconfig`, `dotnet-tools.json` (dotnet-ef) |
+| Kök | `nuget.config`, `Directory.Build.props` (uyarılar hata, analyzer'lar, NuGet audit), `Directory.Packages.props` (merkezi sürümler, `NovaCoreVersion`), `global.json`, `.editorconfig`, `dotnet-tools.json` (dotnet-ef, nuget-license), `eng/check-licenses.sh` (lisans kapısı ve projenin adlı istisnaları) |
 
 Log hattı tektir: `AddCoreObservability` log, metrik ve trace'i OpenTelemetry'den geçirir, `OTEL_EXPORTER_OTLP_ENDPOINT`
 varsa OTLP'ye gönderir. Serilog eklentisi (`BMD.NovaCore.Serilog`) isteyen proje için ayrıca durur.
@@ -99,7 +104,7 @@ secret deposu, veritabanı hesabı, IdP barındırma) → proje; paket yalnızca
 | Token doğrulama | JwtBearer, yalnızca asimetrik, `Jwt:Authority` | `Jwt:Authority`/`Audience` değerleri | IdP'yi seçer ve işletir |
 | Yetkilendirme | `RequirePermission`, varsayılan kapalı (fallback policy), izin önbelleği, resolver sözleşmesi | Örnek modülün izinleri | İzin tanımları, harici IdP'de resolver, **nesne düzeyi yetki** |
 | Hata sözleşmesi | ProblemDetails, `Result` → HTTP, exception eşlemesi | — | Domain hataları, kendi `IExceptionHandler`'ları |
-| Veri | `AddModuleDbContext`, outbox, audit | Sağlayıcı (`UseSqlServer`), migration bundle'ları | Şema, migration üretimi ve **uygulanması**, yedekleme |
+| Veri | `AddModuleDatabase` (sağlayıcı tek yerde), `AddModuleDbContext` (şema ve geçmiş tablosu), outbox, audit | Sağlayıcı (`--db`), migration'lar, migration bundle'ları | Şema, migration üretimi ve **uygulanması**, yedekleme |
 | Gözlem | OpenTelemetry ve Serilog eklentileri | OpenTelemetry hattı | Backend (OTLP collector), alarmlar |
 | Proxy ve TLS | `UseForwardedHeaders` en başta, güvenilen proxy listesi doğrulanır | `ForwardedHeaders:*` | Reverse proxy, TLS sertifikası, HTTPS yönlendirmesi |
 | Data Protection | Kimlik eklentisi Development dışında anahtar deposu yoksa açılmaz | Kontrol listesinde | Anahtar deposu (volume, veritabanı, Key Vault) |
@@ -115,7 +120,8 @@ secret deposu, veritabanı hesabı, IdP barındırma) → proje; paket yalnızca
       bir `IPermissionResolver`.
 - [ ] `Cors:AllowedOrigins`: tarayıcıdan çağıracak origin'ler. Liste boşsa Development dışında hiçbir origin'e izin yok.
 - [ ] `AllowedHosts`: API'nin cevap verdiği alan adları (şablonda `*`).
-- [ ] Bağlantı dizesi. Şablondaki Windows kimlik doğrulaması yalnızca yereldir; uygulamanın hesabı DDL yetkisi taşımaz.
+- [ ] Bağlantı dizesi. Şablondaki dize (SQL Server'da Windows kimlik doğrulaması, PostgreSQL'de parolasız) yalnızca
+      yereldir; parola user-secrets ya da ortamdan gelir, uygulamanın hesabı DDL yetkisi taşımaz.
 - [ ] Migration'lar CI'ın bundle'larıyla, ayrı bir hesapla uygulanır; `Database:ApplyMigrations` Development dışında `false`.
 - [ ] Reverse proxy arkasındaysa `ForwardedHeaders:KnownProxies`/`KnownIPNetworks`. TLS ve HTTPS yönlendirmesi edge'de.
 - [ ] Probe'lar: `HealthChecks:ProbePort` ve host'un o portu da dinlemesi (`ASPNETCORE_HTTP_PORTS=8080;8081`).
@@ -207,7 +213,7 @@ paketi yok (iki proje ihtiyaç duyana kadar, Y-14). Seçenekler:
   artifact'i, 7 gün). Dağıtımda, uygulama sürümünden önce tek seferlik bir iş olarak, şema yetkili ayrı bir hesapla
   çalıştırılır: `ASPNETCORE_ENVIRONMENT=Production ./efbundle --connection "$DEPLOYMENT_CONNECTION_STRING"`. Bundle'lar
   framework-dependent'tır (`linux-x64`); runtime'ı olmayan bir ortam için CI'da `--self-contained` ekleyin.
-- SQL'in gözden geçirilmesi gerekiyorsa script: `dotnet ef migrations script --idempotent --project <modül> --startup-project <modül> --context <Context> -o <ad>.sql`.
+- SQL'in gözden geçirilmesi gerekiyorsa script: `dotnet ef migrations script --idempotent --project src/Api/<Ad>.Api --startup-project src/Api/<Ad>.Api --context <Context> -o <ad>.sql`.
 - `Database:ApplyMigrations=true` (açılışta uygula) yalnızca Development ya da tek örnekli basit kurulumlar içindir: her
   replika migration denemesine girer ve uygulamanın hesabı şema yetkisi ister.
 - Her context kendi şemasında kendi `__EFMigrationsHistory` tablosunu tutar; bundle'lar birbirinden bağımsızdır.
@@ -225,18 +231,19 @@ kod güncellemeyle değişmez; yeni bir şablon özelliğini istiyorsanız yeni 
 Bu bölüm NovaCore'un kendisini (paketler, referans Api host'u, Catalog ve Payments modülleri) geliştirmek içindir.
 
 Gereksinim: **.NET 10 SDK**, tam olarak `global.json`'daki sürüm (10.0.300; `rollForward: disable`, lock dosyaları için),
-**SQL Server** (yerel instance, Windows auth — bkz. `appsettings.json`).
+**SQL Server** (yerel instance, Windows auth — bkz. `appsettings.json`; Api host'u SQL Server seçer).
 
 ```bash
-# 1) Bağımlılıkları derle + test et (SQL Server kurulumu GEREKMEZ: testler SQLite kullanır, SQL Server katmanı Docker'da koşar)
+# 1) Bağımlılıkları derle + test et (veritabanı kurulumu GEREKMEZ: testler SQLite kullanır, SQL Server ve PostgreSQL
+#    katmanları Docker'da koşar)
 dotnet build
 dotnet test
 
 # 2) Migration'ları uygula (modül başına ayrı şema: catalog / payments / identity)
 dotnet tool restore
-dotnet ef database update --project src/Modules/Catalog/NovaCore.Modules.Catalog   --context CatalogDbContext   --startup-project src/Modules/Catalog/NovaCore.Modules.Catalog
-dotnet ef database update --project src/Modules/Payments/NovaCore.Modules.Payments  --context PaymentsDbContext  --startup-project src/Modules/Payments/NovaCore.Modules.Payments
-dotnet ef database update --project src/Api/NovaCore.Api  --context IdentityServerDbContext  --startup-project src/Api/NovaCore.Api
+for context in CatalogDbContext PaymentsDbContext IdentityServerDbContext; do
+  dotnet ef database update --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context "$context"
+done
 
 # 3) İlk admin + roller + izinler için seed (parolayı user-secrets ile ver — repoya YAZMA). Admin izinleri, admin
 #    parolayla girip 2FA'yı açınca gelir: POST /api/v1/auth/2fa/setup, sonra /2fa/enable (parola + authenticator kodu)
@@ -300,7 +307,7 @@ Repo public'tir (DECISIONS D-042). Kararlar D-048, D-051 ve D-052'de; kaynaklar 
 dotnet restore NovaCore.slnx --force-evaluate
 dotnet restore NovaCore.slnx --locked-mode          # CI'ın yaptığı kontrol
 
-bash eng/check-licenses.sh                           # her paket MIT/Apache-2.0 (Microsoft ve Polly istisnası: D-052)
+bash eng/check-licenses.sh                           # her paket MIT/Apache-2.0; istisnalar: Microsoft, Polly.* (geçişli, D-052), Npgsql ve Npgsql.EntityFrameworkCore.PostgreSQL (D-072)
 bash eng/check-coverage.sh [--update]                # testler coverage'la, baseline'a karşı (önce Release build; Docker gerekir)
 bash eng/check-openapi.sh                            # docs/openapi/v1.json'da main'e göre kırıcı değişiklik (oasdiff, Docker)
 bash eng/mutation.sh                                 # Stryker.NET mutation raporu, ~2 dk (StrykerOutput/)
@@ -389,13 +396,13 @@ NovaCore.AspNetCore        NovaCore.EntityFrameworkCore     (çekirdek: yalnızc
 |---|---|
 | `Result<T>`, `Error`, `PagedList<T>` | Domain entity'leri (Product, Payment...) |
 | Global exception handling + ProblemDetails | İş modülleri ve endpoint'leri |
-| `IModule` + açık kayıt (`AddModule<TModule>()`) | DbContext'ler + migration'lar |
+| `IModule` + açık kayıt (`AddModule<TModule>()`) | DbContext'ler; veritabanı seçimi ve migration'lar (host'ta) |
 | HybridCache kaydı ve varsayılan süre (`AddCoreCaching`) | İş kuralları, request validation kuralları |
 | Health + resilient HttpClient (`AddCoreDefaults`); Serilog ve OpenTelemetry eklentileri | Modüle özel konfigürasyon |
 | OpenAPI (+ Scalar eklentisi), rate limiting, CORS | |
 | JWT bearer auth (`Jwt:Authority`) + permission-based authz altyapısı | Kimlik sağlayıcının store'u ve migration'ları (host'ta) |
 | Kimlik sağlayıcı eklentisi (`NovaCore.Identity.OpenIddict`) | Client'lar, seed yöneticisi, üretim sertifikaları |
-| Auditing interceptor, transactional outbox ve dispatcher'ı | |
+| Auditing interceptor, transactional outbox ve dispatcher'ı; modül context'lerine host'un veritabanı (`AddModuleDatabase`) | |
 
 ---
 
@@ -406,16 +413,16 @@ NovaCore.slnx
 ├── Directory.Build.props          # tüm projeler: net10.0, nullable, analyzer'lar, TreatWarningsAsErrors, VersionPrefix
 ├── Directory.Build.targets        # IsPackable projeler: paket metadata'sı, README, PublicAPI dosyaları, doc/analyzer korumaları
 ├── Directory.Packages.props       # merkezî paket sürümleri (CPM)
-├── docker-compose.yml             # opsiyonel SQL Server + Seq + Jaeger (imaj sürümleri pinli)
+├── docker-compose.yml             # opsiyonel SQL Server + PostgreSQL + Seq + Jaeger (imaj sürümleri pinli)
 ├── docker-compose.keycloak.yml    # opsiyonel harici IdP: Keycloak + örnek realm (deploy/keycloak/)
 ├── .env.example                   # compose parolaları için şablon (.env git-ignored)
-├── eng/template-smoke.sh          # şablonu paketlerden kurup her kimlik seçeneğiyle build/test eden smoke testi
+├── eng/template-smoke.sh          # şablonu paketlerden kurup her kimlik ve veritabanı seçeneğiyle build/test eden smoke testi
 │
 ├── src/
 │   ├── BuildingBlocks/
 │   │   ├── NovaCore.Abstractions/        # Result, PagedList, Entity, IDomainEvent/DomainEvent, ICurrentUser (yalnızca BCL)
 │   │   ├── NovaCore.AspNetCore/          # IModule + AddModule<T>, AddCoreDefaults/AddCoreWeb, ProblemDetails, Result→HTTP, JWT, authz, OpenAPI, HybridCache
-│   │   ├── NovaCore.EntityFrameworkCore/ # AddModuleDbContext, AddCorePersistence: auditing, startup migration, outbox + dispatcher
+│   │   ├── NovaCore.EntityFrameworkCore/ # AddModuleDatabase, AddModuleDbContext, AddCorePersistence: auditing, startup migration, outbox + dispatcher
 │   │   ├── NovaCore.Serilog/             # eklenti: AddCoreLogging (Console + opsiyonel Seq)
 │   │   ├── NovaCore.OpenTelemetry/       # eklenti: AddCoreObservability (logs + metrics + tracing, OTLP)
 │   │   ├── NovaCore.Scalar/              # eklenti: MapCoreScalar (Scalar UI, yalnızca Development)
@@ -430,14 +437,16 @@ NovaCore.slnx
 │   │       └── NovaCore.Modules.Payments/           # PaymentsModule (schema: payments) — Catalog'a Contracts ile bağlı
 │   │
 │   ├── Api/
-│   │   └── NovaCore.Api/           # Program.cs: composition root, her şeyi açıkça ekler
+│   │   └── NovaCore.Api/           # Program.cs: composition root, her şeyi açıkça ekler; veritabanını seçer (SQL Server)
+│   │       ├── Catalog/ Payments/  # modüllerin SQL Server migration'ları + design-time factory'leri
 │   │       └── Identity/           # kimlik sağlayıcının migration'ları + design-time factory (schema: identity)
 │   │
 │   └── Templates/
 │       └── NovaCore.Templates/     # `dotnet new novacore` şablon paketi (BMD.NovaCore.Templates); şablon content/novacore'da
 │
 └── tests/
-    └── NovaCore.Api.Tests/         # unit + integration (WebApplicationFactory) + architecture testleri
+    └── NovaCore.Api.Tests/         # unit + integration (WebApplicationFactory) + architecture testleri;
+                                    # SqlServer/ ve PostgreSql/: gerçek veritabanı katmanları (PostgreSQL migration'ları dahil)
 ```
 
 ### `Program.cs` — tüm host
@@ -453,9 +462,12 @@ builder.AddCoreDefaults();                         // health + resilient HttpCli
 builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth, rate limit, CORS
 builder.AddCorePersistence();                      // audit interceptor, domain event'ler + outbox dispatcher, opt-in startup migration
 
-// Kimlik sağlayıcı (eklenti): Jwt:Authority'nin gösterdiği token'ları üretir; store'u ve migration'ları host'ta
+// Bütün modül context'lerinin veritabanı, yalnızca burada seçilir; migration'ları da host'ta
+builder.Services.AddModuleDatabase((services, db) => db.UseSqlServer(/* bağlantı, MigrationsAssembly, retry */));
+
+// Kimlik sağlayıcı (eklenti): Jwt:Authority'nin gösterdiği token'ları üretir; store'u host'un veritabanında
 builder.AddCoreIdentityServer();
-builder.Services.AddModuleDbContext<IdentityServerDbContext>((services, db) => db.UseSqlServer(/* ... */));
+builder.Services.AddModuleDbContext<IdentityServerDbContext>(IdentityServerDbContext.Schema, /* interceptor'lar */);
 
 // Modüller: açık kayıt; endpoint'ler bu sırayla bağlanır
 builder.AddModule<CatalogModule>();
@@ -494,12 +506,9 @@ public sealed class OrdersModule : IModule
 
     public IServiceCollection AddModule(IServiceCollection services, IConfiguration config)
     {
-        services.AddModuleDbContext<OrdersDbContext>((sp, o) =>
-        {
-            o.UseSqlServer(config.GetConnectionString("Database"),
-                sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", OrdersDbContext.Schema));
-            o.AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>());
-        });
+        // Veritabanını host seçer (AddModuleDatabase); modül şemasını ve interceptor'larını verir.
+        services.AddModuleDbContext<OrdersDbContext>(OrdersDbContext.Schema,
+            (sp, o) => o.AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>()));
         services.AddValidation();   // .NET 10 validation; generator yalnızca bu çağrının assembly'sini kapsar
         return services;
     }
@@ -512,7 +521,11 @@ public sealed class OrdersModule : IModule
     }
 }
 ```
-4. `NovaCore.Api`'ye proje referansı ekle ve `Program.cs`'e `builder.AddModule<OrdersModule>();` yaz. Bitti.
+4. `NovaCore.Api`'ye proje referansı ekle ve `Program.cs`'e `builder.AddModule<OrdersModule>();` yaz.
+5. Migration'lar host'ta: Api'ye bir design-time factory ekle (`Catalog/CatalogDbContextFactory.cs` gibi, ortak
+   `DesignTimeDatabase`'le) ve ilk migration'ı üret:
+   `dotnet ef migrations add Initial --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context OrdersDbContext --output-dir Orders/Migrations`.
+   Bu repoda PostgreSQL test katmanının setine de bir migration gerekir (bkz. [Veritabanı & Migration](#veritabanı--migration)).
 
 ### Bir özelliğin (feature) anatomisi — Vertical Slice
 Her özellik tek dosya: request (validation attribute'larıyla) + response + route + handler bir arada. Mediator yok;
@@ -826,24 +839,49 @@ Değerler kayıt anında değil, ilk kullanımda okunur. Bu yüzden `CreateBuild
 
 ## Veritabanı & Migration
 
-Her modül **kendi DbContext'ine + kendi SQL Server şemasına** sahiptir (`catalog` / `payments`,
-`HasDefaultSchema`), migration geçmişi de şema bazında ayrılır (`__EFMigrationsHistory`). Kimlik sağlayıcının
-`IdentityServerDbContext`'i (`identity` şeması) eklenti paketinden gelir; sağlayıcıyı ve migration'ları host seçer, bu
-yüzden migration'ları Api projesindedir (`src/Api/NovaCore.Api/Identity/Migrations`). Sınırlar veritabanı düzeyinde
+NovaCore hiçbir projeyi bir veritabanına bağlamaz (DECISIONS D-068). Paketler sağlayıcıya referans vermez; sağlayıcıyı
+proje seçer, tek bir yerde: host'un `AddModuleDatabase`'i bütün modül context'lerine sağlayıcıyı, bağlantıyı,
+`MigrationsAssembly`'yi ve retry'ı verir. Modül yalnızca kendi ayarını verir: `AddModuleDbContext<T>(schema, configure)`
+migration geçmişini (`__EFMigrationsHistory`) modülün şemasında tutar, outbox interceptor'ını ekler. Hiçbir modülün
+sağlayıcıya bağlanmadığını `ModuleProviderTests` doğrular.
+
+Her modül **kendi DbContext'ine + kendi şemasına** sahiptir (`catalog` / `payments`, `HasDefaultSchema`). Kimlik
+sağlayıcının `IdentityServerDbContext`'i (`identity` şeması) eklenti paketinden gelir. Sınırlar veritabanı düzeyinde
 uygulanır. Her modül şemasında outbox tabloları da vardır: `outbox_messages` ve `outbox_consumers`.
 
+**Migration'lar host'ta:** migration'lar sağlayıcıya özgüdür (EF Core her sağlayıcı için ayrı bir set ister), bu yüzden
+seçilen sağlayıcının setini host tutar: `src/Api/NovaCore.Api/{Catalog,Payments,Identity}/Migrations`, her biri için de
+bir design-time factory (ortak `DesignTimeDatabase`). Design-time ile çalışma zamanının aynı sağlayıcıyı, migration'ları
+ve geçmiş tablosunu kullandığını SQL Server katmanındaki bir test doğrular.
+
 ```bash
-# Yeni migration (modül = hem -p hem -s; design-time factory sayesinde DB gerekmez)
-dotnet ef migrations add <Ad> --project src/Modules/Catalog/NovaCore.Modules.Catalog --context CatalogDbContext --startup-project src/Modules/Catalog/NovaCore.Modules.Catalog --output-dir Infrastructure/Migrations
+# Yeni migration (Api = hem -p hem -s; design-time factory sayesinde DB gerekmez)
+dotnet ef migrations add <Ad> --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context CatalogDbContext --output-dir Catalog/Migrations
+
+# Bu repoda aynı model değişikliği PostgreSQL test katmanının setine de bir migration ister (test projesi = -p ve -s)
+dotnet ef migrations add <Ad> --project tests/NovaCore.Api.Tests --startup-project tests/NovaCore.Api.Tests --context CatalogDbContext --output-dir PostgreSql/Catalog/Migrations
 
 # Uygula
-dotnet ef database update --project src/Modules/Catalog/NovaCore.Modules.Catalog --context CatalogDbContext --startup-project src/Modules/Catalog/NovaCore.Modules.Catalog
-
-# Kimlik sağlayıcının migration'ları Api'de
-dotnet ef migrations add <Ad> --project src/Api/NovaCore.Api --context IdentityServerDbContext --startup-project src/Api/NovaCore.Api --output-dir Identity/Migrations
+dotnet ef database update --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context CatalogDbContext
 ```
 Alternatif: `Database:ApplyMigrations=true` ile uygulama açılışta tüm modül migration'larını otomatik uygular
 (`DatabaseMigrationService`).
+
+### Sağlayıcılar
+
+| Sağlayıcı | Durum | Not |
+|---|---|---|
+| SQL Server (`Microsoft.EntityFrameworkCore.SqlServer`) | Şablonun varsayılanı, repo'nun Api host'u; testlerde gerçek sunucuda | SqlClient'ın açıklı Pkcs'i için doğrudan referans (yalnız sağlayıcıyı referans alan proje) |
+| PostgreSQL (`Npgsql.EntityFrameworkCore.PostgreSQL`) | Şablonda `--db PostgreSql`; paketler testlerde gerçek sunucuda aynı senaryolarla | `PostgreSQL` lisansı: projenin lisans kapısında adıyla istisna (Y-47) |
+| SQLite | Testlerin hızlı katmanı | Şemaları yok sayar (tablolar ve geçmiş tablosu şemasız); `DateTimeOffset`'i karşılaştıramaz, testler tick olarak saklar |
+| MySQL / MariaDB, Oracle, diğerleri | Test edilmedi | MySQL/MariaDB'de şema ayrı bir veritabanıdır: "modül başına şema" orada modül başına veritabanı olur (ölçülmedi). Sağlayıcının lisansı proje kapısından adlı istisnayla geçer (MySQL'in resmî sağlayıcısı GPL'lidir, Pomelo MIT) |
+
+- **Sağlayıcı farkları modülün değil veritabanının:** `EF.Functions.Like` kolonun collation'ını izler. SQL Server'ın
+  varsayılanı büyük/küçük harfe duyarsızdır, PostgreSQL'inki duyarlıdır; Catalog araması bu yüzden PostgreSQL'de
+  büyük/küçük harfi ayırır (`SqlServerQueryTests`, `PostgreSqlQueryTests`). Bir modül sağlayıcıya özgü bir fonksiyon
+  (`ILike`) çağırmaz; gerekiyorsa collation'ı veritabanında ya da modelde (`UseCollation`) ayarlayın.
+- **Bir projede sağlayıcıyı değiştirmek:** host'ta `AddModuleDatabase` ve `DesignTimeDatabase`'deki çağrı, sağlayıcı
+  paketi, bağlantı dizesi ve her context'in migration'ları (yeni sağlayıcıyla yeniden üretilir). Modüller değişmez.
 
 ---
 
@@ -855,10 +893,12 @@ dotnet test -- --filter-class "*.CatalogEndpointsTests"    # tek sınıf (--filt
 ```
 Testler xUnit v3 (4.x) ile **Microsoft.Testing.Platform** üzerinde koşar: `global.json`'daki `test.runner`, `dotnet test`'i
 MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri `--`'dan sonra gelir.
-- **SQL Server katmanı (`SqlServer/`):** SQLite'ın gizlediklerini (migration'lar ve içlerindeki SQL, şemalar, collation,
-  `decimal`, `DateTimeOffset` sıralaması) gerçek bir SQL Server'da sınar. Testcontainers, `docker-compose.yml`'deki imajla
-  koşu başına bir container açar; Api host'u migration'ları açılışta üretimdeki gibi uygular. Docker yoksa bu testler
-  atlanır; CI `--fail-skips on` ile koşar, orada atlanan test koşuyu kırar.
+- **Veritabanı katmanları (`SqlServer/`, `PostgreSql/`):** SQLite'ın gizlediklerini (migration'lar ve içlerindeki SQL,
+  şemalar, collation, `decimal`, `DateTimeOffset` sıralaması) gerçek bir SQL Server'da ve PostgreSQL'de sınar.
+  Testcontainers, `docker-compose.yml`'deki imajlarla koşu başına birer container açar; Api host'u migration'ları
+  açılışta üretimdeki gibi uygular (PostgreSQL'de test projesindeki setle). Aynı senaryolar (migration servisi, outbox,
+  ödeme listesi, kimlik sağlayıcıyla giriş) iki sağlayıcıda koşar (`Databases/`). Docker yoksa bu testler atlanır; CI
+  `--fail-skips on` ile koşar, orada atlanan test koşuyu kırar.
 - **Domain (`NovaCore.Domain.Tests`):** `Result<T>`, `PaginationRequest`/`PagedList<T>`, `Payment`, `Product`, domain
   event'leri; host'suz, saniyeler içinde. CsCheck property testleri ve haftalık mutation testi bu projede.
 - **Integration:** gerçek host'u `WebApplicationFactory` ile ayağa kaldırır; her DbContext testte **in-memory
@@ -935,7 +975,9 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
 | Microsoft.EntityFrameworkCore.Relational / Extensions.Hosting.Abstractions / Options.ConfigurationExtensions / Diagnostics.HealthChecks.EntityFrameworkCore | Microsoft-yerleşik (`NovaCore.EntityFrameworkCore`) | **MIT** |
 | Microsoft.AspNetCore.Identity.EntityFrameworkCore | Kullanıcı/rol deposu (`NovaCore.Identity.OpenIddict`) | **MIT** |
 | OpenIddict.Server.AspNetCore / OpenIddict.EntityFrameworkCore | OpenID Connect sağlayıcı (`NovaCore.Identity.OpenIddict` eklentisi) | **Apache-2.0** |
-| Microsoft.EntityFrameworkCore.SqlServer | EF Core sağlayıcı | **MIT** |
+| Microsoft.EntityFrameworkCore.SqlServer | EF Core sağlayıcı (Api host'u; paketler sağlayıcıya bağlanmaz, D-068) | **MIT** |
+| Npgsql.EntityFrameworkCore.PostgreSQL / Npgsql | PostgreSQL test katmanının sağlayıcısı ve sürücüsü (yalnız testler) | **PostgreSQL** (adlı istisna, D-068, D-072) |
+| Testcontainers.MsSql / Testcontainers.PostgreSql, Respawn | Gerçek veritabanı test katmanları (yalnız testler) | **MIT** / **Apache-2.0** |
 | Microsoft.CodeAnalysis.PublicApiAnalyzers | Public API takibi (yalnızca build, pakete girmez) | **MIT** |
 | Microsoft.CodeAnalysis.BannedApiAnalyzers | Yasak API'ler, `src/` altında (yalnızca build, pakete girmez) | **MIT** |
 | Meziantou.Analyzer | Ek analizör kuralları, her projede (yalnızca build, pakete girmez) | **MIT** |
@@ -945,7 +987,11 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
 | dotnet-sonarscanner | Yalnızca CI'daki `sonar` job'unda kurulur, hiçbir projeye referans değildir; indirdiği Sonar analizörleri SSALv1 (D-045, K4: kullanıcı onayı) | **LGPL-3.0** |
 
 CI'daki lisans kapısı (`eng/check-licenses.sh`) geçişliler dahil her paketi denetler: MIT ya da Apache-2.0 olmalı;
-Microsoft paketleri (`Microsoft.*`, `System.*`) lisansa bakılmadan geçer (Y-06), getirdikleri paketler yine denetlenir.
+Microsoft paketleri (`Microsoft.*`, `System.*`) lisansa bakılmadan geçer (Y-47), getirdikleri paketler yine denetlenir.
+Adlı istisnalar DECISIONS'taki kayıtlarla vardır: `Polly.*` yalnız geçişli olarak (D-052) ve projenin seçtiği veritabanı
+sağlayıcısıyla sürücüsü, tam paket adlarıyla (D-068): bu repo'da PostgreSQL test katmanınınkiler. Bir ad yalnız kendisini
+geçirir; aynı aileden başka bir paket (`Npgsql.NodaTime`) kapıda kalır. Şablonun ürettiği proje aynı kapıyı kendi
+`eng/check-licenses.sh`'ıyla taşır.
 
 > ⚠️ **MediatR (v13+) ve AutoMapper (v15+) artık ticari** (Lucky Penny). NovaCore bunları kullanmaz. Başka bir mediator
 > ya da request-dispatch soyutlaması da eklenmez (DECISIONS Y-01): handler'lar bağımlılıklarını minimal API DI'dan alır.

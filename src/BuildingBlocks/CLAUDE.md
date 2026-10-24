@@ -23,8 +23,11 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   (`Authorization/`), the OpenAPI document, `SecurityHeadersMiddleware`, HybridCache (`AddCoreCaching`). Depends on
   Abstractions + `FrameworkReference Microsoft.AspNetCore.App`, never on EntityFrameworkCore.
 
-- **`NovaCore.EntityFrameworkCore`** — persistence without ASP.NET Core: `AddModuleDbContext` (also a "ready"-tagged
-  `AddDbContextCheck` per context, and the `OutboxInterceptor` on every module context), `AddOutbox()` (maps a module's
+- **`NovaCore.EntityFrameworkCore`** — persistence without ASP.NET Core: `AddModuleDatabase` (the host's database for
+  every module context: provider, connection, migrations assembly; options, so a later call replaces it, and
+  `ValidateOnStart` stops a host without one), `AddModuleDbContext(schema, configure)` (the migration history in the
+  module's schema, set through the provider's `RelationalOptionsExtension` because the provider's own builder is the
+  host's; also a "ready"-tagged `AddDbContextCheck` per context, and the `OutboxInterceptor` on every module context), `AddOutbox()` (maps a module's
   `outbox_messages` and `outbox_consumers`), `AddCorePersistence` (`AuditableEntityInterceptor`,
   `DatabaseMigrationService`, which migrates only when `Database:ApplyMigrations` is true, and the outbox dispatcher).
   The dispatcher resolves and invokes the handlers of an event type through a `DomainEventHandlerInvoker<TEvent>` built
@@ -49,8 +52,9 @@ its logs in Serilog, which doesn't write to other providers), `NovaCore.Scalar`
 Identity + OpenIddict, D-026). A new third-party integration becomes a new add-on, not a dependency of the core.
 
 `NovaCore.Identity.OpenIddict` owns `IdentityServerDbContext` but no migrations: it can't reference
-NovaCore.EntityFrameworkCore, so the host registers the context with `AddModuleDbContext` (provider + `MigrationsAssembly`)
-and keeps the migrations (R-060). Its issuer is `Jwt:Authority` and its access tokens are unencrypted signed JWTs, so
+NovaCore.EntityFrameworkCore, so the host registers the context with `AddModuleDbContext` (its database, provider and
+`MigrationsAssembly` from `AddModuleDatabase`, like every module context's) and keeps the migrations (R-060, D-073).
+No package references a database provider (D-068). Its issuer is `Jwt:Authority` and its access tokens are unencrypted signed JWTs, so
 the core's JwtBearer validates them through discovery like any provider's (R-059). Tests run it on
 `tests/.../IdentityServer/IdentityServerTestHost`, a host composed only of the core and the add-on. Two traps (R-061):
 the host pipeline has no antiforgery middleware, so form posts validate with `IAntiforgery.IsRequestValidAsync` in

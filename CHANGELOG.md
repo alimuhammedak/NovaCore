@@ -115,6 +115,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Template: the generated project runs the same Security, Reliability, Performance and Usage rules, the dead-code
   rules and the code metric rules (CA2007, CA1812, and CA1506 in `Program.cs`, stay off: the project is ASP.NET Core
   application code). Its tests pass `Uri` objects to `HttpClient`.
+- Template: the generated project checks the license of every package, transitive ones included
+  (`eng/check-licenses.sh`, a CI step after restore): MIT or Apache-2.0, Microsoft packages whatever their license, and
+  the exceptions the script names by their exact package IDs (`Polly.*` transitively, under
+  `Microsoft.Extensions.Http.Resilience`).
+- The license gate names a database provider and its driver as exceptions by their exact package IDs: here the
+  PostgreSQL test layer's `Npgsql` and `Npgsql.EntityFrameworkCore.PostgreSQL` (PostgreSQL license).
+- **Breaking:** the host chooses the database of every module context, in one place:
+  `services.AddModuleDatabase((services, options) => options.UseSqlServer(...))` (`NovaCore.EntityFrameworkCore`). A
+  module no longer chooses a provider: `AddModuleDbContext<TContext>(schema, configure)` takes the module's schema, keeps
+  its migration history (`__EFMigrationsHistory`) there and applies `configure` (the module's interceptors) after the
+  host's database. A later `AddModuleDatabase` replaces the earlier one; without one the host doesn't start.
+  **Upgrade:** in each module, replace `options.UseSqlServer(connection, sql => sql.MigrationsHistoryTable(...)...)` with
+  the schema argument, and call `AddModuleDatabase` once in `Program.cs` with the provider, the connection, the retry
+  strategy and `MigrationsAssembly`. The existing databases need nothing: the history tables stay where they are.
+- The provider-specific parts moved from the modules to the host: the modules' migrations
+  (`src/Api/NovaCore.Api/{Catalog,Payments}/Migrations`, same migrations, namespaces after their folder) and the
+  design-time factories. The modules reference no database provider (an architecture test checks it), and only the Api
+  references `System.Security.Cryptography.Pkcs`. `dotnet ef` runs every context on the Api project:
+  `--project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context <Context>`.
+- Template: the same. `TodosModule` chooses no database, `Program.cs` calls `AddModuleDatabase`, and the Todos
+  migrations and design-time factory live in the Api project (`Todos/`), which references the provider and
+  `Microsoft.EntityFrameworkCore.Design` with either `--auth`.
+- The packages are tested on PostgreSQL too (Testcontainers, `postgres:18.4`): the startup migrations, the outbox
+  (written with the change, delivered, retention), the payment list and the identity provider's sign-in run the same
+  scenarios on SQL Server and PostgreSQL. The PostgreSQL migrations live in the test project; `docker-compose.yml` has
+  an optional `postgres` service (`POSTGRES_PASSWORD` in `.env`).
+- Template: `dotnet new novacore --db SqlServer|PostgreSql` (default `SqlServer`) chooses the database of the generated
+  project: the provider package, `AddModuleDatabase` in `Program.cs`, the design-time database, the connection string,
+  the migrations of each context and, for PostgreSQL, the license gate's named exception. The test project replaces the
+  host's database with SQLite through `AddModuleDatabase`, whichever was chosen.
 
 ### Removed
 
