@@ -307,7 +307,7 @@ Repo public'tir (DECISIONS D-042). Kararlar D-048, D-051 ve D-052'de; kaynaklar 
 dotnet restore NovaCore.slnx --force-evaluate
 dotnet restore NovaCore.slnx --locked-mode          # CI'ın yaptığı kontrol
 
-bash eng/check-licenses.sh                           # her paket MIT/Apache-2.0 (Microsoft ve Polly istisnası: D-052)
+bash eng/check-licenses.sh                           # her paket MIT/Apache-2.0; istisnalar: Microsoft, Polly.* (geçişli, D-052), Npgsql ve Npgsql.EntityFrameworkCore.PostgreSQL (D-072)
 bash eng/check-coverage.sh [--update]                # testler coverage'la, baseline'a karşı (önce Release build; Docker gerekir)
 bash eng/check-openapi.sh                            # docs/openapi/v1.json'da main'e göre kırıcı değişiklik (oasdiff, Docker)
 bash eng/mutation.sh                                 # Stryker.NET mutation raporu, ~2 dk (StrykerOutput/)

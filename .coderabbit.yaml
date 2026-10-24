@@ -67,7 +67,9 @@ reviews:
           `[SuppressMessage]`, or an `.editorconfig` severity lowered to none/silent/suggestion) unless one of these
           holds: (a) Microsoft's "When to suppress warnings" section for that rule explicitly allows it, the
           suppression is permanent (not "for now"), and it carries a justification and an R- or D-entry as its source;
-          or (b) a D- or Q-entry records the user's approval of that suppression. Separately, fail if a test is
+          or (b) a D- or Q-entry records the user's approval of that suppression. Files a tool writes are not the
+          change's suppressions: EF Core puts `#pragma warning disable 612, 618` in every `*.Designer.cs` and
+          `*ModelSnapshot.cs` it generates, which the path filters above skip. Separately, fail if a test is
           skipped, deleted or weakened (fewer assertions, looser expectations) without a D- or Q-entry recording the
           user's approval; a Microsoft quote does not cover tests.
       - name: "Geçici kod yok (Y-38, Y-45)"

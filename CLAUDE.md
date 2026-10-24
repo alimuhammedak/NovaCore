@@ -67,7 +67,7 @@ dotnet build                                  # whole solution (NovaCore.slnx); 
 dotnet restore NovaCore.slnx --force          # incremental builds skip restore, so NuGet audit (NU19xx) stays hidden without this
 dotnet restore NovaCore.slnx --force-evaluate # after changing a package version: rewrites the packages.lock.json files
 dotnet restore NovaCore.slnx --locked-mode    # what CI runs: fails if the package graph differs from the lock files
-bash eng/check-licenses.sh                    # license gate: every package MIT/Apache-2.0 (Microsoft and Polly.*: D-052)
+bash eng/check-licenses.sh                    # license gate: every package MIT/Apache-2.0; exceptions: Microsoft, Polly.* (transitive, D-052), Npgsql and Npgsql.EntityFrameworkCore.PostgreSQL (D-072)
 bash eng/check-coverage.sh [Debug] [--update] # tests with coverage, held to eng/coverage-baseline.txt (D-060); build first
 bash eng/check-openapi.sh [base-revision]     # breaking changes in docs/openapi/v1.json since main (oasdiff, Docker; D-061)
 bash eng/mutation.sh                          # Stryker.NET on the abstractions and domain code, a report (D-063)
