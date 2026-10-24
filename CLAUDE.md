@@ -15,10 +15,12 @@ NovaCore is mid-way through a multi-phase restructuring. Its source of truth liv
 Where this file's Architecture/Standards sections disagree with `DECISIONS.md`, `DECISIONS.md` wins;
 completed phases update this file.
 
-- **Phase work starts only via `/novacore-phase <id>`** (project skill, user-invoked), one phase per fresh
-  session. When a phase ends, **stop**. A phase merges through a `faz/...` → `main` pull request that CodeRabbit
-  reviews (advisory, `.coderabbit.yaml`, D-067); the merge itself still waits for the user. "devam"/"continue"
-  means "next step inside the approved phase plan", never "start the next phase".
+- **Phase work starts only via `/novacore-phase <id>`** (project skill, user-invoked), never two phases in one
+  session. A phase spans several sessions: after at most three committed steps the skill pauses (`⏸`) and the user
+  continues with `/clear` and the same command, without approving the plan again (D-076). When a phase ends,
+  **stop**. A phase merges through a `faz/...` → `main` pull request that CodeRabbit reviews (advisory,
+  `.coderabbit.yaml`, D-067); the merge itself still waits for the user. "devam"/"continue" means "next step inside
+  the approved phase plan", never "start the next phase".
 - **Never implement anything in DECISIONS.md → "Yapılmayacaklar"**, not even as a design suggestion. If one
   seems necessary, stop and ask with the reason and a source.
 - **Counter the "most typical answer" pull (Y-40…Y-43, applies to every session, not only phase work):**
