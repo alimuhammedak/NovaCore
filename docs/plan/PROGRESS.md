@@ -1158,7 +1158,9 @@ Başlangıç 2026-10-24, `main` @ `6204b04` (7a'nın merge kaydı, başka bir ot
 
 **Bu fazda yapılmayacaklar:** şube kapsamı ve CRM'in rolleri; kurum başına veritabanı; RLS'in paketlere girmesi (belgelenmiş örnek); token'da kurum claim'i; kurum başına istek sınırı; CRM'in geçişi; `UseCoreWeb`'e middleware yeri; yerleşik rol ya da hiyerarşi; eklentide HTTP uçları; kurum slug'ı; saklama zamanlayıcısı; `.claude/hooks/` düzenlemesi (kullanıcıda).
 
-- F7b.1 devam ediyor.
+- [x] F7b.1 (e4ab92d): Tasarım kararları D-076, araştırma R-129 (Finbuckle 10.1.5 belgeleri, EF Core 10 kaynağında filtrenin context'e bağlanması, MS'in kurum eşleme ve yaşam döngüsü sayfaları). Kod yok; build/test gerekmedi. CodeRabbit CLI: 10 bulgu, hepsi Q-40 dosyalarında (`.codex/`, `AGENTS.md`), dokunulmadı.
+- [x] F7b.7 (99080c1): Çekirdek düzeltmeleri. Yeni `ClaimsTransformationStartupCheck`: NovaCore'unkinden başka bir `IClaimsTransformation` kayıtlıysa (önce ya da sonra) host açılmaz; framework'ün `AddAuthentication`'da `TryAdd` ile kaydettiği `NoopClaimsTransformation` sayılmaz (ilk tam koşuda her host testi bu yüzden kırmızıydı), etkin olan da NovaCore'unki olmalı. `AuditableEntityInterceptor` damgası `UserId ?? "system"` (`sub`), 0.x davranış değişikliği CHANGELOG'da. "Sonraya bırakılanlar"daki Faz 5 maddesi (çekirdeğe bir sonraki dokunuşta `PermissionResolverStartupCheck`'in "Identity module" mesajı) yapıldı. README'nin nesne düzeyi yetki örneğindeki `CreatedBy` cümlesi düzeltildi. Testler önce kırmızı (3): iki dönüşüm sırası ve `sub` damgası; ayrıca framework no-op'u testi. 414/414 (SQLite, SQL Server, PostgreSQL, atlanan yok), format temiz. CodeRabbit CLI: 9 bulgu; 1'i kapsam içi ve doğru (`sub` "kişisel veri değil" değil, takma adlı bir kimlik; açıklama ve CHANGELOG düzeltildi), 8'i Q-40 dosyalarında.
+- F7b.3 devam ediyor.
 
 ## Açık sorular (Q)
 
