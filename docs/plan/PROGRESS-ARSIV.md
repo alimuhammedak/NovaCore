@@ -1,7 +1,7 @@
 # İlerleme arşivi
 
 > [PROGRESS.md](PROGRESS.md)'den taşınan kayıtlar (D-076): biten fazların adımları, eski devir notları, kapanmış "Sonraya bırakılanlar" maddeleri.
-> İçerik değiştirilmeden taşındı. Faz sonunda biten fazın kayıtları buraya eklenir; `/novacore-phase` bu dosyayı oturum başında okumaz.
+> İçerik değiştirilmeden taşındı. Her faz sonunda bir önceki fazın kayıtları buraya eklenir (son biten faz PROGRESS.md'de kalır); `/novacore-phase` bu dosyayı oturum başında okumaz.
 
 ## Adımlar
 

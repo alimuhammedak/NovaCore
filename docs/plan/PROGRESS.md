@@ -2,7 +2,7 @@
 
 > Tek doğru durum kaynağı. `/novacore-phase` her başlangıçta bu dosyayı okur ve her adımdan sonra günceller.
 > Adım tanımları [PLAN.md](PLAN.md)'dedir. Burada yalnızca durum, commit hash'i ve notlar tutulur.
-> Biten fazların adım kayıtları, eski devir notları ve kapanmış "Sonraya bırakılanlar" maddeleri [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md)'dedir (D-076). Oturum başında okunmaz; bir kaydın geçmişi gerektiğinde orada aranır.
+> Son biten fazdan önceki fazların adım kayıtları, eski devir notları ve kapanmış "Sonraya bırakılanlar" maddeleri [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md)'dedir (D-076). Son biten fazın adımları burada kalır, bir sonraki faz sonunda taşınır. Oturum başında okunmaz; bir kaydın geçmişi gerektiğinde orada aranır.
 
 ## Fazlar
 
@@ -34,7 +34,7 @@ Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıld�
 
 Biçim: `- [x] F0.3 (abc1234): not`
 
-Biten fazların eski adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
+Son biten fazdan önceki fazların adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
 
 ### Faz 7a
 Başlangıç 2026-10-23, `main` @ `af5ce0b` (plan commit'i henüz push edilmemişti, branch'le gider), 387 test. Plan onaylandı (plan modu). Faz branch'i her adımdan sonra push edilir (Q-59), main'e dokunulmaz; faz sonunda PR (D-067). Q-40 sürüyor. Kararlar D-072'den, araştırmalar R-125'ten başlayarak yazılır.

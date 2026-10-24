@@ -39,7 +39,7 @@ Ardından şunları kontrol et. Biri başarısızsa **dur ve kullanıcıya bildi
 - **Bağımlılık:** Önceki fazların hepsi `✅ tamam` mı? Sıra PLAN.md'deki "Faz sırası ve bağımlılıklar" bölümündedir, buraya kopyalanmaz. Koşullu bir faz atlandıysa `✅ tamam (atlandı)` sayılır.
 - **Açık sorular:** Bu fazın ihtiyaç duyduğu Q-kayıtları cevaplanmış mı? Cevaplanmamışsa `AskUserQuestion` ile şimdi sor.
 - **Çalışma ağacı:** Temiz mi? Değilse neyin değiştiğini göster ve ne yapılacağını sor.
-- **Devam eden faz:** Faz `🔄 devam ediyor` veya `⏸ duraklatıldı` durumundaysa bu bir devamdır. Son devir notunu ve işaretlenmemiş ilk adımı esas al, tamamlanmış adımları tekrar yapma.
+- **Devam eden faz:** Faz `🔄 devam ediyor` veya `⏸ duraklatıldı` durumundaysa bu bir devamdır. Son devir notunu ve işaretlenmemiş ilk adımı esas al, tamamlanmış adımları tekrar yapma. Plan fazın ilk oturumunda onaylandı: §2'yi atla, doğrudan §3'e geç.
 
 ## 2. Kapsamı yazılı olarak onaylat (plan modu)
 
@@ -67,7 +67,7 @@ Her adım için aynı döngü:
 1. **Başlat:** PROGRESS'te adıma "devam ediyor" notu düş.
 2. **Test:** Adım bir hata düzeltmesi veya yeni davranış içeriyorsa önce testi yaz ve kırmızı olduğunu gör.
 3. **Uygula:** Yalnızca o adımın kapsamı. Aynı dosyada yan bir şey gözüne çarparsa dokunma, §4'ü uygula.
-4. **Doğrula:** `dotnet build NovaCore.slnx` ve `dotnet test NovaCore.slnx`. Paket değiştiyse `dotnet restore NovaCore.slnx --force` da çalıştır. Kırmızıysa düzelt. Düzeltme kapsam dışına taşıyorsa §4. Çıktının tamamını bağlama alma: özeti ve hata satırlarını oku (ör. `dotnet build -v q`, testlerde yalnız başarısızlar ve toplam). CodeRabbit CLI adımda çalışmaz, faz sonunda bir kez çalışır (§5, D-076).
+4. **Doğrula:** `dotnet build NovaCore.slnx` ve `dotnet test NovaCore.slnx`. Paket değiştiyse `dotnet restore NovaCore.slnx --force` da çalıştır; sürüm değiştiyse `--force-evaluate` ile lock dosyalarını yeniden yaz ve onları da commit'le. Kırmızıysa düzelt. Düzeltme kapsam dışına taşıyorsa §4. Çıktının tamamını bağlama alma: özeti ve hata satırlarını oku (ör. `dotnet build -v q`, testlerde yalnız başarısızlar ve toplam). CodeRabbit CLI adımda çalışmaz, faz sonunda bir kez çalışır (§5, D-076).
 5. **Commit:** `faz<id>(<adım-id>): <özet>`, sonuna oturumun attribution satırını ekle. Sadece o adımın dosyalarını stage'le (`git add <yol>`); `git add -A` kullanma.
 6. **Kaydet:** PROGRESS'te `- [x] <adım-id> (<kısa-hash>): <kısa not>`.
 7. **Bilgilendir:** Kullanıcıya tek satır yaz, ör. "F0.3 tamam: strict limiter IP bazlı, 2 yeni test." Adımda kendi aldığın bir karar varsa aynı satıra ekle. Plan onaylandığı için adımlar arasında onay bekleme. Yalnızca §4'teki "sor" durumunda dur.
