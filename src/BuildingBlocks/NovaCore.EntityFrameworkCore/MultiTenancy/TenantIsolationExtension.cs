@@ -89,7 +89,10 @@ internal sealed class TenantQueryFilterConvention : IModelFinalizingConvention
 
             // The tenant joins the WHERE of every UPDATE and DELETE: a detached copy that names another tenant's row by
             // its key and claims this scope's tenant then changes nothing, and the save fails as a concurrency conflict.
-            tenantId.Builder.IsConcurrencyToken(true);
+            if (tenantId.Builder.IsConcurrencyToken(true) is null)
+                throw new InvalidOperationException(
+                    $"The {nameof(ITenantEntity.TenantId)} of {entityType.DisplayName()} can't be made a concurrency token: "
+                    + "the model configures it as none itself. Leave it to NovaCore.");
 
             if (entityType.Builder.HasQueryFilter(TenantQueryFilter.Name, TenantQueryFilter.For(entityType.ClrType)) is null)
                 throw new InvalidOperationException(

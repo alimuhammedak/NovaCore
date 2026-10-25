@@ -57,6 +57,24 @@ public class TenantModelTests
     }
 
     [Fact]
+    public void A_tenant_entity_whose_tenant_is_configured_as_no_concurrency_token_fails_the_model()
+    {
+        // The token keeps the tenant in every UPDATE and DELETE; a module turning it off would let a detached copy reach
+        // another tenant's row by its key.
+        var error = Assert.Throws<InvalidOperationException>(() => ModelOf<NoTenantTokenContext>());
+
+        Assert.Contains("concurrency token", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_tenant_entitys_tenant_is_a_concurrency_token()
+    {
+        var note = ModelOf<NotesDbContext>().FindEntityType(typeof(Note))!;
+
+        Assert.True(note.FindProperty(nameof(Note.TenantId))!.IsConcurrencyToken);
+    }
+
+    [Fact]
     public void The_convention_test_catches_a_tenant_column_without_the_tenant_filter()
     {
         Assert.Equal(["Orphan"], TenantConvention.UnfilteredTenantEntities(ModelOf<OrphanContext>()));
@@ -133,6 +151,16 @@ public class TenantModelTests
             modelBuilder.Entity<TenantRoot>().UseTptMappingStrategy();
             modelBuilder.Entity<TenantLeaf>();
         }
+    }
+
+    private sealed class NoTenantTokenContext(DbContextOptions<NoTenantTokenContext> options) : DbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+            modelBuilder.Entity<Note>(note =>
+            {
+                note.Ignore(n => n.DomainEvents);
+                note.Property(n => n.TenantId).IsConcurrencyToken(false);
+            });
     }
 
     private sealed class OrphanContext(DbContextOptions<OrphanContext> options) : DbContext(options)
