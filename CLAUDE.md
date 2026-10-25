@@ -112,7 +112,7 @@ bash eng/template-smoke.sh [work-dir]
 dotnet new install BMD.NovaCore.Templates::<version>    # from the GitHub Packages feed
 dotnet new novacore -n MyProject [--auth BuiltIn|External] [--db SqlServer|PostgreSql] [--multitenancy]
 
-# NuGet packages (the seven building blocks + the template, IDs BMD.NovaCore.*) → artifacts/ (git-ignored). Version: VersionPrefix.
+# NuGet packages (the eight building blocks + the template, IDs BMD.NovaCore.*) → artifacts/ (git-ignored). Version: VersionPrefix.
 dotnet pack NovaCore.slnx -c Release -o artifacts [--version-suffix preview.1]
 ```
 
@@ -137,7 +137,8 @@ targets a **local SQL Server via Windows auth** (`appsettings.json`).
 - **Packages (`src/BuildingBlocks/`, ANALYSIS §4):** three **core** packages that depend on the BCL and Microsoft
   packages only (D-003) — `NovaCore.Abstractions` (BCL only), `NovaCore.AspNetCore` and `NovaCore.EntityFrameworkCore`
   — plus optional **add-on** packages for third-party libraries: `NovaCore.Serilog`, `NovaCore.OpenTelemetry` (logs,
-  metrics, traces), `NovaCore.Scalar`, `NovaCore.Identity.OpenIddict` (the OpenID Connect provider).
+  metrics, traces), `NovaCore.Scalar`, `NovaCore.Identity.OpenIddict` (the OpenID Connect provider),
+  `NovaCore.MultiTenancy` (tenants, memberships, their roles and the life cycle).
   **Package IDs are `BMD.NovaCore.*`** (`Directory.Build.targets`: `BMD.$(MSBuildProjectName)`); assembly, project and
   namespace names stay `NovaCore.*` (D-041: other owners publish `NovaCore.*` on nuget.org).
 
@@ -153,10 +154,10 @@ targets a **local SQL Server via Windows auth** (`appsettings.json`).
   D-076 (2)). Enforced by `PackageDependencyTests`.
 
 - **The host composes everything explicitly** (`src/Api/NovaCore.Api/Program.cs`): the add-ons (`AddCoreLogging`,
-  `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`), the identity provider
-  the database of every module context (`AddModuleDatabase`: SQL Server, the host's migrations), the identity provider
-  (`AddCoreIdentityServer` + `AddModuleDbContext<IdentityServerDbContext>`), then one `builder.AddModule<TModule>()` per
-  module; after `Build`,
+  `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`), the database of every
+  module context (`AddModuleDatabase`: SQL Server, the host's migrations), the identity provider
+  (`AddCoreIdentityServer` + `AddModuleDbContext<IdentityServerDbContext>`), multi-tenancy (`AddCoreMultiTenancy` +
+  `AddModuleDbContext<MultiTenancyDbContext>`), then one `builder.AddModule<TModule>()` per module; after `Build`,
   `UseSerilogRequestLogging`, `UseCoreWeb`, `MapCoreScalar`, `MapCoreIdentityServer`, `MapModules`,
   `MapDefaultEndpoints` (health endpoints, Development only, D-022). Nothing is found by
   assembly scanning (Y-20, `ExplicitRegistrationTests`).
@@ -193,14 +194,29 @@ targets a **local SQL Server via Windows auth** (`appsettings.json`).
 - **Security** is a first-class subsystem. The core only *validates* access tokens (D-002): JWT bearer against an
   OpenID Connect provider, `Jwt:Authority` (issuer + JWKS discovered, asymmetric algorithms only), required in every
   environment (D-028). Permission-based authorization lives in
-  `NovaCore.AspNetCore` too: permissions are resolved on the server through `IPermissionResolver` (never read from the
-  token) and cached per `sub` + security stamp for `Cache:PermissionExpiration`; code that changes what the resolver
-  returns drops the entries at once with `HybridCache.RemovePermissionsAsync(sub)` (a tag). The tokens come from the
+  `NovaCore.AspNetCore` too: permissions are resolved on the server through every registered `IPermissionResolver`
+  (never read from the token; the caller holds what any of them grants) and cached per `sub` + security stamp +
+  requested tenant for `Cache:PermissionExpiration`; code that changes what a resolver returns drops the entries at once
+  with `HybridCache.RemovePermissionsAsync(sub)` (a tag). The core's claims transformation is the only one: another
+  `IClaimsTransformation` stops the host (`ClaimsTransformationStartupCheck`). The tokens come from the
   `NovaCore.Identity.OpenIddict` add-on (ASP.NET Core Identity + OpenIddict: Authorization Code + PKCE, refresh
   rotation with an absolute 7-day lifetime, client credentials, single-use TOTP 2FA with hashed recovery codes,
   password reset, token pruning, admin; the API accepts only its `at+jwt` tokens), which the Api host runs as its own
   authority (DECISIONS D-037, Faz 6b: D-053…D-055). See `src/BuildingBlocks/NovaCore.Identity.OpenIddict/CLAUDE.md` before
   touching auth.
+
+- **Multi-tenancy** (D-069, D-076…D-084; README "Çok kiracılılık"): tenants share one database and their rows carry a
+  `TenantId`. The core isolates every `ITenantEntity` in every module context with nothing for the module to do
+  (`AddModuleDbContext`: a named query filter, `TenantQueryFilter.Name`; a write guard; a parameterless
+  `IgnoreQueryFilters()` fails), in the tenant of the DI scope (`TenantContext`, given once; none → no rows). A request
+  gets its tenant from the optional `NovaCore.MultiTenancy` add-on (`AddCoreMultiTenancy`: the `tenant` route value,
+  validated against the caller's membership and the tenant's status on the server, cached with the permissions; no
+  tenant claim in the token, D-070 (3)); `RequireTenant()` guards a tenant endpoint. Members' roles grant permissions in
+  their tenant (`MultiTenancy:Roles`), the outbox runs a message's handlers in the tenant that saved it, and
+  `TenantDirectory` runs the life cycle (active, suspended, closed, deleted through `TenantData`). There is no "see
+  everything" switch: other work runs in a tenant's scope, a read across tenants turns the filter off by its name.
+  Row-level security is a documented example for the host, not package code (D-069 (5)). The Api host wires the add-on;
+  the repo's modules have no tenant entities, so isolation is tested on `TenancyFixture` (`tests/CLAUDE.md`).
 
 ---
 

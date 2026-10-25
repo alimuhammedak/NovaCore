@@ -115,6 +115,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`RequireTenant()`, an index on the tenant and title). Its tests open tenants and members through `TenantDirectory`
   and show that another tenant's todos are out of reach. The template's Todos migrations carry the outbox's tenant and
   trace columns too; the smoke test builds all eight `--auth` × `--db` × `--multitenancy` projects.
+- README: a multi-tenancy guide (tenant resolution, memberships and roles, isolation, work outside a request and reads
+  across tenants, the outbox, the life cycle and deletion) and a row-level security example for SQL Server and
+  PostgreSQL, a host's own backstop in the database (a connection interceptor that writes the scope's tenant to the
+  session, and the policy in the host's migrations). Row-level security stays out of the packages.
 
 ### Changed
 

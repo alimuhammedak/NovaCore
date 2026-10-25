@@ -68,6 +68,14 @@ they show a cross-module write through events both ways (DECISIONS D-034): a pay
   delivery on the next pass with a fresh read.
 - **Guard every endpoint** with `.RequirePermission(<M>Permissions.X)` (or `.RequireAuthorization()` only
   when no finer permission applies).
+- **A tenant's data** (in a host with the multi-tenancy add-on; the repo's modules have none, the template's Todos with
+  `--multitenancy` does): the entity implements `ITenantEntity` (`NovaCore.Abstractions`, a public `Guid TenantId` on
+  the hierarchy's root, left empty on a new entity), and its endpoints sit under `/api/v1/tenants/{tenant:guid}/...` with
+  `.RequireTenant()` (`NovaCore.AspNetCore`) next to the permission. `AddModuleDbContext` filters, fills and guards the
+  rows by the scope's tenant; the module neither references the add-on nor writes a `Where(TenantId == ...)`. Start the
+  entity's indexes with `TenantId`. Never call `IgnoreQueryFilters()` without names (it fails); a read across tenants
+  names the filter (`IgnoreQueryFilters([TenantQueryFilter.Name])`), and work outside a request gives its scope a tenant
+  (`TenantContext.Use`). An event handler runs in the tenant that saved the event. README "Çok kiracılılık".
 - **Validate write DTOs with DataAnnotations** on the request record (`[Required, MaxLength(200)] string Name`).
   The module's `services.AddValidation()` call makes .NET 10 run them before the handler and answer 400 with a
   validation ProblemDetails. Without that call nothing is validated, and nothing fails either. A rule no built-in

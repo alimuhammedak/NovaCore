@@ -15,7 +15,7 @@ ile organize edilmiş iş modülleri.
 - [Yeni Proje (Tüketici Rehberi)](#yeni-proje-tüketici-rehberi)
   - [Kurulum](#kurulum) · [Şablon ne üretir](#şablon-ne-üretir) · [Sorumluluk modeli](#sorumluluk-modeli) ·
     [Kontrol listesi](#yeni-proje-kontrol-listesi) · [Ayarları ezmek](#ayarları-ezmek) ·
-    [Nesne düzeyi yetki](#nesne-düzeyi-yetki) · [BFF](#tarayıcı-uygulamaları-bff) ·
+    [Nesne düzeyi yetki](#nesne-düzeyi-yetki) · [Çok kiracılılık](#çok-kiracılılık) · [BFF](#tarayıcı-uygulamaları-bff) ·
     [Migration dağıtımı](#migrationların-dağıtımı) · [Güncelleme](#güncelleme)
 - [Bu Repoda Çalışmak](#bu-repoda-çalışmak)
 - [Mimari](#mimari)
@@ -75,7 +75,8 @@ cd SiparisServisi && dotnet build && dotnet test         # veritabanı sunucusu 
 - `--multitenancy` (varsayılan kapalı): host'a `NovaCore.MultiTenancy` eklentisini bağlar (`AddCoreMultiTenancy`, kurum
   store'unun context'i ve migration'ları, `MultiTenancy:Roles`'ta örnek `Editor` ve `Viewer` rolleri). Todos'un kayıtları
   kuruma aittir ve `/api/v1/tenants/{tenant}/todos` altında yalnız o kurumun üyesine açılır (`RequireTenant()`); izni
-  üyenin o kurumdaki rolü verir. Testler kurumu ve üyeyi `TenantDirectory` ile açar.
+  üyenin o kurumdaki rolü verir. Testler kurumu ve üyeyi `TenantDirectory` ile açar. Rehber:
+  [Çok kiracılılık](#çok-kiracılılık).
 
 ### Şablon ne üretir
 
@@ -110,6 +111,7 @@ secret deposu, veritabanı hesabı, IdP barındırma) → proje; paket yalnızca
 | Yetkilendirme | `RequirePermission`, varsayılan kapalı (fallback policy), izin önbelleği, resolver sözleşmesi | Örnek modülün izinleri | İzin tanımları, harici IdP'de resolver, **nesne düzeyi yetki** |
 | Hata sözleşmesi | ProblemDetails, `Result` → HTTP, exception eşlemesi | — | Domain hataları, kendi `IExceptionHandler`'ları |
 | Veri | `AddModuleDatabase` (sağlayıcı tek yerde), `AddModuleDbContext` (şema ve geçmiş tablosu), outbox, audit | Sağlayıcı (`--db`), migration'lar, migration bundle'ları | Şema, migration üretimi ve **uygulanması**, yedekleme |
+| Çok kiracılılık | Kurum çözümü ve doğrulaması, izolasyon, outbox'ta kurum, üyelik izinleri, yaşam döngüsü ve silme (eklenti) | `--multitenancy`, örnek roller, kurum kapsamlı Todos | Roller, kurum açma ve davet uçları, saklama işi, RLS ([rehber](#çok-kiracılılık)) |
 | Gözlem | OpenTelemetry ve Serilog eklentileri | OpenTelemetry hattı | Backend (OTLP collector), alarmlar |
 | Proxy ve TLS | `UseForwardedHeaders` en başta, güvenilen proxy listesi doğrulanır | `ForwardedHeaders:*` | Reverse proxy, TLS sertifikası, HTTPS yönlendirmesi |
 | Data Protection | Kimlik eklentisi Development dışında anahtar deposu yoksa açılmaz | Kontrol listesinde | Anahtar deposu (volume, veritabanı, Key Vault) |
@@ -166,9 +168,17 @@ builder.Services.PostConfigure<RateLimiterOptions>(options => options.AddPolicy(
         _ => new ConcurrencyLimiterOptions { PermitLimit = 2, QueueLimit = 0 })));
 ```
 
-Ezilemeyenler: `UseCoreWeb`'in middleware sırası (kimlik doğrulama ile yetkilendirme arasında bir yer yok), izin
-önbelleğinin anahtarı (`sub` + security stamp) ve outbox ile token temizliğinin sabitleri (5 sn tur, 10 deneme, 7 gün
-saklama; 14 gün). Bunlar bir proje ihtiyaç duyunca açılır (DECISIONS Y-14, Y-19).
+Ezilemeyenler:
+
+- `UseCoreWeb`'in middleware sırası. Kimlik doğrulama ile yetkilendirme arasında bir yer yoktur ve gerekmez: izinler ve
+  isteğin kurumu kimlik doğrulamanın içinde çözülür (`IClaimsTransformation`), askıdaki kurum da orada elenir; projenin
+  middleware'i `UseCoreWeb`'den sonra, endpoint'ten önce çalışır (DECISIONS D-070 (5)).
+- İzin çözümünün kendisi. Başka bir `IClaimsTransformation` kayıtlıysa host açılmaz (framework'ün no-op'u hariç);
+  izin eklemenin yolu bir `IPermissionResolver` daha kaydetmektir, çekirdek hepsini sorar ve birleştirir.
+- İzin önbelleğinin anahtarı (`sub` + security stamp + istenen kurum) ve outbox ile token temizliğinin sabitleri (5 sn
+  tur, 10 deneme, 7 gün saklama; 14 gün).
+
+Bunlar bir proje ihtiyaç duyunca açılır (DECISIONS Y-48, Y-19).
 
 ### Nesne düzeyi yetki
 
@@ -201,11 +211,220 @@ if (!(await authorization.AuthorizeAsync(user, todo, new TodoOwnerRequirement())
 Başkasının kaydına 404 dönmek kaydın varlığını da gizler. Listelerde aynı kural sorguya girer
 (`Where(t => t.OwnerId == currentUser.UserId)`): sayfalanmış bir listeyi bellekte süzmek sayfaları bozar.
 
+### Çok kiracılılık
+
+Birçok kuruma satılan bir ürünün ortak altyapısı isteğe bağlı `BMD.NovaCore.MultiTenancy` eklentisindedir; çekirdek
+kurum izolasyonunu her modül context'ine kendisi uygular. Model (DECISIONS D-069, D-070, D-076): kişi başına tek hesap
+kimlik sağlayıcıda, kurum ve üyelik uygulamada. Token kurum taşımaz; kurum her istekte gelir ve sunucu her istekte
+çağıranın orada üye olduğunu ve kurumun açık olduğunu doğrular. Kurumlar tek veritabanını paylaşır, satırlar `TenantId`
+ile ayrılır. Şablonda `--multitenancy` bunların hepsini bağlar.
+
+```csharp
+// Program.cs
+builder.AddCoreMultiTenancy();                                      // kurum route değerinden: /api/v1/tenants/{tenant}/...
+builder.Services.AddModuleDbContext<MultiTenancyDbContext>(         // kurumlar ve üyelikler, şema "tenancy";
+    MultiTenancyDbContext.Schema, (_, _) => { });                   // migration'ları her context'inki gibi host'ta
+```
+
+```jsonc
+"MultiTenancy": {
+  "Roles": {                                       // ürünün rolleri ve kurumdaki izinleri; yerleşik rol yok
+    "Editor": [ "todos:items:read", "todos:items:write" ],
+    "Viewer": [ "todos:items:read" ]
+  }
+}
+```
+
+**Kurum çözümü.** Kurum varsayılan olarak `tenant` route değeridir (Guid): iki sekmede iki kurum açılabilir ve OpenAPI
+belgesinde görünür. Başka bir kaynak için delege overload'u: `builder.AddCoreMultiTenancy(context =>
+context.Request.Headers["X-Tenant"])` (alan adı ya da sorgu dizesi de olur; Guid olmayan değer kurum adlandırmaz).
+İstek adlandırdığı kurumda yalnız çağıranın (`sub`) orada üyeliği varsa ve kurum açıksa çalışır. Aksi hâlde isteğin
+kurumu yoktur: kurum varlıkları okunmaz ve yazılamaz, `RequireTenant()` 403 döner (anonim istek 401); var olmayan kurum
+da aynı 403'ü alır. Karar izinlerle aynı önbellek girdisindedir (anahtar `sub` + security stamp + istenen kurum,
+`Cache:PermissionExpiration`). Kurum seçici için `TenantDirectory.TenantsOfAsync(sub)` çağıranın açık kurumlarını ve
+oradaki rollerini verir. Modül eklentiye bağlanmaz: `ITenantEntity` Abstractions'ta, `RequireTenant()` AspNetCore'da.
+
+```csharp
+var group = endpoints.MapGroup("/api/v1/tenants/{tenant:guid}/todos").RequireTenant();   // her uç ayrıca RequirePermission
+```
+
+**Üyelik ve roller.** `TenantDirectory` (scoped): `CreateAsync(name)`, `AddMemberAsync(tenant, sub, roles)` (üyenin
+rollerini de değiştirir; listede olmayan rol `tenant.unknown_role`), `RemoveMemberAsync`. Eklenti HTTP ucu açmaz: kurumu
+kimin açacağı, davet ve onay akışı ürünündür; uçlar bu servisin üzerine kurulur. Çekirdek bütün `IPermissionResolver`'ları
+sorar: kimlik sağlayıcının platform izinleri ve üyeliğin kurum izinleri birlikte gelir. Kurumu çözülmüş bir istekte rolün
+izinleri isteğin çağırdığı her uçta geçerlidir; bu yüzden bir kurum rolü yalnız kurum uçlarının izinlerini listeler,
+platformunkileri (`identity:*`) asla. Şablonun BuiltIn + `--multitenancy` bileşiminde `Identity:Seed:UserPermissions`
+aynı nedenle boştur: platform rolünün izni her kurumda geçerli olurdu. Bir üyelik değişikliği bu sunucuda sonraki istekte
+etkilidir, başka sunucunun belleğinde en geç `Cache:PermissionExpiration` sonra.
+
+**İzolasyon.** Kurumun bir varlığı `ITenantEntity` uygular (`public Guid TenantId { get; set; }`, kalıtımda kök tipte;
+yeni varlıkta boş bırakılır). Başka bir şey gerekmez, `AddModuleDbContext` her modül context'ine şunları ekler:
+
+- adlı bir sorgu filtresi (`TenantQueryFilter.Name`): sorgu yalnız kapsamın kurumunun satırlarını okur, kurum yoksa
+  hiçbirini; `ExecuteUpdate`/`ExecuteDelete` de yalnız onlara ulaşır;
+- yazma koruması: yeni satır kapsamın kurumunu alır; başka kurumun satırını ekleyen, değiştiren ya da silen, bir satırı
+  başka kuruma taşıyan ya da kurumsuz kapsamda kurum satırı yazan kayıt `InvalidOperationException` atar;
+- parametresiz `IgnoreQueryFilters()` kurum varlığı olan context'te hata verir; modülün kendi adlı filtresini kapatmak
+  (`IgnoreQueryFilters(["Unarchived"])`) kurum filtresini yerinde bırakır.
+
+EF Core'un süzemediği bir kurum varlığı (owned tip, kökü kurum varlığı olmayan türetilmiş tip) model kurulurken hata
+verir. Index'leri `TenantId` ile başlatın: her sorgu kurumla süzülür (şablon: `(TenantId, Title)`). Filtre ve koruma
+kazaları önler (Microsoft: filtre geliştiricinin "kazara" başka kurumun verisine erişmesini engeller); kasıtlı yollar
+açıktır: filtreyi adıyla kapatmak, `ExecuteUpdate` ile `TenantId`'yi değiştirmek, ham SQL. Veritabanı düzeyindeki arka
+durak RLS'tir (aşağıda).
+
+**Sistem işi ve kurumlar arası okuma.** "Hepsini gör" bayrağı yoktur. İstek dışı bir iş bir kurumun kapsamında koşar;
+kapsamın kurumu bir kez verilir ve değişmez:
+
+```csharp
+await using var scope = scopeFactory.CreateAsyncScope();
+scope.ServiceProvider.GetRequiredService<TenantContext>().Use(tenantId);   // başka bir kuruma geçmek hata verir
+var todos = scope.ServiceProvider.GetRequiredService<TodosDbContext>();
+```
+
+Birden çok kurumdaki iş kurum başına bir kapsamla yürür. Kurumlar arası okuma (rapor, destek) filtreyi adıyla, açıkça
+kapatır: `IgnoreQueryFilters([TenantQueryFilter.Name])`. Yazma koruması orada da geçerlidir: okunan başka kurumun
+satırı o kapsamda kaydedilemez.
+
+**Arka plan işleri.** Bir istekte kaydedilen domain event'i isteğin kurumunu ve trace'ini outbox'a yazar
+(`outbox_messages.TenantId`, `TraceParent`); dağıtıcı handler'ları o kurumun kapsamında ve isteğin trace'inde bir
+`process {event}` consumer span'inde çalıştırır. Event'in kendisi kurum taşımaz. Kurumsuz kaydedilen event'in
+handler'ları kurumsuz çalışır (kurum satırları görünmez). Span'ler `AddCoreObservability`'nin dinlediği
+`NovaCore.EntityFrameworkCore` kaynağındadır.
+
+**Yaşam döngüsü ve silme** (`TenantDirectory`; her değişiklik kurumun önbellekteki kararlarını düşürür):
+
+| Durum | Ne olur | Geçiş |
+|---|---|---|
+| Açık (`Active`) | Üyeler çalışır | `SuspendAsync` → askıda, `CloseAsync` → kapalı |
+| Askıda (`Suspended`) | Kurum çözülmez, üyeler bütün erişimini kaybeder; veri kalır | `ActivateAsync` → açık, `CloseAsync` → kapalı |
+| Kapalı (`Closed`) | Askıdaki gibi; saklama süresi başlar | `ActivateAsync` → açık (yeniden katılım), `DeleteAsync` → silinir; `SuspendAsync` reddedilir (`tenant.closed`) |
+
+`DeleteAsync` yalnız kapalı kurumda çalışır (yoksa `tenant.not_closed`) ve geri alınamaz: kurumun her modül
+context'indeki satırlarını (`TenantData`: context başına tek transaction, bağımlı önce), outbox mesajlarını, üyeliklerini
+ve kurumun kendisini siler. Yarıda kalan çağrı tekrarlanır. Sınırlar: TPT ile eşlenmiş kurum varlığı silinemez (toplu
+silme tek tabloya etki eder); kurum varlığı olmayan bir tipin kurum satırına işaret eden satırı, FK'si cascade değilse
+silmeyi durdurur. Saklama süresini ve zamanlamayı ürün seçer (yasal gereklilik); NovaCore zamanlamaz, ayar eklemez:
+
+```csharp
+foreach (var tenant in await directory.ClosedBeforeAsync(time.GetUtcNow() - retention, cancellationToken))
+    await directory.DeleteAsync(tenant, cancellationToken);
+```
+
+#### Veritabanı arka durağı: RLS
+
+Row-level security, filtreyi adıyla kapatan sorguyu, `TenantId`'yi değiştiren `ExecuteUpdate`'i ve ham SQL'i de
+veritabanında durdurur. Paketlerde değildir (D-069 (5)): sağlayıcıya özgüdür, bu yüzden host'a aittir. SQL host'un o
+sağlayıcı için tuttuğu migration'a (`migrationBuilder.Sql(...)`, her ifade ayrı bir çağrı), interceptor
+`AddModuleDatabase`'e girer. Aşağıdaki iki örnek SQL Server ve PostgreSQL'de ölçüldü (RESEARCH R-134): kurumun satırları
+EF filtresi kapalıyken de yalnız kapsamın kurumuna görünür, kurumsuz kapsam hiçbirini görmez, başka kuruma ekleme ve
+`ExecuteUpdate` ile taşıma reddedilir, `TenantData` silmeyi yapar.
+
+Interceptor kapsamın kurumunu bağlantının oturumuna her açılışta yazar: EF bir sorgu ya da kayıt için bağlantıyı açıp
+kapatır, havuz da yeniden kullanılan bağlantının oturumunu sıfırlar.
+
+```csharp
+// SQL Server: kurum SESSION_CONTEXT'e, bağlantı havuza dönene kadar değiştirilemez (@read_only = 1); kurumsuzda NULL.
+internal sealed class TenantSessionContext(TenantContext tenant) : DbConnectionInterceptor
+{
+    public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
+    {
+        using var command = Command(connection);
+        command.ExecuteNonQuery();
+    }
+
+    public override async Task ConnectionOpenedAsync(
+        DbConnection connection, ConnectionEndEventData eventData, CancellationToken cancellationToken = default)
+    {
+        await using var command = Command(connection);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private DbCommand Command(DbConnection connection)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText = "EXEC sys.sp_set_session_context @key = N'TenantId', @value = @tenant, @read_only = 1;";
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "@tenant";
+        parameter.DbType = DbType.Guid;
+        parameter.Value = tenant.TenantId is { } id ? id : DBNull.Value;
+        command.Parameters.Add(parameter);
+        return command;
+    }
+}
+
+// Program.cs: context başına bir örnek, kapsamın TenantContext'iyle (bağlantı interceptor'ı singleton değildir)
+builder.Services.AddModuleDatabase((services, db) => db
+    .UseSqlServer(services.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
+        sql => sql.MigrationsAssembly(typeof(Program).Assembly).EnableRetryOnFailure())
+    .AddInterceptors(new TenantSessionContext(services.GetRequiredService<TenantContext>())));
+```
+
+```csharp
+// SQL Server migration'ı (Todos'un tablosu todos.items); Down: DROP SECURITY POLICY, sonra DROP FUNCTION
+migrationBuilder.Sql("IF SCHEMA_ID(N'security') IS NULL EXEC(N'CREATE SCHEMA security');");
+migrationBuilder.Sql("""
+    CREATE FUNCTION security.todos_tenant(@TenantId uniqueidentifier)
+        RETURNS TABLE
+        WITH SCHEMABINDING
+    AS
+        RETURN SELECT 1 AS allowed
+        WHERE @TenantId = CAST(SESSION_CONTEXT(N'TenantId') AS uniqueidentifier);
+    """);
+migrationBuilder.Sql("""
+    CREATE SECURITY POLICY security.todos_tenant_isolation
+        ADD FILTER PREDICATE security.todos_tenant(TenantId) ON todos.items,
+        ADD BLOCK PREDICATE security.todos_tenant(TenantId) ON todos.items AFTER INSERT,
+        ADD BLOCK PREDICATE security.todos_tenant(TenantId) ON todos.items AFTER UPDATE
+        WITH (STATE = ON);
+    """);
+```
+
+PostgreSQL'de interceptor yalnız komutta ayrılır (sınıfın adı `TenantSessionSetting` olsun); kurumsuz kapsamda boş dize
+yazar, çünkü Npgsql'in sıfırlaması `No Reset On Close=true` ile kapatılabilir ve o zaman önceki kurumun değeri bağlantıda
+kalır (ölçüldü):
+
+```csharp
+command.CommandText = "SELECT set_config('app.tenant_id', @tenant, false);";   // false: oturum boyunca, transaction'dan bağımsız
+parameter.ParameterName = "tenant";
+parameter.DbType = DbType.String;
+parameter.Value = tenant.TenantId?.ToString() ?? string.Empty;
+```
+
+```csharp
+// PostgreSQL migration'ı; Down: DROP POLICY tenant_isolation ON todos.items, sonra DISABLE ROW LEVEL SECURITY
+migrationBuilder.Sql("ALTER TABLE todos.items ENABLE ROW LEVEL SECURITY;");
+migrationBuilder.Sql("""
+    CREATE POLICY tenant_isolation ON todos.items
+        USING ("TenantId" = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+    """);
+```
+
+Yalnız `USING`'li bir `ALL` politikası onu eklenen ve güncellenen satırlara da uygular (`WITH CHECK` yerine). Sıfırlanan
+bir bağlantıda ayar NULL değil boş dize okunur (ölçüldü); `NULLIF` olmasa `''::uuid` her kurumsuz sorguyu hataya düşürürdü.
+
+Bilinmesi gerekenler:
+
+- **Kurumsuz kapsam hiçbir satır görmez ve yazamaz**, EF filtresi gibi; normal kod farkı görmez. Ama filtreyi adıyla
+  kapatan kurumlar arası okuma da yalnız kapsamın kurumunu görür. Böyle bir okuma kurum başına bir kapsamla yürür ya da
+  politikanın kabul ettiği ayrı bir hesapla bağlanır (Microsoft: bütün satırları görmesi gereken hesap için politika
+  "must be written to allow that").
+- **Hesaplar:** SQL Server'da politika dbo dahil her kullanıcıya uygulanır: bir migration'ın kurum tablosundaki veri
+  adımı satır görmez; o adım politikayı kapatır (`ALTER SECURITY POLICY ... WITH (STATE = OFF)`) ya da kurum başına
+  yazılır. PostgreSQL'de superuser'lar ve `BYPASSRLS` rolleri politikayı her zaman atlar, tablonun sahibi de
+  `ALTER TABLE ... FORCE ROW LEVEL SECURITY` olmadıkça: uygulama ikisi de olmayan, tablolara sahip olmayan bir rolle
+  bağlanır (migration'ları ayrı hesap uygular, kontrol listesi). Uygulama tablolara sahipse (`Database:ApplyMigrations`
+  tek hesapla) `FORCE` eklenir.
+- **Maliyet:** her bağlantı açılışında bir gidiş dönüş daha (EF her sorgu ve kayıt için bir bağlantı açar).
+- **SQL Server'ın bilinen sorunu:** Microsoft, `SESSION_CONTEXT`'in paralel bir planda, oturum yeniden kullanıma
+  sıfırlanırken hata ya da yanlış sonuç verebildiğini yazıyor (SQL Server 2019 CU14 ve sonrası); geçici çözüm trace flag
+  11042 (`SESSION_CONTEXT`'i seri çalıştırır). Havuzlu bağlantıyla kullanılan bu kalıp tam o durumdur.
+
 ### Tarayıcı uygulamaları: BFF
 
 Microsoft, web uygulamaları için tarayıcıda çalışan public OIDC/OAuth client'larını artık önermiyor; önerilen mimari
 **Backend for Frontend**: token'lar sunucuda kalır, tarayıcıda yalnızca HttpOnly bir cookie olur. NovaCore'da bir BFF
-paketi yok (iki proje ihtiyaç duyana kadar, Y-14). Seçenekler:
+paketi yok (iki proje ihtiyaç duyana kadar, Y-48). Seçenekler:
 
 - **SPA + BFF host:** ayrı bir ASP.NET Core host'u confidential client olarak (`Identity:Clients`'ta `ClientSecret` ve
   `RedirectUris`) OIDC ile oturum açar, cookie tutar ve API çağrılarını access token'ı ekleyerek API'ye iletir (YARP).
@@ -371,8 +590,9 @@ eklentiyi `/plugin` ile etkinleştirin.
 kullanabilir — diğerleri etkilenmez.
 
 ```
-Api (ince host / composition root) ──►  eklentiler: NovaCore.Serilog / .OpenTelemetry / .Scalar
-        │  referans                      (üçüncü taraf paketler; en fazla AspNetCore'a bağlanır)
+Api (ince host / composition root) ──►  eklentiler: NovaCore.Serilog / .OpenTelemetry / .Scalar /
+        │  referans                      .Identity.OpenIddict / .MultiTenancy
+        │                                (yalnız çekirdek paketlere bağlanır, başka eklentiye asla)
         ▼
 Modules.*  ──(yalnızca Contracts üzerinden)──►  diğer Modules.*
         │
@@ -390,8 +610,9 @@ NovaCore.AspNetCore        NovaCore.EntityFrameworkCore     (çekirdek: yalnızc
 **Bağımlılık kuralları**
 - `NovaCore.Abstractions` hiçbir framework'e bağlı değildir (yalnızca BCL).
 - Çekirdek paketler (`NovaCore.Abstractions`, `NovaCore.AspNetCore`, `NovaCore.EntityFrameworkCore`) yalnızca
-  Microsoft paketlerine bağlanır. AspNetCore ile EntityFrameworkCore birbirine bağlanmaz; eklentiler en fazla
-  AspNetCore ve Abstractions'a bağlanır. Bu kurallar **mimari testlerle** zorlanır (`ModularityTests`,
+  Microsoft paketlerine bağlanır. AspNetCore ile EntityFrameworkCore birbirine bağlanmaz; eklentiler yalnız çekirdek
+  paketlere bağlanır, başka bir eklentiye asla (`NovaCore.MultiTenancy` ikisine de: kurum çözümü AspNetCore'da, kurum
+  verisinin silinmesi EntityFrameworkCore'da). Bu kurallar **mimari testlerle** zorlanır (`ModularityTests`,
   `PackageDependencyTests`).
 - Modüller **birbirine doğrudan referans vermez**; yalnızca bir modülün `*.Contracts` projesine bağlanır.
   Bu da bir mimari test ile zorlanır.
@@ -409,6 +630,7 @@ NovaCore.AspNetCore        NovaCore.EntityFrameworkCore     (çekirdek: yalnızc
 | JWT bearer auth (`Jwt:Authority`) + permission-based authz altyapısı | Kimlik sağlayıcının store'u ve migration'ları (host'ta) |
 | Kimlik sağlayıcı eklentisi (`NovaCore.Identity.OpenIddict`) | Client'lar, seed yöneticisi, üretim sertifikaları |
 | Auditing interceptor, transactional outbox ve dispatcher'ı; modül context'lerine host'un veritabanı (`AddModuleDatabase`) | |
+| Kurum izolasyonu (`ITenantEntity`, adlı filtre, yazma koruması), `RequireTenant()`; çok kiracılılık eklentisi (`NovaCore.MultiTenancy`: kurumlar, üyelik, roller, yaşam döngüsü, silme) | Kurum rolleri (`MultiTenancy:Roles`), kurum açma ve davet uçları, saklama süresi, isteğe bağlı RLS |
 
 ---
 
@@ -953,9 +1175,10 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
    dotnet pack NovaCore.slnx -c Release -o ./artifacts --version-suffix preview.1    # 0.1.0-preview.1
    # artifacts/ klasörünü lokal feed olarak ekleyin, sonra: dotnet add package BMD.NovaCore.AspNetCore (ve ihtiyaca göre diğerleri)
    ```
-   - Yedi kütüphane paketi ve şablon paketi üretilir: çekirdek `BMD.NovaCore.Abstractions`, `BMD.NovaCore.AspNetCore`,
+   - Sekiz kütüphane paketi ve şablon paketi üretilir: çekirdek `BMD.NovaCore.Abstractions`, `BMD.NovaCore.AspNetCore`,
      `BMD.NovaCore.EntityFrameworkCore`; eklentiler `BMD.NovaCore.Serilog`, `BMD.NovaCore.OpenTelemetry`,
-     `BMD.NovaCore.Scalar`, `BMD.NovaCore.Identity.OpenIddict`; şablon `BMD.NovaCore.Templates`. Modüller paketlenmez.
+     `BMD.NovaCore.Scalar`, `BMD.NovaCore.Identity.OpenIddict`, `BMD.NovaCore.MultiTenancy`; şablon
+     `BMD.NovaCore.Templates`. Modüller paketlenmez.
    - **Paket ID'leri `BMD.` önekini taşır, içlerindeki assembly ve namespace'ler `NovaCore.*`'dır** (`BMD.NovaCore.AspNetCore`
      → `using NovaCore.AspNetCore;`). nuget.org'da başka sahiplerin `NovaCore.*` paketleri var (`NovaCore.AspNetCore`,
      `NovaCore.Templates` dahil); paket ID'si her yerde benzersiz olmalı (DECISIONS D-041). Üretilen projenin
