@@ -132,6 +132,28 @@ public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixtu
     }
 
     [Fact]
+    public async Task Another_tenants_row_reached_through_its_id_with_this_tenant_on_the_copy_is_left_alone()
+    {
+        var (mine, theirs) = (Guid.NewGuid(), Guid.NewGuid());
+        var id = await AddNoteAsync(theirs, "theirs");
+
+        // A detached copy that names the row by its id and claims this scope's tenant passes every check on the copy: the
+        // database's write must still find the row in this tenant only.
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => Fixture.InScopeAsync(mine, notes =>
+        {
+            notes.Notes.Attach(new Note(id, "overwritten") { TenantId = mine }).Property(n => n.Text).IsModified = true;
+            return notes.SaveChangesAsync(Cancellation);
+        }));
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => Fixture.InScopeAsync(mine, notes =>
+        {
+            notes.Notes.Remove(new Note(id, "theirs") { TenantId = mine });
+            return notes.SaveChangesAsync(Cancellation);
+        }));
+
+        Assert.Equal(["theirs"], await TextsAsync(theirs));
+    }
+
+    [Fact]
     public async Task Turning_another_filter_off_by_its_name_keeps_the_tenant_filter()
     {
         var (mine, theirs) = (Guid.NewGuid(), Guid.NewGuid());
@@ -366,6 +388,23 @@ public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixtu
     }
 
     [Fact]
+    public async Task A_membership_ended_and_added_again_in_one_scope_is_there()
+    {
+        var alice = Subject();
+        var tenant = await Fixture.AddTenantAsync();
+
+        var memberships = await Fixture.InDirectoryAsync(async directory =>
+        {
+            Assert.True((await directory.AddMemberAsync(tenant, alice, [TenancyFixture.Reader], Cancellation)).IsSuccess);
+            Assert.True((await directory.RemoveMemberAsync(tenant, alice, Cancellation)).IsSuccess);
+            Assert.True((await directory.AddMemberAsync(tenant, alice, [TenancyFixture.Reader], Cancellation)).IsSuccess);
+            return await directory.TenantsOfAsync(alice, Cancellation);
+        });
+
+        Assert.Equal([tenant], memberships.Select(membership => membership.TenantId));
+    }
+
+    [Fact]
     public async Task The_tenants_of_a_subject_are_its_active_memberships_with_their_roles_by_name()
     {
         var alice = Subject();
@@ -490,6 +529,18 @@ public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixtu
 
         Assert.Empty(await TextsAsync(tenant));
         Assert.Equal("tenant.not_found", await DeletionErrorAsync(tenant));
+    }
+
+    [Fact]
+    public async Task Deleting_a_closed_tenant_removes_the_rows_its_modules_own_filters_hide()
+    {
+        var tenant = await Fixture.AddTenantAsync();
+        await AddNoteAsync(tenant, "archived", archived: true);
+        await ChangeAsync(directory => directory.CloseAsync(tenant, Cancellation));
+
+        await ChangeAsync(directory => directory.DeleteAsync(tenant, Cancellation));
+
+        Assert.Equal((0, 0), await RowsOfAsync(tenant));
     }
 
     [Fact]

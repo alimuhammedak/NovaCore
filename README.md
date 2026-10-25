@@ -263,7 +263,9 @@ yeni varlıkta boş bırakılır). Başka bir şey gerekmez, `AddModuleDbContext
 - adlı bir sorgu filtresi (`TenantQueryFilter.Name`): sorgu yalnız kapsamın kurumunun satırlarını okur, kurum yoksa
   hiçbirini; `ExecuteUpdate`/`ExecuteDelete` de yalnız onlara ulaşır;
 - yazma koruması: yeni satır kapsamın kurumunu alır; başka kurumun satırını ekleyen, değiştiren ya da silen, bir satırı
-  başka kuruma taşıyan ya da kurumsuz kapsamda kurum satırı yazan kayıt `InvalidOperationException` atar;
+  başka kuruma taşıyan ya da kurumsuz kapsamda kurum satırı yazan kayıt `InvalidOperationException` atar; `TenantId`
+  bir concurrency token'dır, `UPDATE`/`DELETE` satırı kurumuyla birlikte arar: başka kurumun satırını anahtarıyla adlayıp
+  bu kurumu taşıyan kopuk bir kopya hiçbir şeyi değiştirmez, kayıt `DbUpdateConcurrencyException` atar;
 - parametresiz `IgnoreQueryFilters()` kurum varlığı olan context'te hata verir; modülün kendi adlı filtresini kapatmak
   (`IgnoreQueryFilters(["Unarchived"])`) kurum filtresini yerinde bırakır.
 

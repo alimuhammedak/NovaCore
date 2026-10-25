@@ -54,8 +54,10 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   context's own scope on every execution), `TenantWriteGuard` (a `SaveChangesInterceptor`) and `TenantQueryGuard`
   (refuses a parameterless `IgnoreQueryFilters()`). The query guard is one shared instance (`TenantQueryGuard.Instance`):
   EF Core keys its internal service provider by the singleton interceptors' instances, and an instance per host built
-  one provider per host until `ManyServiceProvidersCreatedWarning` (R-130). `TenantData` (a singleton) deletes a tenant's
-  rows from every module context, each in a scope of that tenant and one transaction, dependents first.
+  one provider per host until `ManyServiceProvidersCreatedWarning` (R-130). The tenant convention also makes `TenantId` a concurrency
+  token, so an `UPDATE`/`DELETE` matches the row's tenant too (a detached copy can't reach another tenant's row by its
+  key). `TenantData` (a singleton) deletes a tenant's rows from every module context, each in a scope of that tenant and
+  one transaction, dependents first, with the module's own filters off by their names.
 
 **Add-ons** (optional; they reference the core packages only, never another add-on, D-076 (2)):
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`: `ILogger` logs with their

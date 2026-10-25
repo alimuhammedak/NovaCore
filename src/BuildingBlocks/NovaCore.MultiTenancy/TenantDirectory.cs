@@ -108,6 +108,11 @@ public sealed class TenantDirectory
             return Result.Failure(Error.NotFound(
                 "tenant.member_not_found", $"'{subject}' is not a member of tenant '{tenantId}'."));
 
+        // The bulk delete leaves a copy this scope tracks; a later AddMemberAsync would find it instead of the database.
+        if (store.Memberships.Local.FirstOrDefault(membership =>
+                membership.TenantId == tenantId && string.Equals(membership.Subject, subject, StringComparison.Ordinal)) is { } tracked)
+            store.Entry(tracked).State = EntityState.Detached;
+
         await cache.RemovePermissionsAsync(subject, cancellationToken).ConfigureAwait(false);
         return Result.Success();
     }

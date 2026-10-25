@@ -76,7 +76,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reads only the rows of the scope's tenant (`TenantContext`, scoped), and none without one, not even rows whose tenant is
   the empty Guid (what a migration that adds the column gives existing rows): a named query filter,
   `TenantQueryFilter.Name`. A new row gets the scope's tenant. A save fails when it would add, change or delete another
-  tenant's row, move a row to another tenant or write a tenant row without a tenant. `IgnoreQueryFilters()` without names
+  tenant's row, move a row to another tenant or write a tenant row without a tenant. `TenantId` is a concurrency token
+  (no schema change), so an `UPDATE` or `DELETE` finds the row in its tenant only: a detached copy that names another
+  tenant's row by its key and claims the scope's tenant changes nothing (`DbUpdateConcurrencyException`). `IgnoreQueryFilters()` without names
   fails on a context with tenant entities, so another filter is turned off by its name and the tenant filter stays on; a
   read across tenants turns it off by its name, explicitly. Work outside a request gives its scope a tenant with
   `TenantContext.Use(tenantId)`; a scope works in one tenant. A context without tenant entities is unaffected.
@@ -113,7 +115,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   way leaves the tenant deleting, `ClosedBeforeAsync` lists it, and repeating the deletion finishes it.
 - `TenantData` (`NovaCore.EntityFrameworkCore`): deletes a tenant's rows from every module context, a transaction per
   context, a dependent before its principal, and the tenant's outbox messages. A tenant entity EF Core can't bulk delete
-  (TPT) fails the deletion with EF Core's own exception.
+  (TPT) fails the deletion with EF Core's own exception. The module's own query filters are off for the deletion (a row
+  they hide, an archived one say, is the tenant's too); the tenant filter stays on.
 - Template: `dotnet new novacore --multitenancy` (off by default) adds the multi-tenancy add-on to the generated host
   (`AddCoreMultiTenancy`, the tenant store's context and migrations, example `Editor` and `Viewer` roles in
   `MultiTenancy:Roles`) and makes the Todos module's todos tenant entities under `/api/v1/tenants/{tenant}/todos`

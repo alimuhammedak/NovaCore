@@ -55,7 +55,8 @@ internal sealed class TenantConventionSetPlugin : IConventionSetPlugin
 /// <summary>
 /// Puts the tenant filter (<see cref="TenantQueryFilter"/>) on every <see cref="ITenantEntity"/> type of the model, once
 /// the module has configured it. EF Core filters only the root of an inheritance hierarchy and never an owned type, so a
-/// tenant entity that is neither a root nor filtered with its root fails the model instead of going unfiltered.
+/// tenant entity that is neither a root nor filtered with its root fails the model instead of going unfiltered. The
+/// tenant is also a concurrency token, so a write reaches a row only in the tenant the tracked entity started with.
 /// </summary>
 internal sealed class TenantQueryFilterConvention : IModelFinalizingConvention
 {
@@ -81,10 +82,14 @@ internal sealed class TenantQueryFilterConvention : IModelFinalizingConvention
                 continue;
             }
 
-            if (entityType.FindProperty(nameof(ITenantEntity.TenantId)) is null)
-                throw new InvalidOperationException(
+            var tenantId = entityType.FindProperty(nameof(ITenantEntity.TenantId))
+                ?? throw new InvalidOperationException(
                     $"{entityType.DisplayName()} is a tenant entity without a mapped {nameof(ITenantEntity.TenantId)} "
                     + "property: implement it as a public property.");
+
+            // The tenant joins the WHERE of every UPDATE and DELETE: a detached copy that names another tenant's row by
+            // its key and claims this scope's tenant then changes nothing, and the save fails as a concurrency conflict.
+            tenantId.Builder.IsConcurrencyToken(true);
 
             if (entityType.Builder.HasQueryFilter(TenantQueryFilter.Name, TenantQueryFilter.For(entityType.ClrType)) is null)
                 throw new InvalidOperationException(

@@ -15,7 +15,7 @@ namespace NovaCore.EntityFrameworkCore.MultiTenancy;
 /// <remarks>
 /// <list type="bullet">
 /// <item>Each context is deleted from in a scope of its own that works in the tenant, so the tenant filter keeps every
-/// other tenant's rows out of reach, and in one transaction: a context's rows go together or not at all. The contexts don't
+/// other tenant's rows out of reach (the module's own filters are off: a row they hide is the tenant's too), and in one transaction: a context's rows go together or not at all. The contexts don't
 /// share a transaction; a call that failed half way deletes the rest when repeated.</item>
 /// <item>A dependent goes before its principal (Microsoft: "deleting dependents before a principal"), so a relationship
 /// between tenant entities needs no cascade in the database. A row of another type that points at a tenant row blocks the
@@ -91,14 +91,22 @@ public sealed class TenantData
     }
 
     // A delete EF Core can't translate (TPT, say) fails as the call starts: with its own exception, not the invocation's.
-    private static Task<int> DeleteRowsOfAsync(IEntityType entityType, DbContext context, CancellationToken cancellationToken) =>
-        (Task<int>)DeleteRows.MakeGenericMethod(entityType.ClrType)
-            .Invoke(null, BindingFlags.DoNotWrapExceptions, binder: null, [context, cancellationToken], culture: null)!;
+    // The module's own filters (archived rows, say) are turned off by their names, the tenant filter stays on.
+    private static Task<int> DeleteRowsOfAsync(IEntityType entityType, DbContext context, CancellationToken cancellationToken)
+    {
+        var moduleFilters = entityType.GetDeclaredQueryFilters()
+            .Select(filter => filter.Key)
+            .OfType<string>()
+            .Where(name => !string.Equals(name, TenantQueryFilter.Name, StringComparison.Ordinal))
+            .ToArray();
+        return (Task<int>)DeleteRows.MakeGenericMethod(entityType.ClrType)
+            .Invoke(null, BindingFlags.DoNotWrapExceptions, binder: null, [context, moduleFilters, cancellationToken], culture: null)!;
+    }
 
     // The tenant filter narrows the delete to the scope's tenant.
-    private static Task<int> DeleteRowsAsync<TEntity>(DbContext context, CancellationToken cancellationToken)
+    private static Task<int> DeleteRowsAsync<TEntity>(DbContext context, string[] moduleFilters, CancellationToken cancellationToken)
         where TEntity : class =>
-        context.Set<TEntity>().ExecuteDeleteAsync(cancellationToken);
+        context.Set<TEntity>().IgnoreQueryFilters(moduleFilters).ExecuteDeleteAsync(cancellationToken);
 
     // The root tenant entity types that have a table, each after every one that points at it: a type is deleted once its
     // dependents are. Types that point at each other keep the model's order; the database then decides (a cascade).
