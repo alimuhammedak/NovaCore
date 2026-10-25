@@ -328,6 +328,28 @@ public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixtu
     }
 
     [Fact]
+    public async Task A_tenant_or_a_membership_that_doesnt_exist_is_not_found()
+    {
+        var alice = Subject();
+        var missing = Guid.NewGuid();
+        var tenant = await Fixture.AddTenantAsync();
+
+        var errors = await Fixture.InDirectoryAsync(async directory => new[]
+        {
+            (await directory.AddMemberAsync(missing, alice, [TenancyFixture.Reader], Cancellation)).Error.Code,
+            (await directory.RemoveMemberAsync(tenant, alice, Cancellation)).Error.Code,
+            (await directory.SuspendAsync(missing, Cancellation)).Error.Code,
+            (await directory.CloseAsync(missing, Cancellation)).Error.Code,
+            (await directory.ActivateAsync(missing, Cancellation)).Error.Code
+        });
+
+        Assert.Equal(
+            ["tenant.not_found", "tenant.member_not_found", "tenant.not_found", "tenant.not_found", "tenant.not_found"],
+            errors);
+        Assert.Empty(await Fixture.InDirectoryAsync(directory => directory.TenantsOfAsync(alice, Cancellation)));
+    }
+
+    [Fact]
     public async Task The_tenants_of_a_subject_are_its_active_memberships_with_their_roles_by_name()
     {
         var alice = Subject();

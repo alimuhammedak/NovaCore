@@ -71,6 +71,18 @@ public sealed class OutboxInterceptorTests : IDisposable
         Assert.Null(message.TraceParent);
     }
 
+    [Fact]
+    public async Task A_message_keeps_no_trace_context_of_an_activity_that_isnt_w3c()
+    {
+        await using var services = await CreateServicesAsync<ShopDbContext>();
+        using var request = new Activity("request");
+        request.SetIdFormat(ActivityIdFormat.Hierarchical).Start();
+
+        await SaveAsync<ShopDbContext>(services, new Order(Guid.CreateVersion7(), Guid.CreateVersion7()));
+
+        Assert.Null(Assert.Single(await OutboxAsync(services)).TraceParent);
+    }
+
     // The two tests below fail one insert of a save each: whichever insert runs first, the other is rolled back with it.
     [Fact]
     public async Task A_rejected_outbox_row_rolls_back_the_entity()

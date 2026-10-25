@@ -52,7 +52,10 @@ public static class MultiTenancyHostingExtensions
             .Configure(options => options.TenantOf = tenantOf)
             .Validate<IEnumerable<IPermissionDefinitionProvider>>(
                 (options, providers) => options.Roles.Values.SelectMany(permissions => permissions).All(
-                    providers.SelectMany(provider => provider.GetPermissions()).Select(permission => permission.Name).Contains),
+                    providers.SelectMany(provider => provider.GetPermissions())
+                        .Select(permission => permission.Name)
+                        .ToHashSet(StringComparer.Ordinal)
+                        .Contains),
                 "MultiTenancy:Roles must list permissions a module declares.")
             .ValidateOnStart();
         services.AddScoped<ITenantResolver, TenantResolver>();

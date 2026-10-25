@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NovaCore.EntityFrameworkCore.Messaging;
 using NovaCore.OpenTelemetry;
 using OpenTelemetry;
 using OpenTelemetry.Logs;
@@ -42,10 +43,15 @@ public class ObservabilityTests
         using var host = builder.Build();
         _ = host.Services.GetRequiredService<TracerProvider>();
 
-        // The source the outbox dispatcher starts a handler's span from (NovaCore.EntityFrameworkCore, internal). Listeners
-        // are process-wide: the dispatchers of the tests running alongside end spans of that source too, so this test
-        // counts its own trace only.
-        using var outbox = new ActivitySource("NovaCore.EntityFrameworkCore");
+        // The source the outbox dispatcher starts a handler's span from, read from the dispatcher (internal), so a rename on
+        // either side fails here: the add-on names it with a string, as it doesn't reference that package. Listeners are
+        // process-wide: the dispatchers of the tests running alongside end spans of that source too, so this test counts
+        // its own trace only.
+        var sourceName = (string)typeof(OutboxInterceptor).Assembly
+            .GetType("NovaCore.EntityFrameworkCore.Messaging.OutboxDispatcher", throwOnError: true)!
+            .GetField("ActivitySourceName")!
+            .GetRawConstantValue()!;
+        using var outbox = new ActivitySource(sourceName);
         var trace = ActivityTraceId.CreateRandom();
         var parent = new ActivityContext(trace, ActivitySpanId.CreateRandom(), ActivityTraceFlags.Recorded);
         outbox.StartActivity("process", ActivityKind.Consumer, parent)?.Dispose();
