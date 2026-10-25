@@ -28,6 +28,7 @@ NovaCore.MultiTenancy.TenantMembershipSummary.TenantMembershipSummary(System.Gui
 NovaCore.MultiTenancy.TenantStatus
 NovaCore.MultiTenancy.TenantStatus.Active = 0 -> NovaCore.MultiTenancy.TenantStatus
 NovaCore.MultiTenancy.TenantStatus.Closed = 2 -> NovaCore.MultiTenancy.TenantStatus
+NovaCore.MultiTenancy.TenantStatus.Deleting = 3 -> NovaCore.MultiTenancy.TenantStatus
 NovaCore.MultiTenancy.TenantStatus.Suspended = 1 -> NovaCore.MultiTenancy.TenantStatus
 override NovaCore.MultiTenancy.TenantMembershipSummary.Equals(object? obj) -> bool
 override NovaCore.MultiTenancy.TenantMembershipSummary.GetHashCode() -> int

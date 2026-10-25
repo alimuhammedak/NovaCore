@@ -63,18 +63,31 @@ public class TenantModelTests
         Assert.Empty(TenantConvention.UnfilteredTenantEntities(ModelOf<NotesDbContext>()));
     }
 
+    [Fact]
+    public async Task Deleting_a_tenant_whose_entity_maps_to_several_tables_fails_with_ef_cores_reason()
+    {
+        // A bulk delete acts on one table, so EF Core refuses one on a TPT hierarchy (TenantData's remarks).
+        await using var provider = ProviderOf<TptTenantContext>();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            provider.GetRequiredService<TenantData>().DeleteAsync(Guid.NewGuid(), TestContext.Current.CancellationToken));
+    }
+
     // The model a module context gets when the module registers it.
     private static Microsoft.EntityFrameworkCore.Metadata.IModel ModelOf<TContext>()
         where TContext : DbContext
     {
-        var services = new ServiceCollection()
-            .AddModuleDatabase((_, options) => options.UseSqlite("DataSource=:memory:"))
-            .AddModuleDbContext<TContext>("sample", (_, _) => { });
-
-        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        using var provider = ProviderOf<TContext>();
         using var scope = provider.CreateScope();
         return scope.ServiceProvider.GetRequiredService<TContext>().Model;
     }
+
+    private static ServiceProvider ProviderOf<TContext>()
+        where TContext : DbContext =>
+        new ServiceCollection()
+            .AddModuleDatabase((_, options) => options.UseSqlite("DataSource=:memory:"))
+            .AddModuleDbContext<TContext>("sample", (_, _) => { })
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
 
     private sealed class PlainContext(DbContextOptions<PlainContext> options) : DbContext(options)
     {
@@ -113,6 +126,15 @@ public class TenantModelTests
             });
     }
 
+    private sealed class TptTenantContext(DbContextOptions<TptTenantContext> options) : DbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<TenantRoot>().UseTptMappingStrategy();
+            modelBuilder.Entity<TenantLeaf>();
+        }
+    }
+
     private sealed class OrphanContext(DbContextOptions<OrphanContext> options) : DbContext(options)
     {
         protected override void OnModelCreating(ModelBuilder modelBuilder) => modelBuilder.Entity<Orphan>();
@@ -132,6 +154,18 @@ public class TenantModelTests
     {
         public Guid TenantId { get; set; }
 
+        public string Text { get; set; } = string.Empty;
+    }
+
+    private class TenantRoot : ITenantEntity
+    {
+        public Guid Id { get; set; }
+
+        public Guid TenantId { get; set; }
+    }
+
+    private sealed class TenantLeaf : TenantRoot
+    {
         public string Text { get; set; } = string.Empty;
     }
 

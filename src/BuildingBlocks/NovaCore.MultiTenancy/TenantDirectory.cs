@@ -143,19 +143,10 @@ public sealed class TenantDirectory
     /// </summary>
     /// <param name="tenantId">The tenant.</param>
     /// <param name="cancellationToken">Cancels the save.</param>
-    /// <returns>Success, <c>tenant.not_found</c>, or <c>tenant.closed</c>.</returns>
-    public async Task<Result> SuspendAsync(Guid tenantId, CancellationToken cancellationToken)
-    {
-        var tenant = await store.Tenants.FindAsync([tenantId], cancellationToken).ConfigureAwait(false);
-        if (tenant is null)
-            return NotFound(tenantId);
-
+    /// <returns>Success, <c>tenant.not_found</c>, <c>tenant.closed</c>, or <c>tenant.deleting</c>.</returns>
+    public Task<Result> SuspendAsync(Guid tenantId, CancellationToken cancellationToken) =>
         // Closing is the later stage: a closed tenant's retention runs from its closing, which a suspension would hide.
-        if (tenant.Status == TenantStatus.Closed)
-            return Result.Failure(Error.Conflict("tenant.closed", $"Tenant '{tenantId}' is closed; reopen it first."));
-
-        return await ChangeStatusAsync(tenant, TenantStatus.Suspended, cancellationToken).ConfigureAwait(false);
-    }
+        ChangeStatusAsync(tenantId, TenantStatus.Suspended, [TenantStatus.Active], cancellationToken);
 
     /// <summary>
     /// Closes (offboards) a tenant, active or suspended: its members lose all access to it, as with a suspension, and its
@@ -164,14 +155,9 @@ public sealed class TenantDirectory
     /// </summary>
     /// <param name="tenantId">The tenant.</param>
     /// <param name="cancellationToken">Cancels the save.</param>
-    /// <returns>Success, or <c>tenant.not_found</c>.</returns>
-    public async Task<Result> CloseAsync(Guid tenantId, CancellationToken cancellationToken)
-    {
-        var tenant = await store.Tenants.FindAsync([tenantId], cancellationToken).ConfigureAwait(false);
-        return tenant is null
-            ? NotFound(tenantId)
-            : await ChangeStatusAsync(tenant, TenantStatus.Closed, cancellationToken).ConfigureAwait(false);
-    }
+    /// <returns>Success, <c>tenant.not_found</c>, or <c>tenant.deleting</c>.</returns>
+    public Task<Result> CloseAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        ChangeStatusAsync(tenantId, TenantStatus.Closed, [TenantStatus.Active, TenantStatus.Suspended], cancellationToken);
 
     /// <summary>
     /// Makes a suspended or closed tenant active again: its members work in it from their next request on this server,
@@ -179,25 +165,22 @@ public sealed class TenantDirectory
     /// </summary>
     /// <param name="tenantId">The tenant.</param>
     /// <param name="cancellationToken">Cancels the save.</param>
-    /// <returns>Success, or <c>tenant.not_found</c>.</returns>
-    public async Task<Result> ActivateAsync(Guid tenantId, CancellationToken cancellationToken)
-    {
-        var tenant = await store.Tenants.FindAsync([tenantId], cancellationToken).ConfigureAwait(false);
-        return tenant is null
-            ? NotFound(tenantId)
-            : await ChangeStatusAsync(tenant, TenantStatus.Active, cancellationToken).ConfigureAwait(false);
-    }
+    /// <returns>Success, <c>tenant.not_found</c>, or <c>tenant.deleting</c>.</returns>
+    public Task<Result> ActivateAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        ChangeStatusAsync(tenantId, TenantStatus.Active, [TenantStatus.Suspended, TenantStatus.Closed], cancellationToken);
 
     /// <summary>
     /// The tenants closed before <paramref name="cutoff"/>, the first closed first: the ones whose retention has passed
-    /// when it is the time of the call minus the retention. NovaCore schedules no deletion; the product runs it.
+    /// when it is the time of the call minus the retention. NovaCore schedules no deletion; the product runs it. A tenant
+    /// whose deletion failed half way is among them, so the next run finishes it.
     /// </summary>
     /// <param name="cutoff">The latest closing time to include, exclusive.</param>
     /// <param name="cancellationToken">Cancels the query.</param>
     /// <returns>The tenants' ids.</returns>
     public async Task<IReadOnlyList<Guid>> ClosedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken) =>
         await store.Tenants
-            .Where(tenant => tenant.Status == TenantStatus.Closed && tenant.StatusChangedOnUtc < cutoff)
+            .Where(tenant => (tenant.Status == TenantStatus.Closed || tenant.Status == TenantStatus.Deleting)
+                             && tenant.StatusChangedOnUtc < cutoff)
             .OrderBy(tenant => tenant.StatusChangedOnUtc)
             .Select(tenant => tenant.Id)
             .ToListAsync(cancellationToken)
@@ -205,43 +188,74 @@ public sealed class TenantDirectory
 
     /// <summary>
     /// Deletes a closed tenant: its rows in every module context and the outbox messages its scopes saved
-    /// (<see cref="TenantData"/>), then its memberships and the tenant itself. It can't be reopened afterwards. A call
-    /// that failed half way leaves the tenant closed with the rest of its data; repeat it.
+    /// (<see cref="TenantData"/>), then its memberships and the tenant itself. It can't be reopened afterwards, nor once
+    /// the deletion has started (<see cref="TenantStatus.Deleting"/>). A call that failed half way leaves the tenant
+    /// deleting with the rest of its data; repeat it.
     /// </summary>
     /// <param name="tenantId">The tenant.</param>
     /// <param name="cancellationToken">Cancels the deletion.</param>
     /// <returns>Success, <c>tenant.not_found</c>, or <c>tenant.not_closed</c>.</returns>
     public async Task<Result> DeleteAsync(Guid tenantId, CancellationToken cancellationToken)
     {
-        var tenant = await store.Tenants.FindAsync([tenantId], cancellationToken).ConfigureAwait(false);
-        if (tenant is null)
-            return NotFound(tenantId);
-
-        if (tenant.Status != TenantStatus.Closed)
-            return Result.Failure(Error.Conflict(
-                "tenant.not_closed", $"Tenant '{tenantId}' is {tenant.Status}; only a closed tenant is deleted."));
+        // Claimed in one conditional update, so a reopening that races the deletion either comes first (and the deletion
+        // is refused) or is refused itself: the data of a tenant that is open again is never deleted.
+        var claimed = await store.Tenants
+            .Where(tenant => tenant.Id == tenantId
+                             && (tenant.Status == TenantStatus.Closed || tenant.Status == TenantStatus.Deleting))
+            .ExecuteUpdateAsync(set => set.SetProperty(tenant => tenant.Status, TenantStatus.Deleting), cancellationToken)
+            .ConfigureAwait(false);
+        if (claimed == 0)
+        {
+            return await StatusOfAsync(tenantId, cancellationToken).ConfigureAwait(false) is { } status
+                ? Result.Failure(Error.Conflict(
+                    "tenant.not_closed", $"Tenant '{tenantId}' is {status}; only a closed tenant is deleted."))
+                : NotFound(tenantId);
+        }
 
         await tenantData.DeleteAsync(tenantId, cancellationToken).ConfigureAwait(false);
 
         // The tenant last, its memberships with it (cascade): until then a failed deletion can be repeated.
-        store.Tenants.Remove(tenant);
-        await store.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await store.Tenants.Where(tenant => tenant.Id == tenantId)
+            .ExecuteDeleteAsync(cancellationToken)
+            .ConfigureAwait(false);
         await cache.RemoveTenantPermissionsAsync(tenantId, cancellationToken).ConfigureAwait(false);
         return Result.Success();
     }
 
-    private async Task<Result> ChangeStatusAsync(Tenant tenant, TenantStatus status, CancellationToken cancellationToken)
+    // One conditional update from one of the statuses it may leave, so it never overwrites a change that came between
+    // (a deletion that started, say). Staying in the status it already has changes nothing.
+    private async Task<Result> ChangeStatusAsync(
+        Guid tenantId, TenantStatus status, TenantStatus[] from, CancellationToken cancellationToken)
     {
-        if (tenant.Status != status)
+        var changed = await store.Tenants
+            .Where(tenant => tenant.Id == tenantId && from.Contains(tenant.Status))
+            .ExecuteUpdateAsync(
+                set => set
+                    .SetProperty(tenant => tenant.Status, status)
+                    .SetProperty(tenant => tenant.StatusChangedOnUtc, timeProvider.GetUtcNow()),
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (changed == 0)
         {
-            tenant.Status = status;
-            tenant.StatusChangedOnUtc = timeProvider.GetUtcNow();
-            await store.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            var current = await StatusOfAsync(tenantId, cancellationToken).ConfigureAwait(false);
+            if (current is null)
+                return NotFound(tenantId);
+            if (current == TenantStatus.Deleting)
+                return Result.Failure(Error.Conflict("tenant.deleting", $"Tenant '{tenantId}' is being deleted."));
+            if (current != status)
+                return Result.Failure(Error.Conflict("tenant.closed", $"Tenant '{tenantId}' is closed; reopen it first."));
         }
 
-        await cache.RemoveTenantPermissionsAsync(tenant.Id, cancellationToken).ConfigureAwait(false);
+        await cache.RemoveTenantPermissionsAsync(tenantId, cancellationToken).ConfigureAwait(false);
         return Result.Success();
     }
+
+    private async Task<TenantStatus?> StatusOfAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        await store.Tenants
+            .Where(tenant => tenant.Id == tenantId)
+            .Select(tenant => (TenantStatus?)tenant.Status)
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
 
     private static Result NotFound(Guid tenantId) =>
         Result.Failure(Error.NotFound("tenant.not_found", $"Tenant '{tenantId}' was not found."));

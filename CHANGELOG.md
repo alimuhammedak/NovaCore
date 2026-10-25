@@ -73,7 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a change takes effect on its next request instead of after `Cache:PermissionExpiration`.
 - Tenant isolation in every module context. An entity that implements `ITenantEntity` (`NovaCore.Abstractions`,
   `Guid TenantId`) belongs to one tenant, and `AddModuleDbContext` isolates it with nothing for the module to do. A query
-  reads only the rows of the scope's tenant (`TenantContext`, scoped), and none without one: a named query filter,
+  reads only the rows of the scope's tenant (`TenantContext`, scoped), and none without one, not even rows whose tenant is
+  the empty Guid (what a migration that adds the column gives existing rows): a named query filter,
   `TenantQueryFilter.Name`. A new row gets the scope's tenant. A save fails when it would add, change or delete another
   tenant's row, move a row to another tenant or write a tenant row without a tenant. `IgnoreQueryFilters()` without names
   fails on a context with tenant entities, so another filter is turned off by its name and the tenant filter stays on; a
@@ -106,9 +107,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one; a closed tenant can't be suspended (`tenant.closed`). `DeleteAsync` deletes a closed tenant (`tenant.not_closed`
   otherwise): its rows in every module context, the outbox messages its scopes saved, its memberships and the tenant.
   `ClosedBeforeAsync(cutoff)` lists the tenants closed before a time, for the product's own retention: NovaCore
-  schedules no deletion. The add-on now references `NovaCore.EntityFrameworkCore`.
+  schedules no deletion. The add-on now references `NovaCore.EntityFrameworkCore`. `DeleteAsync` first claims the tenant
+  with one conditional update (`TenantStatus.Deleting`), and every status change is conditional, so a reopening that
+  races a deletion is either first (the deletion is refused) or refused (`tenant.deleting`); a deletion that failed half
+  way leaves the tenant deleting, `ClosedBeforeAsync` lists it, and repeating the deletion finishes it.
 - `TenantData` (`NovaCore.EntityFrameworkCore`): deletes a tenant's rows from every module context, a transaction per
-  context, a dependent before its principal, and the tenant's outbox messages.
+  context, a dependent before its principal, and the tenant's outbox messages. A tenant entity EF Core can't bulk delete
+  (TPT) fails the deletion with EF Core's own exception.
 - Template: `dotnet new novacore --multitenancy` (off by default) adds the multi-tenancy add-on to the generated host
   (`AddCoreMultiTenancy`, the tenant store's context and migrations, example `Editor` and `Viewer` roles in
   `MultiTenancy:Roles`) and makes the Todos module's todos tenant entities under `/api/v1/tenants/{tenant}/todos`

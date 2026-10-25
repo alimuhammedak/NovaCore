@@ -74,8 +74,7 @@ public sealed class TenantData
             {
                 foreach (var entityType in tenantTypes)
                 {
-                    await ((Task<int>)DeleteRows.MakeGenericMethod(entityType.ClrType).Invoke(null, [context, cancellationToken])!)
-                        .ConfigureAwait(false);
+                    await DeleteRowsOfAsync(entityType, context, cancellationToken).ConfigureAwait(false);
                 }
 
                 if (hasOutbox)
@@ -90,6 +89,11 @@ public sealed class TenantData
             }
         }).ConfigureAwait(false);
     }
+
+    // A delete EF Core can't translate (TPT, say) fails as the call starts: with its own exception, not the invocation's.
+    private static Task<int> DeleteRowsOfAsync(IEntityType entityType, DbContext context, CancellationToken cancellationToken) =>
+        (Task<int>)DeleteRows.MakeGenericMethod(entityType.ClrType)
+            .Invoke(null, BindingFlags.DoNotWrapExceptions, binder: null, [context, cancellationToken], culture: null)!;
 
     // The tenant filter narrows the delete to the scope's tenant.
     private static Task<int> DeleteRowsAsync<TEntity>(DbContext context, CancellationToken cancellationToken)

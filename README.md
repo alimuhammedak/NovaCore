@@ -299,10 +299,13 @@ handler'ları kurumsuz çalışır (kurum satırları görünmez). Span'ler `Add
 | Açık (`Active`) | Üyeler çalışır | `SuspendAsync` → askıda, `CloseAsync` → kapalı |
 | Askıda (`Suspended`) | Kurum çözülmez, üyeler bütün erişimini kaybeder; veri kalır | `ActivateAsync` → açık, `CloseAsync` → kapalı |
 | Kapalı (`Closed`) | Askıdaki gibi; saklama süresi başlar | `ActivateAsync` → açık (yeniden katılım), `DeleteAsync` → silinir; `SuspendAsync` reddedilir (`tenant.closed`) |
+| Siliniyor (`Deleting`) | `DeleteAsync` kurumu sahiplendi; askıdaki gibi | `DeleteAsync` (tekrar) → silinir; diğer geçişler reddedilir (`tenant.deleting`) |
 
 `DeleteAsync` yalnız kapalı kurumda çalışır (yoksa `tenant.not_closed`) ve geri alınamaz: kurumun her modül
 context'indeki satırlarını (`TenantData`: context başına tek transaction, bağımlı önce), outbox mesajlarını, üyeliklerini
-ve kurumun kendisini siler. Yarıda kalan çağrı tekrarlanır. Sınırlar: TPT ile eşlenmiş kurum varlığı silinemez (toplu
+ve kurumun kendisini siler. Kurumu önce tek bir koşullu güncellemeyle `Deleting` yapar, durum geçişleri de koşulludur:
+silmeyle yarışan bir yeniden açılış ya önce gelir (silme reddedilir) ya da reddedilir. Yarıda kalan çağrı kurumu
+`Deleting`'de bırakır, `ClosedBeforeAsync` onu da döndürür; tekrarlanan çağrı bitirir. Sınırlar: TPT ile eşlenmiş kurum varlığı silinemez (toplu
 silme tek tabloya etki eder); kurum varlığı olmayan bir tipin kurum satırına işaret eden satırı, FK'si cascade değilse
 silmeyi durdurur. Saklama süresini ve zamanlamayı ürün seçer (yasal gereklilik); NovaCore zamanlamaz, ayar eklemez:
 

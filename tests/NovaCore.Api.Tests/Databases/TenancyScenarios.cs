@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Abstractions.Results;
 using NovaCore.EntityFrameworkCore.MultiTenancy;
 using NovaCore.MultiTenancy;
@@ -41,6 +42,21 @@ public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixtu
         await AddNoteAsync(Guid.NewGuid(), "someone's");
 
         Assert.Empty(await TextsAsync(tenant: null));
+    }
+
+    [Fact]
+    public async Task A_row_without_a_tenant_is_read_by_no_scope()
+    {
+        // As a row saved before its table had tenants: a migration fills a new TenantId column with the empty Guid.
+        var text = $"legacy {Guid.NewGuid()}";
+        await AddNoteAsync(Guid.NewGuid(), text);
+        await Fixture.InScopeAsync(tenant: null, notes => notes.Notes
+            .IgnoreQueryFilters([TenantQueryFilter.Name])
+            .Where(note => note.Text == text)
+            .ExecuteUpdateAsync(set => set.SetProperty(note => note.TenantId, Guid.Empty), Cancellation));
+
+        Assert.Empty(await TextsAsync(tenant: null));
+        Assert.Empty(await TextsAsync(Guid.NewGuid()));
     }
 
     [Fact]
@@ -451,6 +467,32 @@ public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixtu
     }
 
     [Fact]
+    public async Task A_tenant_whose_deletion_stopped_half_way_stays_closed_to_every_change_and_the_deletion_finishes_it()
+    {
+        var alice = Subject();
+        var tenant = await Fixture.AddTenantAsync(alice);
+        await AddNoteAsync(tenant, "left");
+        await ChangeAsync(directory => directory.CloseAsync(tenant, Cancellation));
+        // Where a deletion that failed after claiming the tenant leaves it.
+        await MarkDeletingAsync(tenant);
+
+        var refusals = await Fixture.InDirectoryAsync(async directory => new[]
+        {
+            (await directory.ActivateAsync(tenant, Cancellation)).Error.Code,
+            (await directory.SuspendAsync(tenant, Cancellation)).Error.Code,
+            (await directory.CloseAsync(tenant, Cancellation)).Error.Code
+        });
+        Assert.Equal(["tenant.deleting", "tenant.deleting", "tenant.deleting"], refusals);
+        Assert.Contains(tenant, await Fixture.InDirectoryAsync(directory =>
+            directory.ClosedBeforeAsync(DateTimeOffset.MaxValue, Cancellation)));
+
+        await ChangeAsync(directory => directory.DeleteAsync(tenant, Cancellation));
+
+        Assert.Empty(await TextsAsync(tenant));
+        Assert.Equal("tenant.not_found", await DeletionErrorAsync(tenant));
+    }
+
+    [Fact]
     public async Task Deleting_a_closed_tenant_removes_its_rows_its_outbox_and_its_memberships_and_nothing_else()
     {
         var (alice, bob) = (Subject(), Subject());
@@ -561,6 +603,17 @@ public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixtu
             await notes.SaveChangesAsync(Cancellation);
             return note.Id;
         });
+
+    // The tenancy store's types are the add-on's own; its table is changed with SQL every provider runs.
+    private async Task MarkDeletingAsync(Guid tenant)
+    {
+        await using var scope = Fixture.Host.Services.CreateAsyncScope();
+        var store = scope.ServiceProvider.GetRequiredService<MultiTenancyDbContext>();
+        var sql = new PortableSql(store);
+        // Only names, quoted by the provider, go into the text; the values are parameters.
+        var update = $"UPDATE {sql.Table("tenants")} SET {sql.Column("Status")} = {{0}} WHERE {sql.Column("Id")} = {{1}}";
+        Assert.Equal(1, await store.Database.ExecuteSqlRawAsync(update, [(int)TenantStatus.Deleting, tenant], Cancellation));
+    }
 
     private Task<List<string>> TextsAsync(Guid? tenant) =>
         Fixture.InScopeAsync(tenant, notes => notes.Notes.Select(n => n.Text).ToListAsync(Cancellation));

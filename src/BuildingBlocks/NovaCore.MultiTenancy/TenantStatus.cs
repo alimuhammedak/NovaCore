@@ -13,5 +13,11 @@ public enum TenantStatus
     /// Offboarded: no member works in it, its data is kept until it is deleted (the product's retention) and it can be
     /// reopened until then.
     /// </summary>
-    Closed = 2
+    Closed = 2,
+
+    /// <summary>
+    /// Being deleted (<see cref="TenantDirectory.DeleteAsync"/>): out of reach, and no longer reopened, suspended or closed.
+    /// A deletion that failed half way leaves it here; repeating the deletion finishes it.
+    /// </summary>
+    Deleting = 3
 }

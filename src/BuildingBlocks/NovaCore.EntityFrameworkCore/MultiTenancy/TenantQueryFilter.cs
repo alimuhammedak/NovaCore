@@ -21,16 +21,18 @@ public static class TenantQueryFilter
     /// </summary>
     public const string Name = "NovaCore.Tenant";
 
-    private static readonly MethodInfo CurrentTenant =
-        typeof(TenantQueryFilter).GetMethod(nameof(Current), BindingFlags.NonPublic | BindingFlags.Static)!;
+    private static readonly MethodInfo TenantOfContext =
+        typeof(TenantQueryFilter).GetMethod(nameof(TenantOf), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     private static readonly MethodInfo TenantProperty =
         typeof(EF).GetMethod(nameof(EF.Property))!.MakeGenericMethod(typeof(Guid));
 
     /// <summary>
-    /// <c>entity =&gt; EF.Property&lt;Guid&gt;(entity, "TenantId") == Current(context)</c>, where <c>context</c> is a node
-    /// typed <see cref="DbContext"/>: EF Core binds such a node to the context that runs the query and evaluates the call
-    /// as a parameter on every execution (docs/plan/RESEARCH.md R-129), so the cached model reads each query's tenant.
+    /// <c>entity =&gt; (Guid?)EF.Property&lt;Guid&gt;(entity, "TenantId") == TenantOf(context)</c>, where <c>context</c> is a
+    /// node typed <see cref="DbContext"/>: EF Core binds such a node to the context that runs the query and evaluates the
+    /// call as a parameter on every execution (docs/plan/RESEARCH.md R-129), so the cached model reads each query's tenant.
+    /// Without a tenant the parameter is null, which equals no row's tenant: not even a row whose tenant is the empty Guid,
+    /// as a migration that adds the column to a table with rows gives them.
     /// </summary>
     internal static LambdaExpression For(Type entityType)
     {
@@ -39,8 +41,10 @@ public static class TenantQueryFilter
 
         return Expression.Lambda(
             Expression.Equal(
-                Expression.Call(TenantProperty, entity, Expression.Constant(nameof(ITenantEntity.TenantId))),
-                Expression.Call(CurrentTenant, context)),
+                Expression.Convert(
+                    Expression.Call(TenantProperty, entity, Expression.Constant(nameof(ITenantEntity.TenantId))),
+                    typeof(Guid?)),
+                Expression.Call(TenantOfContext, context)),
             entity);
     }
 
@@ -51,7 +55,4 @@ public static class TenantQueryFilter
     internal static Guid? TenantOf(DbContext context) =>
         context.GetService<IDbContextOptions>().FindExtension<CoreOptionsExtension>()?.ApplicationServiceProvider
             ?.GetService<TenantContext>()?.TenantId;
-
-    // Guid.Empty, which no saved row has (the save fills the tenant in or refuses it): without a tenant no row is read.
-    private static Guid Current(DbContext context) => TenantOf(context) ?? Guid.Empty;
 }
