@@ -10,8 +10,8 @@
 - **Öncelik sırası:** DECISIONS.md > PLAN.md > PROGRESS.md > CLAUDE.md > konuşma geçmişi. Bir çelişki görürsen dur ve sor.
 - **Branch:** Her faz `main`'den açılan `faz/<id>-<kısa-ad>` branch'inde yürür. `main`'e merge yalnızca kullanıcı onayıyla yapılır.
 - **Commit:** Her adım ayrı bir commit'tir. Mesaj biçimi `faz<id>(<adım-id>): <özet>`, örneğin `faz0(F0.3): partition strict rate limiter by client IP`.
-- **Her adımdan sonra:** `dotnet build NovaCore.slnx` ve `dotnet test NovaCore.slnx` çalıştırılır. Kırmızıyken bir sonraki adıma geçilmez.
-- **Test önce gelir:** Bir hata düzeltmesinde önce hatayı gösteren test yazılır. Test kırmızı görülür, sonra düzeltme yapılır.
+- **Her adımdan sonra (D-088):** Yazan oturum (`/novacore-phase`) `dotnet build NovaCore.slnx`'i çalıştırır ve adımın yeni ya da değişen test sınıflarını koşar. Kırmızıyken bir sonraki adıma geçilmez. Tam paket (`dotnet test --solution NovaCore.slnx`) her yazan oturumdan sonra ayrı bir oturumda `/novacore-verify <faz-id>` ile çalışır. Açık bir doğrulama bulgusu ya da önceki bir oturumdan kalan doğrulanmamış bir kod commit'i varken yeni adıma başlanmaz.
+- **Test önce gelir:** Bir hata düzeltmesinde önce hatayı gösteren test yazılır. Test kırmızı görülür, sonra düzeltme yapılır. Kırmızı, adımın kendi test sınıfında görülür.
 - **Kapsam:** Yalnızca o adımın "Dosyalar/Kapsam" satırındaki işler yapılır. Başka her şey sapma protokolüne (skill §4) tabidir.
 - **Dokümanlar:** Bir faz bir konvansiyonu değiştirirse aynı fazda README.md, ilgili CLAUDE.md ve memory dosyaları da güncellenir.
 - **Adım ID'leri sabittir.** Bir adım bölünecekse `F2b.1a` gibi alt ID'ler kullanılır. Adımlar yeniden numaralandırılmaz.
