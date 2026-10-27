@@ -65,7 +65,7 @@ Sırayla çalıştır. Çıktının tamamını bağlama alma: özeti ve hata sat
    grep -n -i -A15 "^\s*failed " artifacts/verify/test.log | head -200
    ```
 
-   Özet günlüğün sonundadır: proje başına bir satır, ardından `total`, `failed`, `succeeded`, `skipped`. Özet başarısız test sayıyor ama ikinci grep bir şey bulmuyorsa günlükte `failed` geçen satırların çevresini oku. Başarısız bir testi bir kez tek başına yeniden koş (`dotnet test --project tests/<Proje> -- --filter-class "*.<Sınıf>"`). Yeniden koşuda geçse de bulgudur: aralıklı kırmızı bir test.
+   Özet günlüğün sonundadır: proje başına bir satır, ardından `total`, `failed`, `succeeded`, `skipped`. Özet başarısız test sayıyor ama ikinci grep bir şey bulmuyorsa günlükte `failed` geçen satırların çevresini oku. Başarısız bir testi bir kez tek başına yeniden koş (`dotnet test --project tests/<Proje> -- --filter-method "*.<Sınıf>.<Metot>"`). Yeniden koşuda geçse de bulgudur: aralıklı kırmızı bir test.
 
    Koşudan sonra `git status --short`'a bak. Testin değiştirdiği izlenen bir dosya bulgudur (kaynak `test`, yer dosya ve test adı). Bugün tek örnek `OpenApiContractTests`: yayımlanan belge eskiyse `docs/openapi/v1.json`'u yeniden yazar ve kırmızı olur. Dosyayı commit'leme; `git restore -- <yol>` ile geri al ki yazan oturum temiz bir ağaç devralsın. Yazan oturum o testi koşunca dosya yeniden üretilir.
 
