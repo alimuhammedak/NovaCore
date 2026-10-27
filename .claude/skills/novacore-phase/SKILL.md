@@ -84,6 +84,7 @@ Her adım için aynı döngü:
 4. **Doğrula (yalnız bunlar, D-088 (1)):**
    - `dotnet build NovaCore.slnx -v q` (analizörler dahil, 0 uyarı).
    - Adımın yeni ya da değişen test sınıfları, 2'deki komutla: önce kırmızı görüldüyse şimdi yeşil.
+   - Adım bir uç noktanın yolunu, isteğini, yanıtını ya da yetkisini değiştirdiyse `OpenApiContractTests`'i de koş. Yayımlanan belge eskiyse test `docs/openapi/v1.json`'u yeniden yazar ve kırmızı olur. Diff'ini incele, adımın commit'ine kat ve testi yeniden koş.
    - Paket değiştiyse `dotnet restore NovaCore.slnx --force`; sürüm değiştiyse `--force-evaluate` ile lock dosyalarını yeniden yaz ve onları da commit'le.
    - Adım kod ya da proje dosyasına dokunduysa commit'ten önce `dotnet format NovaCore.slnx` (CI `--verify-no-changes` koşar); adımın dosyalarında yaptığı değişikliği commit'e kat.
 

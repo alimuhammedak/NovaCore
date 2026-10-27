@@ -67,6 +67,8 @@ Sırayla çalıştır. Çıktının tamamını bağlama alma: özeti ve hata sat
 
    Özet günlüğün sonundadır: proje başına bir satır, ardından `total`, `failed`, `succeeded`, `skipped`. Özet başarısız test sayıyor ama ikinci grep bir şey bulmuyorsa günlükte `failed` geçen satırların çevresini oku. Başarısız bir testi bir kez tek başına yeniden koş (`dotnet test --project tests/<Proje> -- --filter-class "*.<Sınıf>"`). Yeniden koşuda geçse de bulgudur: aralıklı kırmızı bir test.
 
+   Koşudan sonra `git status --short`'a bak. Testin değiştirdiği izlenen bir dosya bulgudur (kaynak `test`, yer dosya ve test adı). Bugün tek örnek `OpenApiContractTests`: yayımlanan belge eskiyse `docs/openapi/v1.json`'u yeniden yazar ve kırmızı olur. Dosyayı commit'leme; `git restore -- <yol>` ile geri al ki yazan oturum temiz bir ağaç devralsın. Yazan oturum o testi koşunca dosya yeniden üretilir.
+
 ### 2.2 İnceleme
 
 1. `code-review` skill'ini (Skill aracıyla) aralık üzerinde çalıştır (`<taban>..HEAD`). Skill bir aralığı hedef olarak almıyorsa branch'i hedef ver ve yalnız aralıktaki commit'lerin değiştirdiği satırların bulgularını say.
@@ -75,12 +77,15 @@ Sırayla çalıştır. Çıktının tamamını bağlama alma: özeti ve hata sat
    - Bir Yapılmayacaklar maddesini uyguluyor mu?
    - Bu fazın D-kayıtlarıyla çelişiyor mu?
    - Geçici kod ya da gerekçesiz bastırma var mı (Y-45, Y-46)?
-3. **Kabul kriterleri:** aralıkta commit'i olan her adım için PLAN'daki kabul kriterini kanıtlayan bir test var mı? Testi adıyla bul ve §2.1'deki koşuda yeşil olduğunu gör. Yoksa bulgudur (kaynak `code-review`).
+3. **Kabul kriterleri:** aralıkta commit'i olan her adım için PLAN'daki kabul kriterinin istediği kanıtı ara.
+   - Kriter bir test istiyorsa ("Test: ..."), testi adıyla bul ve §2.1'deki koşuda yeşil olduğunu gör.
+   - Rapor, bulgu listesi, R/D kaydı ya da belge istiyorsa (ör. F6e.3 "Rapor", F7b.1 "R ve D kaydı"), o çıktının PROGRESS'te ya da repoda olduğunu gör; test arama.
+   - Kanıt yoksa bulgudur (kaynak `code-review`).
 4. Bir bulguyu doğrulamak için kaynak gerekiyorsa D-079'a göre araştır. R-kaydı yazma; URL'yi bulgu satırına ya da rapora koy (kaydı düzelten yazan oturum yazar).
 
 ### 2.3 Kapatılan bulgular
 
-`kapatıldı (<hash>)` durumundaki her bulguyu yeniden kontrol et: kaynağı `test` ise test yeşil mi, diğerlerinde aynı sorun aralıkta hâlâ duruyor mu? Temizse durumu `doğrulandı` yap. Değilse `açık`'a döndür ve satıra nedenini ekle.
+`kapatıldı (<hash>)` durumundaki her bulguyu yeniden kontrol et: kaynağı `test` ise test yeşil mi, diğerlerinde aynı sorun aralıkta hâlâ duruyor mu? Temizse durumu `doğrulandı` yap. Değilse `açık`'a döndür ve satıra nedenini ekle. Kaynağı `PR` olan bir bulgu `doğrulandı` olunca PR'daki yorumuna cevap ver ve konuyu çöz (§4.2).
 
 ### 2.4 Yazanın notları
 
@@ -142,11 +147,15 @@ Koşul: fazın PR'ı açık. §2'den sonra (aralıkta yazanın PR düzeltmeleri 
 
    Cevaplanmış ya da çözülmüş yorumları atla.
 2. **Her yorumu sınıflandır:**
-   - **Kapsam içi gerçek hata** → bulgu (kaynak `PR`, yer `dosya:satır`), `açık`.
+   - **Kapsam içi gerçek hata** → bulgu (kaynak `PR`, yer `dosya:satır` ve yorumun ID'si, ör. `Foo.cs:12 (yorum 4388968154)`), `açık`. Yoruma şimdi değil, düzeltme doğrulanınca cevap verilir (§2.3).
    - **Kapsam dışı** → "Sonraya bırakılanlar". Yorumu GitHub'da gerekçesiyle yanıtla ("Sonraya bırakılanlar"a alındı, ilgili D/Y ID'si).
    - **Yanlış pozitif ya da bir D/Y kaydıyla çelişen öneri** → yorumu gerekçesi ve kaydın ID'siyle yanıtla.
 
-   Satır yorumuna cevap: `gh api repos/{owner}/{repo}/pulls/<no>/comments/<id>/replies -f body=...`. Konuşma yorumuna cevap: `gh pr comment <no> --body ...`. CodeRabbit inceleme yapmadıysa (rate limit, kesinti) bunu raporda söyle; merge'ü engellemez (D-067 (2)).
+   Satır yorumuna cevap: `gh api repos/{owner}/{repo}/pulls/<no>/comments/<id>/replies -f body=...`. Konuşma yorumuna cevap: `gh pr comment <no> --body ...`. Düzeltmesi doğrulanan bir yorumun cevabı tek satırdır: düzelten commit'in hash'i ve ne değiştiği. Ardından konuyu çöz:
+   - konunun ID'sini `gh api graphql` ile bul: `pullRequest(number: <no>) { reviewThreads { nodes { id isResolved comments(first: 1) { nodes { databaseId } } } } }`, yorumun ID'si `databaseId`'dir,
+   - `resolveReviewThread(input: { threadId: "<id>" })` mutation'ını çalıştır.
+
+   CodeRabbit inceleme yapmadıysa (rate limit, kesinti) bunu raporda söyle; merge'ü engellemez (D-067 (2)).
 3. PROGRESS'i §2.5'e göre güncelle, commit'le ve aynı branch'e push'la: merge'ten önce PR'da commit'lenmemiş bir şey kalmasın.
 4. **Açık bulgu varsa** raporla, §5'teki son satırla yazana dön.
 5. **Her şey temizse** (açık bulgu yok, bütün yorumlar ele alındı, CI yeşil) merge'ü `AskUserQuestion` ile sor. Soru merge'ü ve merge kaydının `main`'e push'unu birlikte kapsar.
