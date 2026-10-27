@@ -1,6 +1,6 @@
 # İlerleme
 
-> Tek doğru durum kaynağı. `/novacore-phase` her başlangıçta bu dosyayı okur ve her adımdan sonra günceller.
+> Tek doğru durum kaynağı. `/novacore-phase` her başlangıçta bu dosyayı okur ve her adımdan sonra günceller. `/novacore-verify` her yazan oturumdan sonra sonucunu ve bulgularını fazın `#### Doğrulama` bölümüne yazar (D-088).
 > Adım tanımları [PLAN.md](PLAN.md)'dedir. Burada yalnızca durum, commit hash'i ve notlar tutulur.
 > Son biten fazdan önceki fazların adım kayıtları, eski devir notları ve kapanmış "Sonraya bırakılanlar" maddeleri [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md)'dedir (D-082). Son biten fazın adımları burada kalır, bir sonraki faz sonunda taşınır. Oturum başında okunmaz; bir kaydın geçmişi gerektiğinde orada aranır.
 
@@ -258,6 +258,8 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 ## Son devir notu
 
 > Her oturumun sonunda (faz bitmese bile) en üste yeni bir not eklenir; öncekilerin üzerine yazılmaz, son üç notu aşanlar faz sonunda arşive taşınır (D-082). Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
+
+**2026-10-27, faz dışı süreç değişikliği: yazan ve doğrulayan oturum ayrıldı (D-088, R-135; branch `surec/ayri-dogrulama-oturumu`).** `/novacore-phase` adımda yalnız build'i, adımın test sınıflarını ve `dotnet format`'ı çalıştırır. Her yazan oturumdan sonra `/novacore-verify` tam testi ve code-review'u ayrı bir oturumda koşar, bulguları fazın `#### Doğrulama` bölümüne yazar ve kod düzeltmez. Faz sonunda faz doğrulamasını, CodeRabbit CLI'ı, PR'ı ve merge sorusunu da doğrulama oturumu yapar. Stop hook artık yalnız build yapıyor. Kod değişmedi; 6e başlamadı.
 
 **2026-10-25, faz sonu, Faz 7b: Çok kiracılılık (✅ tamam, PR #13 ile `main`'e merge edildi).** Kullanıcı onayı (2026-10-27): "PR #13'ü merge commit ile merge et ve yerel main'i güncelle"; merge `dba8318` (`gh pr merge 13 --merge`), yerel `main` `--ff-only` ile güncellendi. Merge anında `87ebf25`'te bütün kontroller yeşil, çözülmemiş inceleme yorumu yok. Branch `faz/7b-cok-kiracililik`; bu oturum faz sonunu yaptı (skill §5).
 

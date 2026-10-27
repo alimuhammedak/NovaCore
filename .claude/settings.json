@@ -19,7 +19,7 @@
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-on-stop.js\"",
             "timeout": 900,
-            "statusMessage": "NovaCore: build + test doğrulanıyor..."
+            "statusMessage": "NovaCore: build doğrulanıyor..."
           }
         ]
       }
