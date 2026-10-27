@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// Stop hook: kaynak dosyalar son başarılı doğrulamadan beri değiştiyse `dotnet build` + `dotnet test` çalıştırır.
+// Stop hook: kaynak dosyalar son kontrolden beri değiştiyse `dotnet build` çalıştırır (analizörler dahil).
 // Kırmızıysa (exit 2) durmayı engeller ve hatayı modele geri verir. Değişiklik yoksa hiçbir şey çalıştırmaz.
-// Başarılı doğrulamanın zaman damgası: .claude/hooks/.last-verified (git'e girmez).
+// Tam test paketini burada değil `/novacore-verify` çalıştırır (D-088): skill'in hook'u oturum boyunca yaşıyor ve hook
+// girdisi çalışan skill'i söylemiyor, yazan ve doğrulayan oturum burada ayırt edilemez (R-135).
+// Son kontrolün zaman damgası: .claude/hooks/.last-verified (git'e girmez).
 'use strict';
 
 const fs = require('fs');
@@ -54,7 +56,7 @@ const newest = Math.max(
 );
 
 // Damga son *kontrolü* tutar, sonucu yeşil olsun kırmızı olsun: kırmızı bir ağaçta her sohbet turu (ör. "merhaba")
-// build + test'i baştan çalıştırmasın. Dosyalar o kontrolden beri değişmediyse yeniden çalıştırmaz, kırmızıysa uyarır.
+// build'i baştan çalıştırmasın. Dosyalar o kontrolden beri değişmediyse yeniden çalıştırmaz, kırmızıysa uyarır.
 let checked = 0;
 let green = true;
 try {
@@ -69,7 +71,7 @@ try {
 if (newest <= checked) {
   if (!green) {
     process.stdout.write(JSON.stringify({
-      systemMessage: '⚠ NovaCore: son doğrulama kırmızıydı ve o zamandan beri kaynak dosya değişmedi; tekrar çalıştırılmadı.'
+      systemMessage: '⚠ NovaCore: son build kırmızıydı ve o zamandan beri kaynak dosya değişmedi; tekrar çalıştırılmadı.'
     }));
   }
   process.exit(0);
@@ -91,22 +93,22 @@ function run(args) {
 function summarize(res) {
   const text = `${res.stdout || ''}\n${res.stderr || ''}`;
   const lines = text.split(/\r?\n/);
-  const important = lines.filter(l => /\berror\b|\bFailed\b|\bfailed\b|Assert\.|Exception/.test(l)).slice(0, 40);
+  const important = lines.filter(l => /\berror\b|\bFailed\b|\bfailed\b/.test(l)).slice(0, 40);
   const tail = lines.filter(l => l.trim()).slice(-15);
   return [...new Set([...important, ...tail])].join('\n').slice(0, 6000);
 }
 
-function fail(stage, res) {
+function fail(res) {
   record(false);
-  const msg = `Doğrulama başarısız (${stage}). Kaynak dosyalar değişti ama ${stage} kırmızı:\n${summarize(res)}`;
+  const msg = `Build başarısız. Kaynak dosyalar değişti ama build kırmızı:\n${summarize(res)}`;
   if (input.stop_hook_active) {
     // Sonsuz döngüyü önle: ikinci denemede durmaya izin ver ama kullanıcıyı uyar.
     process.stdout.write(JSON.stringify({
-      systemMessage: `⚠ NovaCore: ${stage} hâlâ kırmızı. Model durdu ama doğrulama geçmedi; raporu kontrol et.`
+      systemMessage: '⚠ NovaCore: build hâlâ kırmızı. Model durdu ama build geçmedi; raporu kontrol et.'
     }));
     process.exit(0);
   }
-  process.stderr.write(msg + '\n\nBuild ve testleri yeşile döndürmeden durma. Düzeltme kapsam dışına taşıyorsa novacore-phase §4 sapma protokolünü uygula ve kullanıcıya sor.');
+  process.stderr.write(msg + '\n\nBuild\'i yeşile döndürmeden durma. Düzeltme kapsam dışına taşıyorsa novacore-phase §4 sapma protokolünü uygula ve kullanıcıya sor.');
   process.exit(2);
 }
 
@@ -115,11 +117,7 @@ if (build.error) {
   process.stdout.write(JSON.stringify({ systemMessage: `⚠ NovaCore Stop hook: dotnet çalıştırılamadı (${build.error.message}).` }));
   process.exit(0);
 }
-if (build.status !== 0) fail('build', build);
-
-// global.json runs `dotnet test` in Microsoft.Testing.Platform mode: the solution goes through --solution.
-const test = run(['test', '--solution', solution, '--no-build']);
-if (test.status !== 0) fail('test', test);
+if (build.status !== 0) fail(build);
 
 record(true);
 process.exit(0);
