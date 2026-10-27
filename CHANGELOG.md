@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-27
+
+The first stable version. Everything below is relative to 0.1.0-preview.1. Each library package's public API is now
+recorded as shipped (`PublicAPI.Shipped.txt`), so a later change to it shows up in `PublicAPI.Unshipped.txt`.
+
 ### Security
 
 - The repository is public. CI pins every GitHub Action to a full commit SHA, grants each job only the permissions it

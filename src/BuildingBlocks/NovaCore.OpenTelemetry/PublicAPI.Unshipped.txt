@@ -1,3 +1,1 @@
 #nullable enable
-NovaCore.OpenTelemetry.OpenTelemetryHostingExtensions
-static NovaCore.OpenTelemetry.OpenTelemetryHostingExtensions.AddCoreObservability(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!

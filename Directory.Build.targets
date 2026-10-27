@@ -67,7 +67,7 @@
 
   <!--
     The analyzer reads the project's PublicAPI.Shipped.txt and PublicAPI.Unshipped.txt (its buildTransitive targets add
-    them, docs/plan/RESEARCH.md R-118; everything goes to Unshipped until a release is declared, F5.4). Without the
+    them, docs/plan/RESEARCH.md R-118; Shipped holds the released API, Unshipped the changes since, D-089). Without the
     reference, a new package would silently ship an untracked public API, so a packable project without it fails the
     build (D-020).
   -->

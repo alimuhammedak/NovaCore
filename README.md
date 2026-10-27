@@ -48,7 +48,7 @@ iskelet üreten **şablon** (`BMD.NovaCore.Templates`). Paketler NovaCore'un sor
 dotnet nuget add source https://nuget.pkg.github.com/alimuhammedak/index.json -n novacore -u <github-kullanıcısı> -p <token>
 
 # 2) Şablon paketi
-dotnet new install BMD.NovaCore.Templates::0.1.0-preview.1
+dotnet new install BMD.NovaCore.Templates::0.1.0
 
 # 3) Proje
 dotnet new novacore -n SiparisServisi                    # kimlik sağlayıcı host'un içinde (--auth BuiltIn), SQL Server (--db SqlServer)
@@ -1170,7 +1170,7 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
    (BuildingBlocks kaynağı, plan belgeleri, `.claude/`, `release.yml`, PublicAPI dosyaları) şablona girmez. Kurulum ve
    kullanım: [Yeni Proje (Tüketici Rehberi)](#yeni-proje-tüketici-rehberi).
    ```bash
-   dotnet new install BMD.NovaCore.Templates::0.1.0-preview.1
+   dotnet new install BMD.NovaCore.Templates::0.1.0
    dotnet new novacore -n YeniProje --auth BuiltIn   # ya da External: yalnızca Jwt:Authority, kimlik sağlayıcı yok
    ```
 2. **Lokal/özel NuGet paketi (BuildingBlocks için):** yalnızca stabil çekirdeği versiyonlu paketleyip
@@ -1191,7 +1191,7 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
    - Sürüm `Directory.Build.props`'taki `VersionPrefix`'ten gelir. API kararlı olana kadar 0.x kalır.
    - Her paket XML dokümanını, `src/PACKAGE.md`'den gelen README'yi, MIT lisans ifadesini ve repo linkini taşır. Yanında bir `.snupkg` sembol paketi üretilir.
    - Public API `PublicAPI.*.txt` dosyalarında izlenir. İzlenmeyen bir değişiklik build'i kırar.
-   - Yayın `.github/workflows/release.yml` ile yapılır. `VersionPrefix` ile eşleşen bir `v*` tag'i (ör. `v0.1.0-preview.1`) GitHub Packages'a push eder.
+   - Yayın `.github/workflows/release.yml` ile yapılır. `VersionPrefix` ile eşleşen bir `v*` tag'i (ör. `v0.1.0`; önizleme için `v0.2.0-preview.1`) GitHub Packages'a push eder.
      `build` job'u yalnızca okuma izniyle derler, test eder, pack eder ve kütüphane başına bir CycloneDX SBOM'u üretir.
      `publish` job'u `release` environment'ında sahibinin onayını bekler; paketlerin build provenance'ını imzalar
      (`actions/attest`) ve push eder (DECISIONS D-051 (6)).

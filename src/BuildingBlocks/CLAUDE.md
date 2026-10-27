@@ -128,7 +128,8 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
 - **They are NuGet packages, so their public surface is tracked:**
   - Every public member has an XML doc comment. The docs also appear in consumers' OpenAPI documents (R-041), so
     describe behaviour and keep the claims true to the code.
-  - `PublicAPI.Unshipped.txt` must list every public API (RS0016/RS0017).
+  - `PublicAPI.Shipped.txt` lists the API released in 0.1.0 and `PublicAPI.Unshipped.txt` every change since
+    (RS0016/RS0017).
   - No two public overloads with optional parameters (RS0026). `ToHttpResult` has three plain overloads, each returning
     a `Results<TSuccess, ProblemHttpResult>` union (F4c.5).
   - `Result<T>`'s own `Success`/`Failure` are internal (CA1000). Callers use `Result.Success<T>(…)`/`Result.Failure<T>(…)`.

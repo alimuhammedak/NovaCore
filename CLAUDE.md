@@ -297,8 +297,8 @@ These are hard rules. Breaking them defeats the point of the project or fails an
     `Microsoft.CodeAnalysis.PublicApiAnalyzers` (`PrivateAssets="all"`); `Directory.Build.targets` fails the build
     without either. Add `PublicAPI.Shipped.txt`/`PublicAPI.Unshipped.txt` starting with `#nullable enable`.
   - A public API change fails the build (RS0016/RS0017) until `PublicAPI.Unshipped.txt` is updated: use the IDE code
-    fix or `dotnet format analyzers <csproj> --diagnostics RS0016 --severity warn`. `PublicAPI.Shipped.txt` stays
-    empty until the first release is declared (F5.4).
+    fix or `dotnet format analyzers <csproj> --diagnostics RS0016 --severity warn`. `PublicAPI.Shipped.txt` holds the
+    API released in 0.1.0, `PublicAPI.Unshipped.txt` the changes since; a release moves Unshipped into Shipped (D-089).
   - Only one public overload of a method may take optional parameters (RS0026); prefer plain overloads.
   - Keep types `internal` unless consumers need them (DECISIONS Y-23).
 
