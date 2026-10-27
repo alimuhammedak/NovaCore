@@ -18,9 +18,15 @@ completed phases update this file.
 - **Phase work starts only via `/novacore-phase <id>`** (project skill, user-invoked), never two phases in one
   session. A phase spans several sessions: after at most three committed steps the skill pauses (`⏸`) and the user
   continues with `/clear` and the same command, without approving the plan again (D-082). When a phase ends,
-  **stop**. A phase merges through a `faz/...` → `main` pull request that CodeRabbit reviews (advisory,
-  `.coderabbit.yaml`, D-067); the merge itself still waits for the user. "devam"/"continue" means "next step inside
-  the approved phase plan", never "start the next phase".
+  **stop**. "devam"/"continue" means "next step inside the approved phase plan", never "start the next phase".
+- **Each writing session is followed by a verifying one (D-088):** `/clear`, then `/novacore-verify <id>` (project
+  skill, user-invoked). The writing session runs only the build, the step's new or changed test classes (red, then
+  green; `--project` + `--filter-class`, the SQLite class of a multi-database scenario) and `dotnet format`; the
+  verifying session runs the full suite and `code-review`, writes findings to PROGRESS and fixes no code.
+  `/novacore-phase` stops at a code commit no verify has seen and closes open findings before a new step. At the
+  phase end the last verify runs the phase verification and the CodeRabbit CLI, opens the `faz/...` → `main` pull
+  request that CodeRabbit reviews (advisory, `.coderabbit.yaml`, D-067), answers out-of-scope and false-positive
+  comments and asks for the merge; `/novacore-phase` fixes the in-scope findings and pushes them.
 - **Never implement anything in DECISIONS.md → "Yapılmayacaklar"**, not even as a design suggestion. If one
   seems necessary, stop and ask with the reason and a source.
 - **Counter the "most typical answer" pull (Y-40…Y-43, applies to every session, not only phase work):**
@@ -48,8 +54,8 @@ completed phases update this file.
   to `PLAN.md`, `DECISIONS.md`, `.claude/settings.json` and `.claude/hooks/`, a workflow `uses:` not pinned to a commit
   SHA, and a written value that looks like a secret trigger a user approval prompt.
   `DECISIONS.md` prompts even for a new entry; policy-wise new entries are pre-approved (D-016), so batch them
-  into one edit per phase step. Banned packages are denied, and the Stop hook blocks finishing while build/tests
-  are red. Don't try to route around them. The auto-mode classifier also blocks the model from editing hooks.
+  into one edit per phase step. Banned packages are denied, and the Stop hook blocks finishing while the build
+  is red (it runs no tests: the full suite is `/novacore-verify`'s, D-088). Don't try to route around them. The auto-mode classifier also blocks the model from editing hooks.
 - Outside the restructuring (a quick question, a one-off fix the user asks for), work normally, but still
   respect DECISIONS.md.
 
@@ -83,12 +89,13 @@ bash eng/check-openapi.sh [base-revision]     # breaking changes in docs/openapi
 bash eng/mutation.sh                          # Stryker.NET on the abstractions and domain code, a report (D-063)
 bash eng/lint-workflows.sh [dir ...]          # actionlint + zizmor on .github (Docker; GH_TOKEN enables online audits)
 bash eng/find-unused.sh                       # unused internal/private types, fields, constants (Roslynator, D-066)
-coderabbit review --agent --base main         # CodeRabbit CLI review of the phase branch, once at phase end (D-067, D-082; `coderabbit auth login` first)
+coderabbit review --agent --base main         # CodeRabbit CLI review of the phase branch, once at phase end in /novacore-verify (D-067, D-082, D-088; `coderabbit auth login` first)
 dotnet format NovaCore.slnx                   # fixes what CI's `dotnet format --verify-no-changes` reports
 git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release
 dotnet test                                   # all tests: SQLite, plus the SQL Server and PostgreSQL layers in Docker containers (skip without Docker)
-dotnet test -- --filter-method "*.AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"   # single test (--filter-class for a class)
+dotnet test --project tests/NovaCore.Api.Tests -- --filter-method "*.AuthorizationCodeFlowTests.Refresh_rotates_the_refresh_token"   # single test (--filter-class for a class)
+#   A filter needs --project: solution-wide, a project with no matching test fails the run with exit code 8 (D-063).
 #   `dotnet test` runs on Microsoft.Testing.Platform (global.json): the solution goes through --solution, xUnit's own
 #   options come after `--`, and -nologo isn't accepted before .NET 11 (exit code 5).
 

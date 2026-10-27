@@ -4,8 +4,10 @@ Subtree rules for `tests/`. See the repo-root `CLAUDE.md` for global standards.
 
 Stack: **xUnit v3 4.x on Microsoft.Testing.Platform** (test projects are `OutputType=Exe`; `global.json` puts
 `dotnet test` in MTP mode, so there is no VSTest package). Run a single test with
-`dotnet test -- --filter-method "*.ClassName.MethodName"` (`--filter-class "*.ClassName"` for a class; `*` only at the
-start or end). xUnit's options go after `--`; a solution goes through `--solution`.
+`dotnet test --project tests/<Project> -- --filter-method "*.ClassName.MethodName"` (`--filter-class "*.ClassName"` for
+a class, repeatable; `*` only at the start or end). A filter needs `--project`: solution-wide, a project with no
+matching test fails the run with exit code 8 (D-063). xUnit's options go after `--`; a solution goes through
+`--solution`. A writing session runs its step's classes this way and leaves the full suite to `/novacore-verify` (D-088).
 
 ## Two projects
 
