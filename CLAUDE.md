@@ -17,7 +17,7 @@ completed phases update this file.
 
 - **Phase work starts only via `/novacore-phase <id>`** (project skill, user-invoked), never two phases in one
   session. A phase spans several sessions: after at most three committed steps the skill pauses (`⏸`) and the user
-  continues with `/clear` and the same command, without approving the plan again (D-076). When a phase ends,
+  continues with `/clear` and the same command, without approving the plan again (D-082). When a phase ends,
   **stop**. A phase merges through a `faz/...` → `main` pull request that CodeRabbit reviews (advisory,
   `.coderabbit.yaml`, D-067); the merge itself still waits for the user. "devam"/"continue" means "next step inside
   the approved phase plan", never "start the next phase".
@@ -29,9 +29,12 @@ completed phases update this file.
   anything (design, naming, even a color), offer 2–3 genuinely different options with trade-offs and a
   project-specific recommendation. "Best practice"/"commonly done" is never a reason on its own. Never
   re-propose a rejected approach under a new name; say "I propose reopening Y-xx" instead.
-- **Make technical decisions yourself (DECISIONS D-016).** Don't guess: research the primary source
-  (Microsoft Learn MCP: `microsoft_docs_search` / `microsoft_docs_fetch` / `microsoft_code_sample_search`;
-  SDK files and `dotnet msbuild -pp`). If Microsoft's docs say how to do it, do it that way. If they don't,
+- **Make technical decisions yourself (DECISIONS D-016).** Don't guess: research the primary source, chosen by
+  topic (D-079). Microsoft technology: Microsoft Learn MCP only (`microsoft_docs_search` / `microsoft_docs_fetch` /
+  `microsoft_code_sample_search`), plus SDK files and `dotnet msbuild -pp`. A third-party package: find it with
+  Context7, then cite the package's official repo or docs in the R-entry, not Context7 (WebFetch the repo when
+  Context7 is unavailable). Package versions, advisories and supply chain: NuGet MCP's read-only tools, never its
+  update tools. If Microsoft's docs say how to do it, do it that way. If they don't,
   weigh cost (implementation + maintenance + risk) and pick the sensible option. Then log it (RESEARCH R-entry,
   a new DECISIONS D-entry if it lasts, PROGRESS note) and report it; don't ask. Writing plan docs needs no
   permission.
@@ -52,10 +55,15 @@ completed phases update this file.
 
 ### Working habits (from the Ponytail skill, DECISIONS D-048 (4))
 
-- **Before an edit, list every place it must reach**: the callers (grep them), the tests and fixtures, the
+- **Use the .NET tooling while coding (D-079)**: find a symbol's callers with the C# LSP (`findReferences`,
+  `incomingCalls`, `goToImplementation`) and keep grep for text, configuration and the uncompiled template content.
+  Open the matching .NET skill (`dotnet-data`, `dotnet-test`, `dotnet-aspnetcore`, `dotnet`) as a checklist;
+  DECISIONS, PLAN and this file win over a skill. The `dotnet-test` agents only run self-contained audits (test gaps,
+  test quality), never phase code.
+- **Before an edit, list every place it must reach**: the callers (LSP, see above), the tests and fixtures, the
   configuration, the docs that describe it, and the template's copies under `src/Templates/.../content`, which this
   repository doesn't compile (only `bash eng/template-smoke.sh` does).
-- **A bug fix starts with the callers**: grep every caller of the code you touch and fix the root cause once, in the
+- **A bug fix starts with the callers**: find every caller of the code you touch (LSP, grep for text) and fix the root cause once, in the
   shared code, instead of at each call site.
 - **End a report with what you skipped or did not check**, and any risk the user must know, in a line or two.
 
@@ -75,7 +83,7 @@ bash eng/check-openapi.sh [base-revision]     # breaking changes in docs/openapi
 bash eng/mutation.sh                          # Stryker.NET on the abstractions and domain code, a report (D-063)
 bash eng/lint-workflows.sh [dir ...]          # actionlint + zizmor on .github (Docker; GH_TOKEN enables online audits)
 bash eng/find-unused.sh                       # unused internal/private types, fields, constants (Roslynator, D-066)
-coderabbit review --agent --base main         # CodeRabbit CLI review of the phase branch, once at phase end (D-067, D-076; `coderabbit auth login` first)
+coderabbit review --agent --base main         # CodeRabbit CLI review of the phase branch, once at phase end (D-067, D-082; `coderabbit auth login` first)
 dotnet format NovaCore.slnx                   # fixes what CI's `dotnet format --verify-no-changes` reports
 git config core.hooksPath .githooks           # opt-in pre-commit secret scan (needs Betterleaks 1.9.0 on PATH)
 dotnet build -c Release
@@ -87,24 +95,24 @@ dotnet test -- --filter-method "*.AuthorizationCodeFlowTests.Refresh_rotates_the
 # Run (Development opens Scalar UI at /scalar/v1)
 dotnet run --project src/Api/NovaCore.Api
 
-# EF Core migrations — THREE separate DbContexts: one per module, plus the identity provider's. The host chooses the
-# database (AddModuleDatabase) and keeps every context's SQL Server migrations and design-time factory (D-073), so the
+# EF Core migrations — FOUR separate DbContexts: one per module, the identity provider's and the tenancy store's. The
+# host chooses the database (AddModuleDatabase) and keeps every context's SQL Server migrations and design-time factory (D-073), so the
 # Api is BOTH -p and -s. Restore tools first.
 dotnet tool restore
 dotnet ef migrations add <Name> --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context <C>DbContext --output-dir <F>/Migrations
 dotnet ef database update     --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context <C>DbContext
-#   <C>/<F> ∈ { Catalog/Catalog, Payments/Payments, IdentityServer/Identity }.
+#   <C>/<F> ∈ { Catalog/Catalog, Payments/Payments, IdentityServer/Identity, MultiTenancy/MultiTenancy }.
 # A model change needs a migration in each provider's set (D-074): the PostgreSQL test layer's lives in the test project.
 dotnet ef migrations add <Name> --project tests/NovaCore.Api.Tests --startup-project tests/NovaCore.Api.Tests --context <C>DbContext --output-dir PostgreSql/<F>/Migrations
 
 # The template package (src/Templates/NovaCore.Templates, package BMD.NovaCore.Templates) and its smoke test: packs every
-# package into a local feed, creates a project for each --auth (BuiltIn, External) and --db (SqlServer, PostgreSql),
-# builds, tests, runs its license gate and checks its migrations.
+# package into a local feed, creates a project for each --auth (BuiltIn, External), --db (SqlServer, PostgreSql) and
+# --multitenancy (false, true), builds, tests, runs its license gate and checks its migrations.
 bash eng/template-smoke.sh [work-dir]
 dotnet new install BMD.NovaCore.Templates::<version>    # from the GitHub Packages feed
-dotnet new novacore -n MyProject [--auth BuiltIn|External] [--db SqlServer|PostgreSql]
+dotnet new novacore -n MyProject [--auth BuiltIn|External] [--db SqlServer|PostgreSql] [--multitenancy]
 
-# NuGet packages (the seven building blocks + the template, IDs BMD.NovaCore.*) → artifacts/ (git-ignored). Version: VersionPrefix.
+# NuGet packages (the eight building blocks + the template, IDs BMD.NovaCore.*) → artifacts/ (git-ignored). Version: VersionPrefix.
 dotnet pack NovaCore.slnx -c Release -o artifacts [--version-suffix preview.1]
 ```
 
@@ -129,7 +137,8 @@ targets a **local SQL Server via Windows auth** (`appsettings.json`).
 - **Packages (`src/BuildingBlocks/`, ANALYSIS §4):** three **core** packages that depend on the BCL and Microsoft
   packages only (D-003) — `NovaCore.Abstractions` (BCL only), `NovaCore.AspNetCore` and `NovaCore.EntityFrameworkCore`
   — plus optional **add-on** packages for third-party libraries: `NovaCore.Serilog`, `NovaCore.OpenTelemetry` (logs,
-  metrics, traces), `NovaCore.Scalar`, `NovaCore.Identity.OpenIddict` (the OpenID Connect provider).
+  metrics, traces), `NovaCore.Scalar`, `NovaCore.Identity.OpenIddict` (the OpenID Connect provider),
+  `NovaCore.MultiTenancy` (tenants, memberships, their roles and the life cycle).
   **Package IDs are `BMD.NovaCore.*`** (`Directory.Build.targets`: `BMD.$(MSBuildProjectName)`); assembly, project and
   namespace names stay `NovaCore.*` (D-041: other owners publish `NovaCore.*` on nuget.org).
 
@@ -141,13 +150,14 @@ targets a **local SQL Server via Windows auth** (`appsettings.json`).
 
 - **Dependency direction (one way):** `Api` → `Modules.*` → `NovaCore.AspNetCore` / `NovaCore.EntityFrameworkCore`
   → `NovaCore.Abstractions` → BCL. AspNetCore and EntityFrameworkCore never reference each other; add-ons reference
-  at most AspNetCore/Abstractions. Enforced by `PackageDependencyTests`.
+  the core packages only, never another add-on (`NovaCore.MultiTenancy` uses both AspNetCore and EntityFrameworkCore,
+  D-076 (2)). Enforced by `PackageDependencyTests`.
 
 - **The host composes everything explicitly** (`src/Api/NovaCore.Api/Program.cs`): the add-ons (`AddCoreLogging`,
-  `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`), the identity provider
-  the database of every module context (`AddModuleDatabase`: SQL Server, the host's migrations), the identity provider
-  (`AddCoreIdentityServer` + `AddModuleDbContext<IdentityServerDbContext>`), then one `builder.AddModule<TModule>()` per
-  module; after `Build`,
+  `AddCoreObservability`), the core (`AddCoreDefaults`, `AddCoreWeb`, `AddCorePersistence`), the database of every
+  module context (`AddModuleDatabase`: SQL Server, the host's migrations), the identity provider
+  (`AddCoreIdentityServer` + `AddModuleDbContext<IdentityServerDbContext>`), multi-tenancy (`AddCoreMultiTenancy` +
+  `AddModuleDbContext<MultiTenancyDbContext>`), then one `builder.AddModule<TModule>()` per module; after `Build`,
   `UseSerilogRequestLogging`, `UseCoreWeb`, `MapCoreScalar`, `MapCoreIdentityServer`, `MapModules`,
   `MapDefaultEndpoints` (health endpoints, Development only, D-022). Nothing is found by
   assembly scanning (Y-20, `ExplicitRegistrationTests`).
@@ -174,7 +184,8 @@ targets a **local SQL Server via Windows auth** (`appsettings.json`).
 - **Domain events go through a transactional outbox.** An entity `Raise`s a `DomainEvent` record; the save that saves
   the entity writes it to the module's `outbox_messages` in the same transaction (`OutboxInterceptor`, added by
   `AddModuleDbContext`; the context calls `modelBuilder.AddOutbox()`). `OutboxDispatcher`, a `BackgroundService` from
-  `AddCorePersistence`, delivers the events to their `IDomainEventHandler<T>`s: each message in its own DI scope, each
+  `AddCorePersistence`, delivers the events to their `IDomainEventHandler<T>`s: each message in its own DI scope (in the
+  tenant of the scope that saved it, or in none) and its own consumer span (continuing the saving trace, D-081), each
   handler once (`outbox_consumers` records the finished ones, keyed by the message row), retried on later passes, left
   for inspection after 10 failures; processed messages are deleted with their records after 7 days. Delivery is at
   least once, so handlers must be idempotent; one dispatcher per database (D-031, D-036 (7), R-068). The outbox is the
@@ -183,14 +194,29 @@ targets a **local SQL Server via Windows auth** (`appsettings.json`).
 - **Security** is a first-class subsystem. The core only *validates* access tokens (D-002): JWT bearer against an
   OpenID Connect provider, `Jwt:Authority` (issuer + JWKS discovered, asymmetric algorithms only), required in every
   environment (D-028). Permission-based authorization lives in
-  `NovaCore.AspNetCore` too: permissions are resolved on the server through `IPermissionResolver` (never read from the
-  token) and cached per `sub` + security stamp for `Cache:PermissionExpiration`; code that changes what the resolver
-  returns drops the entries at once with `HybridCache.RemovePermissionsAsync(sub)` (a tag). The tokens come from the
+  `NovaCore.AspNetCore` too: permissions are resolved on the server through every registered `IPermissionResolver`
+  (never read from the token; the caller holds what any of them grants) and cached per `sub` + security stamp +
+  requested tenant for `Cache:PermissionExpiration`; code that changes what a resolver returns drops the entries at once
+  with `HybridCache.RemovePermissionsAsync(sub)` (a tag). The core's claims transformation is the only one: another
+  `IClaimsTransformation` stops the host (`ClaimsTransformationStartupCheck`). The tokens come from the
   `NovaCore.Identity.OpenIddict` add-on (ASP.NET Core Identity + OpenIddict: Authorization Code + PKCE, refresh
   rotation with an absolute 7-day lifetime, client credentials, single-use TOTP 2FA with hashed recovery codes,
   password reset, token pruning, admin; the API accepts only its `at+jwt` tokens), which the Api host runs as its own
   authority (DECISIONS D-037, Faz 6b: D-053…D-055). See `src/BuildingBlocks/NovaCore.Identity.OpenIddict/CLAUDE.md` before
   touching auth.
+
+- **Multi-tenancy** (D-069, D-076…D-084; README "Çok kiracılılık"): tenants share one database and their rows carry a
+  `TenantId`. The core isolates every `ITenantEntity` in every module context with nothing for the module to do
+  (`AddModuleDbContext`: a named query filter, `TenantQueryFilter.Name`; a write guard; a parameterless
+  `IgnoreQueryFilters()` fails), in the tenant of the DI scope (`TenantContext`, given once; none → no rows). A request
+  gets its tenant from the optional `NovaCore.MultiTenancy` add-on (`AddCoreMultiTenancy`: the `tenant` route value,
+  validated against the caller's membership and the tenant's status on the server, cached with the permissions; no
+  tenant claim in the token, D-070 (3)); `RequireTenant()` guards a tenant endpoint. Members' roles grant permissions in
+  their tenant (`MultiTenancy:Roles`), the outbox runs a message's handlers in the tenant that saved it, and
+  `TenantDirectory` runs the life cycle (active, suspended, closed, deleted through `TenantData`). There is no "see
+  everything" switch: other work runs in a tenant's scope, a read across tenants turns the filter off by its name.
+  Row-level security is a documented example for the host, not package code (D-069 (5)). The Api host wires the add-on;
+  the repo's modules have no tenant entities, so isolation is tested on `TenancyFixture` (`tests/CLAUDE.md`).
 
 ---
 
@@ -258,7 +284,7 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   argument must be computed (CA1873), wrap the call in an `IsEnabled` guard and declare the methods as `this ILogger`
   extensions: CA1873 only accepts a guard on the same receiver (`SecurityAuditLogger`, RESEARCH R-047).
 
-- **Packable projects are NuGet packages** (the three core packages and the four add-ons in `src/BuildingBlocks`):
+- **Packable projects are NuGet packages** (the three core packages and the five add-ons in `src/BuildingBlocks`):
   - Every public member needs an XML doc comment (CS1591).
   - The `.csproj` sets `<GenerateDocumentationFile>true</GenerateDocumentationFile>` next to `IsPackable` and references
     `Microsoft.CodeAnalysis.PublicApiAnalyzers` (`PrivateAssets="all"`); `Directory.Build.targets` fails the build
@@ -291,8 +317,9 @@ These are hard rules. Breaking them defeats the point of the project or fails an
   `ILike`); the host's `AddModuleDatabase` (and its design-time factories) is the only `UseSqlServer`/`UseNpgsql`. Text
   comparison follows the database's collation: SQL Server's default ignores case, PostgreSQL's doesn't.
 - **Two EF providers can't coexist** on one context. A test host points the module contexts at its own database with a
-  later `AddModuleDatabase` (the PostgreSQL layer, the template's test factory); `NovaCoreApiFactory` still swaps every
-  DbContext to SQLite with its own internal service provider (see `tests/CLAUDE.md`).
+  later `AddModuleDatabase` (`NovaCoreApiFactory`'s SQLite, the PostgreSQL layer, the template's test factory), so
+  Program's SQL Server is never configured and every context still goes through `AddModuleDbContext` (see
+  `tests/CLAUDE.md`).
 - **Suppressed-by-design warnings** (all user-approved, DECISIONS D-011):
   - `Directory.Build.props`: `NoWarn` `RMG020` (Mapperly intentional source-member drops). `WarningsNotAsErrors`
     `NU1901;NU1902` (low/moderate advisories stay warnings; high/critical fail restore; CI fails on any).

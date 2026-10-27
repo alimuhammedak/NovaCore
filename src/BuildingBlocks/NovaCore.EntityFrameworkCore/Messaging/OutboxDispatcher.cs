@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NovaCore.Abstractions.Messaging;
+using NovaCore.Abstractions.MultiTenancy;
 using NovaCore.EntityFrameworkCore.Persistence;
 
 namespace NovaCore.EntityFrameworkCore.Messaging;
@@ -15,7 +17,11 @@ namespace NovaCore.EntityFrameworkCore.Messaging;
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
-/// <item>Each message gets a DI scope for its handlers, which they share.</item>
+/// <item>Each message gets a DI scope for its handlers, which they share. The scope works in the tenant the event was
+/// saved in (<see cref="TenantContext"/>), or in none when it was saved without one.</item>
+/// <item>The handlers run in a span of their own (<see cref="ActivitySourceName"/>, a consumer's "process" span): a child
+/// of the activity the event was saved in, and linked to it, so the handlers show in the trace of the request that raised
+/// the event; a trace of its own when there was none.</item>
 /// <item>A handler that finishes is recorded in <c>outbox_consumers</c>, and a retry of the message skips it. Once
 /// every handler has finished, the message is marked processed.</item>
 /// <item>A failure counts an attempt; the next pass tries again. After <see cref="MaxAttempts"/> the message stays in
@@ -54,7 +60,17 @@ internal sealed partial class OutboxDispatcher(
     /// </summary>
     public static readonly TimeSpan ProcessedRetention = TimeSpan.FromDays(7);
 
+    /// <summary>
+    /// The <see cref="ActivitySource"/> of the handlers' spans, the assembly's name: OpenTelemetry takes them with
+    /// <c>AddSource</c> (<c>AddCoreObservability</c> does).
+    /// </summary>
+    public const string ActivitySourceName = "NovaCore.EntityFrameworkCore";
+
     private const int BatchSize = 50;
+
+    // Created once and kept for the process, as Microsoft's instrumentation guidance says; it holds no state of a host.
+    private static readonly ActivitySource Source =
+        new(ActivitySourceName, typeof(OutboxDispatcher).Assembly.GetName().Version?.ToString());
 
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -113,6 +129,7 @@ internal sealed partial class OutboxDispatcher(
     private async Task DeliverAsync(DbContext outbox, OutboxMessage message, CancellationToken cancellationToken)
     {
         var row = outbox.Set<OutboxMessage>().Where(stored => stored.Id == message.Id);
+        using var span = StartSpan(message);
         try
         {
             var domainEvent = Deserialize(message);
@@ -132,6 +149,9 @@ internal sealed partial class OutboxDispatcher(
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            span?.SetStatus(ActivityStatusCode.Error);
+            span?.SetTag("error.type", exception.GetType().FullName);
+
             // A record that failed to save must not ride along with the next one.
             outbox.ChangeTracker.Clear();
 
@@ -163,6 +183,10 @@ internal sealed partial class OutboxDispatcher(
         var scope = scopeFactory.CreateAsyncScope();
         await using (scope.ConfigureAwait(false))
         {
+            // The tenant the event was saved in; without one the handlers work in none, and its tenant rows stay out of reach.
+            if (message.TenantId is { } tenant)
+                scope.ServiceProvider.GetRequiredService<TenantContext>().Use(tenant);
+
             foreach (var handler in invoker.GetHandlers(scope.ServiceProvider))
             {
                 var name = handler.GetType().FullName!;
@@ -209,6 +233,32 @@ internal sealed partial class OutboxDispatcher(
                 .ConfigureAwait(false);
         }
         while (deleted == BatchSize);
+    }
+
+    // A consumer's "process" span, as OpenTelemetry's messaging conventions describe it: the creation context (the activity
+    // the event was saved in) is its parent, which the conventions allow for a single message, and its link, which they
+    // ask for (docs/plan/RESEARCH.md R-131). Null without a listener.
+    private static Activity? StartSpan(OutboxMessage message)
+    {
+        if (!Source.HasListeners())
+            return null;
+
+        // The event's type without its assembly ("Namespace.Type, Assembly"): the destination, of low cardinality.
+        var separator = message.Type.LastIndexOf(", ", StringComparison.Ordinal);
+        var destination = separator < 0 ? message.Type : message.Type[..separator];
+        KeyValuePair<string, object?>[] tags =
+        [
+            new("messaging.system", "novacore.outbox"),
+            new("messaging.operation.name", "process"),
+            new("messaging.operation.type", "process"),
+            new("messaging.destination.name", destination),
+            new("messaging.message.id", message.EventId.ToString())
+        ];
+        var name = $"process {destination}";
+
+        return ActivityContext.TryParse(message.TraceParent, traceState: null, isRemote: true, out var saved)
+            ? Source.StartActivity(name, ActivityKind.Consumer, saved, tags, [new ActivityLink(saved)])
+            : Source.StartActivity(name, ActivityKind.Consumer, parentContext: default, tags);
     }
 
     private static IDomainEvent Deserialize(OutboxMessage message)

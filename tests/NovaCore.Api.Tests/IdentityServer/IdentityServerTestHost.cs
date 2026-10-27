@@ -195,7 +195,7 @@ public class IdentityServerFixture : IAsyncLifetime
 {
     public IdentityServerTestHost Host { get; private set; } = null!;
 
-    public async ValueTask InitializeAsync() => Host = await IdentityServerTestHost.StartAsync(configure: Configure);
+    public virtual async ValueTask InitializeAsync() => Host = await IdentityServerTestHost.StartAsync(configure: Configure);
 
     public async ValueTask DisposeAsync()
     {

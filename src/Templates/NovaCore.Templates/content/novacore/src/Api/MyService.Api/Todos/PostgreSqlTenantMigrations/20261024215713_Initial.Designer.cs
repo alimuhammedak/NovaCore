@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MyService.Api.Todos.Migrations
 {
     [DbContext(typeof(TodosDbContext))]
-    [Migration("20261023222152_Initial")]
+    [Migration("20261024215713_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -49,6 +49,9 @@ namespace MyService.Api.Todos.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -56,7 +59,7 @@ namespace MyService.Api.Todos.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Title");
+                    b.HasIndex("TenantId", "Title");
 
                     b.ToTable("items", "todos");
                 });
@@ -105,6 +108,13 @@ namespace MyService.Api.Todos.Migrations
 
                     b.Property<DateTimeOffset?>("ProcessedOnUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(55)
+                        .HasColumnType("character varying(55)");
 
                     b.Property<string>("Type")
                         .IsRequired()

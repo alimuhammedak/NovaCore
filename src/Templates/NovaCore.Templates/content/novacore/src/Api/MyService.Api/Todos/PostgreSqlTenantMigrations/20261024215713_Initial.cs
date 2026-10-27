@@ -1,5 +1,6 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -19,13 +20,14 @@ namespace MyService.Api.Todos.Migrations
                 schema: "todos",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Title = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    IsCompleted = table.Column<bool>(type: "bit", nullable: false),
-                    CreatedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
-                    CreatedBy = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    ModifiedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
-                    ModifiedBy = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Title = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    IsCompleted = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    ModifiedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    ModifiedBy = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -38,14 +40,16 @@ namespace MyService.Api.Todos.Migrations
                 columns: table => new
                 {
                     Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    EventId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Type = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false),
-                    Content = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    OccurredOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
-                    ProcessedOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
-                    Attempts = table.Column<int>(type: "int", nullable: false),
-                    Error = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    EventId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Type = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    Content = table.Column<string>(type: "text", nullable: false),
+                    OccurredOnUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: true),
+                    TraceParent = table.Column<string>(type: "character varying(55)", maxLength: 55, nullable: true),
+                    ProcessedOnUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    Attempts = table.Column<int>(type: "integer", nullable: false),
+                    Error = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -58,8 +62,8 @@ namespace MyService.Api.Todos.Migrations
                 columns: table => new
                 {
                     MessageId = table.Column<long>(type: "bigint", nullable: false),
-                    Handler = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    ProcessedOnUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
+                    Handler = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    ProcessedOnUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -74,10 +78,10 @@ namespace MyService.Api.Todos.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_items_Title",
+                name: "IX_items_TenantId_Title",
                 schema: "todos",
                 table: "items",
-                column: "Title");
+                columns: new[] { "TenantId", "Title" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_outbox_messages_EventId",

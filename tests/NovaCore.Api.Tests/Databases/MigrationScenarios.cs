@@ -3,13 +3,14 @@ using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Identity.OpenIddict;
 using NovaCore.Modules.Catalog.Infrastructure;
 using NovaCore.Modules.Payments.Infrastructure;
+using NovaCore.MultiTenancy;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Databases;
 
 /// <summary>
 /// The startup migrations on a real database, the same on every provider: the host's <c>DatabaseMigrationService</c>
-/// applies every migration of the three contexts when it starts (their SQL runs nowhere else: the SQLite tests take their
+/// applies every migration of the four contexts when it starts (their SQL runs nowhere else: the SQLite tests take their
 /// schema from <c>EnsureCreated</c>), and each context keeps its tables and its migration history in its own schema.
 /// </summary>
 public abstract class MigrationScenarios<TFactory>(TFactory factory) : IClassFixture<TFactory>
@@ -61,7 +62,7 @@ public abstract class MigrationScenarios<TFactory>(TFactory factory) : IClassFix
             Assert.Equal(InOrder(modelTables), InOrder(tables.Where(table => string.Equals(table.Schema, schema, StringComparison.Ordinal))));
         }
 
-        // Nothing outside the three schemas (no dbo, no public).
+        // Nothing outside the contexts' schemas (no dbo, no public).
         Assert.Equal(
             contexts.Select(context => context.Model.GetDefaultSchema()).Order(StringComparer.Ordinal),
             tables.Select(table => table.Schema).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
@@ -71,7 +72,8 @@ public abstract class MigrationScenarios<TFactory>(TFactory factory) : IClassFix
     [
         services.GetRequiredService<CatalogDbContext>(),
         services.GetRequiredService<PaymentsDbContext>(),
-        services.GetRequiredService<IdentityServerDbContext>()
+        services.GetRequiredService<IdentityServerDbContext>(),
+        services.GetRequiredService<MultiTenancyDbContext>()
     ];
 
     private static List<TableName> InOrder(IEnumerable<TableName> tables) =>

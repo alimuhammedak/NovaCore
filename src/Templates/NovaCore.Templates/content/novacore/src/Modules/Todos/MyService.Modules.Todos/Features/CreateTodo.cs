@@ -29,6 +29,9 @@ public static class CreateTodo
 
     private static async Task<Created<Response>> Handle(
         Request request,
+#if (multitenancy)
+        Guid tenant,
+#endif
         TodosDbContext dbContext,
         CancellationToken cancellationToken)
     {
@@ -37,6 +40,10 @@ public static class CreateTodo
         dbContext.Todos.Add(todo);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+#if (multitenancy)
+        return TypedResults.Created($"/api/v1/tenants/{tenant}/todos/{todo.Id}", new Response(todo.Id));
+#else
         return TypedResults.Created($"/api/v1/todos/{todo.Id}", new Response(todo.Id));
+#endif
     }
 }

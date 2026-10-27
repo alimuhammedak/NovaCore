@@ -57,6 +57,12 @@
       "type": "computed",
       "value": "(db == \"PostgreSql\")"
     },
+    "multitenancy": {
+      "type": "parameter",
+      "datatype": "bool",
+      "description": "Sells to many organizations: the NovaCore.MultiTenancy add-on (tenants, members, their roles and life cycle), and the Todos module's todos belong to a tenant, under /api/v1/tenants/{tenant}/todos.",
+      "defaultValue": "false"
+    },
     "PostgreSqlMigrationsFolder": {
       "type": "generated",
       "generator": "constant",
@@ -64,6 +70,22 @@
         "value": "Migrations"
       },
       "fileRename": "MigrationsPostgreSql"
+    },
+    "SqlServerTenantMigrationsFolder": {
+      "type": "generated",
+      "generator": "constant",
+      "parameters": {
+        "value": "Migrations"
+      },
+      "fileRename": "SqlServerTenantMigrations"
+    },
+    "PostgreSqlTenantMigrationsFolder": {
+      "type": "generated",
+      "generator": "constant",
+      "parameters": {
+        "value": "Migrations"
+      },
+      "fileRename": "PostgreSqlTenantMigrations"
     },
     "HttpsPort": {
       "type": "generated",
@@ -97,17 +119,38 @@
           ]
         },
         {
+          "condition": "(!multitenancy)",
+          "exclude": [
+            "src/Api/MyService.Api/MultiTenancy/**",
+            "src/Api/MyService.Api/Todos/SqlServerTenantMigrations/**",
+            "src/Api/MyService.Api/Todos/PostgreSqlTenantMigrations/**",
+            "tests/MyService.Api.Tests/TenantTodosTests.cs"
+          ]
+        },
+        {
+          "condition": "(multitenancy)",
+          "exclude": [
+            "src/Api/MyService.Api/Todos/Migrations/**",
+            "src/Api/MyService.Api/Todos/MigrationsPostgreSql/**",
+            "tests/MyService.Api.Tests/TodosTests.cs"
+          ]
+        },
+        {
           "condition": "(!DbSqlServer)",
           "exclude": [
             "src/Api/MyService.Api/Todos/Migrations/**",
-            "src/Api/MyService.Api/Identity/Migrations/**"
+            "src/Api/MyService.Api/Todos/SqlServerTenantMigrations/**",
+            "src/Api/MyService.Api/Identity/Migrations/**",
+            "src/Api/MyService.Api/MultiTenancy/Migrations/**"
           ]
         },
         {
           "condition": "(!DbPostgreSql)",
           "exclude": [
             "src/Api/MyService.Api/Todos/MigrationsPostgreSql/**",
-            "src/Api/MyService.Api/Identity/MigrationsPostgreSql/**"
+            "src/Api/MyService.Api/Todos/PostgreSqlTenantMigrations/**",
+            "src/Api/MyService.Api/Identity/MigrationsPostgreSql/**",
+            "src/Api/MyService.Api/MultiTenancy/MigrationsPostgreSql/**"
           ]
         }
       ]

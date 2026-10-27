@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Consumer smoke test of the template (docs/plan/PLAN.md F5.2). Packs the NovaCore packages and the template into a local
-# feed, creates a project from the template with each identity option and each database (--auth x --db), and builds and
-# tests it the way a consumer does: the packages come from the feed (not from this repository's projects), warnings are
-# errors, the package licenses pass the project's gate and the migrations match the model.
+# feed, creates a project from the template with each identity option, each database and multi-tenancy off and on
+# (--auth x --db x --multitenancy), and builds and tests it the way a consumer does: the packages come from the feed (not
+# from this repository's projects), warnings are errors, the package licenses pass the project's gate and the migrations
+# match the model.
 # Usage: eng/template-smoke.sh [work-directory]
 set -euo pipefail
 
@@ -33,11 +34,14 @@ dotnet new install "$(native "$template")" --debug:custom-hive "$hive"
 
 for auth in BuiltIn External; do
 for db in SqlServer PostgreSql; do
+for mt in false true; do
   # Short names: on Windows a native library's path under tests/<name>.Api.Tests/bin must stay within MAX_PATH.
   case "$db" in SqlServer) name="Smoke${auth}Sql" ;; PostgreSql) name="Smoke${auth}Pg" ;; esac
+  if [[ "$mt" == true ]]; then name="${name}Mt"; fi
   project="$work/projects/$name"
-  echo "== dotnet new novacore --auth $auth --db $db"
-  dotnet new novacore -n "$name" --auth "$auth" --db "$db" -o "$(native "$project")" --debug:custom-hive "$hive"
+  echo "== dotnet new novacore --auth $auth --db $db --multitenancy $mt"
+  dotnet new novacore -n "$name" --auth "$auth" --db "$db" --multitenancy "$mt" -o "$(native "$project")" \
+    --debug:custom-hive "$hive"
 
   # The generated nuget.config maps BMD.NovaCore.* to the GitHub feed; here the same source name points at the local one.
   (cd "$project" && dotnet nuget update source novacore --source "$feed" --configfile nuget.config)
@@ -56,6 +60,10 @@ for db in SqlServer PostgreSql; do
       dotnet ef migrations has-pending-model-changes --project "$api" --startup-project "$api" \
         --context IdentityServerDbContext --configuration Release --no-build
     fi
+    if [[ "$mt" == true ]]; then
+      dotnet ef migrations has-pending-model-changes --project "$api" --startup-project "$api" \
+        --context MultiTenancyDbContext --configuration Release --no-build
+    fi
   )
 
   echo "== $name: nothing of this repository's own"
@@ -70,9 +78,10 @@ for db in SqlServer PostgreSql; do
   fi
 
   echo "== $name: the chosen database only"
-  # One migration set per context, the chosen provider's, in Migrations (the template keeps the other's apart).
-  if find "$project" -path '*MigrationsPostgreSql*' -not -path '*/bin/*' -not -path '*/obj/*' | grep -q .; then
-    echo "::error::$name contains a MigrationsPostgreSql folder"; exit 1
+  # One migration set per context, the chosen provider's, in Migrations (the template keeps the others apart).
+  if find "$project" \( -path '*MigrationsPostgreSql*' -o -path '*TenantMigrations*' \) -not -path '*/bin/*' -not -path '*/obj/*' \
+    | grep -q .; then
+    echo "::error::$name contains a MigrationsPostgreSql or *TenantMigrations folder"; exit 1
   fi
   if [[ "$db" == SqlServer ]]; then use=UseSqlServer; annotations=SqlServer; other=Npgsql; else use=UseNpgsql; annotations=Npgsql; other=SqlServer; fi
   grep -q "$use" "$project/src/Api/$name.Api/Program.cs" || { echo "::error::$name doesn't call $use"; exit 1; }
@@ -81,6 +90,20 @@ for db in SqlServer PostgreSql; do
   if grep -rIl --exclude-dir=bin --exclude-dir=obj -e "$other" "$project/src"; then
     echo "::error::$name references the other database (files above)"; exit 1
   fi
+
+  echo "== $name: multi-tenancy $mt"
+  snapshot="$project/src/Api/$name.Api/Todos/Migrations/TodosDbContextModelSnapshot.cs"
+  if [[ "$mt" == true ]]; then
+    grep -q AddCoreMultiTenancy "$project/src/Api/$name.Api/Program.cs" \
+      || { echo "::error::$name doesn't call AddCoreMultiTenancy"; exit 1; }
+    grep -q 'HasIndex("TenantId", "Title")' "$snapshot" || { echo "::error::$name's todos aren't tenant entities"; exit 1; }
+  else
+    # The outbox has a TenantId column either way; a tenant entity and the add-on come with --multitenancy only.
+    if grep -rIl --exclude-dir=bin --exclude-dir=obj -e MultiTenancy -e ITenantEntity "$project/src" "$project/tests"; then
+      echo "::error::$name has multi-tenancy without --multitenancy (files above)"; exit 1
+    fi
+  fi
+done
 done
 done
 

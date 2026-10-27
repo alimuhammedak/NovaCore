@@ -10,7 +10,7 @@ namespace NovaCore.Api.Tests.PostgreSql;
 /// </summary>
 public class PostgreSqlModelTests
 {
-    public static TheoryData<string> Contexts => ["Catalog", "Payments", "Identity"];
+    public static TheoryData<string> Contexts => ["Catalog", "Payments", "Identity", "MultiTenancy"];
 
     [Theory]
     [MemberData(nameof(Contexts))]
@@ -20,6 +20,7 @@ public class PostgreSqlModelTests
         {
             "Catalog" => new CatalogPostgreSqlFactory().CreateDbContext([]),
             "Payments" => new PaymentsPostgreSqlFactory().CreateDbContext([]),
+            "MultiTenancy" => new MultiTenancyPostgreSqlFactory().CreateDbContext([]),
             _ => new IdentityServerPostgreSqlFactory().CreateDbContext([])
         };
 

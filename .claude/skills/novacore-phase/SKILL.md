@@ -30,7 +30,7 @@ Sırayla ve eksiksiz oku:
 
 1. `docs/plan/DECISIONS.md`: tamamı. Özellikle **Yapılmayacaklar** bölümü. Bu dosya diğer her şeyden önce gelir.
 2. `docs/plan/PLAN.md`: "Genel kurallar" bölümü ve **yalnızca hedef fazın** bölümü.
-3. `docs/plan/PROGRESS.md`: faz tablosu, hedef fazın adımları, açık sorular, son devir notu. `PROGRESS-ARSIV.md`'yi okuma; eski bir kaydın geçmişi gerekirse orada `grep` ile ara (D-076).
+3. `docs/plan/PROGRESS.md`: faz tablosu, hedef fazın adımları, açık sorular, son devir notu. `PROGRESS-ARSIV.md`'yi okuma; eski bir kaydın geçmişi gerekirse orada `grep` ile ara (D-082).
 4. Git durumu: `git status`, `git branch --show-current`, `git log --oneline -15`.
 
 Ardından şunları kontrol et. Biri başarısızsa **dur ve kullanıcıya bildir**, çözüm üretmeye başlama:
@@ -66,15 +66,15 @@ Her adım için aynı döngü:
 
 1. **Başlat:** PROGRESS'te adıma "devam ediyor" notu düş.
 2. **Test:** Adım bir hata düzeltmesi veya yeni davranış içeriyorsa önce testi yaz ve kırmızı olduğunu gör.
-3. **Uygula:** Yalnızca o adımın kapsamı. Aynı dosyada yan bir şey gözüne çarparsa dokunma, §4'ü uygula.
-4. **Doğrula:** `dotnet build NovaCore.slnx` ve `dotnet test NovaCore.slnx`. Paket değiştiyse `dotnet restore NovaCore.slnx --force` da çalıştır; sürüm değiştiyse `--force-evaluate` ile lock dosyalarını yeniden yaz ve onları da commit'le. Kırmızıysa düzelt. Düzeltme kapsam dışına taşıyorsa §4. Çıktının tamamını bağlama alma: özeti ve hata satırlarını oku (ör. `dotnet build -v q`, testlerde yalnız başarısızlar ve toplam). CodeRabbit CLI adımda çalışmaz, faz sonunda bir kez çalışır (§5.6, D-076).
+3. **Uygula:** Yalnızca o adımın kapsamı. Aynı dosyada yan bir şey gözüne çarparsa dokunma, §4'ü uygula. Bir sembole dokunmadan önce çağıranlarını LSP'yle bul (`findReferences`, `incomingCalls`, `goToImplementation`); metin, yapılandırma ve şablon içeriği için grep (D-079). Adımın konusuna uyan .NET skill'ini (`dotnet-data`, `dotnet-test`, `dotnet-aspnetcore`, `dotnet`) kontrol listesi olarak aç; DECISIONS, PLAN ya da CLAUDE.md ile çelişirse onlar geçerlidir.
+4. **Doğrula:** `dotnet build NovaCore.slnx` ve `dotnet test NovaCore.slnx`. Paket değiştiyse `dotnet restore NovaCore.slnx --force` da çalıştır; sürüm değiştiyse `--force-evaluate` ile lock dosyalarını yeniden yaz ve onları da commit'le. Kırmızıysa düzelt. Düzeltme kapsam dışına taşıyorsa §4. Çıktının tamamını bağlama alma: özeti ve hata satırlarını oku (ör. `dotnet build -v q`, testlerde yalnız başarısızlar ve toplam). CodeRabbit CLI adımda çalışmaz, faz sonunda bir kez çalışır (§5.6, D-082).
 5. **Commit:** `faz<id>(<adım-id>): <özet>`, sonuna oturumun attribution satırını ekle. Sadece o adımın dosyalarını stage'le (`git add <yol>`); `git add -A` kullanma.
 6. **Kaydet:** PROGRESS'te `- [x] <adım-id> (<kısa-hash>): <kısa not>`.
 7. **Bilgilendir:** Kullanıcıya tek satır yaz, ör. "F0.3 tamam: strict limiter IP bazlı, 2 yeni test." Adımda kendi aldığın bir karar varsa aynı satıra ekle. Plan onaylandığı için adımlar arasında onay bekleme. Yalnızca §4'teki "sor" durumunda dur.
 
 Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'yi ve PLAN'daki faz bölümünü **yeniden oku**. Kapsam için konuşma özetine güvenme.
 
-**Oturum bütçesi (D-076):** bir oturumda en fazla 3 adım commit'le; adımlar büyükse ya da uzun bir hata ayıklama olduysa daha önce dur. Model her araç çağrısında bütün bağlamı yeniden okur, bu yüzden uzayan oturumun her adımı bir öncekinden pahalıdır ve kullanıcının kotasını eritir. Durunca PROGRESS'e devir notu yaz (nerede kalındı, sıradaki adım, yarım kalan bir şey varsa ne), fazı `⏸ duraklatıldı` yap ve commit'le. Mesajının son satırı kopyalanacak komut olsun: "Devam: `/clear`, ardından `/novacore-phase <id>`" (`/clear` bağlamı sıfırlar; maliyet açısından yeni oturumla aynıdır). Yeni oturum §1'deki "Devam eden faz" kuralıyla sürer, plan yeniden onaylatılmaz.
+**Oturum bütçesi (D-082):** bir oturumda en fazla 3 adım commit'le; adımlar büyükse ya da uzun bir hata ayıklama olduysa daha önce dur. Model her araç çağrısında bütün bağlamı yeniden okur, bu yüzden uzayan oturumun her adımı bir öncekinden pahalıdır ve kullanıcının kotasını eritir. Durunca PROGRESS'e devir notu yaz (nerede kalındı, sıradaki adım, yarım kalan bir şey varsa ne), fazı `⏸ duraklatıldı` yap ve commit'le. Mesajının son satırı kopyalanacak komut olsun: "Devam: `/clear`, ardından `/novacore-phase <id>`" (`/clear` bağlamı sıfırlar; maliyet açısından yeni oturumla aynıdır). Yeni oturum §1'deki "Devam eden faz" kuralıyla sürer, plan yeniden onaylatılmaz.
 
 ## 4. Sapma protokolü
 
@@ -87,9 +87,10 @@ Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'
 
 **Ne yapılır:**
 1. **Tahminle ilerleme.** Uydurma bir API, paket sürümü ya da davranış, sessiz bir hatadan daha pahalıdır.
-2. **Araştır.** Birincil kaynağa git:
-   - Microsoft teknolojileri için Microsoft Learn MCP: önce `microsoft_docs_search`, sayfa önemliyse `microsoft_docs_fetch`, kod örneği için `microsoft_code_sample_search`. Araçlar yüklü değilse ToolSearch ile yükle.
-   - Diğer paketler için resmi repo veya doküman (WebFetch).
+2. **Araştır.** Birincil kaynağa git; kaynağı konu seçer (D-079):
+   - Microsoft teknolojileri için yalnızca Microsoft Learn MCP: önce `microsoft_docs_search`, sayfa önemliyse `microsoft_docs_fetch`, kod örneği için `microsoft_code_sample_search`. Context7'ye gitme. Araçlar yüklü değilse ToolSearch ile yükle.
+   - Üçüncü taraf paketler için konuyu Context7 ile bul, R-kaydına paketin resmî repo ya da doküman URL'sini yaz (Context7'yi değil). Context7 yoksa ya da oturumu açık değilse resmî repoyu WebFetch ile oku.
+   - Paket sürümü, güvenlik açığı ve tedarik zinciri için NuGet MCP'nin okuyan araçları: `get_latest_package_version`, `get_package_context`, `review_supply_chain_security`. Paket değiştiren araçlarını kullanma; sürüm `Directory.Packages.props`'ta değişir.
    - SDK davranışı için SDK'nın kendi dosyalarına ve `dotnet msbuild -pp`/`-getProperty` çıktısına bak (R-040 böyle bulundu).
    - Kaynak bulamazsan bunu açıkça söyle.
    - Konu başka bir fazsa o fazın PLAN bölümünü ve PROGRESS'teki durumunu oku.
@@ -120,10 +121,10 @@ Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'
 
 1. PLAN'daki "Faz doğrulaması" komutlarını çalıştır. Her komutun sonucunu rapora koy (geçti/kaldı ve özet).
 2. `code-review` skill'ini (Skill aracıyla) bu branch'in değişiklikleri üzerinde çalıştır. Bulguları rapora ekle. Kapsam dışı bulguları **düzeltme**, "Sonraya bırakılanlar" listesine yaz. Kapsam içi gerçek hataları düzelt ve yeniden doğrula.
-3. PROGRESS'i güncelle: faz `✅ tamam`, bitiş tarihi, **son devir notu** (yapılanlar, sürprizler, bekleyen sorular, sonraki fazın bilmesi gerekenler). Ardından arşivle (D-076): bir önceki fazın "Adımlar" bölümünü, son üç devir notundan eskilerini ve üstü çizilmiş (kapanmış) "Sonraya bırakılanlar" maddelerini değiştirmeden `PROGRESS-ARSIV.md`'nin ilgili bölümlerine taşı. PROGRESS'te biten fazın adımları kalır.
+3. PROGRESS'i güncelle: faz `✅ tamam`, bitiş tarihi, **son devir notu** (yapılanlar, sürprizler, bekleyen sorular, sonraki fazın bilmesi gerekenler). Ardından arşivle (D-082): bir önceki fazın "Adımlar" bölümünü, son üç devir notundan eskilerini ve üstü çizilmiş (kapanmış) "Sonraya bırakılanlar" maddelerini değiştirmeden `PROGRESS-ARSIV.md`'nin ilgili bölümlerine taşı. PROGRESS'te biten fazın adımları kalır.
 4. Faz bir konvansiyonu değiştirdiyse README, CLAUDE.md dosyaları ve memory'nin güncellendiğini doğrula (Genel kurallar).
 5. Commit: 2–4'teki düzeltmeleri ve PROGRESS güncellemesini (son adımın `[x]` kaydı ve arşiv dahil) doğrulayıp commit'le; çalışma ağacında bir şey kalmasın.
-6. **CodeRabbit CLI, fazda bir kez (D-076):** 5'teki commit'ten sonra, çalışma ağacı temizken faz branch'inin tamamını (PR'a gidecek son hâlini) incelet: `coderabbit review --agent --base main`. İnceleme uzun sürebilir; arka planda çalıştır ve bitmesini bekle, poll etme. Kapsam içi gerçek bulguyu düzelt, build ile testleri (paket değiştiyse restore'u da) yeniden çalıştır ve commit'le (`faz<id>: address the CodeRabbit CLI review`); kapsam dışını §4'e göre "Sonraya bırakılanlar"a yaz; yanlış pozitifi raporda tek cümleyle belirt. CLI kurulu ya da oturum açık değilse (`coderabbit auth status`) ya da rate limit'e takılırsa fazı bekletme: raporda "CLI incelemesi yok: <neden>" de, PR incelemesi yine yakalar.
+6. **CodeRabbit CLI, fazda bir kez (D-082):** 5'teki commit'ten sonra, çalışma ağacı temizken faz branch'inin tamamını (PR'a gidecek son hâlini) incelet: `coderabbit review --agent --base main`. İnceleme uzun sürebilir; arka planda çalıştır ve bitmesini bekle, poll etme. Kapsam içi gerçek bulguyu düzelt, build ile testleri (paket değiştiyse restore'u da) yeniden çalıştır ve commit'le (`faz<id>: address the CodeRabbit CLI review`); kapsam dışını §4'e göre "Sonraya bırakılanlar"a yaz; yanlış pozitifi raporda tek cümleyle belirt. CLI kurulu ya da oturum açık değilse (`coderabbit auth status`) ya da rate limit'e takılırsa fazı bekletme: raporda "CLI incelemesi yok: <neden>" de, PR incelemesi yine yakalar.
 7. **PR ve CodeRabbit (D-067):** çalışma ağacı temizken branch'i push et ve `gh pr create --base main --head faz/<id>-<kısa-ad>` ile PR aç (başlık `faz<id>: <faz adı>`, gövde: son devir notunun özeti). PR'ı açmak bu sürecin parçasıdır, ayrıca sorulmaz; merge sorulur. CodeRabbit kendiliğinden inceler. İncelemeyi bekle (poll etme; PR araçları CI'ı ve yorumları bildirir), sonra her yorumu sınıflandır: kapsam içi gerçek hata → düzelt, doğrula, aynı branch'e commit ve push; kapsam dışı → "Sonraya bırakılanlar"; yanlış pozitif ya da bir D/Y kaydıyla çelişen öneri → yorumu gerekçesi ve kaydın ID'siyle yanıtla. Pre-merge check'lerin uyarılarını da aynı şekilde ele al. Sonucu PROGRESS'e yaz, commit'le ve aynı branch'e push et; merge'ten önce PR'da commit'lenmemiş bir şey kalmasın. CodeRabbit inceleme yapmadıysa (rate limit, kesinti) bunu raporda söyle; merge'ü engellemez (danışman, D-067 (2)).
 8. Aşağıdaki rapor şablonuyla raporla.
 9. **Dur.** Sonraki faza başlama. Merge için kullanıcıya sor. Onay gelince `gh pr merge <no> --merge` (merge commit; squash ya da rebase değil, adım commit'leri korunur), ardından yerel `main`'i `git pull --ff-only` ile güncelle. Kullanıcı sonraki fazı yeni bir oturumda `/novacore-phase <id>` ile başlatacak. "devam" bir sonraki faz için onay **değildir**.

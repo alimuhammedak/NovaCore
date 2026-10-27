@@ -5,61 +5,26 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using MyService.Modules.Todos.Infrastructure;
+using NovaCore.Modules.Payments.Infrastructure;
 
 #nullable disable
 
-namespace MyService.Api.Todos.Migrations
+namespace NovaCore.Api.Payments.Migrations
 {
-    [DbContext(typeof(TodosDbContext))]
-    [Migration("20261020173043_Initial")]
-    partial class Initial
+    [DbContext(typeof(PaymentsDbContext))]
+    [Migration("20261024104712_OutboxTenantAndTrace")]
+    partial class OutboxTenantAndTrace
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("todos")
+                .HasDefaultSchema("payments")
                 .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("MyService.Modules.Todos.Domain.Todo", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<bool>("IsCompleted")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("ModifiedBy")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Title");
-
-                    b.ToTable("items", "todos");
-                });
 
             modelBuilder.Entity("NovaCore.EntityFrameworkCore.Messaging.OutboxConsumer", b =>
                 {
@@ -75,7 +40,7 @@ namespace MyService.Api.Todos.Migrations
 
                     b.HasKey("MessageId", "Handler");
 
-                    b.ToTable("outbox_consumers", "todos");
+                    b.ToTable("outbox_consumers", "payments");
                 });
 
             modelBuilder.Entity("NovaCore.EntityFrameworkCore.Messaging.OutboxMessage", b =>
@@ -106,6 +71,13 @@ namespace MyService.Api.Todos.Migrations
                     b.Property<DateTimeOffset?>("ProcessedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(55)
+                        .HasColumnType("nvarchar(55)");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -118,7 +90,67 @@ namespace MyService.Api.Todos.Migrations
 
                     b.HasIndex("ProcessedOnUtc", "Id");
 
-                    b.ToTable("outbox_messages", "todos");
+                    b.ToTable("outbox_messages", "payments");
+                });
+
+            modelBuilder.Entity("NovaCore.Modules.Payments.Domain.Payment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("OwnerId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("OwnerId", "CreatedAtUtc");
+
+                    b.ToTable("payments", "payments");
                 });
 
             modelBuilder.Entity("NovaCore.EntityFrameworkCore.Messaging.OutboxConsumer", b =>

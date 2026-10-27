@@ -594,6 +594,14 @@
           "OpenIddict.Server.AspNetCore": "[7.7.1, )"
         }
       },
+      "BMD.NovaCore.MultiTenancy": {
+        "type": "Project",
+        "dependencies": {
+          "BMD.NovaCore.AspNetCore": "[0.1.0, )",
+          "BMD.NovaCore.EntityFrameworkCore": "[0.1.0, )",
+          "Microsoft.EntityFrameworkCore.Relational": "[10.0.12, )"
+        }
+      },
       "BMD.NovaCore.OpenTelemetry": {
         "type": "Project",
         "dependencies": {

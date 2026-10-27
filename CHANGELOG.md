@@ -71,9 +71,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `HybridCache.RemovePermissionsAsync(subject)` (`NovaCore.AspNetCore`): drops the permissions cached for a subject, so
   a change takes effect on its next request instead of after `Cache:PermissionExpiration`.
+- Tenant isolation in every module context. An entity that implements `ITenantEntity` (`NovaCore.Abstractions`,
+  `Guid TenantId`) belongs to one tenant, and `AddModuleDbContext` isolates it with nothing for the module to do. A query
+  reads only the rows of the scope's tenant (`TenantContext`, scoped), and none without one, not even rows whose tenant is
+  the empty Guid (what a migration that adds the column gives existing rows): a named query filter,
+  `TenantQueryFilter.Name`. A new row gets the scope's tenant. A save fails when it would add, change or delete another
+  tenant's row, move a row to another tenant or write a tenant row without a tenant. `TenantId` is a concurrency token
+  (no schema change), so an `UPDATE` or `DELETE` finds the row in its tenant only: a detached copy that names another
+  tenant's row by its key and claims the scope's tenant changes nothing (`DbUpdateConcurrencyException`). `IgnoreQueryFilters()` without names
+  fails on a context with tenant entities, so another filter is turned off by its name and the tenant filter stays on; a
+  read across tenants turns it off by its name, explicitly. Work outside a request gives its scope a tenant with
+  `TenantContext.Use(tenantId)`; a scope works in one tenant. A context without tenant entities is unaffected.
+- `BMD.NovaCore.MultiTenancy`, an optional add-on: the tenants and their members, and which tenant a request works in.
+  `builder.AddCoreMultiTenancy()` reads the tenant from the `tenant` route value (`/api/v1/tenants/{tenant}/...`; an
+  overload reads it from anywhere else, such as a header), and the request works in it only when the caller (`sub`) is a
+  member of it and it is active, decided on the server for every request and cached with the caller's permissions.
+  Otherwise the request has no tenant: its tenant entities stay out of reach and `RequireTenant()` (an endpoint
+  convention in `NovaCore.AspNetCore`) answers 403, the same for a tenant that doesn't exist. `TenantDirectory` opens
+  tenants, adds members and suspends a tenant, which takes effect on this server's next request. The store is
+  `MultiTenancyDbContext` (schema `tenancy`): the host registers it with `AddModuleDbContext` and keeps its migrations.
+- `ITenantResolver` (`NovaCore.AspNetCore`): the core asks it which tenant a request names and whether the caller may
+  work in it, while it resolves the caller's permissions; the add-on implements it. The cached permissions are kept
+  per tenant too, and `HybridCache.RemoveTenantPermissionsAsync(tenantId)` drops a tenant's.
+- Multi-tenancy add-on: a member holds roles in a tenant, and in a request that works in that tenant the permissions
+  their roles grant there, on top of the identity provider's. The roles are the product's: `MultiTenancy:Roles:<role>`
+  lists the permissions a role grants, and the host doesn't start when one is a permission no module declares; there is
+  no built-in role. `TenantDirectory.AddMemberAsync` takes roles of that list (`tenant.unknown_role` otherwise),
+  `RemoveMemberAsync` ends a membership, and `TenantsOfAsync` lists a subject's active tenants with their roles there,
+  for a tenant picker. A change takes effect on the member's next request on this server.
+- Outbox: a message keeps the tenant of the scope that saved it and the W3C trace context of the activity it was saved
+  in (a request's, say). Its handlers run in that tenant (`TenantContext`), or in none when it was saved without one, and
+  in a consumer span of their own, `process <event type>`, a child of the saving activity and linked to it.
+  `AddCoreObservability` collects those spans (source `NovaCore.EntityFrameworkCore`). **Upgrade:** a module context with
+  an outbox needs a migration for the two new nullable columns of `outbox_messages` (`TenantId`, `TraceParent`).
+- Multi-tenancy add-on: the tenant life cycle. `TenantDirectory.CloseAsync` offboards a tenant (`TenantStatus.Closed`):
+  its members lose access as with a suspension, its data is kept, and `ActivateAsync` reopens it, as it does a suspended
+  one; a closed tenant can't be suspended (`tenant.closed`). `DeleteAsync` deletes a closed tenant (`tenant.not_closed`
+  otherwise): its rows in every module context, the outbox messages its scopes saved, its memberships and the tenant.
+  `ClosedBeforeAsync(cutoff)` lists the tenants closed before a time, for the product's own retention: NovaCore
+  schedules no deletion. The add-on now references `NovaCore.EntityFrameworkCore`. `DeleteAsync` first claims the tenant
+  with one conditional update (`TenantStatus.Deleting`), and every status change is conditional, so a reopening that
+  races a deletion is either first (the deletion is refused) or refused (`tenant.deleting`); a deletion that failed half
+  way leaves the tenant deleting, `ClosedBeforeAsync` lists it, and repeating the deletion finishes it.
+- `TenantData` (`NovaCore.EntityFrameworkCore`): deletes a tenant's rows from every module context, a transaction per
+  context, a dependent before its principal, and the tenant's outbox messages. A tenant entity EF Core can't bulk delete
+  (TPT) fails the deletion with EF Core's own exception. The module's own query filters are off for the deletion (a row
+  they hide, an archived one say, is the tenant's too); the tenant filter stays on.
+- Template: `dotnet new novacore --multitenancy` (off by default) adds the multi-tenancy add-on to the generated host
+  (`AddCoreMultiTenancy`, the tenant store's context and migrations, example `Editor` and `Viewer` roles in
+  `MultiTenancy:Roles`) and makes the Todos module's todos tenant entities under `/api/v1/tenants/{tenant}/todos`
+  (`RequireTenant()`, an index on the tenant and title). Its tests open tenants and members through `TenantDirectory`
+  and show that another tenant's todos are out of reach. The template's Todos migrations carry the outbox's tenant and
+  trace columns too; the smoke test builds all eight `--auth` × `--db` × `--multitenancy` projects.
+- README: a multi-tenancy guide (tenant resolution, memberships and roles, isolation, work outside a request and reads
+  across tenants, the outbox, the life cycle and deletion) and a row-level security example for SQL Server and
+  PostgreSQL, a host's own backstop in the database (a connection interceptor that writes the scope's tenant to the
+  session, and the policy in the host's migrations). Row-level security stays out of the packages.
 
 ### Changed
 
+- `NovaCore.AspNetCore`: the core asks every registered `IPermissionResolver`, and the caller holds what any of them
+  grants; before, the last registration answered alone. **Upgrade:** a host that registered its own resolver to replace
+  the identity provider's now gets both; remove the registration it doesn't want.
 - Template: the generated CI workflow pins its actions to commit SHAs, narrows its permissions and doesn't persist the
   checkout token. A `.github/dependabot.yml` keeps the pins up to date.
 - Tests run on Microsoft.Testing.Platform with xUnit v3 4.0.2 (`global.json` `test.runner`); `Microsoft.NET.Test.Sdk`
@@ -145,6 +204,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   project: the provider package, `AddModuleDatabase` in `Program.cs`, the design-time database, the connection string,
   the migrations of each context and, for PostgreSQL, the license gate's named exception. The test project replaces the
   host's database with SQLite through `AddModuleDatabase`, whichever was chosen.
+- **Breaking:** `AuditableEntityInterceptor` stamps `CreatedBy`/`ModifiedBy` with the caller's subject
+  (`ICurrentUser.UserId`, the token's `sub`) instead of the user name, which the identity provider sets to the email
+  address: a subject never changes, and it is a pseudonymous id rather than a name that identifies the person directly.
+  Without a caller it is still `system`. Rows saved before keep the user name they were stamped with.
+- The host doesn't start when an `IClaimsTransformation` other than NovaCore's is registered. ASP.NET Core runs only one:
+  a project's registered after `AddCoreWeb` switched permission resolution off without an error (every protected
+  endpoint 403, the token's own `permission` claims kept), one registered before it never ran. **Upgrade:** move what
+  the transformation adds into an `IPermissionResolver`.
 
 ### Removed
 

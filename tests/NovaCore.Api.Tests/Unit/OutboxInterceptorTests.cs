@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Abstractions.Entities;
 using NovaCore.Abstractions.Messaging;
+using NovaCore.Abstractions.MultiTenancy;
 using NovaCore.EntityFrameworkCore.Messaging;
 using NovaCore.EntityFrameworkCore.Persistence;
 using Xunit;
@@ -13,7 +15,8 @@ namespace NovaCore.Api.Tests.Unit;
 /// <summary>
 /// PLAN F4a.1: the events an entity raises are written to its module's <c>outbox_messages</c> table by the SaveChanges
 /// that saves the entity, so both are committed or neither is. Module contexts get the interceptor from
-/// <c>AddModuleDbContext</c>.
+/// <c>AddModuleDbContext</c>. PLAN F7b.5: a message keeps the tenant of the scope that saved it and the trace context of
+/// the activity it was saved in, for its handlers.
 /// </summary>
 public sealed class OutboxInterceptorTests : IDisposable
 {
@@ -39,6 +42,45 @@ public sealed class OutboxInterceptorTests : IDisposable
         Assert.Equal(placed.OccurredOnUtc, message.OccurredOnUtc);
         Assert.Equal(typeof(OrderPlaced), Type.GetType(message.Type));
         Assert.Equal(placed, JsonSerializer.Deserialize<OrderPlaced>(message.Content));
+    }
+
+    [Fact]
+    public async Task A_message_keeps_the_saving_scopes_tenant_and_the_saving_activitys_trace_context()
+    {
+        await using var services = await CreateServicesAsync<ShopDbContext>();
+        var tenant = Guid.NewGuid();
+        using var request = new Activity("request");
+        request.SetIdFormat(ActivityIdFormat.W3C).Start();
+
+        await SaveAsync<ShopDbContext>(services, new Order(Guid.CreateVersion7(), Guid.CreateVersion7()), tenant);
+
+        var message = Assert.Single(await OutboxAsync(services));
+        Assert.Equal(tenant, message.TenantId);
+        Assert.Equal(request.Id, message.TraceParent);
+    }
+
+    [Fact]
+    public async Task A_message_saved_without_a_tenant_or_an_activity_keeps_neither()
+    {
+        await using var services = await CreateServicesAsync<ShopDbContext>();
+
+        await SaveAsync<ShopDbContext>(services, new Order(Guid.CreateVersion7(), Guid.CreateVersion7()));
+
+        var message = Assert.Single(await OutboxAsync(services));
+        Assert.Null(message.TenantId);
+        Assert.Null(message.TraceParent);
+    }
+
+    [Fact]
+    public async Task A_message_keeps_no_trace_context_of_an_activity_that_isnt_w3c()
+    {
+        await using var services = await CreateServicesAsync<ShopDbContext>();
+        using var request = new Activity("request");
+        request.SetIdFormat(ActivityIdFormat.Hierarchical).Start();
+
+        await SaveAsync<ShopDbContext>(services, new Order(Guid.CreateVersion7(), Guid.CreateVersion7()));
+
+        Assert.Null(Assert.Single(await OutboxAsync(services)).TraceParent);
     }
 
     // The two tests below fail one insert of a save each: whichever insert runs first, the other is rolled back with it.
@@ -112,10 +154,13 @@ public sealed class OutboxInterceptorTests : IDisposable
         return services;
     }
 
-    private static async Task SaveAsync<TContext>(IServiceProvider services, Order order)
+    private static async Task SaveAsync<TContext>(IServiceProvider services, Order order, Guid? tenant = null)
         where TContext : DbContext
     {
         await using var scope = services.CreateAsyncScope();
+        if (tenant is { } id)
+            scope.ServiceProvider.GetRequiredService<TenantContext>().Use(id);
+
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
         context.Add(order);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -133,13 +178,15 @@ public sealed class OutboxInterceptorTests : IDisposable
     {
         await using var scope = services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<ShopDbContext>().Database
-            .SqlQueryRaw<OutboxRow>("SELECT EventId, Type, Content, OccurredOnUtc FROM outbox_messages ORDER BY Id")
+            .SqlQueryRaw<OutboxRow>(
+                "SELECT EventId, Type, Content, OccurredOnUtc, TenantId, TraceParent FROM outbox_messages ORDER BY Id")
             .ToListAsync(TestContext.Current.CancellationToken);
     }
 
     private sealed record OrderPlaced(Guid OrderId) : DomainEvent;
 
-    private sealed record OutboxRow(Guid EventId, string Type, string Content, DateTimeOffset OccurredOnUtc);
+    private sealed record OutboxRow(
+        Guid EventId, string Type, string Content, DateTimeOffset OccurredOnUtc, Guid? TenantId, string? TraceParent);
 
     private sealed class Order : Entity<Guid>
     {

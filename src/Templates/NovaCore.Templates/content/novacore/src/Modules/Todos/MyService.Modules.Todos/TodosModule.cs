@@ -14,7 +14,11 @@ namespace MyService.Modules.Todos;
 
 /// <summary>
 /// The Todos module, added by the host with <c>builder.AddModule&lt;TodosModule&gt;()</c>: registers its DbContext,
+#if (multitenancy)
+/// permissions and request validation, and maps its endpoints under <c>/api/v1/tenants/{tenant}/todos</c>.
+#else
 /// permissions and request validation, and maps its endpoints under <c>/api/v1/todos</c>.
+#endif
 /// </summary>
 public sealed class TodosModule : IModule
 {
@@ -39,9 +43,18 @@ public sealed class TodosModule : IModule
 
     public IEndpointRouteBuilder MapEndpoints(IEndpointRouteBuilder endpoints)
     {
+#if (multitenancy)
+        // A tenant's todos. The request names the tenant and works in it only when the caller is a member of it and it is
+        // active (RequireTenant answers 403 otherwise); the context then reads and writes that tenant's todos only.
+        var group = endpoints
+            .MapGroup("/api/v1/tenants/{tenant:guid}/todos")
+            .RequireTenant()
+            .WithTags("Todos");
+#else
         var group = endpoints
             .MapGroup("/api/v1/todos")
             .WithTags("Todos");
+#endif
 
         CreateTodo.Map(group);
         GetTodos.Map(group);

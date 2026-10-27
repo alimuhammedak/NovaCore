@@ -70,12 +70,12 @@ jobs:
       - name: Architecture tests
         run: dotnet test --project tests/NovaCore.Api.Tests -c Release --no-build -- --filter-namespace NovaCore.Api.Tests.Architecture
 
-      # Each module owns a DbContext, and the host owns the identity provider's; the host keeps every context's SQL Server
-      # migrations (docs/plan/DECISIONS.md D-073). A model change without a migration fails here.
+      # Each module owns a DbContext, and the host owns the identity provider's and the tenancy store's; it keeps every
+      # context's SQL Server migrations (docs/plan/DECISIONS.md D-073). A model change without a migration fails here.
       - name: EF Core model matches migrations
         run: |
           dotnet tool restore
-          for context in CatalogDbContext PaymentsDbContext IdentityServerDbContext; do
+          for context in CatalogDbContext PaymentsDbContext IdentityServerDbContext MultiTenancyDbContext; do
             dotnet ef migrations has-pending-model-changes \
               --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context "$context" \
               --configuration Release --no-build

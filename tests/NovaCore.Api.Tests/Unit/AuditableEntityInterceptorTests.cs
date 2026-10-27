@@ -19,7 +19,7 @@ public class AuditableEntityInterceptorTests
 
         var options = new DbContextOptionsBuilder<AuditDbContext>()
             .UseSqlite(connection)
-            .AddInterceptors(new AuditableEntityInterceptor(new NamedUser("alice"), clock))
+            .AddInterceptors(new AuditableEntityInterceptor(new SignedInUser("alice-subject", "alice@example.com"), clock))
             .Options;
         await using var context = new AuditDbContext(options);
         await context.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
@@ -35,7 +35,31 @@ public class AuditableEntityInterceptorTests
 
         Assert.Equal(created, item.CreatedAtUtc);
         Assert.Equal(clock.GetUtcNow(), item.ModifiedAtUtc);
-        Assert.Equal("alice", item.ModifiedBy);
+    }
+
+    [Fact]
+    public async Task Audit_stamps_name_the_caller_by_their_subject_not_their_user_name()
+    {
+        // The subject never changes and isn't personal data; the identity provider's user name is the email address
+        // (DECISIONS D-054 (11), PLAN F7b.7).
+        using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+
+        var options = new DbContextOptionsBuilder<AuditDbContext>()
+            .UseSqlite(connection)
+            .AddInterceptors(new AuditableEntityInterceptor(new SignedInUser("alice-subject", "alice@example.com"), TimeProvider.System))
+            .Options;
+        await using var context = new AuditDbContext(options);
+        await context.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+
+        var item = new AuditedItem(Guid.NewGuid()) { Name = "first" };
+        context.Items.Add(item);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        item.Name = "second";
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("alice-subject", item.CreatedBy);
+        Assert.Equal("alice-subject", item.ModifiedBy);
     }
 
     private sealed class AuditDbContext(DbContextOptions<AuditDbContext> options) : DbContext(options)
@@ -48,11 +72,11 @@ public class AuditableEntityInterceptorTests
         public string Name { get; set; } = string.Empty;
     }
 
-    private sealed class NamedUser(string name) : ICurrentUser
+    private sealed class SignedInUser(string subject, string userName) : ICurrentUser
     {
         public bool IsAuthenticated => true;
-        public string? UserId => name;
-        public string? UserName => name;
+        public string? UserId => subject;
+        public string? UserName => userName;
         public string? Email => null;
         public IReadOnlyCollection<string> Roles => [];
         public IReadOnlyCollection<string> Permissions => [];

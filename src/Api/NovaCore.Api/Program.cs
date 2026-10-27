@@ -6,6 +6,7 @@ using NovaCore.EntityFrameworkCore.Persistence;
 using NovaCore.Identity.OpenIddict;
 using NovaCore.Modules.Catalog;
 using NovaCore.Modules.Payments;
+using NovaCore.MultiTenancy;
 using NovaCore.OpenTelemetry;
 using NovaCore.Scalar;
 using NovaCore.Serilog;
@@ -34,6 +35,11 @@ builder.Services.AddModuleDatabase((services, db) => db.UseSqlServer(
 builder.AddCoreIdentityServer();
 builder.Services.AddModuleDbContext<IdentityServerDbContext>(IdentityServerDbContext.Schema,
     (services, db) => db.AddInterceptors(services.GetRequiredService<AuditableEntityInterceptor>()));
+
+// Multi-tenancy (add-on): a request under /api/v1/tenants/{tenant} works in that tenant only when the caller is a member
+// of it and it is active. Its store is a context of this host's database. No module here has tenant entities.
+builder.AddCoreMultiTenancy();
+builder.Services.AddModuleDbContext<MultiTenancyDbContext>(MultiTenancyDbContext.Schema, (_, _) => { });
 
 // Modules, after AddCorePersistence so migrations start before module hosted services. Endpoints map in this order.
 builder.AddModule<CatalogModule>();

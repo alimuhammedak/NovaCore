@@ -1341,6 +1341,14 @@
           "OpenIddict.Server.AspNetCore": "[7.7.1, )"
         }
       },
+      "BMD.NovaCore.MultiTenancy": {
+        "type": "Project",
+        "dependencies": {
+          "BMD.NovaCore.AspNetCore": "[0.1.0, )",
+          "BMD.NovaCore.EntityFrameworkCore": "[0.1.0, )",
+          "Microsoft.EntityFrameworkCore.Relational": "[10.0.12, )"
+        }
+      },
       "BMD.NovaCore.OpenTelemetry": {
         "type": "Project",
         "dependencies": {
@@ -1371,6 +1379,7 @@
           "BMD.NovaCore.AspNetCore": "[0.1.0, )",
           "BMD.NovaCore.EntityFrameworkCore": "[0.1.0, )",
           "BMD.NovaCore.Identity.OpenIddict": "[0.1.0, )",
+          "BMD.NovaCore.MultiTenancy": "[0.1.0, )",
           "BMD.NovaCore.OpenTelemetry": "[0.1.0, )",
           "BMD.NovaCore.Scalar": "[0.1.0, )",
           "BMD.NovaCore.Serilog": "[0.1.0, )",

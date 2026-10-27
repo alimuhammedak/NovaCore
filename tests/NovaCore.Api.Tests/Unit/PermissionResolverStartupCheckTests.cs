@@ -38,6 +38,8 @@ public class PermissionResolverStartupCheckTests
         {
             EnvironmentName = Environments.Production
         });
+        // The cache the core's claims transformation needs, which the startup checks build.
+        builder.Services.AddHybridCache();
         builder.Services.AddCoreAuthorization();
         if (registerResolver)
             builder.Services.AddSingleton<IPermissionResolver, NoPermissions>();

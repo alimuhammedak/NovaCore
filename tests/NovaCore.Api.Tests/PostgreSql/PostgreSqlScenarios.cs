@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using NovaCore.Api.Tests.Databases;
 using NovaCore.Api.Tests.IdentityServer;
 using NovaCore.Modules.Catalog.Authorization;
@@ -34,3 +35,15 @@ public sealed class PostgreSqlQueryTests(PostgreSqlApiFactory factory) : QuerySc
 [Collection(IdentityServerTestGroup.Name)]
 public sealed class PostgreSqlSignInTests(PostgreSqlAuthorityApiFactory factory)
     : SignInScenarios<PostgreSqlAuthorityApiFactory>(factory);
+
+/// <summary>Tenant isolation on PostgreSQL (<see cref="TenancyScenarios{TFixture}"/>).</summary>
+public sealed class PostgreSqlTenancyTests(PostgreSqlTenancyFixture fixture) : TenancyScenarios<PostgreSqlTenancyFixture>(fixture);
+
+/// <summary>The tenancy host on a database of its own on the PostgreSQL test server.</summary>
+public sealed class PostgreSqlTenancyFixture : TenancyFixture
+{
+    private protected override Task<TestDatabase> CreateDatabaseAsync() => TestPostgreSql.CreateDatabaseAsync();
+
+    protected override void UseDatabase(DbContextOptionsBuilder options, string connectionString) =>
+        options.UseNpgsql(connectionString);
+}

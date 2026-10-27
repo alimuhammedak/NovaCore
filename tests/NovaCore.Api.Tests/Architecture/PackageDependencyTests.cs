@@ -7,7 +7,7 @@ namespace NovaCore.Api.Tests.Architecture;
 /// <summary>
 /// DECISIONS Y-05 / D-003 and the package map in ANALYSIS §4. The core packages depend on Microsoft packages and the
 /// BCL only; third-party packages live in optional add-ons. Dependencies point one way: Abstractions ← AspNetCore,
-/// Abstractions ← EntityFrameworkCore, add-ons → AspNetCore. The core never depends on an add-on, a module or a
+/// Abstractions ← EntityFrameworkCore, add-ons → the core packages. The core never depends on an add-on, a module or a
 /// project outside that map.
 /// </summary>
 public class PackageDependencyTests
@@ -71,16 +71,18 @@ public class PackageDependencyTests
     }
 
     [Fact]
-    public void Add_ons_reference_no_first_party_project_but_AspNetCore_and_Abstractions()
+    public void Add_ons_reference_no_first_party_project_but_the_core_packages()
     {
         // Every packable building block outside the core is an add-on, so a new one is covered without editing this test.
+        // An add-on may build on any core package (the multi-tenancy add-on deletes a tenant's rows through
+        // EntityFrameworkCore, D-076 (2)), never on another add-on.
         var addOns = BuildingBlocks().Where(project => project.IsPackable && !CorePackages.Contains(project.Name)).ToList();
         Assert.NotEmpty(addOns);
 
         var violations =
             from addOn in addOns
             from reference in addOn.ProjectReferences
-            where reference is not (AspNetCore or Abstractions)
+            where !CorePackages.Contains(reference)
             select $"{addOn.Name} -> {reference}";
 
         Assert.Empty(violations);

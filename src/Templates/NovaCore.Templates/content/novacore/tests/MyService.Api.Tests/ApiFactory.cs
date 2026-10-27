@@ -17,6 +17,9 @@ using NovaCore.EntityFrameworkCore.Persistence;
 #if (BuiltInAuth)
 using NovaCore.Identity.OpenIddict;
 #endif
+#if (multitenancy)
+using NovaCore.MultiTenancy;
+#endif
 
 namespace MyService.Api.Tests;
 
@@ -25,6 +28,10 @@ namespace MyService.Api.Tests;
 /// in-memory OpenID Connect issuer (<see cref="IdentityProvider"/>), and every DbContext runs on its own in-memory SQLite
 /// database, so the tests need no database server and no network. Permissions are resolved on the server, never read from the
 /// token: <see cref="CreateClientWithPermissions"/> grants them to a fresh subject.
+#if (multitenancy)
+/// A tenant's endpoints also need the caller to be a member of that tenant: <see cref="CreateMemberClientAsync"/> makes a
+/// fresh subject a member, whose role there grants the permissions.
+#endif
 /// </summary>
 public class ApiFactory : WebApplicationFactory<Program>
 {
@@ -34,6 +41,9 @@ public class ApiFactory : WebApplicationFactory<Program>
     private readonly SqliteConnection _todosDatabase = OpenSharedInMemoryDatabase();
 #if (BuiltInAuth)
     private readonly SqliteConnection _identityDatabase = OpenSharedInMemoryDatabase();
+#endif
+#if (multitenancy)
+    private readonly SqliteConnection _tenancyDatabase = OpenSharedInMemoryDatabase();
 #endif
 
     private readonly ConcurrentDictionary<string, string[]> _grants = new();
@@ -50,6 +60,12 @@ public class ApiFactory : WebApplicationFactory<Program>
         using var identity = new IdentityServerDbContext(new DbContextOptionsBuilder<IdentityServerDbContext>()
             .UseSqlite(_identityDatabase).ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>().Options);
         identity.Database.EnsureCreated();
+#endif
+#if (multitenancy)
+
+        using var tenancy = new MultiTenancyDbContext(new DbContextOptionsBuilder<MultiTenancyDbContext>()
+            .UseSqlite(_tenancyDatabase).ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>().Options);
+        tenancy.Database.EnsureCreated();
 #endif
     }
 
@@ -75,6 +91,36 @@ public class ApiFactory : WebApplicationFactory<Program>
         _grants[subject] = permissions;
         return CreateClientWithClaims(new Claim(NovaClaims.Subject, subject));
     }
+#if (multitenancy)
+
+    /// <summary>Opens a tenant through the host's <see cref="TenantDirectory"/>.</summary>
+    public async Task<Guid> CreateTenantAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<TenantDirectory>().CreateAsync("Tenant", cancellationToken);
+    }
+
+    /// <summary>
+    /// A client for a fresh subject that is a member of each of <paramref name="tenants"/> with <paramref name="role"/>, a
+    /// role of MultiTenancy:Roles (appsettings.json): what the role grants is all the subject holds, in those tenants only.
+    /// </summary>
+    public async Task<HttpClient> CreateMemberClientAsync(string role, IEnumerable<Guid> tenants, CancellationToken cancellationToken)
+    {
+        var subject = Guid.NewGuid().ToString();
+        await using (var scope = Services.CreateAsyncScope())
+        {
+            var directory = scope.ServiceProvider.GetRequiredService<TenantDirectory>();
+            foreach (var tenant in tenants)
+            {
+                var added = await directory.AddMemberAsync(tenant, subject, [role], cancellationToken);
+                if (added.IsFailure)
+                    throw new InvalidOperationException(added.Error.Message);
+            }
+        }
+
+        return CreateClientWithClaims(new Claim(NovaClaims.Subject, subject));
+    }
+#endif
 
     // Captive dependencies and scoped services resolved from the root fail the host build in every environment.
     protected override IHost CreateHost(IHostBuilder builder)
@@ -110,24 +156,18 @@ public class ApiFactory : WebApplicationFactory<Program>
             services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
                 options => options.BackchannelHttpHandler = IdentityProvider.Handler);
 
-#if (BuiltInAuth)
-            // The test issuer's subjects hold what CreateClientWithPermissions granted; the identity provider's own
-            // tokens go to the host's resolver, which reads its store.
-            var hostResolver = services.Single(d => d.ServiceType == typeof(IPermissionResolver));
-            services.Remove(hostResolver);
-            services.AddScoped<IPermissionResolver>(provider => new GrantingPermissionResolver(
-                _grants, (IPermissionResolver)ActivatorUtilities.CreateInstance(provider, hostResolver.ImplementationType!)));
-#else
-            // The test issuer's subjects hold what CreateClientWithPermissions granted. Registered last, this resolver is
-            // the one the host uses, also once the project registers its own.
-            services.AddScoped<IPermissionResolver>(_ => new GrantingPermissionResolver(_grants, fallback: null));
-#endif
+            // The core asks every IPermissionResolver: the test issuer's subjects also hold what CreateClientWithPermissions
+            // granted. The host's resolvers answer every token, the identity provider's from its store.
+            services.AddScoped<IPermissionResolver>(_ => new GrantingPermissionResolver(_grants));
 
             // Every module context on its own SQLite database, in place of the host's: a later AddModuleDatabase replaces
             // the earlier one, so the host's provider is never configured and the contexts have one provider each.
             services.AddModuleDatabase((_, options) => UseSqlite(options,
 #if (BuiltInAuth)
                 options.Options.ContextType == typeof(IdentityServerDbContext) ? _identityDatabase.ConnectionString :
+#endif
+#if (multitenancy)
+                options.Options.ContextType == typeof(MultiTenancyDbContext) ? _tenancyDatabase.ConnectionString :
 #endif
                 _todosDatabase.ConnectionString));
         });
@@ -145,6 +185,9 @@ public class ApiFactory : WebApplicationFactory<Program>
 #if (BuiltInAuth)
             _identityDatabase.Dispose();
 #endif
+#if (multitenancy)
+            _tenancyDatabase.Dispose();
+#endif
             IdentityProvider.Dispose();
         }
 
@@ -159,17 +202,14 @@ public class ApiFactory : WebApplicationFactory<Program>
         return connection;
     }
 
-    private sealed class GrantingPermissionResolver(
-        IReadOnlyDictionary<string, string[]> grants, IPermissionResolver? fallback) : IPermissionResolver
+    private sealed class GrantingPermissionResolver(IReadOnlyDictionary<string, string[]> grants) : IPermissionResolver
     {
         // By subject, not by issuer: the host's own provider (BuiltIn) issues its tokens as Jwt:Authority, which here is the
         // test issuer too, so only a subject CreateClientWithPermissions made is answered from the grants.
-        public Task<IReadOnlyCollection<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken cancellationToken)
-        {
-            if (user.FindFirstValue(NovaClaims.Subject) is { } subject && grants.TryGetValue(subject, out var granted))
-                return Task.FromResult<IReadOnlyCollection<string>>(granted);
-
-            return fallback?.GetPermissionsAsync(user, cancellationToken) ?? Task.FromResult<IReadOnlyCollection<string>>([]);
-        }
+        public Task<IReadOnlyCollection<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyCollection<string>>(
+                user.FindFirstValue(NovaClaims.Subject) is { } subject && grants.TryGetValue(subject, out var granted)
+                    ? granted
+                    : []);
     }
 }

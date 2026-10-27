@@ -18,6 +18,9 @@
 <!--#if (BuiltInAuth) -->
     <PackageVersion Include="BMD.NovaCore.Identity.OpenIddict" Version="$(NovaCoreVersion)" />
 <!--#endif -->
+<!--#if (multitenancy) -->
+    <PackageVersion Include="BMD.NovaCore.MultiTenancy" Version="$(NovaCoreVersion)" />
+<!--#endif -->
   </ItemGroup>
 
   <ItemGroup>

@@ -59,12 +59,11 @@ public sealed class StockRaceApiFactory : FakeClockApiFactory
     /// </summary>
     public void ChangeStockBeforeNextSave(Guid productId, int stock) => _competingWrite.Arm(productId, stock);
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    protected override void UseDatabase(DbContextOptionsBuilder options)
     {
-        base.ConfigureWebHost(builder);
-
-        builder.ConfigureServices(services => ReplaceWithSqlite<CatalogDbContext>(services,
-            options => options.UseSqlite(CatalogConnectionString).AddInterceptors(_competingWrite)));
+        base.UseDatabase(options);
+        if (options.Options.ContextType == typeof(CatalogDbContext))
+            options.AddInterceptors(_competingWrite);
     }
 
     // Runs before the save sends its commands, so the other writer's change lands after the read and before the write.

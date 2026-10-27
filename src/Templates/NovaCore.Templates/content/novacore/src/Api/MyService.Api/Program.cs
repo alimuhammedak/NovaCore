@@ -8,6 +8,9 @@ using NovaCore.EntityFrameworkCore.Persistence;
 #if (BuiltInAuth)
 using NovaCore.Identity.OpenIddict;
 #endif
+#if (multitenancy)
+using NovaCore.MultiTenancy;
+#endif
 using NovaCore.OpenTelemetry;
 using NovaCore.Scalar;
 #if (BuiltInAuth)
@@ -40,9 +43,25 @@ builder.AddCoreIdentityServer();
 builder.Services.AddModuleDbContext<IdentityServerDbContext>(IdentityServerDbContext.Schema,
     (services, db) => db.AddInterceptors(services.GetRequiredService<AuditableEntityInterceptor>()));
 #else
+#if (multitenancy)
+// The tokens come from an external OpenID Connect provider (Jwt:Authority). Permissions are resolved on the server, never
+// read from the token: a tenant's roles grant the permissions in that tenant (below); for anything else register the
+// IPermissionResolver that answers it for that provider's users, e.g.
+// builder.Services.AddScoped<IPermissionResolver, YourPermissionResolver>(). The core asks every resolver.
+#else
 // The tokens come from an external OpenID Connect provider (Jwt:Authority). Permissions are resolved on the server, never
 // read from the token: register the IPermissionResolver that answers them for that provider's users, e.g.
 // builder.Services.AddScoped<IPermissionResolver, YourPermissionResolver>(). The host doesn't start without one.
+#endif
+#endif
+#if (multitenancy)
+
+// Multi-tenancy: a request under /api/v1/tenants/{tenant} works in that tenant only when the caller is a member of it and
+// it is active; the member's roles there (MultiTenancy:Roles) grant its permissions. TenantDirectory opens tenants, adds
+// members and closes, reopens or deletes a tenant. The tenants and their members are a context of the database above,
+// with its migrations in MultiTenancy/Migrations.
+builder.AddCoreMultiTenancy();
+builder.Services.AddModuleDbContext<MultiTenancyDbContext>(MultiTenancyDbContext.Schema, (_, _) => { });
 #endif
 
 // Modules, after AddCorePersistence. Their endpoints map in this order.
