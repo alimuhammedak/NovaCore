@@ -25,7 +25,7 @@
 | 6c | ✅ tamam | `faz/6c-test-altyapisi` | 2026-10-22 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `64b3ab6`; push 2026-10-23, kullanıcı isteği) |
 | 6d | ✅ tamam | `faz/6d-analizor-sikilastirma` | 2026-10-23 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `231b05f`; push 2026-10-23, kullanıcı isteği) |
 | 7a | ✅ tamam | `faz/7a-veritabani-ozgurlugu` | 2026-10-23 | 2026-10-24 | 2026-10-24 (kullanıcı onayı, PR #11 merge commit'i `cf895d8`) |
-| 7b | ✅ tamam | `faz/7b-cok-kiracililik` | 2026-10-24 | 2026-10-25 | |
+| 7b | ✅ tamam | `faz/7b-cok-kiracililik` | 2026-10-24 | 2026-10-25 | 2026-10-27 (kullanıcı onayı, PR #13 merge commit'i `dba8318`) |
 | 6e | ⏳ başlamadı | | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
@@ -259,7 +259,7 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 
 > Her oturumun sonunda (faz bitmese bile) en üste yeni bir not eklenir; öncekilerin üzerine yazılmaz, son üç notu aşanlar faz sonunda arşive taşınır (D-082). Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
 
-**2026-10-25, faz sonu, Faz 7b: Çok kiracılılık (✅ tamam, PR ve merge onayı bekliyor).** Branch `faz/7b-cok-kiracililik`; bu oturum faz sonunu yaptı (skill §5).
+**2026-10-25, faz sonu, Faz 7b: Çok kiracılılık (✅ tamam, PR #13 ile `main`'e merge edildi).** Kullanıcı onayı (2026-10-27): "PR #13'ü merge commit ile merge et ve yerel main'i güncelle"; merge `dba8318` (`gh pr merge 13 --merge`), yerel `main` `--ff-only` ile güncellendi. Merge anında `87ebf25`'te bütün kontroller yeşil, çözülmemiş inceleme yorumu yok. Branch `faz/7b-cok-kiracililik`; bu oturum faz sonunu yaptı (skill §5).
 
 - **Yapılanlar (faz):** isteğe bağlı `NovaCore.MultiTenancy` eklentisi (kurum ve üyelik store'u, roller, `TenantDirectory` ile yaşam döngüsü ve silme); çekirdekte `TenantContext`/`ITenantEntity`, her modül context'ine otomatik adlı kurum filtresi, yazma ve sorgu korumaları, `TenantData`, kurum bölümlü izin önbelleği ve bütün resolver'ların birleşimi, `RequireTenant()`, tek `IClaimsTransformation` koruması, `sub` audit damgası; outbox'ta kurum ve trace; şablonda `--multitenancy`; README rehberi ve RLS örneği. Kararlar D-076…D-087, araştırmalar R-129…R-134.
 - **Faz sonu:** coverage kapısı ilk koşuda kırmızıydı (dal %82,6, baseline 82,9); yeni kodun kapsanmamış yolları için test eklendi, %83,2. Code review'un iki bulgusu düzeltildi; silme/yeniden açma yarışı CodeRabbit CLI'la birlikte düzeltildi (D-086), CLI'ın diğer iki bulgusu da; PR #13'te Greptile ve CodeRabbit'in üç bulgusu düzeltildi (D-087). Üçü Sonraya bırakılanlar'da (outbox ile kurum silme arasındaki pencere, rastgele kurum Guid'leriyle önbellek büyütme, `Subject` collation'ı). Doğrulamanın tamamı ve sonuçları Faz 7b'nin "Faz sonu" satırında.
