@@ -49,7 +49,9 @@ completed phases update this file.
   SHA, and a written value that looks like a secret trigger a user approval prompt.
   `DECISIONS.md` prompts even for a new entry; policy-wise new entries are pre-approved (D-016), so batch them
   into one edit per phase step. Banned packages are denied, and the Stop hook blocks finishing while build/tests
-  are red. Don't try to route around them. The auto-mode classifier also blocks the model from editing hooks.
+  are red; it runs only when the session changed a file the build reads, judged from git against the state a
+  SessionStart hook records (D-088). Don't try to route around them. The auto-mode classifier also blocks the model
+  from editing hooks.
 - Outside the restructuring (a quick question, a one-off fix the user asks for), work normally, but still
   respect DECISIONS.md.
 

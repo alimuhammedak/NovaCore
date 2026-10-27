@@ -1,12 +1,15 @@
 #!/usr/bin/env node
-// Stop hook: kaynak dosyalar son başarılı doğrulamadan beri değiştiyse `dotnet build` + `dotnet test` çalıştırır.
-// Kırmızıysa (exit 2) durmayı engeller ve hatayı modele geri verir. Değişiklik yoksa hiçbir şey çalıştırmaz.
-// Başarılı doğrulamanın zaman damgası: .claude/hooks/.last-verified (git'e girmez).
+// Stop hook: bu oturum build'in okuduğu dosyaları değiştirdiyse `dotnet build` + `dotnet test` çalıştırır.
+// Kırmızıysa (exit 2) durmayı engeller ve hatayı modele geri verir. Oturum o dosyalara dokunmadıysa hiçbir şey
+// çalıştırmaz ve hiçbir şey yazmaz: değişiklik dosya zamanından değil git'ten okunur (source-state.js, D-088).
+// Oturumun başlangıç durumu .claude/hooks/.sessions/<session_id>'de (SessionStart hook'u yazar), son kontrolün durumu
+// ve sonucu .claude/hooks/.last-verified'da; ikisi de git'e girmez.
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { sourceState, baselineFile } = require('./source-state');
 
 const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const stampFile = path.join(__dirname, '.last-verified');
@@ -17,57 +20,35 @@ try {
   input = JSON.parse(fs.readFileSync(0, 'utf8') || '{}');
 } catch { /* girdi olmadan da çalışır */ }
 
-const SKIP_DIRS = new Set(['bin', 'obj', '.vs', '.git', 'node_modules', 'TestResults', 'artifacts']);
-// .txt: PublicAPI.*.txt; a public API change without them fails the build (RS0016/RS0017).
-const WATCHED_EXT = /\.(cs|csproj|props|targets|json|slnx|editorconfig|txt)$/i;
-
-function newestMtime(dir) {
-  let newest = 0;
-  let entries;
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return 0;
-  }
-  for (const e of entries) {
-    const full = path.join(dir, e.name);
-    if (e.isDirectory()) {
-      if (!SKIP_DIRS.has(e.name)) newest = Math.max(newest, newestMtime(full));
-    } else if (WATCHED_EXT.test(e.name)) {
-      try { newest = Math.max(newest, fs.statSync(full).mtimeMs); } catch { /* yok say */ }
-    }
-  }
-  return newest;
-}
-
-function rootFilesMtime() {
-  const names = ['Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props', 'NovaCore.slnx', 'global.json', '.editorconfig'];
-  return Math.max(0, ...names.map(n => {
-    try { return fs.statSync(path.join(projectDir, n)).mtimeMs; } catch { return 0; }
-  }));
-}
-
-const newest = Math.max(
-  newestMtime(path.join(projectDir, 'src')),
-  newestMtime(path.join(projectDir, 'tests')),
-  rootFilesMtime()
-);
-
-// Damga son *kontrolü* tutar, sonucu yeşil olsun kırmızı olsun: kırmızı bir ağaçta her sohbet turu (ör. "merhaba")
-// build + test'i baştan çalıştırmasın. Dosyalar o kontrolden beri değişmediyse yeniden çalıştırmaz, kırmızıysa uyarır.
-let checked = 0;
-let green = true;
+let current;
 try {
-  const text = fs.readFileSync(stampFile, 'utf8');
-  try {
-    ({ checked, green } = JSON.parse(text));
-  } catch {
-    checked = fs.statSync(stampFile).mtimeMs; // eski biçim: yalnızca yeşil bir doğrulamanın zaman damgası
-  }
-} catch { /* ilk çalışma */ }
+  current = sourceState(projectDir);
+} catch (e) {
+  process.stdout.write(JSON.stringify({ systemMessage: `⚠ NovaCore Stop hook: git okunamadı (${e.message}); doğrulama yapılmadı.` }));
+  process.exit(0);
+}
 
-if (newest <= checked) {
-  if (!green) {
+// Başlangıç durumu yoksa (hook oturum açıkken eklendi) HEAD sayılır: commit'lenmemiş her değişiklik yine yakalanır.
+let baseline = current.committed;
+const baselinePath = baselineFile(input.session_id);
+if (baselinePath) {
+  try {
+    baseline = fs.readFileSync(baselinePath, 'utf8').trim() || baseline;
+  } catch { /* başlangıç durumu yok */ }
+}
+
+// Bu oturum build'in okuduğu bir dosyayı değiştirmedi (ya da değişikliğini geri aldı): doğrulanacak bir şey yok.
+if (current.state === baseline) process.exit(0);
+
+// Damga son *kontrolü* tutar, sonucu ne olursa olsun: kırmızı bir ağaçta her sohbet turu build + test'i baştan
+// çalıştırmasın. Durum o kontrolden beri değişmediyse yeniden çalıştırmaz, kırmızıysa uyarır.
+let last = {};
+try {
+  last = JSON.parse(fs.readFileSync(stampFile, 'utf8'));
+} catch { /* ilk çalışma ya da eski biçim */ }
+
+if (last.state === current.state) {
+  if (last.result === 'red') {
     process.stdout.write(JSON.stringify({
       systemMessage: '⚠ NovaCore: son doğrulama kırmızıydı ve o zamandan beri kaynak dosya değişmedi; tekrar çalıştırılmadı.'
     }));
@@ -76,7 +57,7 @@ if (newest <= checked) {
 }
 
 function record(result) {
-  fs.writeFileSync(stampFile, JSON.stringify({ checked: newest, green: result, at: new Date().toISOString() }) + '\n');
+  fs.writeFileSync(stampFile, JSON.stringify({ state: current.state, result, at: new Date().toISOString() }) + '\n');
 }
 
 function run(args) {
@@ -97,7 +78,7 @@ function summarize(res) {
 }
 
 function fail(stage, res) {
-  record(false);
+  record('red');
   const msg = `Doğrulama başarısız (${stage}). Kaynak dosyalar değişti ama ${stage} kırmızı:\n${summarize(res)}`;
   if (input.stop_hook_active) {
     // Sonsuz döngüyü önle: ikinci denemede durmaya izin ver ama kullanıcıyı uyar.
@@ -112,7 +93,11 @@ function fail(stage, res) {
 
 const build = run(['build', solution, '-nologo', '-v', 'q']);
 if (build.error) {
-  process.stdout.write(JSON.stringify({ systemMessage: `⚠ NovaCore Stop hook: dotnet çalıştırılamadı (${build.error.message}).` }));
+  // Aynı durum için bir kez uyarır: dotnet'siz bir ortamda (ör. bulut oturumu) her tur aynı mesajı yazmasın.
+  record('skipped');
+  process.stdout.write(JSON.stringify({
+    systemMessage: `⚠ NovaCore Stop hook: dotnet çalıştırılamadı (${build.error.message}); bu oturumun değişiklikleri doğrulanmadı.`
+  }));
   process.exit(0);
 }
 if (build.status !== 0) fail('build', build);
@@ -121,5 +106,5 @@ if (build.status !== 0) fail('build', build);
 const test = run(['test', '--solution', solution, '--no-build']);
 if (test.status !== 0) fail('test', test);
 
-record(true);
+record('green');
 process.exit(0);

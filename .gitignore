@@ -45,3 +45,4 @@ logs/
 
 ## Claude Code hook durumu (makineye özel)
 .claude/hooks/.last-verified
+.claude/hooks/.sessions/
