@@ -43,7 +43,7 @@ services:
 
   # Structured log UI. Enable by setting Seq:ServerUrl=http://localhost:5341
   seq:
-    image: datalust/seq:2026.1.17182@sha256:9e9cc9183c6efaa7c187407d16901506ab3bc0aed7522bfc3ad7b529be30d8d8
+    image: datalust/seq:2026.1.17473@sha256:1e038adf49726f4a04d9c8f9c950457f4971dee4b8385adb927c8e993cb89b8d
     container_name: novacore-seq
     environment:
       ACCEPT_EULA: "Y"
