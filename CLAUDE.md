@@ -19,12 +19,12 @@ completed phases update this file.
   session. A phase spans several sessions: after at most three committed steps the skill pauses (`⏸`) and the user
   continues with `/clear` and the same command, without approving the plan again (D-082). When a phase ends,
   **stop**. "devam"/"continue" means "next step inside the approved phase plan", never "start the next phase".
-- **Each writing session is followed by a verifying one (D-088):** `/clear`, then `/novacore-verify <id>` (project
-  skill, user-invoked). The writing session runs only the build, the step's new or changed test classes (red, then
+- **A phase is verified once, at its end (D-088, D-093):** after the last step, `/clear`, then `/novacore-verify <id>`
+  (project skill, user-invoked). Between writing sessions it is `/clear` and `/novacore-phase <id>` again, with no
+  verify in between. The writing session runs only the build, the step's new or changed test classes (red, then
   green; `--project` + `--filter-class`, the SQLite class of a multi-database scenario) and `dotnet format`; the
   verifying session runs the full suite and `code-review`, writes findings to PROGRESS and fixes no code.
-  `/novacore-phase` stops at a code commit no verify has seen and closes open findings before a new step. At the
-  phase end the last verify runs the phase verification and the CodeRabbit CLI, opens the `faz/...` → `main` pull
+  `/novacore-phase` closes open findings before a new step. At the phase end the verify runs the phase verification and the CodeRabbit CLI, opens the `faz/...` → `main` pull
   request that CodeRabbit reviews (advisory, `.coderabbit.yaml`, D-067), answers out-of-scope and false-positive
   comments and asks for the merge; `/novacore-phase` fixes the in-scope findings and pushes them.
 - **Never implement anything in DECISIONS.md → "Yapılmayacaklar"**, not even as a design suggestion. If one

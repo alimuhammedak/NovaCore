@@ -41,9 +41,7 @@ Ardından şunları kontrol et. Biri başarısızsa **dur ve kullanıcıya bildi
 - **Bağımlılık:** Önceki fazların hepsi `✅ tamam` mı? Sıra PLAN.md'deki "Faz sırası ve bağımlılıklar" bölümündedir, buraya kopyalanmaz. Koşullu bir faz atlandıysa `✅ tamam (atlandı)` sayılır.
 - **Açık sorular:** Bu fazın ihtiyaç duyduğu Q-kayıtları cevaplanmış mı? Cevaplanmamışsa `AskUserQuestion` ile şimdi sor.
 - **Çalışma ağacı:** Temiz mi? Değilse neyin değiştiğini göster ve ne yapılacağını sor.
-- **Doğrulama kapısı (D-088 (3)):** Faz başladıysa (branch'i varsa) önceki oturumların kodu doğrulanmış olmalı.
-  - Taban, fazın `#### Doğrulama` bölümündeki "Son doğrulanan commit"tir. Kayıt yoksa taban `git merge-base main HEAD`'dir.
-  - `git log --oneline <taban>..HEAD -- . ':(exclude)docs/plan/PROGRESS.md' ':(exclude)docs/plan/PROGRESS-ARSIV.md'` boş değilse **dur** ve tek satır yaz: "Önce `/clear`, ardından `/novacore-verify <id>`". Yalnız PROGRESS'e (ve faz sonundaki arşivine) dokunan commit'ler sayılmaz. Fazın henüz commit'lenmiş adımı yoksa liste boştur, kapı geçer.
+- **Doğrulama yalnız faz sonunda (D-093):** Önceki oturumların doğrulanmamış kod commit'leri bir yeni oturumu durdurmaz; tam doğrulama fazın bütün adımları bitince bir kez `/novacore-verify` ile çalışır. Kullanıcı faz ortasında bir doğrulama çalıştırdıysa onun açık bulguları aşağıdaki kuralla kapatılır.
 - **Açık bulgular:** `#### Doğrulama` tablosunda `açık` durumlu satır varsa yeni adımdan önce onları kapat (aşağıda).
 - **Devam eden faz:** Faz `🔄 devam ediyor` veya `⏸ duraklatıldı` durumundaysa bu bir devamdır. Son devir notunu esas al ve tamamlanmış adımları tekrar yapma. Plan fazın ilk oturumunda onaylandı: §2'yi atla. Açık bulguları kapattıktan sonra işaretlenmemiş adım varsa ilkinden §3'e geç; kalmadıysa §5'e (faz sonu) geç.
 - **PR'ı açık faz:** Faz `✅ tamam` ve PR'ı açıksa (doğrulama oturumu açtı) bu bir PR düzeltme oturumudur: yalnız açık bulguları kapat, aynı branch'e push'la ve §5.4'e göre doğrulamaya yönlendir. Yeni adım yoktur.
@@ -95,7 +93,7 @@ Her adım için aynı döngü:
 
 Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'yi ve PLAN'daki faz bölümünü **yeniden oku**. Kapsam için konuşma özetine güvenme.
 
-**Oturum bütçesi (D-082, D-088):** bir oturumda en fazla 3 adım (kapatılan bulgular dahil) commit'le; adımlar büyükse ya da uzun bir hata ayıklama olduysa daha önce dur. Model her araç çağrısında bütün bağlamı yeniden okur, bu yüzden uzayan oturumun her adımı bir öncekinden pahalıdır ve kullanıcının kotasını eritir. Durunca PROGRESS'e devir notu yaz (nerede kalındı, sıradaki adım, yarım kalan bir şey varsa ne, doğrulamaya kalan test katmanları), fazı `⏸ duraklatıldı` yap ve commit'le. Mesajının son satırı kopyalanacak komut olsun: "Doğrulama: `/clear`, ardından `/novacore-verify <id>`" (`/clear` bağlamı sıfırlar; maliyet açısından yeni oturumla aynıdır). Doğrulamadan sonra kullanıcı `/novacore-phase <id>` ile sürdürür; yeni oturum §1'deki "Devam eden faz" kuralıyla sürer, plan yeniden onaylatılmaz.
+**Oturum bütçesi (D-082, D-088):** bir oturumda en fazla 3 adım (kapatılan bulgular dahil) commit'le; adımlar büyükse ya da uzun bir hata ayıklama olduysa daha önce dur. Model her araç çağrısında bütün bağlamı yeniden okur, bu yüzden uzayan oturumun her adımı bir öncekinden pahalıdır ve kullanıcının kotasını eritir. Durunca PROGRESS'e devir notu yaz (nerede kalındı, sıradaki adım, yarım kalan bir şey varsa ne, doğrulamaya kalan test katmanları), fazı `⏸ duraklatıldı` yap ve commit'le. Mesajının son satırı kopyalanacak komut olsun: "Devam: `/clear`, ardından `/novacore-phase <id>`" (`/clear` bağlamı sıfırlar; maliyet açısından yeni oturumla aynıdır). Ara doğrulama yoktur (D-093); yeni oturum §1'deki "Devam eden faz" kuralıyla sürer, plan yeniden onaylatılmaz.
 
 ## 4. Sapma protokolü
 
@@ -179,5 +177,5 @@ Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'
 ### Sonraya bırakılanlar (bu oturumda eklenenler)
 - ...
 
-Doğrulama: `/clear`, ardından `/novacore-verify <id>`
+Devam: `/clear`, ardından `/novacore-phase <id>`   (faz sonunda: Doğrulama: `/clear`, ardından `/novacore-verify <id>`)
 ```

@@ -108,7 +108,7 @@ Son doğrulanan commit: `<hash>` (<tarih>; test N/N, atlanan 0; code-review k bu
 | V<faz>-1 | test / code-review / CLI / PR | dosya:satır ya da test adı | kısa hata satırı | açık · kapatıldı (<hash>) · doğrulandı |
 ```
 
-- "Son doğrulanan commit" incelenen HEAD'dir; açık bulgu olsa da ilerler. Yazan oturumun kapısı (D-088 (3)) bu satırı okur.
+- "Son doğrulanan commit" incelenen HEAD'dir; açık bulgu olsa da ilerler. Bir sonraki doğrulamanın aralığı bu satırdan başlar. Doğrulama normalde faz sonunda bir kez çalışır (D-093); yazan oturum bu satır yüzünden durmaz.
 - `test N/N` başarılı/toplam test sayısıdır. Atlanan test sayısı 0 değilse (Docker yok) satırı **ilerletme**. Altına "Deneme `<hash>` (<tarih>): atlanan N (<neden>); aralık doğrulanmadı" yaz.
 - Commit: `git add docs/plan/PROGRESS.md` ve `faz<id>: verify <kısa-hash>`. Ara modda push etme; fazın push kararı (ör. Q-59, Q-60) yazan oturumun push'uyla gider.
 
