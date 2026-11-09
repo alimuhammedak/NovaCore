@@ -51,3 +51,16 @@ public sealed record SessionSignInRequest(
 public sealed record SessionCodeRequest(
     [Required, MaxLength(64)] string Code,
     [MaxLength(4096), LocalUrl] string? ReturnUrl);
+
+/// <summary>The body of <c>POST /api/v1/auth/password/forgot</c>.</summary>
+/// <param name="Email">The account's email address. Every address gets the same answer; only a confirmed account gets a code.</param>
+public sealed record PasswordForgotRequest([Required, EmailAddress, MaxLength(256)] string Email);
+
+/// <summary>The body of <c>POST /api/v1/auth/password/reset</c>.</summary>
+/// <param name="Email">The account's email address.</param>
+/// <param name="Code">The 8-digit code from the email. It works once, for 15 minutes, and for 5 wrong tries.</param>
+/// <param name="NewPassword">15 to 128 characters and not a commonly used password; no composition rules (NIST SP 800-63B-4).</param>
+public sealed record PasswordResetCodeRequest(
+    [Required, EmailAddress, MaxLength(256)] string Email,
+    [Required, Length(8, 8)] string Code,
+    [Required, Length(15, 128)] string NewPassword);

@@ -42,6 +42,8 @@ public class ModuleRegistrationTests(NovaCoreApiFactory factory) : IClassFixture
             "GET /api/v1/auth/session/antiforgery",
             "POST /api/v1/auth/session/login",
             "POST /api/v1/auth/session/login/2fa",
+            "POST /api/v1/auth/password/forgot",
+            "POST /api/v1/auth/password/reset",
             "GET /api/v1/admin/users",
             "GET /api/v1/admin/roles",
             "GET /api/v1/admin/permissions",

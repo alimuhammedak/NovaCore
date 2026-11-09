@@ -57,6 +57,7 @@ public static class IdentityServerHostingExtensions
         services.AddSingleton<SecurityAuditLogger>();
         services.AddSingleton<DummyPasswordHash>();
         services.AddScoped<SignInFlow>();
+        services.AddScoped<PasswordResetCodes>();
 
         AddEmail(services, builder.Environment);
 
@@ -352,6 +353,7 @@ public static class IdentityServerHostingExtensions
 
         AccountEndpoints.Map(endpoints);
         SessionEndpoints.Map(endpoints);
+        PasswordCodeEndpoints.Map(endpoints);
         AdminEndpoints.Map(endpoints);
         return endpoints;
     }

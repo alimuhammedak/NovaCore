@@ -31,6 +31,7 @@ internal sealed class SignInFlow(
     SignInManager<ApplicationUser> signIn,
     IPasswordHasher<ApplicationUser> hasher,
     DummyPasswordHash dummyHash,
+    PasswordResetCodes resetCodes,
     SecurityAuditLogger audit)
 {
     /// <summary>The password step. On <see cref="SignInOutcome.TwoFactorRequired"/> the two-factor cookie names the user.</summary>
@@ -53,6 +54,7 @@ internal sealed class SignInFlow(
 
         if (result.Succeeded)
         {
+            await resetCodes.ClearFailuresAsync(user);
             audit.LoginSucceeded(user.Id, ip);
             return SignInOutcome.Succeeded;
         }
@@ -91,6 +93,7 @@ internal sealed class SignInFlow(
 
         if (result.Succeeded)
         {
+            await resetCodes.ClearFailuresAsync(user);
             if (isRecoveryCode)
                 audit.RecoveryCodeUsed(user.Id);
             audit.LoginSucceeded(user.Id, ip);

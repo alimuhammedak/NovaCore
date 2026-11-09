@@ -41,6 +41,8 @@ internal sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
 
     public void PasswordReset(Guid userId) => logger.LogPasswordReset(userId);
 
+    public void PasswordResetCodeRejected(Guid userId) => logger.LogPasswordResetCodeRejected(userId);
+
     public void RoleAssigned(Guid userId, string role, string? byUserId) => logger.LogRoleAssigned(userId, role, byUserId);
 
     public void RoleRemoved(Guid userId, string role, string? byUserId) => logger.LogRoleRemoved(userId, role, byUserId);
@@ -97,6 +99,10 @@ internal static partial class SecurityAuditLog
 
     [LoggerMessage(EventId = 26, Level = LogLevel.Information, Message = "SECURITY password_reset User={UserId}")]
     public static partial void LogPasswordReset(this ILogger logger, Guid userId);
+
+    // Warning: a run of these is someone guessing an account's reset code.
+    [LoggerMessage(EventId = 43, Level = LogLevel.Warning, Message = "SECURITY password_reset_code_rejected User={UserId}")]
+    public static partial void LogPasswordResetCodeRejected(this ILogger logger, Guid userId);
 
     [LoggerMessage(EventId = 22, Level = LogLevel.Information, Message = "SECURITY sessions_revoked User={UserId} Reason={Reason}")]
     public static partial void LogSessionsRevoked(this ILogger logger, Guid userId, string reason);
