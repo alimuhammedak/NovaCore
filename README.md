@@ -425,6 +425,61 @@ Bilinmesi gerekenler:
   sıfırlanırken hata ya da yanlış sonuç verebildiğini yazıyor (SQL Server 2019 CU14 ve sonrası); geçici çözüm trace flag
   11042 (`SESSION_CONTEXT`'i seri çalıştırır). Havuzlu bağlantıyla kullanılan bu kalıp tam o durumdur.
 
+### Kendi giriş ekranı
+
+Kimlik eklentisinin HTML sayfaları (`/account/*`) varsayılan yedektir. Kendi giriş, şifre yenileme ve davet ekranını
+çizen proje JSON uçlarını kullanır; güvenlik kuralları (kilit, aynı cevap, sahte hash, 2FA, kod sayımı) pakettedir,
+proje yalnız ekranı ve metinleri yazar (D-090, D-091).
+
+**Akış (Authorization Code + PKCE değişmez):**
+
+1. İstemci uygulaması `/connect/authorize`'a gider. Oturumsuz tarayıcı `Identity:SignIn:LoginPath`'e (ör. `/sign-in`)
+   yönlenir, istek `ReturnUrl` olarak sorgudadır. Ayar boşsa `/account/login`.
+2. Ekran `GET /api/v1/auth/session/antiforgery` ile token'ı alır (`{ token, headerName }`) ve her POST'ta
+   `X-XSRF-TOKEN` başlığında geri yollar.
+3. `POST /api/v1/auth/session/login` (`{ email, password, returnUrl }`) → `200 { status, returnUrl }`. `status`
+   `signed_in` ise ekran `returnUrl`'e gider; `two_factor_required` ise kod alanını gösterir ve
+   `POST /api/v1/auth/session/login/2fa` (`{ code, returnUrl }`) çağırır (authenticator ya da kurtarma kodu).
+4. Giriş ucu token vermez; sağlayıcının oturum çerezini açar. `/connect/authorize` kodu verir, istemci kodu
+   `/connect/token`'da PKCE ile token'a çevirir.
+
+**Aynı kaynak kuralı:** ekran kimlik sağlayıcıyla aynı origin'den sunulur (host'un statik dosyaları ya da önündeki ters
+proxy). Uçlarda CORS kapalıdır (RFC 9700 §2.6) ve `returnUrl` yalnız bu host'un yolu olabilir. Geliştirmede SPA'nın dev
+sunucusu (Vite vb.) `/api`, `/connect` ve `/.well-known` isteklerini host'a proxy'ler; tarayıcı tek origin görür.
+Çerezler: uygulama çerezi `Secure` + `HttpOnly`, `SameSite=Lax` (istemciden `/connect/authorize`'a gezinme onu
+taşımalı); antiforgery çerezi `SameSite=Strict`. Token tarayıcıya giriş ucundan hiç verilmez; ROPC yok.
+
+**Şifre yenileme (kodla):** `POST /api/v1/auth/password/forgot` (`{ email }`) her adrese aynı `202`'yi döner, yalnız onaylı
+hesaba 8 haneli bir kod e-postalanır. `POST /api/v1/auth/password/reset` (`{ email, code, newPassword }`): kod 15 dakika,
+bir kez ve 5 yanlış denemeye kadar geçer; yeni kod eskisinin yerini alır; hesapta art arda 100 yanlış kod olunca kodlar
+başarılı bir giriş ya da bağlantılı sıfırlamaya kadar çalışmaz. Yanlış kod hesabı kilitlemez. Başarı bütün oturumları
+kapatır, giriş yapmaz. Bağlantılı yol (`/account/forgot-password`) yedek olarak kalır.
+
+**Davet:** ürün kendi ucunda (kendi izniyle) `AccountInvitations.InviteAsync(email)` çağırır; dönen `sub` ile üyeliği
+kendisi ekler (`TenantDirectory.AddMemberAsync(tenant, sub, roles)`). Platformun yöneticileri için
+`POST /api/v1/admin/invitations` (`identity:invitations:create`). E-postadaki bağlantı `Identity:SignIn:InvitationPath`'i
+(varsayılan `/accept-invitation`) `?token=` ile açar; ekran `POST /api/v1/auth/invitations/status` (`{ token }`) ile
+adresi gösterir, `POST /api/v1/auth/invitations/accept` (`{ token, password }`) ile şifreyi kurar ve e-postayı onaylar.
+Bağlantı 7 gün, bir kez geçer. Onaylı bir hesabın daveti şifre kurmaz (`invitation.account_exists`): kullanıcı kendi
+şifresiyle girer, davet hesabı ele geçiremez.
+
+**Hata kodları → ekran durumu** (ProblemDetails'in `code` alanı; metni ekran yazar):
+
+| Kod | Durum | Ekran |
+|---|---|---|
+| `account.invalid_credentials` | 401 | "E-posta ya da şifre yanlış" (bilinmeyen hesap, yanlış şifre ve kilitli hesap aynı) |
+| `account.email_not_confirmed` | 403 | "E-postanı onayla" (yalnız doğru şifreden sonra) |
+| `account.invalid_code` | 401 | "Kod yanlış" |
+| `account.two_factor_session_missing` | 401 | Şifre adımına dön |
+| `account.antiforgery_invalid` | 400 | Token'ı yeniden al, isteği tekrarla |
+| `account.invalid_reset_code` | 400 | "Kod geçersiz ya da süresi doldu; yeni kod iste" |
+| `invitation.not_found` | 404 | "Bağlantı geçersiz" |
+| `invitation.used` | 409 | "Davet kullanılmış; giriş yap" |
+| `invitation.expired` | 410 | "Davetin süresi doldu; yenisini iste" |
+| `invitation.account_exists` | 409 | "Hesabın var; şifrenle giriş yap" |
+| (doğrulama) | 400 | `errors` alanlarını göster (ör. `newPassword`, `password`) |
+| (hız sınırı) | 429 | "Biraz bekle" |
+
 ### Tarayıcı uygulamaları: BFF
 
 Microsoft, web uygulamaları için tarayıcıda çalışan public OIDC/OAuth client'larını artık önermiyor; önerilen mimari
@@ -890,7 +945,8 @@ Tasarım OWASP cheat sheet'lerine, RFC 9700 (OAuth 2.0 Security BCP) ve Microsof
 ### Kimlik sağlayıcı (`NovaCore.Identity.OpenIddict`)
 - **Akışlar:** Authorization Code + **PKCE (yalnızca S256)**, refresh token, client credentials. Uçlar `/connect/*`;
   tarayıcı girişi `/account/login` (sade HTML, antiforgery, yalnızca yerel ReturnUrl), gerekirse 2FA adımı, parola
-  sıfırlama `/account/forgot-password`.
+  sıfırlama `/account/forgot-password`. Kendi ekranını çizen proje aynı kuralları JSON uçlarıyla kullanır
+  (`Identity:SignIn:LoginPath`, `/api/v1/auth/session/*`, kodla şifre yenileme, davet; bkz. "Kendi giriş ekranı").
 - **Token'lar:** imzalı JWT access token (RFC 9068; şifresiz, çünkü çekirdek her sağlayıcıyı standart bir resource
   server gibi doğrular), **15 dk**; `sub`, `name`, `email`, `role` claim'leri, **izinler token'a girmez**. Issuer =
   `Jwt:Authority`, `aud` = `Jwt:Audience`.

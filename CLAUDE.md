@@ -208,7 +208,8 @@ targets a **local SQL Server via Windows auth** (`appsettings.json`).
   `IClaimsTransformation` stops the host (`ClaimsTransformationStartupCheck`). The tokens come from the
   `NovaCore.Identity.OpenIddict` add-on (ASP.NET Core Identity + OpenIddict: Authorization Code + PKCE, refresh
   rotation with an absolute 7-day lifetime, client credentials, single-use TOTP 2FA with hashed recovery codes,
-  password reset, token pruning, admin; the API accepts only its `at+jwt` tokens), which the Api host runs as its own
+  password reset by link or emailed code, account invitations, token pruning, admin, and JSON sign-in endpoints for a
+  project's own screens next to the HTML pages, F8; the API accepts only its `at+jwt` tokens), which the Api host runs as its own
   authority (DECISIONS D-037, Faz 6b: D-053…D-055). See `src/BuildingBlocks/NovaCore.Identity.OpenIddict/CLAUDE.md` before
   touching auth.
 
