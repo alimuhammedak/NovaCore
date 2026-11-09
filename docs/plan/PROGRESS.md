@@ -26,7 +26,7 @@
 | 6d | ✅ tamam | `faz/6d-analizor-sikilastirma` | 2026-10-23 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `231b05f`; push 2026-10-23, kullanıcı isteği) |
 | 7a | ✅ tamam | `faz/7a-veritabani-ozgurlugu` | 2026-10-23 | 2026-10-24 | 2026-10-24 (kullanıcı onayı, PR #11 merge commit'i `cf895d8`) |
 | 7b | ✅ tamam | `faz/7b-cok-kiracililik` | 2026-10-24 | 2026-10-25 | 2026-10-27 (kullanıcı onayı, PR #13 merge commit'i `dba8318`) |
-| 8 | 🔄 devam ediyor | `faz/8-bassiz-giris` | 2026-11-09 | | |
+| 8 | ⏸ duraklatıldı | `faz/8-bassiz-giris` | 2026-11-09 | | |
 | 6e | ⏳ başlamadı | | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
@@ -70,7 +70,8 @@ Başlangıç 2026-11-09, `main` @ `f319d57`. Plan onaylandı (plan modu). Kullan
 **Bu fazda yapılmayacaklar:** ROPC ya da şifre karşılığında tarayıcıya token; `/account`'a ya da yeni uçlara CORS; paketten SPA sunmak; CRM'in React ekranları ve metinleri; kilitli hesabı ayrı kodla açığa çıkarmak; BFF paketi; HTML sayfalarının tasarımı/yerelleştirilmesi; sürüm numarası ve yayın (D-090 (6)); `MapIdentityApi`; IETF First-Party Apps taslağı.
 
 - [x] F8.1 (1aaf0f9): Tasarım kararları D-091, araştırma R-137 (MS Learn antiforgery ve Identity token sağlayıcıları, OWASP Forgot Password, NIST SP 800-63B-4 §3.1.3/§4.2 — NIST bölümleri araçtan özet olarak geldi, değerler R-137'de işaretli —, openiddict-samples Velusia). Kod yok; build/test gerekmedi. Ön karardan sapma: yok; davetin platform ucu ve ürünün kendi ucu ayrıldı (D-091 (5)).
-- [x] F8.2 (commit aşağıda): Giriş kuralları `SignInFlow`'da (internal, scoped; D-092), `LoginPage` yalnız form ve HTML. Codex iki kez denendi, ikisinde de model reddedildi (`gpt-6.1-sol`, `gpt-6.1`: "not supported when using Codex with a ChatGPT account"), kod yazmadı; kullanıcı kararıyla adımı yazan oturum yazdı. Kimlik eklentisine `InternalsVisibleTo NovaCore.Api.Tests` (depoda ilk). Yeni `SignInFlowTests` (6) önce kırmızı (servis kayıtlı değil), sonra yeşil; `SignInHardeningTests`, `TwoFactorTests`, `AuthorizationCodeFlowTests`, `TwoFactorRaceTests`, `PasswordResetTests`, `SessionTests` değişmeden yeşil: 87/87. Build 0 uyarı, format temiz. Doğrulamaya kalan: tam paket, SQL Server/PostgreSQL `SignInScenarios`.
+- [x] F8.2 (8df7b64): Giriş kuralları `SignInFlow`'da (internal, scoped; D-092), `LoginPage` yalnız form ve HTML. Codex iki kez denendi, ikisinde de model reddedildi (`gpt-6.1-sol`, `gpt-6.1`: "not supported when using Codex with a ChatGPT account"), kod yazmadı; kullanıcı kararıyla adımı yazan oturum yazdı. Kimlik eklentisine `InternalsVisibleTo NovaCore.Api.Tests` (depoda ilk). Yeni `SignInFlowTests` (6) önce kırmızı (servis kayıtlı değil), sonra yeşil; `SignInHardeningTests`, `TwoFactorTests`, `AuthorizationCodeFlowTests`, `TwoFactorRaceTests`, `PasswordResetTests`, `SessionTests` değişmeden yeşil: 87/87. Build 0 uyarı, format temiz. Doğrulamaya kalan: tam paket, SQL Server/PostgreSQL `SignInScenarios`.
+- [x] F8.3 (b7107ee): JSON giriş uçları `/api/v1/auth/session` (`GET antiforgery`, `POST login`, `POST login/2fa`; `SessionEndpoints`): `SignInFlow`'u çağırır, grup `strict` + `DisableCors` + `AllowAnonymous`, OpenAPI'de (yalnız ekleme, `docs/openapi/v1.json`). Antiforgery `HeaderName = X-XSRF-TOKEN` (HTML formları değişmeden yeşil). İstekler public record (`SessionSignInRequest`, `SessionCodeRequest`, PublicAPI.Unshipped), `returnUrl` için internal `[LocalUrl]` (`RedirectHttpResult.IsLocalUrl`) → 400 `ValidationProblem`. D-091 (1)'e ek: antiforgery'siz istek 400 ProblemDetails `account.antiforgery_invalid` (D-091 yalnız "400" diyordu). Yeni `SessionSignInTests` (16) önce kırmızı (16/16), sonra yeşil: üç hesap durumu aynı gövde/durum, hash sayısı eşit (süre), onaysız hesap, antiforgery'siz istek, üç yerel olmayan `returnUrl`, başarıdan sonra `/connect/authorize` kod verir ve yanıtta token yok, 2FA kodu (yanlış/doğru), oturumsuz kod adımı, `strict`, CORS preflight. `ModuleRegistrationTests`, `ValidationTests` (+2 satır), `OpenApiContractTests` güncellendi; HTML/2FA/sıfırlama/oturum sınıflarıyla 102/102 yeşil. Build 0 uyarı, format temiz. Doğrulamaya kalan: tam paket, SQL Server/PostgreSQL katmanları, `eng/check-openapi.sh`.
 
 ## Açık sorular (Q)
 
@@ -269,6 +270,15 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 ## Son devir notu
 
 > Her oturumun sonunda (faz bitmese bile) en üste yeni bir not eklenir; öncekilerin üzerine yazılmaz, son üç notu aşanlar faz sonunda arşive taşınır (D-082). Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
+
+**2026-11-09, Faz 8: Başsız kimlik arayüzü (⏸ duraklatıldı, oturum bütçesi: 3 adım).** Branch `faz/8-bassiz-giris`, yerel, push edilmedi. Biten: F8.1 (`1aaf0f9`), F8.2 (`8df7b64`), F8.3 (`b7107ee`). Doğrulanmamış aralık `f319d57..b7107ee`.
+
+- **Sıradaki:** `/clear`, `/novacore-verify 8` (bu üç adım); sonra `/novacore-phase 8` ile F8.4 (ayarlanabilir giriş yolu, D-091 (3)), F8.5 (kodla yenileme, D-091 (4)), F8.6 (davet, D-091 (5); `invitations` tablosu, dört migration seti), F8.7 (şablon), F8.8 (belgeler: README rehberi, eklentinin CLAUDE.md'sine yeni uçlar ve `SignInFlow` değişmezi, CHANGELOG, memory).
+- **Codex:** kullanıcı kod adımlarını Codex'e vermek istedi; iki deneme de modeli reddetti (`gpt-6.1-sol`, `gpt-6.1`: "not supported when using Codex with a ChatGPT account"), Codex hiçbir dosyaya dokunmadı. Kullanıcı kararıyla adımları yazan oturum yazdı. Sonraki oturum Codex'i yeniden denemeden önce kullanıcıya çalışan bir modeli sormalı ya da kendisi yazmalı.
+- **Sürprizler:** test projesi kimlik eklentisinin iç tiplerini göremiyordu; `InternalsVisibleTo NovaCore.Api.Tests` (D-092). NIST SP 800-63B-4'ün §3.1.3/§4.2 değerleri araçtan özet olarak geldi (R-137'de işaretli); F8.5 öncesi sayfanın kendisinden doğrulanmalı.
+- **Doğrulama (bu oturum):** build 0 uyarı; adım sınıfları ve ilgili kimlik sınıfları 102/102 (SQLite); tam paket, SQL Server/PostgreSQL, smoke, coverage koşmadı (doğrulama oturumunun işi).
+- **Bekleyen soru:** yok. Q-40 sürüyor.
+- Doğrulama: `/clear`, ardından `/novacore-verify 8`.
 
 **2026-11-09, faz dışı: Faz 8 (başsız kimlik arayüzü) planlandı (D-090, R-136, Q-62; branch `plan/faz-8-bassiz-giris`).** CRM-Nominal'in giriş sorunu (CRM ADR-022) kodda doğrulandı: giriş yalnız HTML formuyla, `LoginPath` belgelenmiş bir ayar değil (host'un `ConfigureApplicationCookie`'si ezer, ölçülmedi), JSON forgot/reset ve davet yok. Kullanıcı D-038 (1) ile D-076 (10)'un davet kısmını yeniden açtı. Faz 8, 7b ile 6e arasına girdi (6e son yüzeyi görmeli). Kod değişmedi.
 
