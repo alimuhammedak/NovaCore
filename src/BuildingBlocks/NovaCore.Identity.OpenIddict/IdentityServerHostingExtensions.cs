@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors;
@@ -295,8 +296,24 @@ public static class IdentityServerHostingExtensions
                     permission => permission.StartsWith(IdentityPermissions.Prefix, StringComparison.Ordinal)),
                 "Identity:Seed:UserPermissions can't hold the identity provider's own permissions (identity:*): every "
                 + "registered account gets them.")
+            // An absolute or protocol-relative path would send the browser, with its authorization request, to another
+            // site (an open redirect, OWASP Unvalidated Redirects; D-091 (3)).
+            .Validate(
+                identity => IdentitySignInOptions.IsValidLoginPath(identity.SignIn.LoginPath),
+                "Identity:SignIn:LoginPath must be a path on this host: it starts with a single '/' (not '//' or '/\\') and "
+                + "has no scheme, host, query or fragment, e.g. /sign-in.")
             .ValidateOnStart();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<IdentityServerOptions>, IdentityServerOptionsValidator>());
+
+        // The sign-in cookie's login path is where /connect/authorize's challenge sends a signed-out browser: a project's
+        // own screen when it sets one, the provider's page otherwise. Read from the validated options, not at
+        // registration (docs/plan/RESEARCH.md R-048).
+        services.AddOptions<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme)
+            .Configure<IOptions<IdentityServerOptions>>((cookie, identity) =>
+            {
+                if (!string.IsNullOrEmpty(identity.Value.SignIn.LoginPath))
+                    cookie.LoginPath = identity.Value.SignIn.LoginPath;
+            });
         services.AddHostedService<IdentityServerSeeder>();
     }
 
