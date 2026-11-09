@@ -35,6 +35,8 @@ public class ValidationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCor
         { "POST", "/api/v1/auth/2fa/setup", Json(new { password = "" }), ["Password"] },
         { "POST", "/api/v1/auth/2fa/enable", Json(new { password = "", code = "12345" }), ["Code", "Password"] },
         { "POST", "/api/v1/auth/2fa/disable", Json(new { code = "123456789" }), ["Code", "Password"] },
+        { "POST", "/api/v1/auth/session/login", Json(new { email = "", password = "", returnUrl = "https://evil.example/" }), ["Email", "Password", "ReturnUrl"] },
+        { "POST", "/api/v1/auth/session/login/2fa", Json(new { code = "", returnUrl = "//evil.example/" }), ["Code", "ReturnUrl"] },
         { "POST", $"/api/v1/admin/users/{SomeId}/roles", Json(new { role = "" }), ["Role"] },
     };
 

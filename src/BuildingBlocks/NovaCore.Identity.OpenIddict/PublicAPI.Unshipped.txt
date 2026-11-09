@@ -1,1 +1,31 @@
 #nullable enable
+NovaCore.Identity.OpenIddict.SessionCodeRequest
+NovaCore.Identity.OpenIddict.SessionCodeRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.SessionCodeRequest!
+NovaCore.Identity.OpenIddict.SessionCodeRequest.Code.get -> string!
+NovaCore.Identity.OpenIddict.SessionCodeRequest.Code.init -> void
+NovaCore.Identity.OpenIddict.SessionCodeRequest.Deconstruct(out string! Code, out string? ReturnUrl) -> void
+NovaCore.Identity.OpenIddict.SessionCodeRequest.Equals(NovaCore.Identity.OpenIddict.SessionCodeRequest? other) -> bool
+NovaCore.Identity.OpenIddict.SessionCodeRequest.ReturnUrl.get -> string?
+NovaCore.Identity.OpenIddict.SessionCodeRequest.ReturnUrl.init -> void
+NovaCore.Identity.OpenIddict.SessionCodeRequest.SessionCodeRequest(string! Code, string? ReturnUrl) -> void
+NovaCore.Identity.OpenIddict.SessionSignInRequest
+NovaCore.Identity.OpenIddict.SessionSignInRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.SessionSignInRequest!
+NovaCore.Identity.OpenIddict.SessionSignInRequest.Deconstruct(out string! Email, out string! Password, out string? ReturnUrl) -> void
+NovaCore.Identity.OpenIddict.SessionSignInRequest.Email.get -> string!
+NovaCore.Identity.OpenIddict.SessionSignInRequest.Email.init -> void
+NovaCore.Identity.OpenIddict.SessionSignInRequest.Equals(NovaCore.Identity.OpenIddict.SessionSignInRequest? other) -> bool
+NovaCore.Identity.OpenIddict.SessionSignInRequest.Password.get -> string!
+NovaCore.Identity.OpenIddict.SessionSignInRequest.Password.init -> void
+NovaCore.Identity.OpenIddict.SessionSignInRequest.ReturnUrl.get -> string?
+NovaCore.Identity.OpenIddict.SessionSignInRequest.ReturnUrl.init -> void
+NovaCore.Identity.OpenIddict.SessionSignInRequest.SessionSignInRequest(string! Email, string! Password, string? ReturnUrl) -> void
+override NovaCore.Identity.OpenIddict.SessionCodeRequest.Equals(object? obj) -> bool
+override NovaCore.Identity.OpenIddict.SessionCodeRequest.GetHashCode() -> int
+override NovaCore.Identity.OpenIddict.SessionCodeRequest.ToString() -> string!
+override NovaCore.Identity.OpenIddict.SessionSignInRequest.Equals(object? obj) -> bool
+override NovaCore.Identity.OpenIddict.SessionSignInRequest.GetHashCode() -> int
+override NovaCore.Identity.OpenIddict.SessionSignInRequest.ToString() -> string!
+static NovaCore.Identity.OpenIddict.SessionCodeRequest.operator !=(NovaCore.Identity.OpenIddict.SessionCodeRequest? left, NovaCore.Identity.OpenIddict.SessionCodeRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.SessionCodeRequest.operator ==(NovaCore.Identity.OpenIddict.SessionCodeRequest? left, NovaCore.Identity.OpenIddict.SessionCodeRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.SessionSignInRequest.operator !=(NovaCore.Identity.OpenIddict.SessionSignInRequest? left, NovaCore.Identity.OpenIddict.SessionSignInRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.SessionSignInRequest.operator ==(NovaCore.Identity.OpenIddict.SessionSignInRequest? left, NovaCore.Identity.OpenIddict.SessionSignInRequest? right) -> bool
