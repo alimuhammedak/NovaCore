@@ -19,9 +19,9 @@
 ## Faz sırası ve bağımlılıklar
 
 ```
-0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 4c → 4d → 5 → 6a → 6b → 6c → 6d → 7a → 7b → 6e
+0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 4c → 4d → 5 → 6a → 6b → 6c → 6d → 7a → 7b → 8 → 6e
 ```
-Bir faza başlamadan önce kendisinden önceki tüm fazlar PROGRESS.md'de "tamam" olarak işaretlenmiş olmalıdır. 4d koşulludur: F4d.1'deki karar fazı gereksiz kılarsa faz `✅ tamam (atlandı)` olarak işaretlenir. 4c ve 4d, 2026-09-28'de tüketici hazırlığı araştırmasıyla eklendi (D-033, [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md)). 6a–6e, 2026-10-21'de güvenlik ve kalite araştırmasıyla eklendi (D-042…D-049, [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-kararlari.md)). 7a ve 7b, 2026-10-23'te CRM-Nominal geçişi değerlendirmesiyle eklendi (D-068…D-071, [proposals/crm-cok-kiracililik.md](proposals/crm-cok-kiracililik.md)). 6e'den önce yürürler: 6e'nin denetimleri son kod yüzeyini görmeli (D-071 (3)).
+Bir faza başlamadan önce kendisinden önceki tüm fazlar PROGRESS.md'de "tamam" olarak işaretlenmiş olmalıdır. 4d koşulludur: F4d.1'deki karar fazı gereksiz kılarsa faz `✅ tamam (atlandı)` olarak işaretlenir. 4c ve 4d, 2026-09-28'de tüketici hazırlığı araştırmasıyla eklendi (D-033, [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md)). 6a–6e, 2026-10-21'de güvenlik ve kalite araştırmasıyla eklendi (D-042…D-049, [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-kararlari.md)). 7a ve 7b, 2026-10-23'te CRM-Nominal geçişi değerlendirmesiyle eklendi (D-068…D-071, [proposals/crm-cok-kiracililik.md](proposals/crm-cok-kiracililik.md)). 6e'den önce yürürler: 6e'nin denetimleri son kod yüzeyini görmeli (D-071 (3)). 8, 2026-11-09'da CRM-Nominal'in giriş ekranı sorunuyla eklendi (D-090, R-136); aynı gerekçeyle 6e'den önce yürür.
 
 ---
 
@@ -345,3 +345,26 @@ Kaynak: [proposals/crm-cok-kiracililik.md](proposals/crm-cok-kiracililik.md) (ku
 **Bu fazda yapılmayacaklar:** şube kapsamı ve CRM'in rolleri (CRM'in işi); kurum başına veritabanı; RLS'in paketlere girmesi; token'da kurum claim'i (D-070 (3)); kurum başına istek sınırı; CRM'in geçişi (ayrı plan, D-070 (4)).
 
 **Faz doğrulaması (7a ve 7b):** `dotnet build NovaCore.slnx -c Release`, `dotnet test NovaCore.slnx` (SQLite, SQL Server ve PostgreSQL katmanları), `bash eng/template-smoke.sh`, her context için `has-pending-model-changes`, lisans kapısı, coverage ve OpenAPI sözleşmesi kapıları, faz branch'inde CI.
+
+---
+
+## Faz 8: Başsız kimlik arayüzü (D-090)
+
+**Amaç:** Kendi giriş, şifre yenileme ve davet ekranlarını çizen bir projenin (ilk tüketici CRM-Nominal) kimlik eklentisini HTML sayfaları olmadan kullanabilmesi. Güvenlik kuralları pakette tek yerde kalır: proje yalnız ekranı ve metinleri yazar (R-136).
+
+**Kural:** Her güvenlik kuralı önce kırmızı testle başlar (6b gibi). Bugünkü HTML sayfalarının testleri her adımda yeşil kalır; sayfalar varsayılan yedektir. "Aynı cevap" kuralı (D-030 (1)) JSON uçlarında da test edilir: gövde, durum kodu ve süre bakımından.
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F8.1 | **Tasarım kararları.** (1) JSON uçlarının yolu ve sözleşmesi: ProblemDetails'te kalıcı `code` değerleri (ör. `account.invalid_credentials`, `account.two_factor_required`, `account.email_not_confirmed`), kilitli hesabın ayrı bir kodu yok (D-030 (1)); hız sınırı 429. (2) CSRF yöntemi: antiforgery başlığı ve token'ın alınma yolu (MS), `SameSite`. (3) Ayarlanabilir giriş yolu ve `returnUrl` doğrulaması: göreli yol, yalnız bu host'un adresleri; ayarın biçimi (validated options, R-048). (4) Kodla şifre yenileme: Identity'nin token sağlayıcısı mı kendi sağlayıcımız mı; kod uzunluğu, süre, deneme sınırı, tek kullanım (OWASP Forgot Password, NIST SP 800-63B-4); bağlantılı yol kalır mı. (5) Davet: hangi eklentide durur, kurum üyeliğine nasıl bağlanır (eklentiler birbirini tanımaz, D-076 (2)); süre (tasarım: 7 gün), tek kullanım, "kullanıldı" ve "süresi doldu" ayrı kodlar; daveti kim gönderir (izin). (6) `openiddict-samples`'ın giriş yönlendirmesi okunur (R-136'da okunmadı). | — | R ve D kaydı |
+| F8.2 | **Giriş mantığı tek serviste.** `LoginPage`'deki kilit, onaysız hesap, sahte hash, 2FA ve kurtarma kodu sayımı bir iç servise taşınır; HTML sayfaları onu çağırır. Davranış değişmez. | `NovaCore.Identity.OpenIddict` | Mevcut giriş, 2FA ve kurtarma kodu testleri değişmeden yeşil; servis için birim testi (kilit, sayım, onaysız hesap) |
+| F8.3 | **JSON giriş ve 2FA uçları.** Şifre adımı, kod adımı (authenticator ya da kurtarma kodu), antiforgery token'ı. Başarıda oturum çerezi açılır ve yanıt doğrulanmış `returnUrl`'i taşır; token verilmez. | `NovaCore.Identity.OpenIddict`, `PublicAPI.Unshipped.txt` | Test: bilinmeyen hesap, yanlış şifre ve kilitli hesap aynı cevabı alır; antiforgery'siz istek reddedilir; başka kaynaktan istek CORS'la reddedilir; yerel olmayan `returnUrl` reddedilir; başarıdan sonra `/connect/authorize` kodu verir; `strict` hız sınırı uygulanır; OpenAPI belgesinde yer alır |
+| F8.4 | **Ayarlanabilir giriş yolu.** `/connect/authorize` oturumsuz tarayıcıyı ayarlanan yola gönderir; ayar yoksa bugünkü HTML sayfası. | `NovaCore.Identity.OpenIddict` | Test: ayarlanan yol ve `returnUrl` yönlendirmesi; mutlak ya da başka host'a giden bir yol host'u açmaz |
+| F8.5 | **Kodla şifre yenileme.** JSON forgot ve reset uçları, F8.1 (4)'teki kurallarla; e-posta kuyruktan gider (`EmailQueue`). Yenileme bütün token ve authorization'ları iptal eder, giriş yapmaz (D-038 (3)). | `NovaCore.Identity.OpenIddict` | Test: her adres aynı cevabı alır; kod bir kez çalışır; süresi dolan kod reddedilir (`FakeTimeProvider`); deneme sınırından sonra kod geçersizdir; yenileme oturumları kapatır |
+| F8.6 | **Davet.** F8.1 (5)'teki yerinde ve kurallarla: davet oluşturma (izinle), davetin durumu, kabul (şifre kurulur, e-posta onaylanır). | F8.1 (5)'e göre kimlik ve/veya çok kiracılılık eklentisi, migration'lar (her sağlayıcı seti) | Test: davet bir kez kabul edilir; kullanılmış ve süresi dolmuş davet ayrı kodlarla reddedilir; izinsiz çağıran davet oluşturamaz; davet var olan bir hesabı ele geçiremez |
+| F8.7 | **Şablon.** Yeni ayarlar şablonun `--auth BuiltIn` seçeneğine yansır (gerekiyorsa); migration setleri güncellenir. | şablon, `eng/template-smoke.sh` | Smoke bütün bileşimlerde yeşil |
+| F8.8 | **Belgeler.** README'de "kendi giriş ekranı" rehberi (akış, aynı kaynak kuralı, geliştirmede dev sunucusu proxy'si, çerez ayarları, hata kodları → ekran durumu). Kimlik eklentisinin CLAUDE.md'si (yeni değişmezler), kök CLAUDE.md, CHANGELOG, memory. | dokümanlar | — |
+
+**Bu fazda yapılmayacaklar:** ROPC ya da şifre karşılığında tarayıcıya token; `/account`'a ya da yeni uçlara CORS açmak; bir SPA'yı paketten sunmak; CRM'in React ekranları ve metinleri; kilitli hesabı ayrı bir kodla açığa çıkarmak; BFF paketi (Sonraya bırakılanlar'daki koşul sürüyor); varsayılan HTML sayfalarının tasarımı ya da yerelleştirilmesi; sürüm numarası ve yayın (kullanıcının kararı, D-090 (6)).
+
+**Faz doğrulaması:** `dotnet build NovaCore.slnx -c Release`, `dotnet test NovaCore.slnx` (SQLite, SQL Server ve PostgreSQL katmanları), `bash eng/template-smoke.sh`, her context için `has-pending-model-changes`, lisans kapısı, coverage ve OpenAPI sözleşmesi kapıları (`eng/check-openapi.sh`: yeni uçlar eklemedir, kırıcı değişiklik yok), faz branch'inde CI.

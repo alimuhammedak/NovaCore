@@ -26,6 +26,7 @@
 | 6d | ✅ tamam | `faz/6d-analizor-sikilastirma` | 2026-10-23 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `231b05f`; push 2026-10-23, kullanıcı isteği) |
 | 7a | ✅ tamam | `faz/7a-veritabani-ozgurlugu` | 2026-10-23 | 2026-10-24 | 2026-10-24 (kullanıcı onayı, PR #11 merge commit'i `cf895d8`) |
 | 7b | ✅ tamam | `faz/7b-cok-kiracililik` | 2026-10-24 | 2026-10-25 | 2026-10-27 (kullanıcı onayı, PR #13 merge commit'i `dba8318`) |
+| 8 | ⏳ başlamadı | | | | |
 | 6e | ⏳ başlamadı | | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
@@ -129,6 +130,7 @@ Soru cevaplanınca buraya cevap yazılır. Kalıcı bir karar ortaya çıkarsa D
 | Q-59 | Faz 7a branch'i her adımdan sonra push edilsin mi? (her adımda / yalnız faz sonunda) | Faz 7a başı | **Her adımda** (2026-10-23, kullanıcı; önerilen). PostgreSQL katmanı ve şablonun dört bileşimi CI'da doğrulanır; main'e dokunulmaz |
 | Q-60 | Faz 7b branch'i her adımdan sonra push edilsin mi? (her adımda / yalnız faz sonunda) | Faz 7b başı | **Yalnız faz sonunda** (2026-10-24, kullanıcı; önerilen "her adımda"ydı). Branch yerelde kalır, PR açılırken bir kez push edilir; o güne kadar Docker'lı yerel koşular tek doğrulama |
 | Q-61 | İkinci sürüm hangi numarayla çıksın, açık PR #14 ne olsun? | Sürüm (6e'den önce) | **`v0.1.0` kararlı; önce PR #14 merge edilir** (2026-10-27, kullanıcı; ikisi de önerilen). Kullanıcı önizlemeyi bitirdi, 6e ve diğer denetimleri beklemeden yayın istedi ("gerekirse yeniden çıkarız"); seçim sürüm commit'inin main'e push'u ve tag için onaydır → D-089. **Yayın:** PR #14 merge (`a6dd278`), sürüm commit'i `83b0610` (main CI yeşil), `v0.1.0` tag'i; release.yml run 40510807822 yeşil (`publish` kullanıcı onayıyla), 9 paket (`BMD.NovaCore.*` 8 kütüphane + şablon) GitHub Packages'ta 0.1.0, provenance attestation 60387462 |
+| Q-62 | CRM-Nominal'in React giriş ve davet ekranları (CRM ADR-022) kimlik eklentisine bağlanamıyor: JSON giriş ucu yok, giriş yolu ayar değil, yenileme bağlantıyla, davet yok. D-038 (1) ve D-076 (10) yeniden açılıp "başsız giriş" için bir faz planlansın mı? (evet / şimdilik demo kalsın) | Faz dışı (2026-11-09) | **Evet, fazı planla** (2026-11-09, kullanıcı; önerilen). Kullanıcı ayrıca "kurallara uymayan göstermelik ya da test amaçlı alanlar" araştırmasını istedi: `src/` taramasında yalnız Development'a kilitli parçalar (`LoggingEmailSender`, geçici anahtarlar) ve referans modüller çıktı, açık yok (R-136) → D-090, PLAN Faz 8 |
 
 ## Sonraya bırakılanlar
 
@@ -259,6 +261,12 @@ Plan dışında fark edilen, ama kapsam dışı olduğu için dokunulmayan konul
 ## Son devir notu
 
 > Her oturumun sonunda (faz bitmese bile) en üste yeni bir not eklenir; öncekilerin üzerine yazılmaz, son üç notu aşanlar faz sonunda arşive taşınır (D-082). Bir sonraki oturumun bilmesi gerekenler: nerede kalındığı, neyin yarım kaldığı, sürprizler ve bekleyen sorular.
+
+**2026-11-09, faz dışı: Faz 8 (başsız kimlik arayüzü) planlandı (D-090, R-136, Q-62; branch `plan/faz-8-bassiz-giris`).** CRM-Nominal'in giriş sorunu (CRM ADR-022) kodda doğrulandı: giriş yalnız HTML formuyla, `LoginPath` belgelenmiş bir ayar değil (host'un `ConfigureApplicationCookie`'si ezer, ölçülmedi), JSON forgot/reset ve davet yok. Kullanıcı D-038 (1) ile D-076 (10)'un davet kısmını yeniden açtı. Faz 8, 7b ile 6e arasına girdi (6e son yüzeyi görmeli). Kod değişmedi.
+
+- **Sıradaki:** `/novacore-phase 8`. F8.1 tasarım kararlarıyla başlar; `openiddict-samples`'ın giriş yönlendirmesi, OWASP Forgot Password ve NIST SP 800-63B-4'ün kod kuralları orada okunur (R-136'da okunmadı).
+- **CRM'e:** yeni uçlar gelene kadar Giriş ve Davet ekranları demo kalır ya da CRM geçici bir köprü kurar; köprü güvenlik mantığının ikinci kopyasıdır (CRM ADR-022 (b)), NovaCore'un kararı değil.
+- **Bekleyen soru:** branch'in push'u ve main'e merge'ü kullanıcı onayı ister. Q-40 sürüyor.
 
 **2026-10-27, faz dışı süreç değişikliği: yazan ve doğrulayan oturum ayrıldı (D-088, R-135; branch `surec/ayri-dogrulama-oturumu`).** `/novacore-phase` adımda yalnız build'i, adımın test sınıflarını ve `dotnet format`'ı çalıştırır. Her yazan oturumdan sonra `/novacore-verify` tam testi ve code-review'u ayrı bir oturumda koşar, bulguları fazın `#### Doğrulama` bölümüne yazar ve kod düzeltmez. Faz sonunda faz doğrulamasını, CodeRabbit CLI'ı, PR'ı ve merge sorusunu da doğrulama oturumu yapar. Stop hook artık yalnız build yapıyor. Kod değişmedi; 6e başlamadı.
 
