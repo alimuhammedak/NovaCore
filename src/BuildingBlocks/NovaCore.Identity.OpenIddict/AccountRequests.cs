@@ -64,3 +64,16 @@ public sealed record PasswordResetCodeRequest(
     [Required, EmailAddress, MaxLength(256)] string Email,
     [Required, Length(8, 8)] string Code,
     [Required, Length(15, 128)] string NewPassword);
+
+/// <summary>The body of <c>POST /api/v1/auth/invitations/status</c>.</summary>
+/// <param name="Token">The <c>token</c> of the invitation link.</param>
+public sealed record InvitationTokenRequest([Required, MaxLength(128)] string Token);
+
+/// <summary>The body of <c>POST /api/v1/auth/invitations/accept</c>.</summary>
+/// <param name="Token">The <c>token</c> of the invitation link.</param>
+/// <param name="Password">15 to 128 characters and not a commonly used password; no composition rules (NIST SP 800-63B-4).</param>
+public sealed record InvitationAcceptRequest([Required, MaxLength(128)] string Token, [Required, Length(15, 128)] string Password);
+
+/// <summary>The body of <c>POST /api/v1/admin/invitations</c>.</summary>
+/// <param name="Email">The invited person's email address.</param>
+public sealed record InvitationCreateRequest([Required, EmailAddress, MaxLength(256)] string Email);

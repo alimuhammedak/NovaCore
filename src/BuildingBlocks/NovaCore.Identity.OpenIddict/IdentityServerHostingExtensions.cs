@@ -58,6 +58,16 @@ public static class IdentityServerHostingExtensions
         services.AddSingleton<DummyPasswordHash>();
         services.AddScoped<SignInFlow>();
         services.AddScoped<PasswordResetCodes>();
+        // Public with an internal constructor (Y-23): the options type behind it is internal.
+        services.AddScoped(provider => new AccountInvitations(
+            provider.GetRequiredService<UserManager<ApplicationUser>>(),
+            provider.GetRequiredService<RoleManager<ApplicationRole>>(),
+            provider.GetRequiredService<IdentityServerDbContext>(),
+            provider.GetRequiredService<EmailQueue>(),
+            provider.GetRequiredService<IOptions<JwtOptions>>(),
+            provider.GetRequiredService<IOptions<IdentityServerOptions>>(),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<SecurityAuditLogger>()));
 
         AddEmail(services, builder.Environment);
 
@@ -297,14 +307,27 @@ public static class IdentityServerHostingExtensions
                     permission => permission.StartsWith(IdentityPermissions.Prefix, StringComparison.Ordinal)),
                 "Identity:Seed:UserPermissions can't hold the identity provider's own permissions (identity:*): every "
                 + "registered account gets them.")
+            .ValidateOnStart();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<IdentityServerOptions>, IdentityServerOptionsValidator>());
+
+        services.AddHostedService<IdentityServerSeeder>();
+        AddSignInPaths(services);
+    }
+
+    // The paths of a project's own screens (Identity:SignIn), validated with the rest of the section.
+    private static void AddSignInPaths(IServiceCollection services)
+    {
+        services.AddOptions<IdentityServerOptions>()
             // An absolute or protocol-relative path would send the browser, with its authorization request, to another
             // site (an open redirect, OWASP Unvalidated Redirects; D-091 (3)).
             .Validate(
-                identity => IdentitySignInOptions.IsValidLoginPath(identity.SignIn.LoginPath),
+                identity => IdentitySignInOptions.IsLocalPath(identity.SignIn.LoginPath),
                 "Identity:SignIn:LoginPath must be a path on this host: it starts with a single '/' (not '//' or '/\\') and "
                 + "has no scheme, host, query or fragment, e.g. /sign-in.")
-            .ValidateOnStart();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<IdentityServerOptions>, IdentityServerOptionsValidator>());
+            .Validate(
+                identity => !string.IsNullOrEmpty(identity.SignIn.InvitationPath) && IdentitySignInOptions.IsLocalPath(identity.SignIn.InvitationPath),
+                "Identity:SignIn:InvitationPath must be a path on this host: it starts with a single '/' (not '//' or '/\\') and "
+                + "has no scheme, host, query or fragment, e.g. /accept-invitation.");
 
         // The sign-in cookie's login path is where /connect/authorize's challenge sends a signed-out browser: a project's
         // own screen when it sets one, the provider's page otherwise. Read from the validated options, not at
@@ -315,7 +338,6 @@ public static class IdentityServerHostingExtensions
                 if (!string.IsNullOrEmpty(identity.Value.SignIn.LoginPath))
                     cookie.LoginPath = identity.Value.SignIn.LoginPath;
             });
-        services.AddHostedService<IdentityServerSeeder>();
     }
 
     // An authorization code sent over plain http can be read on the way, except to a native app's own loopback listener,
@@ -355,6 +377,7 @@ public static class IdentityServerHostingExtensions
         SessionEndpoints.Map(endpoints);
         PasswordCodeEndpoints.Map(endpoints);
         AdminEndpoints.Map(endpoints);
+        InvitationEndpoints.Map(endpoints);
         return endpoints;
     }
 }

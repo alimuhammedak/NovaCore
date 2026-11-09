@@ -35,10 +35,19 @@ internal sealed class IdentitySignInOptions
     public string? LoginPath { get; set; }
 
     /// <summary>
-    /// True when <paramref name="path"/> is a path on this host that a cookie's login path can hold: the framework's local
+    /// The project's screen that accepts an invitation, on this host: the emailed link opens it with the invitation as
+    /// <c>token</c> in the query. The provider has no page of its own for it. A path of this host only, like
+    /// <see cref="LoginPath"/>.
+    /// </summary>
+    public string InvitationPath { get; set; } = DefaultInvitationPath;
+
+    public const string DefaultInvitationPath = "/accept-invitation";
+
+    /// <summary>
+    /// True when <paramref name="path"/> is a path on this host that the login path or a link can hold: the framework's local
     /// URL rule without its <c>~/</c> form, and no query or fragment (the handler appends <c>ReturnUrl</c> itself).
     /// </summary>
-    public static bool IsValidLoginPath(string? path) =>
+    public static bool IsLocalPath(string? path) =>
         string.IsNullOrEmpty(path)
         || (path[0] == '/'
             && RedirectHttpResult.IsLocalUrl(path)

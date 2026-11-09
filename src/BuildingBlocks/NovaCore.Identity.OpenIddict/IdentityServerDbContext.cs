@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 namespace NovaCore.Identity.OpenIddict;
 
 /// <summary>
-/// The identity provider's store: ASP.NET Core Identity's users, roles and claims, and OpenIddict's applications,
-/// authorizations, scopes and tokens, all in the <see cref="Schema"/> schema. It carries no migrations: the host
+/// The identity provider's store: ASP.NET Core Identity's users, roles and claims, OpenIddict's applications,
+/// authorizations, scopes and tokens, and the account invitations, all in the <see cref="Schema"/> schema. It carries no migrations: the host
 /// registers it with its database provider (<c>AddModuleDbContext</c>) and keeps the migrations in its own assembly
 /// (<c>MigrationsAssembly</c>).
 /// </summary>
@@ -24,5 +24,17 @@ public sealed class IdentityServerDbContext(DbContextOptions<IdentityServerDbCon
 
         builder.HasDefaultSchema(Schema);
         builder.UseOpenIddict();
+
+        builder.Entity<Invitation>(invitation =>
+        {
+            invitation.ToTable("invitations");
+            invitation.HasKey(entry => entry.Id);
+            invitation.Property(entry => entry.TokenHash).HasMaxLength(64).IsFixedLength();
+            invitation.HasIndex(entry => entry.TokenHash).IsUnique();
+            invitation.HasOne(entry => entry.User).WithMany().HasForeignKey(entry => entry.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
     }
+
+    /// <summary>The account invitations (<c>invitations</c>).</summary>
+    internal DbSet<Invitation> Invitations => Set<Invitation>();
 }

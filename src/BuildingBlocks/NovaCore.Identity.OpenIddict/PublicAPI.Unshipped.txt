@@ -1,4 +1,29 @@
 #nullable enable
+NovaCore.Identity.OpenIddict.AccountInvitations
+NovaCore.Identity.OpenIddict.AccountInvitations.InviteAsync(string! email, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Guid>!
+NovaCore.Identity.OpenIddict.InvitationAcceptRequest
+NovaCore.Identity.OpenIddict.InvitationAcceptRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.InvitationAcceptRequest!
+NovaCore.Identity.OpenIddict.InvitationAcceptRequest.Deconstruct(out string! Token, out string! Password) -> void
+NovaCore.Identity.OpenIddict.InvitationAcceptRequest.Equals(NovaCore.Identity.OpenIddict.InvitationAcceptRequest? other) -> bool
+NovaCore.Identity.OpenIddict.InvitationAcceptRequest.InvitationAcceptRequest(string! Token, string! Password) -> void
+NovaCore.Identity.OpenIddict.InvitationAcceptRequest.Password.get -> string!
+NovaCore.Identity.OpenIddict.InvitationAcceptRequest.Password.init -> void
+NovaCore.Identity.OpenIddict.InvitationAcceptRequest.Token.get -> string!
+NovaCore.Identity.OpenIddict.InvitationAcceptRequest.Token.init -> void
+NovaCore.Identity.OpenIddict.InvitationCreateRequest
+NovaCore.Identity.OpenIddict.InvitationCreateRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.InvitationCreateRequest!
+NovaCore.Identity.OpenIddict.InvitationCreateRequest.Deconstruct(out string! Email) -> void
+NovaCore.Identity.OpenIddict.InvitationCreateRequest.Email.get -> string!
+NovaCore.Identity.OpenIddict.InvitationCreateRequest.Email.init -> void
+NovaCore.Identity.OpenIddict.InvitationCreateRequest.Equals(NovaCore.Identity.OpenIddict.InvitationCreateRequest? other) -> bool
+NovaCore.Identity.OpenIddict.InvitationCreateRequest.InvitationCreateRequest(string! Email) -> void
+NovaCore.Identity.OpenIddict.InvitationTokenRequest
+NovaCore.Identity.OpenIddict.InvitationTokenRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.InvitationTokenRequest!
+NovaCore.Identity.OpenIddict.InvitationTokenRequest.Deconstruct(out string! Token) -> void
+NovaCore.Identity.OpenIddict.InvitationTokenRequest.Equals(NovaCore.Identity.OpenIddict.InvitationTokenRequest? other) -> bool
+NovaCore.Identity.OpenIddict.InvitationTokenRequest.InvitationTokenRequest(string! Token) -> void
+NovaCore.Identity.OpenIddict.InvitationTokenRequest.Token.get -> string!
+NovaCore.Identity.OpenIddict.InvitationTokenRequest.Token.init -> void
 NovaCore.Identity.OpenIddict.PasswordForgotRequest
 NovaCore.Identity.OpenIddict.PasswordForgotRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.PasswordForgotRequest!
 NovaCore.Identity.OpenIddict.PasswordForgotRequest.Deconstruct(out string! Email) -> void
@@ -37,6 +62,15 @@ NovaCore.Identity.OpenIddict.SessionSignInRequest.Password.init -> void
 NovaCore.Identity.OpenIddict.SessionSignInRequest.ReturnUrl.get -> string?
 NovaCore.Identity.OpenIddict.SessionSignInRequest.ReturnUrl.init -> void
 NovaCore.Identity.OpenIddict.SessionSignInRequest.SessionSignInRequest(string! Email, string! Password, string? ReturnUrl) -> void
+override NovaCore.Identity.OpenIddict.InvitationAcceptRequest.Equals(object? obj) -> bool
+override NovaCore.Identity.OpenIddict.InvitationAcceptRequest.GetHashCode() -> int
+override NovaCore.Identity.OpenIddict.InvitationAcceptRequest.ToString() -> string!
+override NovaCore.Identity.OpenIddict.InvitationCreateRequest.Equals(object? obj) -> bool
+override NovaCore.Identity.OpenIddict.InvitationCreateRequest.GetHashCode() -> int
+override NovaCore.Identity.OpenIddict.InvitationCreateRequest.ToString() -> string!
+override NovaCore.Identity.OpenIddict.InvitationTokenRequest.Equals(object? obj) -> bool
+override NovaCore.Identity.OpenIddict.InvitationTokenRequest.GetHashCode() -> int
+override NovaCore.Identity.OpenIddict.InvitationTokenRequest.ToString() -> string!
 override NovaCore.Identity.OpenIddict.PasswordForgotRequest.Equals(object? obj) -> bool
 override NovaCore.Identity.OpenIddict.PasswordForgotRequest.GetHashCode() -> int
 override NovaCore.Identity.OpenIddict.PasswordForgotRequest.ToString() -> string!
@@ -49,6 +83,12 @@ override NovaCore.Identity.OpenIddict.SessionCodeRequest.ToString() -> string!
 override NovaCore.Identity.OpenIddict.SessionSignInRequest.Equals(object? obj) -> bool
 override NovaCore.Identity.OpenIddict.SessionSignInRequest.GetHashCode() -> int
 override NovaCore.Identity.OpenIddict.SessionSignInRequest.ToString() -> string!
+static NovaCore.Identity.OpenIddict.InvitationAcceptRequest.operator !=(NovaCore.Identity.OpenIddict.InvitationAcceptRequest? left, NovaCore.Identity.OpenIddict.InvitationAcceptRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.InvitationAcceptRequest.operator ==(NovaCore.Identity.OpenIddict.InvitationAcceptRequest? left, NovaCore.Identity.OpenIddict.InvitationAcceptRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.InvitationCreateRequest.operator !=(NovaCore.Identity.OpenIddict.InvitationCreateRequest? left, NovaCore.Identity.OpenIddict.InvitationCreateRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.InvitationCreateRequest.operator ==(NovaCore.Identity.OpenIddict.InvitationCreateRequest? left, NovaCore.Identity.OpenIddict.InvitationCreateRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.InvitationTokenRequest.operator !=(NovaCore.Identity.OpenIddict.InvitationTokenRequest? left, NovaCore.Identity.OpenIddict.InvitationTokenRequest? right) -> bool
+static NovaCore.Identity.OpenIddict.InvitationTokenRequest.operator ==(NovaCore.Identity.OpenIddict.InvitationTokenRequest? left, NovaCore.Identity.OpenIddict.InvitationTokenRequest? right) -> bool
 static NovaCore.Identity.OpenIddict.PasswordForgotRequest.operator !=(NovaCore.Identity.OpenIddict.PasswordForgotRequest? left, NovaCore.Identity.OpenIddict.PasswordForgotRequest? right) -> bool
 static NovaCore.Identity.OpenIddict.PasswordForgotRequest.operator ==(NovaCore.Identity.OpenIddict.PasswordForgotRequest? left, NovaCore.Identity.OpenIddict.PasswordForgotRequest? right) -> bool
 static NovaCore.Identity.OpenIddict.PasswordResetCodeRequest.operator !=(NovaCore.Identity.OpenIddict.PasswordResetCodeRequest? left, NovaCore.Identity.OpenIddict.PasswordResetCodeRequest? right) -> bool
@@ -57,3 +97,4 @@ static NovaCore.Identity.OpenIddict.SessionCodeRequest.operator !=(NovaCore.Iden
 static NovaCore.Identity.OpenIddict.SessionCodeRequest.operator ==(NovaCore.Identity.OpenIddict.SessionCodeRequest? left, NovaCore.Identity.OpenIddict.SessionCodeRequest? right) -> bool
 static NovaCore.Identity.OpenIddict.SessionSignInRequest.operator !=(NovaCore.Identity.OpenIddict.SessionSignInRequest? left, NovaCore.Identity.OpenIddict.SessionSignInRequest? right) -> bool
 static NovaCore.Identity.OpenIddict.SessionSignInRequest.operator ==(NovaCore.Identity.OpenIddict.SessionSignInRequest? left, NovaCore.Identity.OpenIddict.SessionSignInRequest? right) -> bool
+static readonly NovaCore.Identity.OpenIddict.AccountInvitations.Lifetime -> System.TimeSpan

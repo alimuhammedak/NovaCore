@@ -40,6 +40,9 @@ public class ValidationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCor
         { "POST", "/api/v1/auth/password/forgot", Json(new { email = "not-an-email" }), ["Email"] },
         { "POST", "/api/v1/auth/password/reset", Json(new { email = "not-an-email", code = "123", newPassword = "too-short" }), ["Code", "Email", "NewPassword"] },
         { "POST", $"/api/v1/admin/users/{SomeId}/roles", Json(new { role = "" }), ["Role"] },
+        { "POST", "/api/v1/auth/invitations/status", Json(new { token = "" }), ["Token"] },
+        { "POST", "/api/v1/auth/invitations/accept", Json(new { token = "", password = "too-short" }), ["Password", "Token"] },
+        { "POST", "/api/v1/admin/invitations", Json(new { email = "not-an-email" }), ["Email"] },
     };
 
     [Theory]
