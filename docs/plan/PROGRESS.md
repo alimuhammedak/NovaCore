@@ -69,7 +69,8 @@ Başlangıç 2026-11-09, `main` @ `f319d57`. Plan onaylandı (plan modu). Kullan
 
 **Bu fazda yapılmayacaklar:** ROPC ya da şifre karşılığında tarayıcıya token; `/account`'a ya da yeni uçlara CORS; paketten SPA sunmak; CRM'in React ekranları ve metinleri; kilitli hesabı ayrı kodla açığa çıkarmak; BFF paketi; HTML sayfalarının tasarımı/yerelleştirilmesi; sürüm numarası ve yayın (D-090 (6)); `MapIdentityApi`; IETF First-Party Apps taslağı.
 
-- [x] F8.1 (commit aşağıda): Tasarım kararları D-091, araştırma R-137 (MS Learn antiforgery ve Identity token sağlayıcıları, OWASP Forgot Password, NIST SP 800-63B-4 §3.1.3/§4.2 — NIST bölümleri araçtan özet olarak geldi, değerler R-137'de işaretli —, openiddict-samples Velusia). Kod yok; build/test gerekmedi. Ön karardan sapma: yok; davetin platform ucu ve ürünün kendi ucu ayrıldı (D-091 (5)).
+- [x] F8.1 (1aaf0f9): Tasarım kararları D-091, araştırma R-137 (MS Learn antiforgery ve Identity token sağlayıcıları, OWASP Forgot Password, NIST SP 800-63B-4 §3.1.3/§4.2 — NIST bölümleri araçtan özet olarak geldi, değerler R-137'de işaretli —, openiddict-samples Velusia). Kod yok; build/test gerekmedi. Ön karardan sapma: yok; davetin platform ucu ve ürünün kendi ucu ayrıldı (D-091 (5)).
+- [x] F8.2 (commit aşağıda): Giriş kuralları `SignInFlow`'da (internal, scoped; D-092), `LoginPage` yalnız form ve HTML. Codex iki kez denendi, ikisinde de model reddedildi (`gpt-6.1-sol`, `gpt-6.1`: "not supported when using Codex with a ChatGPT account"), kod yazmadı; kullanıcı kararıyla adımı yazan oturum yazdı. Kimlik eklentisine `InternalsVisibleTo NovaCore.Api.Tests` (depoda ilk). Yeni `SignInFlowTests` (6) önce kırmızı (servis kayıtlı değil), sonra yeşil; `SignInHardeningTests`, `TwoFactorTests`, `AuthorizationCodeFlowTests`, `TwoFactorRaceTests`, `PasswordResetTests`, `SessionTests` değişmeden yeşil: 87/87. Build 0 uyarı, format temiz. Doğrulamaya kalan: tam paket, SQL Server/PostgreSQL `SignInScenarios`.
 
 ## Açık sorular (Q)
 

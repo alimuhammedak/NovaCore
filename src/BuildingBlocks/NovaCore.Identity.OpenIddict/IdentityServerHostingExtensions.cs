@@ -55,6 +55,7 @@ public static class IdentityServerHostingExtensions
         AddAccountStore(services);
         services.AddSingleton<SecurityAuditLogger>();
         services.AddSingleton<DummyPasswordHash>();
+        services.AddScoped<SignInFlow>();
 
         AddEmail(services, builder.Environment);
 
