@@ -34,13 +34,13 @@ Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıld�
 
 ## Gece koşusu (D-096)
 
-Durum: **hazır, başlamadı.** Kullanıcı `/novacore-night` ile başlatır; kurallar `.claude/skills/novacore-night/SKILL.md`'de. Koşu her turda bu bölümü okur ve günceller.
+Durum: **sürüyor (2026-11-13).** Bir kez kota sınırına takıldı, kaldığı yerden sürdü. Kullanıcı `/novacore-night` ile başlatır; kurallar `.claude/skills/novacore-night/SKILL.md`'de. Koşu her turda bu bölümü okur ve günceller.
 
 ### İş kuyruğu
 
 | # | İş | Durum | Not |
 |---|---|---|---|
-| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ⏳ | İlk CI koşusu `43310617390` (`ee7e2b2`): `build-and-test` (üç veritabanı, coverage), `template-smoke`, `api-contract`, `workflow-lint` yeşil. **Kırmızı:** `secret-scan` (3 bulgu; `main`'de yeşil, yani Faz 8'in aralığında: ilk iş, V8-1) ve `sonar` (aşağıda) |
+| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | 🔄 | İlk CI koşusu `43310617390` (`ee7e2b2`): `build-and-test` (üç veritabanı, coverage), `template-smoke`, `api-contract`, `workflow-lint` yeşil. **Kırmızı:** `secret-scan` (3 bulgu; `main`'de yeşil, yani Faz 8'in aralığında: ilk iş, V8-1) ve `sonar` (aşağıda) |
 | 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | ⏳ | |
 | 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏳ | F6e.3 yerel Docker ister; F6e.4'ün adını verdiği iki araç kurulu değil |
 | 4 | Sabah raporu ve devir notu | ⏳ | |
@@ -81,6 +81,22 @@ Başlangıç 2026-11-09, `main` @ `f319d57`. Plan onaylandı (plan modu). Doğru
 - [x] F8.7 (ac3005a): şablonun BuiltIn kimlik setlerine `Invitations` migration'ı (paketlenmiş şablondan `MyService` projeleri, iki sağlayıcı; `has-pending-model-changes` ikisinde temiz), `appsettings.json`'a `Identity:SignIn` (yorumlu). **Smoke (sekiz bileşim) koşmadı** → doğrulamada.
 - [x] F8.8 (163c4af): README "Kendi giriş ekranı" (akış, aynı kaynak, dev proxy, çerezler, hata kodları → ekran), kimlik eklentisinin CLAUDE.md'si (yeni değişmezler; `LoginPage` → `SignInFlow` atıfları), kök CLAUDE.md, CHANGELOG (Added/Changed, `invitations` için yükseltme notu), memory `novacore-security`.
 - **Oturum sonu koşusu (D-094 (2)):** 19 sınıf (yeni üçü + `ModuleRegistrationTests`, `ValidationTests`, `OpenApiContractTests`, `AdminTests`, `SignInFlowTests`, `SessionSignInTests`, `PasswordResetTests`, `SignInHardeningTests`, `TwoFactorTests`, `TwoFactorRaceTests`, `AuthorizationCodeFlowTests`, `SessionTests`, `IdentityServerConfigurationTests`, `RegistrationTests`, `ConfigurationValidationTests`, `IdentityServerWiringTests`) 215 test: ilk koşuda 1 kırmızı (`AdminTests`, yukarıda), düzeltmeden sonra `AdminTests` 12/12. `PostgreSqlModelTests` 4/4. Build 0 uyarı, format temiz.
+
+#### Doğrulama (gece koşusu, 2026-11-13)
+
+İnceleme: iki Opus okuyan ajanı (`main...HEAD` kod incelemesi, elle: `code-review` skill'i kotaya takıldı; PLAN/DECISIONS denetimi). CodeRabbit CLI koşmadı (oturum açık değil, D-067 (3)). Kapsam ve Yapılmayacaklar temiz.
+
+| ID | Bulgu | Yer | Durum |
+|---|---|---|---|
+| V8-1 | CI `secret-scan`: 3 bulgu, `main..HEAD` aralığında | run `43310617390` | kapatıldı (`5a7a956`): iki test parolası, `tests/` altında birebir allowlist; yeniden tarama temiz |
+| V8-2 | Yanlış kod sayacının `IdentityResult`'ı yok sayılıyor: eşzamanlı yanlış tahminler sayacı düşürür, 5/100 sınırı aşılır | `PasswordResetCodes.cs:107-112` | açık |
+| V8-3 | forgot/reset'te süreyle hesap sayımı: bilinmeyen/onaysız adres hash ve yazma olmadan döner (D-030 (1), D-091 (4)) | `PasswordCodeEndpoints.cs:190-218` | açık |
+| V8-4 | Kilitli ve onaysız hesap hash hesaplamadan döner; D-091 (1) "aynı süre". Test kilitli hesabın hash sayısını sınamıyor | `SignInFlow.cs:51,116` | açık |
+| V8-5 | Davet oluşturmada beklenen hata (`InvalidUserName`, `DuplicateEmail`) exception → 500; `ProducesProblem` yok | `AccountInvitations.cs:156`, `InvitationEndpoints.cs:240,269` | açık |
+| V8-6 | Davet/kod "kullanıldı" işaretlendikten sonra şifre adımı düşerse yanar; yorum "kullanılmamış kalır" diyor | `AccountInvitations.cs:131-142`, `PasswordResetCodes.cs:84-91` | açık |
+| V8-7 | Kuralı yakalamayan/eksik testler: onaysız hesabın reset'i, kabul etmeden giriş (totolojik), davetin tek kullanım yarışı, `InvitationPath` doğrulaması, `/password` ve `/invitations` CORS'u (D-095 (6)), JSON 2FA'da kurtarma kodu, `A_new_code_replaces_the_old_one`'daki `if` | `PasswordCodeResetTests`, `InvitationTests`, `SessionSignInTests` | açık |
+
+Yanlış pozitif: kök CLAUDE.md'deki başsız giriş satırının `f6185ab` ile gitmesi (kullanıcının bilinçli küçültmesi; bilgi kimlik eklentisinin CLAUDE.md'sinde).
 
 ## Açık sorular (Q)
 
