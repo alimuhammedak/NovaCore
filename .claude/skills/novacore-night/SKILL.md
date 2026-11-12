@@ -37,10 +37,21 @@ Kullanıcının bu skill'i çağırması şunlara izindir, ayrıca sorulmaz:
 
 ## 2. Alt ajanlar
 
+**Sen kod, test ya da belge yazmazsın** (kullanıcı, 2026-11-13: "Her şeyi sen yazma, opus agentlerine böl işleri"). Senin işin kuyruk, brif, denetim (§3.2), PROGRESS ve git/gh komutlarıdır. Kendi yazdığın tek dosyalar `docs/plan/PROGRESS.md`, `PROGRESS-ARSIV.md` ve `SONRAYA-BIRAKILANLAR.md`'dir.
+
+- **Her alt ajan Opus'tur:** `Agent` çağrısında `model: "opus"`, `subagent_type: "general-purpose"`. `effort` verme.
 - **Yazan:** çalışma ağacında aynı anda **bir tane**. Kod, test, belge yazar ve commit'ler.
 - **Okuyan:** paralel, aynı mesajda birden çok `Agent` çağrısıyla. Sınıflandırma, inceleme, denetim, araştırma. Dosya değiştirmez, commit atmaz.
 - Alt ajanın raporu kanıt değildir: commit'i, çalışma ağacını ve build'i kendin görürsün (§3.2).
 - Tam test bir alt ajana da verilmez; CI koşar.
+
+**Boş durma, boşa da harcama:**
+- Yazan çalışırken okuyanları aynı anda çalıştır: sıradaki adımın araştırması, bitmiş commit'lerin incelemesi, Faz 9'un sınıflandırması, 6e'nin denetimleri. Alt ajanlar arka planda yürür; biri bitince haber gelir, beklerken başka iş başlat.
+- Aynı alana dokunan en çok üç küçük alt adımı tek bir yazana ver (her biri yine ayrı commit): her alt ajan soğuk başlar ve plan dosyalarını yeniden okur, küçük işleri tek tek dağıtmak bu maliyeti katlar. Büyük ya da riskli adım tek başına gider.
+- Brifi dar yaz: adımın PLAN satırı, dokunulacak dosyalar, kabul kriteri, bilinen tuzaklar. Alt ajana "depoyu tanı" dedirtme.
+- Alt ajanın dökümünü okuma; yalnız raporunu oku. Eksik bir şey varsa `SendMessage` ile aynı ajana sor, yenisini başlatma.
+- İnceleme `code-review` skill'inin `high` düzeyindedir; `max` ya da `ultra` kullanılmaz.
+- Kaliteden kısılmaz: önce kırmızı test, §3.2'deki denetim ve §4.5'teki merge koşulları hiçbir optimizasyon için atlanmaz.
 
 **Yazan alt ajanın brifi** (her seferinde eksiksiz; alt ajan bu konuşmayı görmez):
 
