@@ -217,7 +217,8 @@ redirects) and the public client: authorize → sign-in form (antiforgery token)
 the given ones. `TokenPruningTests` moves a fake clock by an hour to run a pruning pass; it signs nobody in.
 `TwoFactorRaceTests` makes two requests verifying one authenticator code interleave on every run: its host's store
 contexts carry `UsedCodeRace`, which runs the competing request to its end just before the next save that records a
-used code, so both read the user before either writes.
+used code, so both read the user before either writes. `PasswordCodeResetTests` does the same for many guesses of one
+reset code: `ResetCodeRace` holds every save of a reset code token until the armed number of requests wait there.
 `IdentityServerFixture` shares one host per class; tests that need a different host start their own
 (`IdentityServerTestHost.StartAsync(environment, configure)`). These classes run in the `IdentityServerTestGroup`
 collection, apart from the parallel tests: their CPU load made the `WebApplicationFactory` startup race (R-055) hit

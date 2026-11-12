@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace NovaCore.Identity.OpenIddict;
 
@@ -24,8 +25,10 @@ internal enum ResetCodeOutcome
 /// expiry and wrong tries in a user token, valid 15 minutes, once, for 5 wrong tries. A new code replaces the old one but
 /// not the account's run of wrong tries; at 100 (NIST SP 800-63B-4 §3.2.2) codes stop working until a sign-in or a link
 /// reset succeeds. A wrong code never counts toward Identity's lockout (OWASP Forgot Password: no lockout from a reset).
+/// Every try is counted before its code is compared, and a try whose count is lost to a concurrent request ends the code
+/// (fails closed), so racing guesses get no more tries than sequential ones.
 /// </summary>
-internal sealed class PasswordResetCodes(UserManager<ApplicationUser> users, TimeProvider timeProvider)
+internal sealed class PasswordResetCodes(UserManager<ApplicationUser> users, IdentityServerDbContext db, TimeProvider timeProvider)
 {
     public const int Digits = 8;
     public const int MaxTriesPerCode = 5;
@@ -48,8 +51,10 @@ internal sealed class PasswordResetCodes(UserManager<ApplicationUser> users, Tim
     }
 
     /// <summary>
-    /// Sets <paramref name="newPassword"/> when <paramref name="code"/> is the account's current code. The code is used up
-    /// before the password changes, with the user's concurrency stamp, so two requests with one code change it once.
+    /// Sets <paramref name="newPassword"/> when <paramref name="code"/> is the account's current code. A try is counted
+    /// before the code is compared, and only a counted try is compared: of requests racing with one code, the ones whose
+    /// count can't be saved are refused and end the code. The code is used up before the password changes, with the
+    /// user's concurrency stamp, so two requests with one code change it once.
     /// </summary>
     public async Task<(ResetCodeOutcome Outcome, IReadOnlyList<string> Errors)> RedeemAsync(ApplicationUser user, string code, string newPassword)
     {
@@ -57,15 +62,24 @@ internal sealed class PasswordResetCodes(UserManager<ApplicationUser> users, Tim
             || await ReadCodeAsync(user) is not { } stored)
             return (ResetCodeOutcome.InvalidCode, []);
 
-        if (stored.ExpiresAt <= timeProvider.GetUtcNow())
+        if (stored.ExpiresAt <= timeProvider.GetUtcNow() || stored.Tries >= MaxTriesPerCode)
         {
-            await users.RemoveAuthenticationTokenAsync(user, LoginProvider, CodeToken);
+            await EndCodeAsync(user);
+            return (ResetCodeOutcome.InvalidCode, []);
+        }
+
+        // Counted first: every save carries the user's concurrency stamp, so of requests that read the same tries only
+        // one saves. Another one's guess isn't compared at all, and the code ends, so no try goes uncounted (V8-2).
+        var counted = stored with { Tries = stored.Tries + 1 };
+        if (!(await SaveCodeAsync(user, counted)).Succeeded)
+        {
+            await EndCodeAsync(user);
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
         if (_hasher.VerifyHashedPassword(user, stored.Hash, code) == PasswordVerificationResult.Failed)
         {
-            await CountWrongCodeAsync(user, stored);
+            await CountWrongCodeAsync(user, counted);
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
@@ -78,7 +92,12 @@ internal sealed class PasswordResetCodes(UserManager<ApplicationUser> users, Tim
         }
 
         if (errors.Count > 0)
+        {
+            // The right code isn't a wrong try: its count goes back. If another request saved in between, this save
+            // fails and the try stays counted, the stricter side.
+            await SaveCodeAsync(user, stored);
             return (ResetCodeOutcome.PasswordRejected, errors);
+        }
 
         // Used up first: the save carries the concurrency stamp, so the loser of a race with the same code fails here.
         if (!(await users.RemoveAuthenticationTokenAsync(user, LoginProvider, CodeToken)).Succeeded)
@@ -101,16 +120,22 @@ internal sealed class PasswordResetCodes(UserManager<ApplicationUser> users, Tim
             await users.RemoveAuthenticationTokenAsync(user, LoginProvider, FailuresToken);
     }
 
-    private async Task CountWrongCodeAsync(ApplicationUser user, StoredCode stored)
+    // The code's try is saved already; the account's run of wrong codes follows. A run that can't be saved (another
+    // request saved in between) ends the code instead, so the wrong guess isn't free.
+    private async Task CountWrongCodeAsync(ApplicationUser user, StoredCode counted)
     {
         var failures = await FailuresAsync(user) + 1;
-        await users.SetAuthenticationTokenAsync(user, LoginProvider, FailuresToken, failures.ToString(CultureInfo.InvariantCulture));
-
-        if (stored.Tries + 1 >= MaxTriesPerCode)
-            await users.RemoveAuthenticationTokenAsync(user, LoginProvider, CodeToken);
-        else
-            await SaveCodeAsync(user, stored with { Tries = stored.Tries + 1 });
+        if (!(await users.SetAuthenticationTokenAsync(user, LoginProvider, FailuresToken, failures.ToString(CultureInfo.InvariantCulture))).Succeeded
+            || counted.Tries >= MaxTriesPerCode)
+            await EndCodeAsync(user);
     }
+
+    // Deletes the code in the database, apart from the change tracker: after a save lost to the concurrency stamp, the
+    // context still holds that save's changes, and every later save through UserManager would fail the same way.
+    private async Task EndCodeAsync(ApplicationUser user) =>
+        await db.UserTokens
+            .Where(token => token.UserId == user.Id && token.LoginProvider == LoginProvider && token.Name == CodeToken)
+            .ExecuteDeleteAsync();
 
     private async Task<int> FailuresAsync(ApplicationUser user) =>
         int.TryParse(await users.GetAuthenticationTokenAsync(user, LoginProvider, FailuresToken), NumberStyles.None, CultureInfo.InvariantCulture, out var failures)

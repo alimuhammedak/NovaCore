@@ -129,8 +129,10 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **Password reset with a code** (D-091 (4), D-095 (5)): `PasswordResetCodes` keeps 8 random digits as a
   `PasswordHasher` hash with expiry (15 min) and tries (5) in a user token; a run of 100 wrong codes (another user token)
   blocks codes until `SignInFlow` signs the user in or the link reset succeeds, and both clear it. A wrong code never
-  counts toward lockout. The code is used up with the user's concurrency stamp before the password changes through
-  `ResetPasswordAsync`. Every address gets the same `202` from `/password/forgot`.
+  counts toward lockout. A try is saved (with the user's concurrency stamp) before its code is compared, and only a
+  saved try is compared; a request whose count loses to a concurrent one ends the code (`ExecuteDelete`, apart from the
+  change tracker that still holds the lost save), so racing guesses never get more tries than sequential ones (V8-2).
+  The code is used up with the user's concurrency stamp before the password changes through `ResetPasswordAsync`. Every address gets the same `202` from `/password/forgot`.
 - **Invitations** (D-091 (5), D-095): `AccountInvitations` (public, internal constructor) stores the SHA-256 of a 256-bit
   token in `invitations`, 7 days, accepted once by a conditional update after the password policy passes. A confirmed
   account's invitation sets no password (`invitation.account_exists`), so an invitation can't take an account over.

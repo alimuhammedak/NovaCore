@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using NovaCore.Identity.OpenIddict;
@@ -31,7 +32,13 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
     {
         public CapturingEmailSender Emails { get; } = new();
 
-        protected override void Configure(WebApplicationBuilder builder) => builder.Services.AddSingleton<IEmailSender>(Emails);
+        public ResetCodeRace Race { get; } = new();
+
+        protected override void Configure(WebApplicationBuilder builder)
+        {
+            builder.Services.AddSingleton<IEmailSender>(Emails);
+            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Race));
+        }
     }
 
     [Fact]
@@ -87,6 +94,24 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         for (var attempt = 0; attempt < PasswordResetCodes.MaxTriesPerCode; attempt++)
             await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code = Wrong(code), newPassword = NewPassword }));
 
+        await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword }));
+    }
+
+    // Every request reads the code before any of them writes (ResetCodeRace): a try that can't be counted mustn't be lost.
+    [Fact]
+    public async Task Concurrent_wrong_codes_all_count_so_the_right_code_fails_after_them()
+    {
+        const int guesses = 10;
+        var user = await _host.CreateUserAsync("code-race@novacore.test", Password);
+        using var client = _host.CreateClient();
+        var code = await RequestCodeAsync(client, user.Email!);
+
+        fixture.Race.Arm(guesses);
+        var answers = await Task.WhenAll(Enumerable.Range(1, guesses).Select(offset =>
+            PostAsync(client, Reset, new { email = user.Email, code = Wrong(code, offset), newPassword = NewPassword })));
+
+        foreach (var answer in answers)
+            await AssertInvalidCodeAsync(answer);
         await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword }));
     }
 
@@ -201,8 +226,8 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         Assert.Equal("account.invalid_reset_code", body.RootElement.GetProperty("code").GetString());
     }
 
-    private static string Wrong(string code) =>
-        ((int.Parse(code, CultureInfo.InvariantCulture) + 1) % 100_000_000).ToString("D8", CultureInfo.InvariantCulture);
+    private static string Wrong(string code, int offset = 1) =>
+        ((int.Parse(code, CultureInfo.InvariantCulture) + offset) % 100_000_000).ToString("D8", CultureInfo.InvariantCulture);
 
     private static string CodeIn(SentEmail email) => Code().Match(email.HtmlBody).Groups["code"].Value;
 
