@@ -15,7 +15,7 @@ Yazan oturum (`/novacore-phase`) her adımda yalnız build'i ve adımın kendi t
 
 **Bu oturum yalnız raporlar** (D-088 (2)):
 - `src/`, `tests/`, şablon içeriği (`src/Templates/.../content`), `eng/`, workflow'lar, `.claude/`, PLAN, DECISIONS, RESEARCH, README ve CLAUDE.md dosyalarında hiçbir şeyi değiştirmez; bir düzeltme ne kadar küçük olursa olsun bulgu olarak yazılır.
-- Yalnız `docs/plan/PROGRESS.md`'yi değiştirir; faz sonundaki arşiv için `docs/plan/PROGRESS-ARSIV.md`'yi de (D-082 (3)). Commit mesajı `faz<id>: verify <kısa-hash>`'tir, `<kısa-hash>` doğrulanan HEAD'dir; sonuna oturumun attribution satırı eklenir.
+- Yalnız `docs/plan/PROGRESS.md`'yi, kapanan kayıtları taşımak için `docs/plan/PROGRESS-ARSIV.md`'yi ve kapsam dışı bulgular için `docs/plan/SONRAYA-BIRAKILANLAR.md`'yi değiştirir (D-097). Commit mesajı `faz<id>: verify <kısa-hash>`'tir, `<kısa-hash>` doğrulanan HEAD'dir; sonuna oturumun attribution satırı eklenir.
 - Faz sonunda branch'i push'lar ve PR'ı açar, PR yorumlarına GitHub'da cevap verir (D-067 akışının parçası, ayrıca sorulmaz). Merge'ü sorar.
 
 Kapsam disiplini `/novacore-phase` ile aynıdır: DECISIONS > PLAN > PROGRESS > CLAUDE.md > konuşma. Kullanıcı Türkçe konuşur; raporlar ve sorular Türkçe yazılır.
@@ -31,7 +31,7 @@ Sırayla oku:
    - fazın PLAN bölümünün atıf yaptığı D-kayıtları,
    - bu fazda eklenen ya da değişen kayıtlar: `git diff <faz-tabanı>..HEAD -- docs/plan/DECISIONS.md`. Faz tabanı `git merge-base main HEAD`'dir.
 2. `docs/plan/PLAN.md`: "Genel kurallar" ve **yalnızca hedef fazın** bölümü: adımlar, kabul kriterleri, "Faz doğrulaması".
-3. `docs/plan/PROGRESS.md`: faz tablosundaki satır, fazın `#### Doğrulama` bölümü (son doğrulanan commit, bulgu tablosu), "Sonraya bırakılanlar" (aynı bulguyu iki kez yazmamak için). Fazın adım notlarını ve devir notlarını **şimdi okuma** (§2.4).
+3. `docs/plan/PROGRESS.md`: faz tablosundaki satır ve fazın `#### Doğrulama` bölümü (son doğrulanan commit, bulgu tablosu). Fazın adım notlarını ve devir notunu **şimdi okuma** (§2.4). `docs/plan/SONRAYA-BIRAKILANLAR.md` okunmaz: bir bulguyu oraya yazmadan önce aynısı var mı diye `grep` ile bakılır.
 4. Git: `git status`, `git branch --show-current`, `git log --oneline -15`.
 
 Ardından kontrol et. Biri başarısızsa **dur ve kullanıcıya bildir**:
@@ -39,7 +39,7 @@ Ardından kontrol et. Biri başarısızsa **dur ve kullanıcıya bildir**:
 - **Argüman:** `$ARGUMENTS` boşsa PROGRESS'te `🔄`, `⏸` ya da PR'ı açık olan fazı öner ve sor.
 - **Branch:** fazın `faz/<id>-...` branch'inde misin? Değilse dur.
 - **Çalışma ağacı:** izlenen dosyalarda değişiklik varsa dur: yazan oturum yarım kalmış olabilir.
-- **Aralık:** taban fazın "Son doğrulanan commit"idir; kayıt yoksa faz tabanıdır. Aralık `<taban>..HEAD`'dir. Doğrulanacak kod commit'leri: `git log --oneline <taban>..HEAD -- . ':(exclude)docs/plan/PROGRESS.md' ':(exclude)docs/plan/PROGRESS-ARSIV.md'`.
+- **Aralık:** taban fazın "Son doğrulanan commit"idir; kayıt yoksa faz tabanıdır. Aralık `<taban>..HEAD`'dir. Doğrulanacak kod commit'leri: `git log --oneline <taban>..HEAD -- . ':(exclude)docs/plan/PROGRESS.md' ':(exclude)docs/plan/PROGRESS-ARSIV.md' ':(exclude)docs/plan/SONRAYA-BIRAKILANLAR.md'`.
 - **Mod:**
   - **PR modu:** fazın PR'ı açık (`gh pr list --head <branch> --state open`). §2, sonra §4.
   - **Faz sonu modu:** bütün adımlar `[x]` ve PR yok. §2, sonra koşulları tutarsa §3.
@@ -95,7 +95,7 @@ Ancak inceleme bittikten sonra fazın PROGRESS'teki adım notlarını ve son dev
 
 Bulguları sınıflandır:
 - **Kapsam içi gerçek hata** → `açık` bulgu, sıradaki ID ile (`V<faz>-<n>`, numaralar fazda artar, yeniden kullanılmaz).
-- **Kapsam dışı** → "Sonraya bırakılanlar"a, `(Faz <id> doğrulaması)` önekiyle ve bir *Koşul:* ile.
+- **Kapsam dışı** → `docs/plan/SONRAYA-BIRAKILANLAR.md`'ye, `(Faz <id> doğrulaması)` önekiyle ve bir *Koşul:* ile.
 - **Yanlış pozitif** → yalnız raporda, tek cümleyle.
 
 Fazın `### Faz <id>` bölümünün sonunda, adım listesinin altında, `#### Doğrulama` bölümünü kur ya da güncelle:
@@ -110,7 +110,7 @@ Son doğrulanan commit: `<hash>` (<tarih>; test N/N, atlanan 0; code-review k bu
 
 - "Son doğrulanan commit" incelenen HEAD'dir; açık bulgu olsa da ilerler. Bir sonraki doğrulamanın aralığı bu satırdan başlar. Doğrulama normalde faz sonunda bir kez çalışır (D-093); yazan oturum bu satır yüzünden durmaz.
 - `test N/N` başarılı/toplam test sayısıdır. Atlanan test sayısı 0 değilse (Docker yok) satırı **ilerletme**. Altına "Deneme `<hash>` (<tarih>): atlanan N (<neden>); aralık doğrulanmadı" yaz.
-- Commit: `git add docs/plan/PROGRESS.md` ve `faz<id>: verify <kısa-hash>`. Ara modda push etme; fazın push kararı (ör. Q-59, Q-60) yazan oturumun push'uyla gider.
+- Commit: `git add docs/plan/PROGRESS.md docs/plan/PROGRESS-ARSIV.md docs/plan/SONRAYA-BIRAKILANLAR.md` ve `faz<id>: verify <kısa-hash>`. Ara modda push etme; fazın push kararı (ör. Q-59, Q-60) yazan oturumun push'uyla gider.
 
 Açık bulgu varsa, ya da faz sonu ve PR modunun koşulları tutmuyorsa §5'e geç.
 
@@ -127,8 +127,8 @@ Koşul: bütün adımlar `[x]`, açık bulgu yok, §2.1'deki testler yeşil ve a
 5. **Fazı kapat (PROGRESS):**
    - faz `✅ tamam` ve bitiş tarihi,
    - "Son doğrulanan commit" satırı,
-   - **son devir notu** en üste: yapılanlar, sürprizler, bekleyen sorular, sonraki fazın bilmesi gerekenler; PROGRESS'teki adım notlarından ve fazın D-kayıtlarından derlenir,
-   - **arşiv (D-082 (3)):** bir önceki fazın "Adımlar" bölümünü, son üç devir notundan eskilerini ve üstü çizilmiş "Sonraya bırakılanlar" maddelerini değiştirmeden `PROGRESS-ARSIV.md`'nin ilgili bölümlerine taşı. Biten fazın adımları PROGRESS'te kalır.
+   - **yeni devir notu:** yapılanlar, sürprizler, bekleyen sorular, sonraki fazın bilmesi gerekenler; PROGRESS'teki adım notlarından ve fazın D-kayıtlarından derlenir. Bir önceki not arşivin "Eski devir notları" bölümünün en üstüne taşınır (D-097 (2)),
+   - **arşiv (D-097 (2)):** PROGRESS'te kapanmış ne varsa (cevaplanmış soru, eski devir notu, biten bir fazın adımları) değiştirmeden `PROGRESS-ARSIV.md`'nin ilgili bölümüne taşı. Bu fazın adımları PR merge edilene kadar PROGRESS'te kalır (PR modu bulguları için), merge kaydıyla birlikte taşınır (§4.5).
    - Faz bir konvansiyonu değiştirdiyse README, CLAUDE.md ve memory'nin güncellendiğini kontrol et. Eksikse bu bir bulgudur: faz kapanmaz, yazana dön.
 6. Commit (`faz<id>: verify <kısa-hash>`); çalışma ağacında bir şey kalmasın.
 7. **Push ve PR (D-067 (1)):** `git push -u origin <branch>`, ardından `gh pr create --base main --head <branch>`. Başlık `faz<id>: <faz adı>`. Gövde son devir notunun özeti ve oturumun PR attribution satırıdır. PR'ı açmak sürecin parçasıdır, ayrıca sorulmaz. CodeRabbit kendiliğinden inceler. İncelemeyi bu oturumda bekleme.
@@ -148,7 +148,7 @@ Koşul: fazın PR'ı açık. §2'den sonra (aralıkta yazanın PR düzeltmeleri 
    Cevaplanmış ya da çözülmüş yorumları atla.
 2. **Her yorumu sınıflandır:**
    - **Kapsam içi gerçek hata** → bulgu (kaynak `PR`, yer `dosya:satır` ve yorumun ID'si, ör. `Foo.cs:12 (yorum 4388968154)`), `açık`. Yoruma şimdi değil, düzeltme doğrulanınca cevap verilir (§2.3).
-   - **Kapsam dışı** → "Sonraya bırakılanlar". Yorumu GitHub'da gerekçesiyle yanıtla ("Sonraya bırakılanlar"a alındı, ilgili D/Y ID'si).
+   - **Kapsam dışı** → `docs/plan/SONRAYA-BIRAKILANLAR.md`. Yorumu GitHub'da gerekçesiyle yanıtla ("Sonraya bırakılanlar"a alındı, ilgili D/Y ID'si).
    - **Yanlış pozitif ya da bir D/Y kaydıyla çelişen öneri** → yorumu gerekçesi ve kaydın ID'siyle yanıtla.
 
    Satır yorumuna cevap: `gh api repos/{owner}/{repo}/pulls/<no>/comments/<id>/replies -f body=...`. Konuşma yorumuna cevap: `gh pr comment <no> --body ...`. Düzeltmesi doğrulanan bir yorumun cevabı tek satırdır: düzelten commit'in hash'i ve ne değiştiği. Ardından konuyu çöz:
@@ -163,7 +163,7 @@ Koşul: fazın PR'ı açık. §2'den sonra (aralıkta yazanın PR düzeltmeleri 
    - Onay gelince:
      - `gh pr merge <no> --merge` (merge commit; squash ya da rebase değil, adım commit'leri korunur),
      - `git switch main` ve `git pull --ff-only`,
-     - PROGRESS'te faz tablosunun Merge sütununa ve son devir notuna merge kaydı: tarih, onay, merge commit'i,
+     - PROGRESS'te faz tablosunun Merge sütununa ve son devir notuna merge kaydı: tarih, onay, merge commit'i; fazın `### Faz <id>` bölümü (adımlar ve `#### Doğrulama`) değiştirilmeden arşivin "Adımlar" bölümüne taşınır (D-097 (2)),
      - `faz<id>: record PR #N's merge in PROGRESS` ile commit ve `git push` (D-067 (1): PROGRESS kayıtları doğrudan `main`'e gidebilir).
    - Merge onaylanınca o turda yapılır; CI hâlâ koşuyorsa son yeşil koşunun kodu kapsayıp kapsamadığına bak, tekrar sorma.
 6. **Dur.** Sonraki faza başlama. Kullanıcı onu yeni bir oturumda `/novacore-phase <id>` ile başlatır.

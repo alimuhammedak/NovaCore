@@ -32,7 +32,7 @@ Sırayla ve eksiksiz oku:
 
 1. `docs/plan/DECISIONS.md`: tamamı. Özellikle **Yapılmayacaklar** bölümü. Bu dosya diğer her şeyden önce gelir.
 2. `docs/plan/PLAN.md`: "Genel kurallar" bölümü ve **yalnızca hedef fazın** bölümü.
-3. `docs/plan/PROGRESS.md`: faz tablosu, hedef fazın adımları ve `#### Doğrulama` bölümü, açık sorular, son devir notu. `PROGRESS-ARSIV.md`'yi okuma; eski bir kaydın geçmişi gerekirse orada `grep` ile ara (D-082).
+3. `docs/plan/PROGRESS.md`: tamamı. Yalnız canlı durumu tutar (D-097): faz tablosu, süren fazın adımları ve `#### Doğrulama` bölümü, cevabı beklenen sorular, en son devir notu. Önce `wc -c docs/plan/PROGRESS.md` ile ölç: 25 KB'ı aşıyorsa başka işten önce kapanan kayıtları arşive taşı (biten fazın adımları, eski devir notları, cevaplanmış sorular). `PROGRESS-ARSIV.md`'yi ve `SONRAYA-BIRAKILANLAR.md`'yi okuma; bir kayıt gerekirse orada `grep` ile ara.
 4. Git durumu: `git status`, `git branch --show-current`, `git log --oneline -15`.
 
 Ardından şunları kontrol et. Biri başarısızsa **dur ve kullanıcıya bildir**, çözüm üretmeye başlama:
@@ -88,12 +88,12 @@ Her adım için aynı döngü:
 
    Kırmızıysa düzelt; düzeltme kapsam dışına taşıyorsa §4. Çıktının tamamını bağlama alma: özeti ve hata satırlarını oku. Tam test paketi, coverage, smoke, `check-openapi`, code-review ve CodeRabbit CLI burada **çalışmaz**: `/novacore-verify`'ın işi.
 5. **Commit:** `faz<id>(<adım-id>): <özet>`, sonuna oturumun attribution satırını ekle. Sadece o adımın dosyalarını stage'le (`git add <yol>`); `git add -A` kullanma.
-6. **Kaydet:** PROGRESS'te `- [x] <adım-id> (<kısa-hash>): <kısa not>`. Notta koşulan test sınıflarını ve doğrulamaya kalanları (ör. SQL Server ve PostgreSQL katmanları) yaz.
+6. **Kaydet:** PROGRESS'te `- [x] <adım-id> (<kısa-hash>): <kısa not>`. Not en çok iki satırdır (D-097 (4)): ne yapıldı, koşulan test sınıfları, doğrulamaya kalanlar (ör. SQL Server ve PostgreSQL katmanları). Gerekçe D/R kaydına, ayrıntı commit mesajına yazılır. Bir soru cevaplandıysa satırını cevabıyla arşivin "Cevaplanmış sorular" bölümüne taşı.
 7. **Bilgilendir:** Kullanıcıya tek satır yaz, ör. "F0.3 tamam: strict limiter IP bazlı, 2 yeni test." Adımda kendi aldığın bir karar varsa aynı satıra ekle. Plan onaylandığı için adımlar arasında onay bekleme. Yalnızca §4'teki "sor" durumunda dur.
 
 Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'yi ve PLAN'daki faz bölümünü **yeniden oku**. Kapsam için konuşma özetine güvenme.
 
-**Oturum bütçesi (D-082, D-088):** bir oturumda en fazla 3 adım (kapatılan bulgular dahil) commit'le; adımlar büyükse ya da uzun bir hata ayıklama olduysa daha önce dur. Model her araç çağrısında bütün bağlamı yeniden okur, bu yüzden uzayan oturumun her adımı bir öncekinden pahalıdır ve kullanıcının kotasını eritir. Durunca PROGRESS'e devir notu yaz (nerede kalındı, sıradaki adım, yarım kalan bir şey varsa ne, doğrulamaya kalan test katmanları), fazı `⏸ duraklatıldı` yap ve commit'le. Mesajının son satırı kopyalanacak komut olsun: "Devam: `/clear`, ardından `/novacore-phase <id>`" (`/clear` bağlamı sıfırlar; maliyet açısından yeni oturumla aynıdır). Ara doğrulama yoktur (D-093); yeni oturum §1'deki "Devam eden faz" kuralıyla sürer, plan yeniden onaylatılmaz.
+**Oturum bütçesi (D-082, D-088):** bir oturumda en fazla 3 adım (kapatılan bulgular dahil) commit'le; adımlar büyükse ya da uzun bir hata ayıklama olduysa daha önce dur. Model her araç çağrısında bütün bağlamı yeniden okur, bu yüzden uzayan oturumun her adımı bir öncekinden pahalıdır ve kullanıcının kotasını eritir. Durunca PROGRESS'e devir notu yaz (nerede kalındı, sıradaki adım, yarım kalan bir şey varsa ne, doğrulamaya kalan test katmanları) ve bir önceki notu arşivin "Eski devir notları" bölümünün en üstüne taşı (D-097 (2)); fazı `⏸ duraklatıldı` yap ve commit'le. Mesajının son satırı kopyalanacak komut olsun: "Devam: `/clear`, ardından `/novacore-phase <id>`" (`/clear` bağlamı sıfırlar; maliyet açısından yeni oturumla aynıdır). Ara doğrulama yoktur (D-093); yeni oturum §1'deki "Devam eden faz" kuralıyla sürer, plan yeniden onaylatılmaz.
 
 ## 4. Sapma protokolü
 
@@ -120,7 +120,7 @@ Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'
    |---|---|
    | Adımı tamamlamak için gereken düzeltme; kaynağın net söylediği yol; planlanan yaklaşımın teknik olarak çalışmaması; analyzer veya MS kuralının gerektirdiği public API değişikliği (yayımlanmamış 0.x paket); adım için gereken yeni dosya | **Kendin karar ver ve uygula.** Kalıcıysa DECISIONS'a D-kaydı ekle (ekleme onay istemez), PROGRESS notuna ve adım satırına yaz, CHANGELOG'a işle. Faz raporunda "Kendi aldığım kararlar" altında listele. |
    | Başka bir fazın işi ve şimdi gerekli | O fazı oku. Toplamda şimdi yapmak daha ucuzsa **eksiksiz** yap (D-kaydı, adım ID'si korunur); değilse dokunma. Geçici çözüm yok (Y-45). |
-   | Kapsam dışı ama değerli, şimdi gerekli değil | PROGRESS → "Sonraya bırakılanlar" listesine yaz, **dokunma** (Y-09). |
+   | Kapsam dışı ama değerli, şimdi gerekli değil | `docs/plan/SONRAYA-BIRAKILANLAR.md`'ye yaz (önce aynısı var mı diye `grep` ile bak), **dokunma** (Y-09). |
    | Uyarı çıktı | Önce düzelt. Düzeltme yerine bastırmak ancak MS dokümanının o kural için "When to suppress" bölümünün açıkça izin verdiği kalıcı durumda olur, gerekçe ve kaynakla; bunun dışındaki her bastırma kullanıcıya sorulur ve onayı bir D/Q kaydına yazılır (Y-46). Geçici bastırma yok. |
    | **Sor (`AskUserQuestion`):** bir D/Y kaydıyla çelişki ya da onu yeniden açma; PLAN'ın kullanıcıya bıraktığı ürün veya sahiplik kararı; Microsoft dışı yeni paket; mevcut bir D/Y satırını değiştirmek; merge, push, tag, yayın, silme | Seçenekler, önerin, kaynak (R-ID). |
    | Yapılmayacaklar listesindeki bir şey gerekli görünüyor | **Uygulama.** Gerekçeyi ve kaynağı göster, sor. |
@@ -142,7 +142,7 @@ Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'
 
 1. Son adım (ve varsa son açık bulgu) commit'lenince PLAN'ın "Faz doğrulaması" komutlarını, code-review'u, CodeRabbit CLI'ı ve PR'ı **yapma**: bunları son `/novacore-verify` yapar.
 2. Faz bir konvansiyonu değiştirdiyse README, CLAUDE.md dosyaları ve memory'nin adımlarda güncellendiğini kontrol et (Genel kurallar); eksikse bir adım gibi tamamla ve commit'le.
-3. PROGRESS'e devir notu yaz (yapılanlar, sürprizler, bekleyen sorular, doğrulamaya kalan test katmanları), fazı `⏸ duraklatıldı (faz sonu doğrulaması bekliyor)` yap ve commit'le; çalışma ağacında bir şey kalmasın. Mesajının son satırı: "Doğrulama: `/clear`, ardından `/novacore-verify <id>`".
+3. PROGRESS'e devir notu yaz (yapılanlar, sürprizler, bekleyen sorular, doğrulamaya kalan test katmanları) ve bir önceki notu arşive taşı (D-097 (2)), fazı `⏸ duraklatıldı (faz sonu doğrulaması bekliyor)` yap ve commit'le; çalışma ağacında bir şey kalmasın. Mesajının son satırı: "Doğrulama: `/clear`, ardından `/novacore-verify <id>`".
 4. **PR açıkken** (doğrulama oturumu PR'ı açtıktan sonra): kapsam içi PR bulguları `#### Doğrulama` tablosuna `açık` olarak gelir. Her birini §1'deki gibi kapat, commit'le ve aynı branch'e push'la (`git push`; D-067 akışının parçası, ayrıca sorulmaz). PROGRESS'i commit'le ve push'la; PR'da commit'lenmemiş bir şey kalmasın. Mesajının son satırı: "Doğrulama: `/clear`, ardından `/novacore-verify <id>`". PR yorumlarına GitHub'da cevap vermek, fazı `✅ tamam` yapmak ve merge'ü sormak doğrulama oturumunun işidir.
 5. Aşağıdaki rapor şablonuyla raporla.
 6. **Dur.** Sonraki faza başlama. Kullanıcı sonraki fazı yeni bir oturumda `/novacore-phase <id>` ile başlatacak. "devam" bir sonraki faz için onay **değildir**.

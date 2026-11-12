@@ -19,8 +19,11 @@
 ## Faz sırası ve bağımlılıklar
 
 ```
-0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 4c → 4d → 5 → 6a → 6b → 6c → 6d → 7a → 7b → 8 → 6e
+0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 4c → 4d → 5 → 6a → 6b → 6c → 6d → 7a → 7b → 8 → 9 → 6e
 ```
+9, 2026-11-13'te gece koşusuyla eklendi (D-096); 6e'den önce yürür, çünkü denetimler son kod yüzeyini ve son paket sürümlerini görmeli (D-071 (3)). Gece koşusunda (`/novacore-night`) fazlar aynı koşuda art arda yürür ve merge ön onaylıdır (D-096); onun dışında aşağıdaki kurallar geçerlidir.
+
+
 Bir faza başlamadan önce kendisinden önceki tüm fazlar PROGRESS.md'de "tamam" olarak işaretlenmiş olmalıdır. 4d koşulludur: F4d.1'deki karar fazı gereksiz kılarsa faz `✅ tamam (atlandı)` olarak işaretlenir. 4c ve 4d, 2026-09-28'de tüketici hazırlığı araştırmasıyla eklendi (D-033, [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md)). 6a–6e, 2026-10-21'de güvenlik ve kalite araştırmasıyla eklendi (D-042…D-049, [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-kararlari.md)). 7a ve 7b, 2026-10-23'te CRM-Nominal geçişi değerlendirmesiyle eklendi (D-068…D-071, [proposals/crm-cok-kiracililik.md](proposals/crm-cok-kiracililik.md)). 6e'den önce yürürler: 6e'nin denetimleri son kod yüzeyini görmeli (D-071 (3)). 8, 2026-11-09'da CRM-Nominal'in giriş ekranı sorunuyla eklendi (D-090, R-136); aynı gerekçeyle 6e'den önce yürür.
 
 ---
@@ -368,3 +371,22 @@ Kaynak: [proposals/crm-cok-kiracililik.md](proposals/crm-cok-kiracililik.md) (ku
 **Bu fazda yapılmayacaklar:** ROPC ya da şifre karşılığında tarayıcıya token; `/account`'a ya da yeni uçlara CORS açmak; bir SPA'yı paketten sunmak; CRM'in React ekranları ve metinleri; kilitli hesabı ayrı bir kodla açığa çıkarmak; BFF paketi (Sonraya bırakılanlar'daki koşul sürüyor); varsayılan HTML sayfalarının tasarımı ya da yerelleştirilmesi; sürüm numarası ve yayın (kullanıcının kararı, D-090 (6)).
 
 **Faz doğrulaması:** `dotnet build NovaCore.slnx -c Release`, `dotnet test NovaCore.slnx` (SQLite, SQL Server ve PostgreSQL katmanları), `bash eng/template-smoke.sh`, her context için `has-pending-model-changes`, lisans kapısı, coverage ve OpenAPI sözleşmesi kapıları (`eng/check-openapi.sh`: yeni uçlar eklemedir, kırıcı değişiklik yok), faz branch'inde CI.
+
+---
+
+## Faz 9: Bakım (D-096)
+
+**Amaç:** [SONRAYA-BIRAKILANLAR.md](SONRAYA-BIRAKILANLAR.md)'de birikmiş maddelerin ve açık Dependabot PR'larının 6e'nin denetimlerinden önce kapatılması.
+
+**Kural (D-096 (7)):** Bir madde ancak sınıflandırıldıktan sonra yapılır. Davranış değiştiren ya da hata düzelten madde önce kırmızı testle başlar. Her madde ayrı bir commit'tir (Y-37).
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F9.1 | **Sınıflandırma.** Listedeki her madde `yapılacak` ya da `kalır` olur. `kalır`: koşulu (*Koşul:*) gerçekleşmemiş; bir Y maddesine giriyor; ürün ya da sahiplik kararı; Microsoft dışı yeni paket; bastırma gerektiriyor; ortam ya da upstream işi; maddenin kendisi artık geçersiz (o zaman arşive taşınır). `yapılacak` maddeler dokundukları yere göre alt adımlara gruplanır (F9.2a, F9.2b, …). | PROGRESS | PROGRESS'te tablo: madde, sınıf, neden, alt adım |
+| F9.2 | **Maddeler.** F9.1'in tablosundaki alt adımlar sırayla. Biten madde listeden arşive taşınır (D-097 (3)). | F9.1'in tablosuna göre | Her alt adım: build, adımın test sınıfları, push'taki CI yeşil |
+| F9.3 | **Dependabot PR'ları.** CI'ı yeşil olan merge edilir. Kırmızı olanın güncellemesi faz branch'inde yapılır: `Directory.Packages.props`, lock dosyaları (`--force-evaluate`), gereken kod uyarlaması, action güncellemesinde şablonun pin'leri (`WorkflowPinTests`). Major sürüm, sürüm notları okunarak (R-kaydı). SDK güncellemesi (`global.json`) yalnız o SDK bu makinede kuruluysa. | paketler, workflow'lar, compose | Açık Dependabot PR'ı kalmaz, ya da kalan her biri nedeniyle PROGRESS'te |
+| F9.4 | **Belgeler.** Değişen konvansiyonlar README, CLAUDE.md dosyaları, CHANGELOG ve memory'de. | dokümanlar | — |
+
+**Bu fazda yapılmayacaklar:** Yapılmayacaklar listesindeki hiçbir madde; koşulu gerçekleşmemiş maddeler; Microsoft dışı yeni paket; bastırma; sürüm numarası ve yayın.
+
+**Faz doğrulaması:** faz branch'inin son commit'inde CI yeşil (D-096 (3)).
