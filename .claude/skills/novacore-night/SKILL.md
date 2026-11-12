@@ -37,9 +37,12 @@ Kullanıcının bu skill'i çağırması şunlara izindir, ayrıca sorulmaz:
 
 ## 2. Alt ajanlar
 
-**Sen kod, test ya da belge yazmazsın** (kullanıcı, 2026-11-13: "Her şeyi sen yazma, opus agentlerine böl işleri"). Senin işin kuyruk, brif, denetim (§3.2), PROGRESS ve git/gh komutlarıdır. Kendi yazdığın tek dosyalar `docs/plan/PROGRESS.md`, `PROGRESS-ARSIV.md` ve `SONRAYA-BIRAKILANLAR.md`'dir.
+**Sen kod, test ya da belge yazmazsın** (kullanıcı, 2026-11-13: "Her şeyi sen yazma, opus agentlerine böl işleri"; ardından "sonnet de kullanabilirsin"). Senin işin kuyruk, brif, denetim (§3.2), PROGRESS ve git/gh komutlarıdır. Kendi yazdığın tek dosyalar `docs/plan/PROGRESS.md`, `PROGRESS-ARSIV.md` ve `SONRAYA-BIRAKILANLAR.md`'dir.
 
-- **Her alt ajan Opus'tur:** `Agent` çağrısında `model: "opus"`, `subagent_type: "general-purpose"`. `effort` verme.
+- **Model işe göre seçilir** (`Agent` çağrısında `model`, `subagent_type: "general-purpose"`; `effort` verme):
+  - **Opus:** güvenlik, kimlik ve yetki kodu; hata düzeltmesi; yeni davranış; public API; migration; tasarım kararı isteyen adım; bütün incelemeler ve denetimler.
+  - **Sonnet:** mekanik ve düşük riskli iş: belge, paket sürümü ve lock dosyaları, action pin'leri, yeniden adlandırma, tekrar eden test yardımcılarını birleştirmek, sınıflandırma ve arama gibi okuyan işler. Kuşkuluysa Opus.
+- **Sonnet'in yazdığı her commit incelenir** (kullanıcı, 2026-11-13: "incelemesi yapılmalı, kötü yazmadığından emin olunmalı"). §3.2'deki denetimden sonra, PROGRESS'e `[x]` yazılmadan önce bir Opus okuyan ajanı commit'in diff'ini (`git show <hash>`) adımın PLAN satırına, kabul kriterine ve bu deponun standartlarına karşı okur: doğru mu, eksik mi, kapsam dışına taşmış mı, test gerçekten hatayı yakalıyor mu, belge kodla tutuyor mu. Bulgu varsa bir Opus yazan düzeltir (ayrı commit); bulgu yoksa adım kaydedilir. İnceleme faz sonundaki genel incelemenin (§4.2) yerine geçmez. Sonnet'in okuyan işinin sonucu (ör. sınıflandırma) bir karara dayanak olacaksa Opus örnekleyerek kontrol eder: en az beş maddede bir, `yapılacak` denenlerin hepsi.
 - **Yazan:** çalışma ağacında aynı anda **bir tane**. Kod, test, belge yazar ve commit'ler.
 - **Okuyan:** paralel, aynı mesajda birden çok `Agent` çağrısıyla. Sınıflandırma, inceleme, denetim, araştırma. Dosya değiştirmez, commit atmaz.
 - Alt ajanın raporu kanıt değildir: commit'i, çalışma ağacını ve build'i kendin görürsün (§3.2).
