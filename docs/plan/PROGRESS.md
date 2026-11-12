@@ -40,7 +40,7 @@ Durum: **hazır, başlamadı.** Kullanıcı `/novacore-night` ile başlatır; ku
 
 | # | İş | Durum | Not |
 |---|---|---|---|
-| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ⏳ | Branch 2026-11-13'te push edildi; ilk CI koşusu `43310617390` |
+| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ⏳ | İlk CI koşusu `43310617390` (`ee7e2b2`): `build-and-test` (üç veritabanı, coverage), `template-smoke`, `api-contract`, `workflow-lint` yeşil. **Kırmızı:** `secret-scan` (3 bulgu; `main`'de yeşil, yani Faz 8'in aralığında: ilk iş, V8-1) ve `sonar` (aşağıda) |
 | 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | ⏳ | |
 | 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏳ | F6e.3 yerel Docker ister; F6e.4'ün adını verdiği iki araç kurulu değil |
 | 4 | Sabah raporu ve devir notu | ⏳ | |
@@ -58,6 +58,7 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 
 | İş | Neden | Ne gerekli |
 |---|---|---|
+| `sonar` job'u | "Authentication with the server has failed"; `main`'de de 2026-11-09'dan beri kırmızı (run `42651867223`), kodla ilgisi yok | Kullanıcı `SONAR_TOKEN` secret'ını yeniler. Yenilenene kadar "bütün kontroller yeşil" koşulu tutmaz: PR'lar merge edilmez, fazlar üst üste açılır (D-096 (4)) |
 
 ## Adımlar
 
