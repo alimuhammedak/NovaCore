@@ -41,7 +41,7 @@ Durum: **sürüyor (2026-11-13).** Bir kez kota sınırına takıldı, kaldığ�
 | # | İş | Durum | Not |
 |---|---|---|---|
 | 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ⏸ PR #35 | İki inceleme, on bulgu, hepsi kapalı. `sonar` dışında bütün job'lar yeşil; son push (`6e7fdb6`) run `43392510435`, sonucu Faz 9'un ilk adımında okunur. Merge koşulu `sonar` yüzünden tutmuyor |
-| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | 🔄 | Dependabot #26, #27, #29, #33, #19 merge edildi; F9.1 ve F9.2'nin on alt adımı bitti, V9-1 doğrulandı; F9.3 bitti (inceleniyor); sıradaki F9.4, PR |
+| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | 🔄 | Dependabot #26, #27, #29, #33, #19 merge edildi; F9.1 ve F9.2'nin on alt adımı bitti, V9-1 doğrulandı; Bütün adımlar bitti (F9.1–F9.4), iki inceleme temiz; PR açılıyor |
 | 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏳ | F6e.3 yerel Docker ister; F6e.4'ün adını verdiği iki araç kurulu değil |
 | 4 | Sabah raporu ve devir notu | ⏳ | |
 
@@ -143,13 +143,18 @@ Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. 
 - [x] F9.3 (`13375bd`, `dc06cda`, `94b6db9`, `f475897`, `003b218`; Sonnet, Opus incelemesi sürüyor): codeql init/analyze v4.39.3 (#28, #30), Scalar 2.18.7 (#34), OpenIddict 7.8.0 (#32), Microsoft paketleri 10.0.14 / 10.11.0 + şablonun props'u (#31; L18 kapanır), Jaeger 2.22.0 (#2). Kod uyarlaması yok; R-146…R-149. Kilitli restore ve build temiz. #21 kullanıcıda.
 - Faz sonu incelemesi (Opus, F9.2'nin davranış commit'leri): kapsam içi hata yok. F9.4'e: `src/Modules/CLAUDE.md:69`'daki 404 yönergesi kiracılı context'te `TenantQueryGuard`'a takılır; sorgu sayısı testine alt sınır. Gerisi Sonraya.
 
+- F9.3'ün Opus incelemesi: temiz (sürümler Dependabot'la aynı, kilitli restore hatasız, codeql SHA'sı `v4.39.3`'ün commit'i, yeni geçişli paket yok); üç eksik → F9.3f, F9.4.
+- [x] F9.3f (`38af086`): `dotnet-ef` 10.0.14 (kök ve şablon), bayat servis yorumu. Pkcs: SqlClient 6.1.7 net10'da hâlâ 9.0.11 istiyor, doğrudan referans kalır (Sonraya metni düzeltildi).
+- [x] F9.2k (`82c672d`; R-150): `GetDatabaseValuesAsync` kiracılı context'te `TenantQueryGuard`'a takılıyor (test önce kırmızı); yönerge ve Catalog'un iki handler'ı filtreli `AnyAsync` kalıbına geçti; sorgu sayısı testine alt sınır. 3 sınıf 48/48.
+- [x] F9.4 (`a623cb1`): CHANGELOG `[Unreleased]` (F9.2g/h, bağımlılıklar), README, `tests/CLAUDE.md` (yazan oturum `*.Architecture`'ı da koşar), kimlik eklentisinin CLAUDE.md'si.
+
 #### Doğrulama (Faz 9)
 
 | ID | Bulgu | Yer | Durum |
 |---|---|---|---|
 | V9-1 | CI `build-and-test` kırmızı (run `43395986910`): F9.2e'nin eklediği `Assembly.Load`, Y-20'yi koruyan `ExplicitRegistrationTests`'i kırıyor. Yazan yalnız `ObservabilityTests`'i koştu | `OpenTelemetryHostingExtensions.cs` (`7310497`) | doğrulandı (CI `43399963544`'te `build-and-test` yeşil; `83cea0c`): yeni overload `AddCoreObservability(Assembly)`, host `typeof(Program).Assembly` verir; parametresiz olan sürüm raporlamaz. `ExplicitRegistrationTests` önce kırmızı, `*.Architecture` 27/27 (orkestratör de koştu) |
 
-**Arşive taşındı (2026-11-13):** biten L26, L32, L48, L56, L57, L65, L74, L85; geçersiz L17, L21, L34, L36, L43, L46, L71, L88, L108. **Kısmen, listede kalır:** L25 (`GlobalPackageReference`), L63 (anahtar stratejisi), L94 (kullanılmayan `using`'ler), L96 (CORS bulgusu SonarCloud'da). L18 F9.3 bitince.
+**Arşive taşındı (2026-11-13):** biten L26, L32, L48, L56, L57, L65, L74, L85; geçersiz L17, L21, L34, L36, L43, L46, L71, L88, L108. **Kısmen, listede kalır:** L25 (`GlobalPackageReference`), L63 (anahtar stratejisi), L94 (kullanılmayan `using`'ler), L96 (CORS bulgusu SonarCloud'da). L18 F9.3'le kapandı, arşivde.
 **kalır:** koşul gerçekleşmedi L11–L15, L20, L33, L45, L51, L60, L62, L68, L72 (F9.3'ten sonra yeniden bak), L73, L75–L79, L84, L86, L89, L90, L92, L93, L103–L105, L107, L112, L113, L116–L118, L121–L127 · ürün/public API/tasarım kararı L22, L24, L29–L31, L41, L42, L52–L55, L61, L66, L67, L80–L83, L114 · D-031 (3)'ü yeniden açar L64 · korunan dosya L27, L49, L69, L95 · bastırma L23, L28 · ortam/upstream L19, L35, L58, L91, L102, L115, L119, L120 · kuşkulu L47.
 
 ## Açık sorular (Q)
