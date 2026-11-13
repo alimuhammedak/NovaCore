@@ -210,6 +210,39 @@ public sealed class SessionSignInTests(SignInHardeningTests.Fixture fixture) : I
         Assert.Equal("signed_in", signedIn.RootElement.GetProperty("status").GetString());
     }
 
+    // Like the HTML code step (TwoFactorTests.A_recovery_code_signs_in_once): any case, and once only.
+    [Fact]
+    public async Task A_recovery_code_signs_in_once()
+    {
+        var user = await _host.CreateUserAsync("session-recovery@novacore.test", Password);
+        string[] recoveryCodes;
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var stored = (await users.FindByIdAsync(user.Id.ToString()))!;
+            await users.ResetAuthenticatorKeyAsync(stored);
+            await users.SetTwoFactorEnabledAsync(stored, enabled: true);
+            recoveryCodes = [.. (await users.GenerateNewTwoFactorRecoveryCodesAsync(stored, 10))!];
+        }
+
+        using var browser = new OidcFlow(_host);
+        await SignInAsync(browser, user.Email!, Password);
+        var first = await PostAsync(browser, TwoFactor, new { code = recoveryCodes[0].ToLowerInvariant(), returnUrl = "/connect/authorize" });
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        using (var signedIn = JsonDocument.Parse(await first.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)))
+            Assert.Equal("signed_in", signedIn.RootElement.GetProperty("status").GetString());
+
+        using var again = new OidcFlow(_host);
+        var password = await SignInAsync(again, user.Email!, Password);
+        using (var answer = JsonDocument.Parse(await password.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)))
+            Assert.Equal("two_factor_required", answer.RootElement.GetProperty("status").GetString());
+        var reused = await PostAsync(again, TwoFactor, new { code = recoveryCodes[0] });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, reused.StatusCode);
+        Assert.Equal("account.invalid_code", (await ProblemAsync(reused)).Code);
+    }
+
     [Fact]
     public async Task The_code_step_without_the_password_step_is_refused()
     {
@@ -235,6 +268,36 @@ public sealed class SessionSignInTests(SignInHardeningTests.Fixture fixture) : I
         Assert.NotEmpty(endpoints);
         Assert.All(endpoints, endpoint =>
             Assert.Equal("strict", endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName));
+    }
+
+    // The metadata (above) and the limit itself: the endpoints share the caller's strict window, a tenth of
+    // RateLimiting:PermitLimit (like ForwardedHeadersTests' strict echo endpoint).
+    [Fact]
+    public async Task The_session_endpoints_answer_429_after_the_strict_limit()
+    {
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal) { ["RateLimiting:PermitLimit"] = "30" }));
+        using var browser = new OidcFlow(host);
+        var (token, header) = await AntiforgeryTokenAsync(browser);
+
+        var statuses = new List<HttpStatusCode>();
+        foreach (var path in new[] { Login, TwoFactor, Login, TwoFactor })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative))
+            {
+                Content = JsonContent.Create(new { email = "nobody-session-limit@novacore.test", password = "not the right passphrase", code = "123456" })
+            };
+            request.Headers.Add(header, token);
+            using var response = await browser.Browser.SendAsync(request, TestContext.Current.CancellationToken);
+            statuses.Add(response.StatusCode);
+        }
+        using var antiforgery = await browser.Browser.GetAsync(new Uri("/api/v1/auth/session/antiforgery", UriKind.Relative), TestContext.Current.CancellationToken);
+        statuses.Add(antiforgery.StatusCode);
+
+        // Three requests a window here: the antiforgery token, then one sign-in and one code step.
+        Assert.Equal(
+            [HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized, HttpStatusCode.TooManyRequests, HttpStatusCode.TooManyRequests, HttpStatusCode.TooManyRequests],
+            statuses);
     }
 
     // RFC 9700 §2.6, D-090 (3): a script on another origin mustn't sign in with, or read, the browser's session.
