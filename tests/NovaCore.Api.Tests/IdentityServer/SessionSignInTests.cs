@@ -66,6 +66,48 @@ public sealed class SessionSignInTests(SignInHardeningTests.Fixture fixture) : I
         Assert.Equal(known, unknown);
     }
 
+    // D-091 (1): the same body, status and time. Counted rather than timed: the hash is what takes the time (600,000
+    // PBKDF2 iterations), and SignInManager answers a locked or unconfirmed account before it hashes (R-138).
+    [Fact]
+    public async Task Every_refusal_costs_the_same_password_hashes()
+    {
+        var wrong = await _host.CreateUserAsync("session-cost-wrong@novacore.test", Password);
+        var locked = await _host.CreateUserAsync("session-cost-locked@novacore.test", Password);
+        var unconfirmed = await CreateUnconfirmedAsync("session-cost-unconfirmed@novacore.test");
+        var lockedUnconfirmed = await CreateUnconfirmedAsync("session-cost-locked-unconfirmed@novacore.test");
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            foreach (var user in new[] { locked, lockedUnconfirmed })
+            {
+                var stored = (await users.FindByIdAsync(user.Id.ToString()))!;
+                Assert.True((await users.SetLockoutEndDateAsync(stored, TimeProvider.System.GetUtcNow().AddHours(1))).Succeeded);
+            }
+        }
+        using var browser = new OidcFlow(_host);
+
+        // The first check for an unknown address makes the dummy hash, once per host.
+        await SignInAsync(browser, "nobody-session-cost-warm-up@novacore.test", "not the right passphrase");
+
+        var costs = new List<int>();
+        foreach (var (email, password) in new[]
+        {
+            ("nobody-session-cost@novacore.test", "not the right passphrase"),
+            (wrong.Email!, "not the right passphrase"),
+            (locked.Email!, Password),
+            (unconfirmed.Email!, "not the right passphrase"),
+            (lockedUnconfirmed.Email!, Password),
+        })
+        {
+            var before = fixture.PasswordChecks.Count;
+            using var answer = await SignInAsync(browser, email, password);
+            Assert.Equal(HttpStatusCode.Unauthorized, answer.StatusCode);
+            costs.Add(fixture.PasswordChecks.Count - before);
+        }
+
+        Assert.Equal([1, 1, 1, 1, 1], costs);
+    }
+
     [Fact]
     public async Task An_unconfirmed_account_hears_about_its_email_only_with_the_right_password()
     {
@@ -213,6 +255,15 @@ public sealed class SessionSignInTests(SignInHardeningTests.Fixture fixture) : I
         var response = await client.SendAsync(preflight, TestContext.Current.CancellationToken);
 
         Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+    }
+
+    private async Task<ApplicationUser> CreateUnconfirmedAsync(string email)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = new ApplicationUser { UserName = email, Email = email, CreatedAtUtc = TimeProvider.System.GetUtcNow() };
+        Assert.True((await users.CreateAsync(user, Password)).Succeeded);
+        return user;
     }
 
     private static async Task<HttpResponseMessage> SignInAsync(OidcFlow browser, string email, string password, string? returnUrl = null) =>

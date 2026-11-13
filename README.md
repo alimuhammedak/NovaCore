@@ -981,8 +981,8 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   parola hiçbir dış servise gitmez.
 - **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**, hatalı 2FA ya da kurtarma kodu da sayılır), giriş sayfası, token ucu ve
   hesap API'sinde rate limiting (`strict`), bilinmeyen hesap / yanlış parola / kilitli hesap için **tek hata mesajı**.
-  Bilinmeyen e-posta da bir parola hash'i doğrular (host'un hasher'ıyla bir kez üretilen sahte hash), böylece yanıt
-  süresi hesabın varlığını ele vermez. Kayıt, parola sıfırlama formu ve onay e-postasını yeniden gönderme e-postayı
+  Bilinmeyen e-posta ve kilitli hesap da bir parola hash'i doğrular (host'un hasher'ıyla bir kez üretilen sahte hash),
+  böylece yanıt süresi hesabın varlığını ya da kilidini ele vermez. Kayıt, parola sıfırlama formu ve onay e-postasını yeniden gönderme e-postayı
   kuyruğa koyup hemen yanıt verir; bir arka plan servisi (`EmailQueue`) host'un `IEmailSender`'ıyla sırayla gönderir.
   Yanıt e-posta sunucusunu beklemediği için süresi de hesabın varlığını ele vermez (OWASP Forgot Password, ASVS 6.3.8).
   Kuyruk bellek içindedir: süreç dururken kuyrukta kalan e-posta kaybolur, kullanıcı linki yeniden ister; gönderim

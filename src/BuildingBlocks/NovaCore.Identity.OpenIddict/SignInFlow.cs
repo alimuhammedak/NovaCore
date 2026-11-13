@@ -23,7 +23,7 @@ internal enum SignInOutcome
 
 /// <summary>
 /// The sign-in rules, in one place for every surface that signs a browser in (the HTML pages, the JSON endpoints, D-090
-/// (2)): lockout, the unconfirmed account, the dummy hash for an unknown account, the two-factor step with an
+/// (2)): lockout, the unconfirmed account, the dummy hash for an unknown or locked account, the two-factor step with an
 /// authenticator or a recovery code, and the audit log. The caller reads the input and renders the outcome.
 /// </summary>
 internal sealed class SignInFlow(
@@ -48,7 +48,11 @@ internal sealed class SignInFlow(
             return SignInOutcome.InvalidCredentials;
         }
 
-        var result = await signIn.PasswordSignInAsync(user, password, isPersistent: false, lockoutOnFailure: true);
+        // SignInManager answers a locked account before it looks at the password, so the password is checked against the
+        // dummy hash first: a locked account costs a hash like a wrong password (D-091 (1), docs/plan/RESEARCH.md R-138).
+        var result = await users.IsLockedOutAsync(user)
+            ? LockedOut(password)
+            : await signIn.PasswordSignInAsync(user, password, isPersistent: false, lockoutOnFailure: true);
         if (result.IsNotAllowed)
             result = await CheckUnconfirmedAsync(user, password);
 
@@ -114,13 +118,21 @@ internal sealed class SignInFlow(
     private async Task<SignInResult> CheckUnconfirmedAsync(ApplicationUser user, string password)
     {
         if (await users.IsLockedOutAsync(user))
-            return SignInResult.LockedOut;
+            return LockedOut(password);
 
         if (await users.CheckPasswordAsync(user, password))
             return SignInResult.NotAllowed;
 
         await users.AccessFailedAsync(user);
         return await users.IsLockedOutAsync(user) ? SignInResult.LockedOut : SignInResult.Failed;
+    }
+
+    // A locked account's password isn't checked (a right one mustn't get in or learn anything), but it costs the same
+    // hash, so the answer doesn't come sooner than for a wrong password.
+    private SignInResult LockedOut(string password)
+    {
+        dummyHash.Check(hasher, password);
+        return SignInResult.LockedOut;
     }
 
     // SignInManager redeems a recovery code without looking at lockout and doesn't count a wrong one: "codes are expected

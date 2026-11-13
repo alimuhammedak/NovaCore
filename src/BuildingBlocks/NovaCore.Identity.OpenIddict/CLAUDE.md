@@ -51,8 +51,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **Anti-enumeration:** the sign-in page shows one message for an unknown account, a wrong password and a locked
   account; the "confirm your email" message comes only after the right password. `SignInManager` answers `NotAllowed`
   before it looks at the password, so `SignInFlow` checks the password itself and counts a wrong one (D-030 (1)).
-  An unknown email costs a password hash like a known one (`DummyPasswordHash`, made once by the host's hasher), so the
-  answer's timing doesn't reveal accounts either (R-087). Registration answers an existing address like a new one.
+  An unknown email and a locked account cost a password hash like a wrong password (`DummyPasswordHash`, made once by
+  the host's hasher; `SignInManager` answers a locked account before the password), so the answer's timing doesn't
+  reveal accounts either (R-087, R-138). Registration answers an existing address like a new one.
   Resending the confirmation answers every address alike and emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
   account; the reset page answers an unknown or unconfirmed account like a bad token (R-084). Those three never wait
   for the mail server: they queue the email (`EmailQueue`, a bounded in-memory channel read by a `BackgroundService`

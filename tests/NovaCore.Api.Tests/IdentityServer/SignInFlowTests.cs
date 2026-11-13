@@ -9,13 +9,14 @@ namespace NovaCore.Api.Tests.IdentityServer;
 /// <summary>
 /// The sign-in rules every surface shares (PLAN F8.2, D-090 (2)): one outcome for an unknown account, a wrong password
 /// and a locked one, lockout after five failures, the "confirm your email" outcome only after the right password, and
-/// the two-factor step. The pages' own tests (<see cref="SignInHardeningTests"/>, <see cref="TwoFactorTests"/>) check
+/// the two-factor step, and one password hash for every refusal. The pages' own tests (<see cref="SignInHardeningTests"/>, <see cref="TwoFactorTests"/>) check
 /// what the browser sees.
 /// </summary>
 [Collection(IdentityServerTestGroup.Name)]
-public sealed class SignInFlowTests(IdentityServerFixture fixture) : IClassFixture<IdentityServerFixture>
+public sealed class SignInFlowTests(SignInHardeningTests.Fixture fixture) : IClassFixture<SignInHardeningTests.Fixture>
 {
     private const string Password = "a long passphrase for tests";
+    private const string WrongPassword = "not the right passphrase";
 
     private readonly IdentityServerTestHost _host = fixture.Host;
 
@@ -57,6 +58,35 @@ public sealed class SignInFlowTests(IdentityServerFixture fixture) : IClassFixtu
         Assert.Equal(SignInOutcome.EmailNotConfirmed, await PasswordAsync(user.Email!, Password));
     }
 
+    // The answers are alike (above) and so is their cost: one password hash whichever account it is, so the time of the
+    // answer doesn't tell a locked or unconfirmed account from an unknown one (D-030 (1), D-091 (1)). SignInManager
+    // answers a locked or unconfirmed account before it hashes the password (docs/plan/RESEARCH.md R-138).
+    [Fact]
+    public async Task Every_refusal_costs_the_same_password_hashes()
+    {
+        var wrong = await _host.CreateUserAsync("flow-cost-wrong@novacore.test", Password);
+        var locked = await _host.CreateUserAsync("flow-cost-locked@novacore.test", Password);
+        await LockOutAsync(locked);
+        var unconfirmed = await CreateUnconfirmedUserAsync("flow-cost-unconfirmed@novacore.test");
+        var lockedUnconfirmed = await CreateUnconfirmedUserAsync("flow-cost-locked-unconfirmed@novacore.test");
+        await LockOutAsync(lockedUnconfirmed);
+
+        // The first check for an unknown address makes the dummy hash, once per host.
+        await PasswordAsync("flow-cost-warm-up@novacore.test", WrongPassword);
+
+        var costs = new[]
+        {
+            await PasswordHashesOfAsync("flow-cost-nobody@novacore.test", WrongPassword),
+            await PasswordHashesOfAsync(wrong.Email!, WrongPassword),
+            await PasswordHashesOfAsync(locked.Email!, Password),
+            await PasswordHashesOfAsync(unconfirmed.Email!, WrongPassword),
+            await PasswordHashesOfAsync(lockedUnconfirmed.Email!, Password),
+        };
+
+        Assert.Equal([1, 1, 1, 1, 1], costs.Select(cost => cost.Hashes));
+        Assert.All(costs, cost => Assert.Equal(SignInOutcome.InvalidCredentials, cost.Outcome));
+    }
+
     [Fact]
     public async Task An_account_with_two_factor_authentication_needs_the_code_step()
     {
@@ -88,6 +118,21 @@ public sealed class SignInFlowTests(IdentityServerFixture fixture) : IClassFixtu
         await using var scope = _host.Services.CreateAsyncScope();
         UseRequest(scope.ServiceProvider);
         return await scope.ServiceProvider.GetRequiredService<SignInFlow>().PasswordAsync(email, password, ip: null);
+    }
+
+    private async Task<(SignInOutcome Outcome, int Hashes)> PasswordHashesOfAsync(string email, string password)
+    {
+        var before = fixture.PasswordChecks.Count;
+        var outcome = await PasswordAsync(email, password);
+        return (outcome, fixture.PasswordChecks.Count - before);
+    }
+
+    private async Task LockOutAsync(ApplicationUser user)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var stored = (await users.FindByIdAsync(user.Id.ToString()))!;
+        Assert.True((await users.SetLockoutEndDateAsync(stored, TimeProvider.System.GetUtcNow().AddHours(1))).Succeeded);
     }
 
     // SignInManager signs in through an HttpContext; the scope's own one stands in for a request.

@@ -1396,3 +1396,13 @@ Bağlam: CRM-Nominal (çok kiracılı eğitim kurumu CRM'i, PostgreSQL) NovaCore
 - Kod: `ResultHttpExtensions.ToHttpResult` hata kodunu zaten ProblemDetails'in `code` uzantısına yazıyor (`ResultHttpExtensions.cs:60`); `ErrorType` `Unauthorized` (401) ve `Forbidden` (403) taşıyor. `/api/v1/auth` grubu `strict` hız sınırlı ve OpenAPI'de, CORS'a açık (bearer API'si); `/account` grubu OpenAPI dışında ve `DisableCorsAttribute` taşıyor. Antiforgery kayıtlı (`IdentityServerHostingExtensions.cs:242`), başlık adı ayarlı değil.
 - Kaynak: https://learn.microsoft.com/aspnet/core/security/anti-request-forgery?view=aspnetcore-10.0 · https://learn.microsoft.com/aspnet/core/security/authentication/accconfirm?view=aspnetcore-10.0 · https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.identity.totpsecuritystampbasedtokenprovider-1?view=aspnetcore-10.0 · https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html · https://pages.nist.gov/800-63-4/sp800-63b.html · https://github.com/openiddict/openiddict-samples/blob/dev/samples/Velusia/Velusia.Server/Controllers/AuthorizationController.cs
 - Sonuç: D-091.
+
+### R-138: Kilitli ve onaysız hesapta `SignInManager`'ın parola hash'i (2026-11-13, faz 8, V8-4; kaynak + kırmızı test)
+- Soru: V8-4 kilitli ve onaysız hesabın parola hash'lenmeden döndüğünü söylüyor; nedeni `PreSignInCheck`'in `CheckPasswordAsync`'ten önce dönmesi mi?
+- Bulgu (dotnet/aspnetcore `release/10.0`, `src/Identity/Core/src/SignInManager.cs`):
+  - `PasswordSignInAsync(TUser, ...)` → `CheckPasswordSignInAsync` → `CheckPasswordSignInCoreAsync`: önce `PreSignInCheck(user)`, hata dönerse `UserManager.CheckPasswordAsync` hiç çağrılmaz.
+  - `PreSignInCheck`: önce `CanSignInAsync` (onaysız e-posta → `NotAllowed`), sonra `IsLockedOut` (→ `LockedOut`). İkisi de hash'ten önce.
+  - NovaCore'da (`SignInFlow`): onaysız ve kilitsiz hesap `CheckUnconfirmedAsync`'te `CheckPasswordAsync` ile hash'lenir (1); kilitli hesap (onaylı ya da değil) hiç hash'lenmez (0). İddia kilitli hesap için doğru; onaysız hesap için yalnız kilitliyken doğru.
+  - Kırmızı test (`SignInFlowTests`, `SessionSignInTests`, sayan hasher): bilinmeyen, yanlış şifre, kilitli, onaysız + yanlış şifre, onaysız + kilitli → `[1, 1, 0, 1, 0]`.
+- Kaynak: https://github.com/dotnet/aspnetcore/blob/release/10.0/src/Identity/Core/src/SignInManager.cs
+- Sonuç: `SignInFlow` kilidi `PasswordSignInAsync`'ten önce kendisi okur; kilitli hesap parolayı `DummyPasswordHash`'e karşı doğrular (gerçek hash'e değil: doğru parola kilitliyken bir şey öğretmemeli) ve `LockedOut` döner; `CheckUnconfirmedAsync`'in kilit dalı da aynı. Kilit sayacı, 2FA ve onaysız hesabın cevabı değişmez.
