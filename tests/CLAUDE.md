@@ -218,7 +218,8 @@ the given ones. `TokenPruningTests` moves a fake clock by an hour to run a pruni
 `TwoFactorRaceTests` makes two requests verifying one authenticator code interleave on every run: its host's store
 contexts carry `UsedCodeRace`, which runs the competing request to its end just before the next save that records a
 used code, so both read the user before either writes. `PasswordCodeResetTests` does the same for many guesses of one
-reset code: `ResetCodeRace` holds every save of a reset code token until the armed number of requests wait there.
+reset code: `ResetCodeRace` holds every save of a reset code token until the armed number of requests wait there, or
+runs a competing request to its end before the next save of the account's run of wrong codes.
 `ConcurrentUserWrite` makes the next save of a new password lose to a concurrent write of the account (it changes the
 user's concurrency stamp through the saving context first), and `AccountCreationRace` holds the saves that add an
 account until the armed number of requests wait there (`InvitationTests`). `InvitationAcceptRace` holds the next

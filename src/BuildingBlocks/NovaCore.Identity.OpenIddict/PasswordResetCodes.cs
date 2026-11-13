@@ -27,8 +27,9 @@ internal enum ResetCodeOutcome
 /// expiry and wrong tries in a user token, valid 15 minutes, once, for 5 wrong tries. A new code replaces the old one but
 /// not the account's run of wrong tries; at 100 (NIST SP 800-63B-4 §3.2.2) codes stop working until a sign-in or a link
 /// reset succeeds. A wrong code never counts toward Identity's lockout (OWASP Forgot Password: no lockout from a reset).
-/// Every try is counted before its code is compared, and a try whose count is lost to a concurrent request ends the code
-/// (fails closed), so racing guesses get no more tries than sequential ones.
+/// Every try is counted, on the code and in the account's run, in one save before its code is compared; a try whose save
+/// is lost to a concurrent request isn't compared and ends the code (fails closed), so racing guesses get no more tries,
+/// and no more uncounted ones, than sequential ones.
 /// </summary>
 internal sealed class PasswordResetCodes(
     UserManager<ApplicationUser> users,
@@ -75,15 +76,16 @@ internal sealed class PasswordResetCodes(
 
     /// <summary>
     /// Sets <paramref name="newPassword"/> when <paramref name="code"/> is the account's current code. A try is counted
-    /// before the code is compared, and only a counted try is compared: of requests racing with one code, the ones whose
-    /// count can't be saved are refused and end the code. The code is used up before the password changes, with the
+    /// (the code's tries and the account's run, one save) before the code is compared, and only a counted try is
+    /// compared: of requests racing with one code, the ones whose count can't be saved are refused and end the code. The code is used up before the password changes, with the
     /// user's concurrency stamp, so two requests with one code change it once; the code's end and the new password commit
     /// together, so a reset whose password save fails leaves the code usable.
     /// </summary>
     public async Task<(ResetCodeOutcome Outcome, IReadOnlyList<string> Errors)> RedeemAsync(ApplicationUser user, string code, string newPassword)
     {
         // Every refusal before the comparison checks the dummy hash instead: one hash check for every answer.
-        if (await FailuresAsync(user) >= MaxConsecutiveFailures
+        var failures = await FailuresAsync(user);
+        if (failures >= MaxConsecutiveFailures
             || await ReadCodeAsync(user) is not { } stored)
         {
             RedeemForNobody(code);
@@ -97,10 +99,11 @@ internal sealed class PasswordResetCodes(
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
-        // Counted first: every save carries the user's concurrency stamp, so of requests that read the same tries only
-        // one saves. Another one's guess isn't compared at all, and the code ends, so no try goes uncounted (V8-2).
+        // Counted first, the code's tries and the account's run in one save: it carries the user's concurrency stamp, so
+        // of requests that read the account before either wrote (another guess, a new code) only one saves. The other
+        // guesses aren't compared at all, and the code ends, so no compared try goes uncounted (V8-2, V8-9).
         var counted = stored with { Tries = stored.Tries + 1 };
-        if (!(await SaveCodeAsync(user, counted)).Succeeded)
+        if (!await SaveCountAsync(user, counted, failures + 1))
         {
             await EndCodeAsync(user);
             RedeemForNobody(code);
@@ -109,7 +112,9 @@ internal sealed class PasswordResetCodes(
 
         if (hasher.VerifyHashedPassword(user, stored.Hash, code) == PasswordVerificationResult.Failed)
         {
-            await CountWrongCodeAsync(user, counted);
+            // Counted already; the fifth wrong try also ends the code (a later read refuses it either way).
+            if (counted.Tries >= MaxTriesPerCode)
+                await EndCodeAsync(user);
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
@@ -123,9 +128,9 @@ internal sealed class PasswordResetCodes(
 
         if (errors.Count > 0)
         {
-            // The right code isn't a wrong try: its count goes back. If another request saved in between, this save
+            // The right code isn't a wrong try: both counts go back. If another request saved in between, this save
             // fails and the try stays counted, the stricter side.
-            await SaveCodeAsync(user, stored);
+            await SaveCountAsync(user, stored, failures);
             return (ResetCodeOutcome.PasswordRejected, errors);
         }
 
@@ -164,14 +169,22 @@ internal sealed class PasswordResetCodes(
             await users.RemoveAuthenticationTokenAsync(user, LoginProvider, FailuresToken);
     }
 
-    // The code's try is saved already; the account's run of wrong codes follows. A run that can't be saved (another
-    // request saved in between) ends the code instead, so the wrong guess isn't free.
-    private async Task CountWrongCodeAsync(ApplicationUser user, StoredCode counted)
+    // Both tokens in one save: UserManager's SetAuthenticationTokenAsync saves the user once per token, so two calls are
+    // two stamp checks, and the second can lose after the first won. The store's token methods only track the change;
+    // UpdateAsync saves it with the user's concurrency stamp. A run back at zero keeps its token at "0".
+    private async Task<bool> SaveCountAsync(ApplicationUser user, StoredCode code, int failures)
     {
-        var failures = await FailuresAsync(user) + 1;
-        if (!(await users.SetAuthenticationTokenAsync(user, LoginProvider, FailuresToken, failures.ToString(CultureInfo.InvariantCulture))).Succeeded
-            || counted.Tries >= MaxTriesPerCode)
-            await EndCodeAsync(user);
+        await TrackTokenAsync(user, CodeToken, Format(code));
+        await TrackTokenAsync(user, FailuresToken, failures.ToString(CultureInfo.InvariantCulture));
+        return (await users.UpdateAsync(user)).Succeeded;
+    }
+
+    private async Task TrackTokenAsync(ApplicationUser user, string name, string value)
+    {
+        if (await db.UserTokens.FindAsync(user.Id, LoginProvider, name) is { } token)
+            token.Value = value;
+        else
+            db.UserTokens.Add(new IdentityUserToken<Guid> { UserId = user.Id, LoginProvider = LoginProvider, Name = name, Value = value });
     }
 
     // Deletes the code in the database, apart from the change tracker: after a save lost to the concurrency stamp, the
@@ -190,10 +203,13 @@ internal sealed class PasswordResetCodes(
             : 0;
 
     private Task<IdentityResult> SaveCodeAsync(ApplicationUser user, StoredCode code) =>
-        users.SetAuthenticationTokenAsync(user, LoginProvider, CodeToken, string.Join('|',
+        users.SetAuthenticationTokenAsync(user, LoginProvider, CodeToken, Format(code));
+
+    private static string Format(StoredCode code) =>
+        string.Join('|',
             code.ExpiresAt.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture),
             code.Tries.ToString(CultureInfo.InvariantCulture),
-            code.Hash));
+            code.Hash);
 
     private async Task<StoredCode?> ReadCodeAsync(ApplicationUser user)
     {

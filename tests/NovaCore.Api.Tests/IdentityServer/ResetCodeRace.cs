@@ -18,6 +18,7 @@ public sealed class ResetCodeRace : SaveChangesInterceptor
     private int _waiting;
     private int _expected;
     private TaskCompletionSource? _release;
+    private Func<Task>? _competitor;
 
     /// <summary>Holds the next saves of reset code tokens until <paramref name="requests"/> of them are waiting.</summary>
     public void Arm(int requests)
@@ -30,24 +31,55 @@ public sealed class ResetCodeRace : SaveChangesInterceptor
         }
     }
 
+    /// <summary>
+    /// Runs <paramref name="competitor"/> (once) to its end before the next save that writes an account's run of wrong
+    /// codes (<c>PasswordResetCodeFailures</c>): the competitor reads the account after every earlier save of this
+    /// request and writes before this one.
+    /// </summary>
+    public void RunBeforeNextFailuresSave(Func<Task> competitor)
+    {
+        lock (_gate)
+            _competitor = competitor;
+    }
+
     public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
     {
+        if (TakeCompetitor(eventData.Context!) is { } competitor)
+            await competitor();
+
         // Fewer requests than armed for never reach the gate together: the wait fails the save loudly instead of hanging.
         await Join(eventData.Context!).WaitAsync(MaxWait, cancellationToken);
 
         return await base.SavingChangesAsync(eventData, result, cancellationToken);
     }
 
+    // The competitor's own saves come through here too, disarmed by then.
+    private Func<Task>? TakeCompetitor(DbContext context)
+    {
+        lock (_gate)
+        {
+            if (_competitor is null || !Writes(context, "PasswordResetCodeFailures"))
+                return null;
+
+            var competitor = _competitor;
+            _competitor = null;
+            return competitor;
+        }
+    }
+
+    private static bool Writes(DbContext context, params string[] names) =>
+        context.ChangeTracker.Entries<IdentityUserToken<Guid>>().Any(entry =>
+            entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+            && string.Equals(entry.Entity.LoginProvider, "[NovaCore]", StringComparison.Ordinal)
+            && names.Contains(entry.Entity.Name, StringComparer.Ordinal));
+
     // The saves after the release come through here too, disarmed by then.
     private Task Join(DbContext context)
     {
         lock (_gate)
         {
-            if (_release is null
-                || !context.ChangeTracker.Entries<IdentityUserToken<Guid>>().Any(entry =>
-                    entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
-                    && entry.Entity is { LoginProvider: "[NovaCore]", Name: "PasswordResetCode" or "PasswordResetCodeFailures" }))
+            if (_release is null || !Writes(context, "PasswordResetCode", "PasswordResetCodeFailures"))
                 return Task.CompletedTask;
 
             var release = _release;

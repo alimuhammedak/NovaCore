@@ -130,9 +130,11 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **Password reset with a code** (D-091 (4), D-095 (5)): `PasswordResetCodes` keeps 8 random digits as a
   `PasswordHasher` hash with expiry (15 min) and tries (5) in a user token; a run of 100 wrong codes (another user token)
   blocks codes until `SignInFlow` signs the user in or the link reset succeeds, and both clear it. A wrong code never
-  counts toward lockout. A try is saved (with the user's concurrency stamp) before its code is compared, and only a
-  saved try is compared; a request whose count loses to a concurrent one ends the code (`ExecuteDelete`, apart from the
-  change tracker that still holds the lost save), so racing guesses never get more tries than sequential ones (V8-2).
+  counts toward lockout. A try is counted on the code and in the account's run in one save (both tokens, the user's
+  concurrency stamp) before its code is compared, and only a counted try is compared; a request whose count loses to a
+  concurrent write (another guess, a new code) isn't compared and ends the code (`ExecuteDelete`, apart from the change
+  tracker that still holds the lost save), so racing guesses never get more tries, on the code or the account, than
+  sequential ones (V8-2, V8-9). A right code gives both counts back.
   The code is used up with the user's concurrency stamp before the password changes through `ResetPasswordAsync`, both
   in one transaction (inside the execution strategy), so a reset that fails leaves the code usable (V8-6).
   Every address gets the same `202` from `/password/forgot`. Both endpoints cost every address one hash of the codes'

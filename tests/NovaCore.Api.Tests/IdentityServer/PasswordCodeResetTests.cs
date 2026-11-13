@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
@@ -144,6 +145,41 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         foreach (var answer in answers)
             await AssertInvalidCodeAsync(answer);
         await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword }));
+    }
+
+    // A guess whose count is saved after its comparison can lose that save to a request that read the account later
+    // (V8-9): the competitor here reads and writes between the guess's earlier saves and its count of the run.
+    [Fact]
+    public async Task Every_compared_wrong_code_counts_toward_the_run_when_guesses_interleave()
+    {
+        var user = await _host.CreateUserAsync("code-run-race@novacore.test", Password);
+        using var client = _host.CreateClient();
+        var code = await RequestCodeAsync(client, user.Email!);
+
+        HttpResponseMessage? competing = null;
+        fixture.Race.RunBeforeNextFailuresSave(async () =>
+            competing = await PostAsync(client, Reset, new { email = user.Email, code = Wrong(code, 2), newPassword = NewPassword }));
+        var first = await PostAsync(client, Reset, new { email = user.Email, code = Wrong(code), newPassword = NewPassword });
+
+        await AssertInvalidCodeAsync(first);
+        await AssertInvalidCodeAsync(competing!);
+        Assert.True(fixture.CodeHashes.ComparisonsOf(user.Id) > 0);
+        Assert.Equal(fixture.CodeHashes.ComparisonsOf(user.Id), await FailuresOfAsync(user));
+    }
+
+    // Asking for a code saves the account too: a /forgot racing a guess mustn't take the guess out of the run (V8-9).
+    [Fact]
+    public async Task A_code_request_racing_a_guess_does_not_take_it_out_of_the_run()
+    {
+        var user = await _host.CreateUserAsync("code-run-forgot@novacore.test", Password);
+        using var client = _host.CreateClient();
+        var code = await RequestCodeAsync(client, user.Email!);
+
+        fixture.Race.RunBeforeNextFailuresSave(async () =>
+            Assert.Equal(HttpStatusCode.Accepted, (await PostAsync(client, Forgot, new { email = user.Email })).StatusCode));
+        await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code = Wrong(code), newPassword = NewPassword }));
+
+        Assert.Equal(fixture.CodeHashes.ComparisonsOf(user.Id), await FailuresOfAsync(user));
     }
 
     // The code is used up before the password changes; a password save lost to a concurrent write of the account
@@ -315,6 +351,15 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         return fixture.CodeHashes.Count - before;
     }
 
+    private async Task<int> FailuresOfAsync(ApplicationUser user)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var stored = await users.GetAuthenticationTokenAsync((await users.FindByIdAsync(user.Id.ToString()))!,
+            PasswordResetCodes.LoginProvider, PasswordResetCodes.FailuresToken);
+        return stored is null ? 0 : int.Parse(stored, CultureInfo.InvariantCulture);
+    }
+
     private async Task SetFailuresAsync(ApplicationUser user, int failures)
     {
         await using var scope = _host.Services.CreateAsyncScope();
@@ -352,12 +397,18 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
     private static partial Regex Code();
 }
 
-/// <summary>The reset codes' hasher (its defaults), counting every hash it makes or checks.</summary>
+/// <summary>
+/// The reset codes' hasher (its defaults), counting every hash it makes or checks, and the checks of each account's code
+/// (a dummy check names a new user, never an account).
+/// </summary>
 public sealed class CountingCodeHasher : PasswordHasher<ApplicationUser>
 {
+    private readonly ConcurrentDictionary<Guid, int> _comparisons = new();
     private int _count;
 
     public int Count => Volatile.Read(ref _count);
+
+    public int ComparisonsOf(Guid userId) => _comparisons.GetValueOrDefault(userId);
 
     public override string HashPassword(ApplicationUser user, string password)
     {
@@ -368,6 +419,7 @@ public sealed class CountingCodeHasher : PasswordHasher<ApplicationUser>
     public override PasswordVerificationResult VerifyHashedPassword(ApplicationUser user, string hashedPassword, string providedPassword)
     {
         Interlocked.Increment(ref _count);
+        _comparisons.AddOrUpdate(user.Id, 1, (_, count) => count + 1);
         return base.VerifyHashedPassword(user, hashedPassword, providedPassword);
     }
 }
