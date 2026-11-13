@@ -58,6 +58,7 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | DA-5 | Davetin "kullanıldı" işareti ve şifre yenileme kodunun silinmesi yeni şifreyle aynı transaction'da commit edilir. | V8-6: şifre kaydı eşzamanlı yazmaya yenilince davet/kod yanıyordu; `0aeeaea` |
 | DA-6 | Kodun deneme sayısı ve hesabın serisi tek kayıtta (tek stamp kontrolü), karşılaştırmadan önce sayılır (DA-1'i tamamlar). | V8-9: ayrı kayıt kaybedilince tahmin seriye yazılmıyordu; `a619a94` |
 | DA-7 | Seed bir client'ı yalnız bir alanı değiştiyse yazar; secret `ValidateClientSecretAsync` ile sınanır, eşleşiyorsa saklı hash korunur. | F9.2f (L56): her açılışta yeniden hash + yazma, çok örnekli açılışta satır yarışı; R-142; `bcfd95e` |
+| DA-8 | Bir eklenti host'un assembly'sini kendisi bulmaz (`Assembly.Load`, `GetEntryAssembly` yok); host `Program.cs`'te açıkça verir. `service.version` için `OpenTelemetry:ServiceVersion` ayarı eklenmedi (Y-19; `OTEL_RESOURCE_ATTRIBUTES` yetiyor). | V9-1 (Y-20'nin testi); `83cea0c` |
 
 ### Kullanıcıya kalanlar
 
@@ -138,7 +139,7 @@ Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. 
 
 | ID | Bulgu | Yer | Durum |
 |---|---|---|---|
-| V9-1 | CI `build-and-test` kırmızı (run `43395986910`): F9.2e'nin eklediği `Assembly.Load`, Y-20'yi koruyan `ExplicitRegistrationTests`'i kırıyor. Yazan yalnız `ObservabilityTests`'i koştu | `OpenTelemetryHostingExtensions.cs` (`7310497`) | açık |
+| V9-1 | CI `build-and-test` kırmızı (run `43395986910`): F9.2e'nin eklediği `Assembly.Load`, Y-20'yi koruyan `ExplicitRegistrationTests`'i kırıyor. Yazan yalnız `ObservabilityTests`'i koştu | `OpenTelemetryHostingExtensions.cs` (`7310497`) | kapatıldı (`83cea0c`): yeni overload `AddCoreObservability(Assembly)`, host `typeof(Program).Assembly` verir; parametresiz olan sürüm raporlamaz. `ExplicitRegistrationTests` önce kırmızı, `*.Architecture` 27/27 (orkestratör de koştu) |
 
 **geçersiz** (arşive): L17, L21, L34, L36, L43, L46, L71, L88, L108; L18 F9.3 bitince (PR #31 kapsıyor).
 **kalır:** koşul gerçekleşmedi L11–L15, L20, L33, L45, L51, L60, L62, L68, L72 (F9.3'ten sonra yeniden bak), L73, L75–L79, L84, L86, L89, L90, L92, L93, L103–L105, L107, L112, L113, L116–L118, L121–L127 · ürün/public API/tasarım kararı L22, L24, L29–L31, L41, L42, L52–L55, L61, L66, L67, L80–L83, L114 · D-031 (3)'ü yeniden açar L64 · korunan dosya L27, L49, L69, L95 · bastırma L23, L28 · ortam/upstream L19, L35, L58, L91, L102, L115, L119, L120 · kuşkulu L47.
