@@ -8,6 +8,8 @@ Stack: **xUnit v3 4.x on Microsoft.Testing.Platform** (test projects are `Output
 a class, repeatable; `*` only at the start or end). A filter needs `--project`: solution-wide, a project with no
 matching test fails the run with exit code 8 (D-063). xUnit's options go after `--`; a solution goes through
 `--solution`. A writing session runs its step's classes this way and leaves the full suite to `/novacore-verify` (D-088).
+It runs the architecture tests with them (`--filter-namespace "*.Architecture"`): they read every project's source
+and references, so a change far from them can break one (a new `Assembly.Load` broke Y-20's test).
 
 ## Two projects
 
@@ -35,13 +37,15 @@ matching test fails the run with exit code 8 (D-063). xUnit's options go after `
   Catalog.Contracts; `NovaCore.Abstractions` has no ASP.NET/EF reference). The testable bans in
   `docs/plan/DECISIONS.md` are tests too: banned packages anywhere in the dependency graph (Y-01/32/33),
   core packages on Microsoft packages only plus the one-way package direction (Y-05, `PackageDependencyTests`, which
-  reads the `src/BuildingBlocks` csproj files and the built assemblies), module references only via `*.Contracts`
+  reads the `src/BuildingBlocks` csproj files, the `Directory.Build.props`/`.targets` above them up to the repo root,
+  and the built assemblies), module references only via `*.Contracts`
   and no extra per-module projects (Y-08/17), no `IRepository`/`IUnitOfWork` or `*Helper`/`*Util`/`*Manager` types
   (Y-15/29), no assembly scanning or `*FromAssembly*` service registration anywhere under `src/` (Y-20; EF's
   `ApplyConfigurationsFromAssembly` is allowed, D-023), scope + build validation on the test host (Y-26),
   no `*.Domain` types in endpoint signatures via ApiExplorer (Y-31), no TODO/FIXME under `src/` (Y-38), every GitHub
   Action pinned to one full commit SHA across the workflows, the template's included (`WorkflowPinTests`, D-051). `Solution`
-  locates the repo root and first-party assemblies.
+  locates the repo root and first-party assemblies, and lists the source files every scan reads (`SourceFiles`, no
+  `bin`/`obj`).
 - **Host wiring** (`Integration/`) — `ModuleRegistrationTests` pin the module order and every module endpoint;
   `ValidationTests` pins the 400 validation ProblemDetails (type, instance, traceId, error keys) of every validated
   request, so a module that forgets `services.AddValidation()` fails here. Update the expected lists when you add or

@@ -1071,7 +1071,8 @@ kaybedemez (409).
   kendisi loglar.
 - **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü
   `Identity:Seed:UserPermissions` listesini alır (Api: `catalog:products:read`, `payments:read`, `payments:create`);
-  opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.
+  opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar. Değişmemiş bir client yeniden
+  yazılmaz, secret'ı hâlâ saklı hash'e uyan client hash'ini korur; birlikte açılan örnekler aynı satırda yarışmaz.
 - **Admin için 2FA zorunlu:** `Administrator` rolü yalnızca 2FA'sı açık hesapta sayılır (çözümleyicide; rolün kendi
   izinleri dahil). Seed admin parolayla girer, 2FA'yı API'den açar; açma ve kapama izin önbelleğini hemen düşürür.
 
