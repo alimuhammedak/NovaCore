@@ -29,7 +29,7 @@ public static class DeleteProduct
     {
         var product = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
         if (product is null)
-            return Result.Failure(Error.NotFound("product.not_found", $"Product '{id}' was not found.")).ToHttpResult();
+            return NotFound(id);
 
         dbContext.Products.Remove(product);
         try
@@ -38,6 +38,11 @@ public static class DeleteProduct
         }
         catch (DbUpdateConcurrencyException)
         {
+            // Deleted after it was read, by another writer or by this delete's own first attempt when a retrying
+            // execution strategy replays it: either way the product is gone.
+            if (await dbContext.Entry(product).GetDatabaseValuesAsync(cancellationToken) is null)
+                return NotFound(id);
+
             // A sale took stock after the product was read (Stock is a concurrency token). The caller reads it again
             // and decides.
             return Result.Failure(Error.Conflict("product.concurrency_conflict",
@@ -46,4 +51,7 @@ public static class DeleteProduct
 
         return Result.Success().ToHttpResult();
     }
+
+    private static Results<NoContent, ProblemHttpResult> NotFound(Guid id) =>
+        Result.Failure(Error.NotFound("product.not_found", $"Product '{id}' was not found.")).ToHttpResult();
 }

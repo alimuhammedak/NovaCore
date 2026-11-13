@@ -174,8 +174,8 @@ PostgreSQL.
 
 `StockRaceApiFactory` (a `FakeClockApiFactory`) plays a concurrent writer for `StockConcurrencyTests`.
 `ChangeStockBeforeNextSave(productId, stock)` makes the next Catalog save that modifies or deletes the product first
-see another connection set its stock. The change lands between the save's read and its write. An update that changes
-nothing sends no `UPDATE`, so the request must really change the product.
+see another connection set its stock (`DeleteProductBeforeNextSave(productId)`: delete the product). The change
+lands between the save's read and its write. An update that changes nothing sends no `UPDATE`, so the request must really change the product.
 
 ## Tokens: an in-memory OpenID Connect issuer
 

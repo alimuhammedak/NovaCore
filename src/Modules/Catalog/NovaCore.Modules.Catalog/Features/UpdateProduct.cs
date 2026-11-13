@@ -40,7 +40,7 @@ public static class UpdateProduct
     {
         var product = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
         if (product is null)
-            return Result.Failure(Error.NotFound("product.not_found", $"Product '{id}' was not found.")).ToHttpResult();
+            return NotFound(id);
 
         product.Update(request.Name, request.Description, request.Price, request.Stock);
         try
@@ -49,6 +49,10 @@ public static class UpdateProduct
         }
         catch (DbUpdateConcurrencyException)
         {
+            // Deleted after it was read: there is nothing left to update.
+            if (await dbContext.Entry(product).GetDatabaseValuesAsync(cancellationToken) is null)
+                return NotFound(id);
+
             // A sale took stock after the product was read (Stock is a concurrency token): writing the requested stock
             // over it would undo the sale. The caller reads the product again and decides.
             return Result.Failure(Error.Conflict("product.concurrency_conflict",
@@ -57,4 +61,7 @@ public static class UpdateProduct
 
         return Result.Success().ToHttpResult();
     }
+
+    private static Results<NoContent, ProblemHttpResult> NotFound(Guid id) =>
+        Result.Failure(Error.NotFound("product.not_found", $"Product '{id}' was not found.")).ToHttpResult();
 }

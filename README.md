@@ -875,8 +875,10 @@ Son birim için gelen iki istek ikisi de 201 alabilir, ama biri sonra Failed olu
 dispatcher turu içinde (yaklaşık 10 sn) `GET /api/v1/payments`'ta görünür; başarısız her teslim bir tur daha ekler.
 
 Stoğa aynı anda yazan iki işlem birbirinin üstüne yazamaz, çünkü `Product.Stock` bir concurrency token'dır. Ürün uç
-noktaları (`PUT`/`DELETE`) okuduktan sonra değişmiş bir stokta 409 `product.concurrency_conflict` döner; rezervasyonun
-teslimi ise düşer ve outbox onu bir sonraki turda güncel stokla yeniden dener.
+noktaları (`PUT`/`DELETE`) okuduktan sonra değişmiş bir stokta 409 `product.concurrency_conflict`, okuduktan sonra
+silinmiş bir üründe 404 `product.not_found` döner; rezervasyonun teslimi ise düşer ve outbox onu bir sonraki turda
+güncel stokla yeniden dener. Bağlantı direnci (`EnableRetryOnFailure`) ilk denemesi uygulanmış bir `DELETE`'i yeniden
+oynatırsa o istek de 404 alır: ürün silinmiştir.
 
 ### Domain event'ler ve outbox
 
@@ -1205,7 +1207,8 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
   nedeni, tekrar teslimde değişiklik olmaması, ödemenin bir kez sonuçlanması. Bir test de akışın tamamını Api host'unda
   gerçek dispatcher'la sahte saati ilerleterek dener (POST'tan Completed'a).
 - **Eşzamanlılık:** son birim için aynı anda gelen iki ödemeden biri Completed, biri Failed olur ve stok 0'da kalır.
-  Bir test interceptor'ı başka bir yazarı taklit eder: okunduktan sonra değişen stok, ürün uçlarında 409 döndürür.
+  Bir test interceptor'ı başka bir yazarı taklit eder: okunduktan sonra değişen stok ürün uçlarında 409, silinen ürün
+  404 döndürür.
   Rezervasyonun teslimi ise düşer ve güncel stokla yeniden denenir.
 - **Kimlik sağlayıcı:** eklenti, yalnızca çekirdek + eklentiden kurulan bir host'ta (`IdentityServer/`) uçtan uca test
   edilir: Authorization Code + PKCE, refresh **rotation** ve **reuse** (zincir iptali), client credentials, sertleştirmeler,

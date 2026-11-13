@@ -66,8 +66,9 @@ they show a cross-module write through events both ways (DECISIONS D-034): a pay
 - **A value that concurrent writes change is a concurrency token** (`Product.Stock`: `IsConcurrencyToken()`,
   application-managed so the SQLite tests enforce it too). A write over a value that changed after it was read then
   throws `DbUpdateConcurrencyException` instead of overwriting it. An endpoint answers 409
-  (`product.concurrency_conflict`) so the caller reads again; an event handler lets it fail, and the outbox retries the
-  delivery on the next pass with a fresh read.
+  (`product.concurrency_conflict`) so the caller reads again, or 404 when the entry's `GetDatabaseValuesAsync()` is
+  null (the row was deleted, R-145); an event handler lets it fail, and the outbox retries the delivery on the next
+  pass with a fresh read.
 - **Guard every endpoint** with `.RequirePermission(<M>Permissions.X)` (or `.RequireAuthorization()` only
   when no finer permission applies).
 - **A tenant's data** (in a host with the multi-tenancy add-on; the repo's modules have none, the template's Todos with

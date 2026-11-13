@@ -14,8 +14,8 @@ namespace NovaCore.Api.Tests.Integration;
 /// <summary>
 /// PLAN F4b.2/F4b.3 (D-035 (3)): stock never goes below zero and a unit is never sold twice, however the writes
 /// interleave. A product's stock is a concurrency token: a write over a stock that changed after it was read fails
-/// instead of overwriting it. The product endpoints then answer 409, and a reservation's delivery is retried by the
-/// outbox on the new stock. <see cref="StockRaceApiFactory"/> plays the other writer, between the read and the write; the
+/// instead of overwriting it. The product endpoints then answer 409 (404 when the product was deleted), and a
+/// reservation's delivery is retried by the outbox on the new stock. <see cref="StockRaceApiFactory"/> plays the other writer, between the read and the write; the
 /// payment tests run through the host's outbox dispatcher.
 /// </summary>
 public sealed class StockConcurrencyTests(StockRaceApiFactory factory) : IClassFixture<StockRaceApiFactory>
@@ -46,6 +46,33 @@ public sealed class StockConcurrencyTests(StockRaceApiFactory factory) : IClassF
 
         await AssertConflictAsync(response);
         Assert.Equal(4, await factory.StockAsync(productId));
+    }
+
+    // F9.2j: a product deleted after it was read is gone, not changed.
+    [Fact]
+    public async Task Updating_a_product_deleted_after_it_was_read_is_not_found()
+    {
+        var productId = await factory.AddProductAsync(stock: 5);
+        using var client = factory.CreateClientWithPermissions(CatalogPermissions.ProductsUpdate);
+        factory.DeleteProductBeforeNextSave(productId);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/v1/products/{productId}", new { name = "Widget", price = 10m, stock = 8 });
+
+        await AssertNotFoundAsync(response);
+    }
+
+    // A DELETE that a retrying execution strategy replays after its first attempt was applied finds no row either.
+    [Fact]
+    public async Task Deleting_a_product_deleted_after_it_was_read_is_not_found()
+    {
+        var productId = await factory.AddProductAsync(stock: 5);
+        using var client = factory.CreateClientWithPermissions(CatalogPermissions.ProductsDelete);
+        factory.DeleteProductBeforeNextSave(productId);
+
+        var response = await client.DeleteAsync(new Uri($"/api/v1/products/{productId}", UriKind.Relative));
+
+        await AssertNotFoundAsync(response);
     }
 
     [Fact]
@@ -89,6 +116,13 @@ public sealed class StockConcurrencyTests(StockRaceApiFactory factory) : IClassF
         var request = Assert.Single(await factory.OutboxMessagesAsync<PaymentsDbContext, PaymentCreated>(paymentId));
         Assert.Equal(1, request.Attempts);
         Assert.Contains(nameof(DbUpdateConcurrencyException), request.Error, StringComparison.Ordinal);
+    }
+
+    private static async Task AssertNotFoundAsync(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("product.not_found", problem.GetProperty("code").GetString());
     }
 
     private static async Task AssertConflictAsync(HttpResponseMessage response)
