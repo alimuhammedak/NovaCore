@@ -144,7 +144,10 @@ public sealed class AccountInvitations
         if (errors.Count > 0)
             return (InvitationState.PasswordRejected, errors);
 
-        // A transaction of our own runs inside the execution strategy, so a retrying strategy retries all of it.
+        // A transaction of our own must run inside the execution strategy (EF Core refuses it outside a retrying one).
+        // A retry can't succeed, though: Identity's saves accept their changes, so after a rolled-back first attempt the
+        // tracked user carries the stamp that attempt wrote, and the replay fails on the concurrency stamp. That is the
+        // safe side (nothing is applied twice); the caller gets a refusal and asks again (R-139).
         var strategy = _store.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(() => MarkAndSetPasswordAsync(invitation, password, cancellationToken));
     }

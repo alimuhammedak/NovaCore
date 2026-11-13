@@ -49,8 +49,9 @@ internal sealed class PasswordResetCodes(
 
     /// <summary>
     /// The codes' hasher in DI: a <see cref="PasswordHasher{TUser}"/> with its defaults, like the recovery codes' (D-053
-    /// (3)), not the host's 600,000 iterations, since a short code with many tries costs a hash each. A singleton, so the
-    /// answers for an address without a code cost the same hasher's work.
+    /// (3)), not the host's 600,000 iterations, since a short code with many tries costs a hash each (D-091 (4)), so not
+    /// the host's <see cref="IPasswordHasher{TUser}"/> either. It is in DI only so a test can count its work (every
+    /// address costs one hash, V8-3); a field would hash the same.
     /// </summary>
     internal const string HasherKey = "NovaCore.PasswordResetCodes";
 
@@ -134,7 +135,7 @@ internal sealed class PasswordResetCodes(
             return (ResetCodeOutcome.PasswordRejected, errors);
         }
 
-        // A transaction of our own runs inside the execution strategy, so a retrying strategy retries all of it.
+        // A transaction of our own runs inside the execution strategy, as EF Core requires (retries: UseUpAndResetAsync).
         var strategy = db.Database.CreateExecutionStrategy();
         var redeemed = await strategy.ExecuteAsync(() => UseUpAndResetAsync(user, newPassword));
         if (redeemed.Outcome == ResetCodeOutcome.Succeeded)
@@ -143,6 +144,9 @@ internal sealed class PasswordResetCodes(
     }
 
     // The code's end and the new password commit together: a reset that fails leaves the code as it was (V8-6).
+    // A retrying strategy's replay can't succeed: Identity's saves accept their changes, so after a rolled-back first
+    // attempt the tracked user carries the stamp that attempt wrote, and the replay fails on the concurrency stamp. That
+    // is the safe side (nothing is applied twice); the caller gets a refusal and asks again (R-139).
     private async Task<(ResetCodeOutcome Outcome, IReadOnlyList<string> Errors)> UseUpAndResetAsync(ApplicationUser user, string newPassword)
     {
         // Disposed without a commit, it rolls back.
