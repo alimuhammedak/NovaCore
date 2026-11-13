@@ -49,8 +49,8 @@ public static class UpdateProduct
         }
         catch (DbUpdateConcurrencyException)
         {
-            // Deleted after it was read: there is nothing left to update.
-            if (await dbContext.Entry(product).GetDatabaseValuesAsync(cancellationToken) is null)
+            // Deleted after it was read: there is nothing left to update (queried as in DeleteProduct).
+            if (!await dbContext.Products.AnyAsync(p => p.Id == id, cancellationToken))
                 return NotFound(id);
 
             // A sale took stock after the product was read (Stock is a concurrency token): writing the requested stock

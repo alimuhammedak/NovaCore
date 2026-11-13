@@ -39,8 +39,9 @@ public static class DeleteProduct
         catch (DbUpdateConcurrencyException)
         {
             // Deleted after it was read, by another writer or by this delete's own first attempt when a retrying
-            // execution strategy replays it: either way the product is gone.
-            if (await dbContext.Entry(product).GetDatabaseValuesAsync(cancellationToken) is null)
+            // execution strategy replays it: either way the product is gone. A query with the filters on, not the entry's
+            // GetDatabaseValuesAsync(), which turns every filter off and fails on a context of tenant entities.
+            if (!await dbContext.Products.AnyAsync(p => p.Id == id, cancellationToken))
                 return NotFound(id);
 
             // A sale took stock after the product was read (Stock is a concurrency token). The caller reads it again

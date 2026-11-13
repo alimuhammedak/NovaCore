@@ -93,6 +93,8 @@ public sealed class IdentityServerPermissionResolverTests(IdentityServerFixture 
 
         Assert.Single(oneRolePermissions);
         Assert.Equal(5, fiveRolesPermissions.Count);
+        // The permissions come from the store, so a count of 0 means the counter saw nothing and the equality proves nothing.
+        Assert.True(oneRoleQueries > 0, "The counter saw none of the resolver's queries.");
         Assert.Equal(oneRoleQueries, fiveRolesQueries);
     }
 
