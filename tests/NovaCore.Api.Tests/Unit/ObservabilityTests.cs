@@ -61,33 +61,34 @@ public class ObservabilityTests
     }
 
     [Fact]
-    public void The_service_version_is_the_host_applications_not_the_add_ons()
+    public void The_service_version_is_the_given_application_assemblys_not_the_add_ons()
     {
-        // Every NovaCore assembly carries the repository's one VersionPrefix, so the host here is an assembly whose version
-        // differs from the add-on's: the resource has to name the application the environment points at.
-        var host = typeof(HostApplicationBuilder).Assembly;
-        var expected = host.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+        // Every NovaCore assembly carries the repository's one VersionPrefix, so the application here is an assembly whose
+        // version differs from the add-on's.
+        var application = typeof(HostApplicationBuilder).Assembly;
+        var expected = application.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
         Assert.DoesNotContain(expected, AddOnVersions(), StringComparer.Ordinal);
 
-        var resource = ResourceOf(host.GetName().Name!);
+        var resource = ResourceOf(builder => builder.AddCoreObservability(application));
 
-        Assert.Equal(host.GetName().Name, resource["service.name"]);
+        Assert.Equal("an-application", resource["service.name"]);
         Assert.Equal(expected, resource["service.version"]);
     }
 
     [Fact]
-    public void An_application_name_that_is_no_assembly_reports_no_service_version()
+    public void Without_the_application_assembly_no_service_version_is_reported()
     {
-        var resource = ResourceOf("not-an-assembly");
+        // Not the add-on's own version in its place: that would name no application.
+        var resource = ResourceOf(builder => builder.AddCoreObservability());
 
-        Assert.Equal("not-an-assembly", resource["service.name"]);
+        Assert.Equal("an-application", resource["service.name"]);
         Assert.False(resource.ContainsKey("service.version"));
     }
 
-    private static Dictionary<string, object> ResourceOf(string applicationName)
+    private static Dictionary<string, object> ResourceOf(Action<HostApplicationBuilder> addObservability)
     {
-        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { ApplicationName = applicationName });
-        builder.AddCoreObservability();
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { ApplicationName = "an-application" });
+        addObservability(builder);
         using var host = builder.Build();
 
         return host.Services.GetRequiredService<TracerProvider>().GetResource().Attributes

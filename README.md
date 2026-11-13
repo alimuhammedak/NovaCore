@@ -90,7 +90,8 @@ cd SiparisServisi && dotnet build && dotnet test         # veritabanı sunucusu 
 | Kök | `nuget.config`, `Directory.Build.props` (uyarılar hata, analyzer'lar, NuGet audit), `Directory.Packages.props` (merkezi sürümler, `NovaCoreVersion`), `global.json`, `.editorconfig`, `dotnet-tools.json` (dotnet-ef, nuget-license), `eng/check-licenses.sh` (lisans kapısı ve projenin adlı istisnaları) |
 
 Log hattı tektir: `AddCoreObservability` log, metrik ve trace'i OpenTelemetry'den geçirir, `OTEL_EXPORTER_OTLP_ENDPOINT`
-varsa OTLP'ye gönderir. Serilog eklentisi (`BMD.NovaCore.Serilog`) isteyen proje için ayrıca durur.
+varsa OTLP'ye gönderir. Kaynağın `service.version`'ı host'un verdiği assembly'nin sürümüdür (`AddCoreObservability(typeof(Program).Assembly)`);
+assembly verilmezse sürüm raporlanmaz. Serilog eklentisi (`BMD.NovaCore.Serilog`) isteyen proje için ayrıca durur.
 
 ### Sorumluluk modeli
 
@@ -746,7 +747,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Eklentiler (üçüncü taraf paketler)
 builder.AddCoreLogging();                          // Serilog: Console + opsiyonel Seq
-builder.AddCoreObservability();                    // OpenTelemetry metrics + tracing, OTLP yalnızca konfigüre ise
+builder.AddCoreObservability(typeof(Program).Assembly); // OpenTelemetry metrics + tracing, service.version uygulamanın; OTLP yalnızca konfigüre ise
 
 // Çekirdek
 builder.AddCoreDefaults();                         // health + resilient HttpClients

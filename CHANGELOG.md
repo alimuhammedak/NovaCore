@@ -33,9 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `AddCoreObservability` (`NovaCore.OpenTelemetry`): the resource's `service.version` is the application's version,
-  read from the assembly `IHostEnvironment.ApplicationName` names (its informational version, else its assembly version),
-  not the add-on's own. An application name that is no assembly reports no version.
+- `AddCoreObservability` (`NovaCore.OpenTelemetry`) no longer reports the add-on's own version as the resource's
+  `service.version`. The new overload `AddCoreObservability(Assembly applicationAssembly)` reports the application's
+  (that assembly's informational version, else its assembly version); without it no version is reported.
+  **Upgrade:** call `builder.AddCoreObservability(typeof(Program).Assembly)` in the host (the template does).
 - Identity provider: the startup seed no longer hashes a confidential client's secret again and rewrites the client on
   every start. A configured secret that still matches the stored hash keeps it, and a client whose fields all match is
   not written (instances starting together no longer race on its row); a changed secret or field is written as before.

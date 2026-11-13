@@ -63,7 +63,8 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`: `ILogger` logs with their
 message and scopes, metrics and traces, all over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; a Serilog host keeps
 its logs in Serilog, which doesn't write to other providers; the outbox handlers' spans by the source name
-`NovaCore.EntityFrameworkCore`), `NovaCore.Scalar`
+`NovaCore.EntityFrameworkCore`; `service.version` is the assembly the host passes, `typeof(Program).Assembly`, none
+without it: the add-on finds no assembly itself, Y-20), `NovaCore.Scalar`
 (`MapCoreScalar`), `NovaCore.Identity.OpenIddict` (`AddCoreIdentityServer`: an OpenID Connect provider on ASP.NET Core
 Identity + OpenIddict, D-026), `NovaCore.MultiTenancy` (`AddCoreMultiTenancy`: tenants, memberships, their roles and the
 life cycle, with no third-party library; it uses AspNetCore for the tenant resolution and EntityFrameworkCore for

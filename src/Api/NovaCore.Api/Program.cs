@@ -17,7 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add-ons (third-party packages): logging and observability.
 builder.AddCoreLogging();                          // Serilog: console, plus Seq when configured
-builder.AddCoreObservability();                    // OpenTelemetry metrics + tracing, OTLP export when configured
+builder.AddCoreObservability(typeof(Program).Assembly); // OpenTelemetry logs, metrics + tracing (service.version: this app's), OTLP export when configured
 
 // Core.
 builder.AddCoreDefaults();                         // health checks + resilient HttpClients
