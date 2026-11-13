@@ -27,6 +27,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The sign-in rules live in an internal service the pages and the JSON endpoints share (SignInFlow); its unit tests
+         need the type, which stays internal (Y-23, docs/plan/DECISIONS.md D-092). -->
+    <InternalsVisibleTo Include="NovaCore.Api.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Read by CommonPasswordValidator: a password blocklist from SecLists (MIT), its notice in the file's header. -->
     <EmbeddedResource Include="CommonPasswords.txt" LogicalName="NovaCore.Identity.OpenIddict.CommonPasswords.txt" />
   </ItemGroup>

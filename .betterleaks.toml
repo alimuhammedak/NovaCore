@@ -8,7 +8,7 @@ title = "NovaCore"
 useDefault = true
 
 [[allowlists]]
-description = "Test credentials of tests/NovaCore.Api.Tests (reviewed 2026-10-21, 2026-10-22)"
+description = "Test credentials of tests/NovaCore.Api.Tests (reviewed 2026-10-21, 2026-10-22, 2026-11-13)"
 condition = "AND"
 paths = ['''^tests/''']
 regexTarget = "secret"
@@ -20,6 +20,7 @@ regexes = [
   '''^User!Passw0rd-2026$''',
   '''^a brand new passphrase$''',
   '''^a long passphrase for tests$''',
+  '''^an invited passphrase$''',
   '''^another long passphrase$''',
   '''^fifteen-letters$''',
   '''^fourteen-chars$''',
@@ -27,12 +28,15 @@ regexes = [
   '''^bm90LWEtdG9rZW4$''',
   '''^not the current one$''',
   '''^not the password$''',
+  '''^not the right passphrase$''',
   '''^reporter-secret-for-tests-at-least-32-chars$''',
   '''^short$''',
   '''^the administrator's passphrase$''',
+  '''^the other passphrase here$''',
   '''^too-short$''',
   '''^totally-wrong-password$''',
   '''^worker-secret-for-tests-at-least-32-chars$''',
+  '''^yet another passphrase$''',
 ]
 
 [[allowlists]]

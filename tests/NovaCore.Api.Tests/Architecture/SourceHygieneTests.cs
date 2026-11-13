@@ -4,8 +4,8 @@ using Xunit;
 namespace NovaCore.Api.Tests.Architecture;
 
 /// <summary>
-/// Line-level rules over the source under <c>src/</c>: DECISIONS Y-38 (leftover work goes to PROGRESS.md "Sonraya
-/// bırakılanlar", not into TODO comments) and PLAN F2b.3 (the time comes from an injected <see cref="TimeProvider"/>).
+/// Line-level rules over the source under <c>src/</c>: DECISIONS Y-38 (leftover work goes to
+/// docs/plan/SONRAYA-BIRAKILANLAR.md, not into TODO comments) and PLAN F2b.3 (the time comes from an injected <see cref="TimeProvider"/>).
 /// </summary>
 public class SourceHygieneTests
 {

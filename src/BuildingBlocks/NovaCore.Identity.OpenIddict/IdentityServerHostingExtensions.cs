@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors;
@@ -55,6 +56,20 @@ public static class IdentityServerHostingExtensions
         AddAccountStore(services);
         services.AddSingleton<SecurityAuditLogger>();
         services.AddSingleton<DummyPasswordHash>();
+        services.AddScoped<SignInFlow>();
+        // Its own hasher with Identity's defaults, keyed apart from the host's (see PasswordResetCodes.HasherKey).
+        services.AddKeyedSingleton<IPasswordHasher<ApplicationUser>>(PasswordResetCodes.HasherKey, new PasswordHasher<ApplicationUser>());
+        services.AddScoped<PasswordResetCodes>();
+        // Public with an internal constructor (Y-23): the options type behind it is internal.
+        services.AddScoped(provider => new AccountInvitations(
+            provider.GetRequiredService<UserManager<ApplicationUser>>(),
+            provider.GetRequiredService<RoleManager<ApplicationRole>>(),
+            provider.GetRequiredService<IdentityServerDbContext>(),
+            provider.GetRequiredService<EmailQueue>(),
+            provider.GetRequiredService<IOptions<JwtOptions>>(),
+            provider.GetRequiredService<IOptions<IdentityServerOptions>>(),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<SecurityAuditLogger>()));
 
         AddEmail(services, builder.Environment);
 
@@ -239,8 +254,13 @@ public static class IdentityServerHostingExtensions
 
         // Antiforgery's cookie has no Secure flag by default, not even over https. Microsoft's guidance: Always outside
         // Development (R-104). In Development it follows the request, since Always fails a plain-http page outright.
-        services.AddAntiforgery(antiforgery => antiforgery.Cookie.SecurePolicy =
-            environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always);
+        // A project's own sign-in screen sends the token in a header (SessionEndpoints, D-091 (2)); the HTML forms keep
+        // their hidden field, and when both come only the header is checked.
+        services.AddAntiforgery(antiforgery =>
+        {
+            antiforgery.Cookie.SecurePolicy = environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
+            antiforgery.HeaderName = SessionEndpoints.AntiforgeryHeader;
+        });
 
         // The cookie is read only at /connect/* and /account/*, so checking its security stamp on every read is cheap, and
         // a password change or "sign out everywhere" ends the provider session at once instead of within 30 minutes.
@@ -291,7 +311,35 @@ public static class IdentityServerHostingExtensions
                 + "registered account gets them.")
             .ValidateOnStart();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<IdentityServerOptions>, IdentityServerOptionsValidator>());
+
         services.AddHostedService<IdentityServerSeeder>();
+        AddSignInPaths(services);
+    }
+
+    // The paths of a project's own screens (Identity:SignIn), validated with the rest of the section.
+    private static void AddSignInPaths(IServiceCollection services)
+    {
+        services.AddOptions<IdentityServerOptions>()
+            // An absolute or protocol-relative path would send the browser, with its authorization request, to another
+            // site (an open redirect, OWASP Unvalidated Redirects; D-091 (3)).
+            .Validate(
+                identity => IdentitySignInOptions.IsLocalPath(identity.SignIn.LoginPath),
+                "Identity:SignIn:LoginPath must be a path on this host: it starts with a single '/' (not '//' or '/\\') and "
+                + "has no scheme, host, query or fragment, e.g. /sign-in.")
+            .Validate(
+                identity => !string.IsNullOrEmpty(identity.SignIn.InvitationPath) && IdentitySignInOptions.IsLocalPath(identity.SignIn.InvitationPath),
+                "Identity:SignIn:InvitationPath must be a path on this host: it starts with a single '/' (not '//' or '/\\') and "
+                + "has no scheme, host, query or fragment, e.g. /accept-invitation.");
+
+        // The sign-in cookie's login path is where /connect/authorize's challenge sends a signed-out browser: a project's
+        // own screen when it sets one, the provider's page otherwise. Read from the validated options, not at
+        // registration (docs/plan/RESEARCH.md R-048).
+        services.AddOptions<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme)
+            .Configure<IOptions<IdentityServerOptions>>((cookie, identity) =>
+            {
+                if (!string.IsNullOrEmpty(identity.Value.SignIn.LoginPath))
+                    cookie.LoginPath = identity.Value.SignIn.LoginPath;
+            });
     }
 
     // An authorization code sent over plain http can be read on the way, except to a native app's own loopback listener,
@@ -328,7 +376,10 @@ public static class IdentityServerHostingExtensions
         PasswordResetPage.Map(account);
 
         AccountEndpoints.Map(endpoints);
+        SessionEndpoints.Map(endpoints);
+        PasswordCodeEndpoints.Map(endpoints);
         AdminEndpoints.Map(endpoints);
+        InvitationEndpoints.Map(endpoints);
         return endpoints;
     }
 }

@@ -82,7 +82,7 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
         var user = await PermissionsOfAsync(roles, "User");
 
         Assert.Equal(
-            ["identity:roles:manage", "identity:roles:read", "identity:users:manage", "identity:users:read", "probe:audit:read", IdentityServerTestHost.ProbePermission],
+            ["identity:invitations:create", "identity:roles:manage", "identity:roles:read", "identity:users:manage", "identity:users:read", "probe:audit:read", IdentityServerTestHost.ProbePermission],
             administrator);
 
         // Identity:Seed:UserPermissions, not every ":read" permission (DECISIONS D-047).
