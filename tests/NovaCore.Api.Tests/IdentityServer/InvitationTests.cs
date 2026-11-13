@@ -36,10 +36,12 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
 
         public AccountCreationRace Creations { get; } = new();
 
+        public ConcurrentUserWrite Writes { get; } = new();
+
         protected override void Configure(WebApplicationBuilder builder)
         {
             builder.Services.AddSingleton<IEmailSender>(Emails);
-            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Creations));
+            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Creations, Writes));
         }
     }
 
@@ -162,6 +164,25 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
 
         Assert.Single(ids.Distinct());
         await fixture.Emails.WaitForAsync(message => string.Equals(message.To, "invited-race@novacore.test", StringComparison.Ordinal), 2);
+    }
+
+    // The invitation is marked used before the password is set; a password save lost to a concurrent write of the
+    // account (ConcurrentUserWrite) must not leave the link used up with no password set (V8-6).
+    [Fact]
+    public async Task A_password_step_lost_to_a_concurrent_write_leaves_the_invitation_unused()
+    {
+        await using (var scope = _host.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<AccountInvitations>().InviteAsync("invited-lost@novacore.test", TestContext.Current.CancellationToken);
+        var token = await TokenSentToAsync(fixture.Emails, "invited-lost@novacore.test");
+        using var client = _host.CreateClient();
+
+        fixture.Writes.Arm();
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(client, Accept, new { token, password = NewPassword })).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Status, new { token })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Accept, new { token, password = NewPassword })).StatusCode);
+        using var browser = new OidcFlow(_host);
+        Assert.False(string.IsNullOrEmpty((await browser.SignInAsync("invited-lost@novacore.test", NewPassword)).AccessToken));
     }
 
     [Fact]

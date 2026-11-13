@@ -37,11 +37,13 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
 
         public CountingCodeHasher CodeHashes { get; } = new();
 
+        public ConcurrentUserWrite Writes { get; } = new();
+
         protected override void Configure(WebApplicationBuilder builder)
         {
             builder.Services.AddSingleton<IEmailSender>(Emails);
             builder.Services.AddKeyedSingleton<IPasswordHasher<ApplicationUser>>(PasswordResetCodes.HasherKey, CodeHashes);
-            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Race));
+            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Race, Writes));
         }
     }
 
@@ -142,6 +144,23 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         foreach (var answer in answers)
             await AssertInvalidCodeAsync(answer);
         await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword }));
+    }
+
+    // The code is used up before the password changes; a password save lost to a concurrent write of the account
+    // (ConcurrentUserWrite) must not leave the right code used up with the old password (V8-6).
+    [Fact]
+    public async Task A_reset_lost_to_a_concurrent_write_leaves_the_code_usable()
+    {
+        var user = await _host.CreateUserAsync("code-lost@novacore.test", Password);
+        using var client = _host.CreateClient();
+        var code = await RequestCodeAsync(client, user.Email!);
+
+        fixture.Writes.Arm();
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword })).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword })).StatusCode);
+        using var browser = new OidcFlow(_host);
+        Assert.False(string.IsNullOrEmpty((await browser.SignInAsync(user.Email!, NewPassword)).AccessToken));
     }
 
     [Fact]

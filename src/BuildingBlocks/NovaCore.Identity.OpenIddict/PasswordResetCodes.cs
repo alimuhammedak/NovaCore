@@ -15,7 +15,8 @@ internal enum ResetCodeOutcome
     // answer doesn't tell them apart (and an unknown or unconfirmed account answers the same, at the endpoint).
     InvalidCode,
 
-    // The code is right but the new password breaks the policy; the code stays good for another try.
+    // The code is right but the new password breaks the policy, or its save lost to a concurrent write of the account;
+    // the code stays good for another try.
     PasswordRejected
 }
 
@@ -76,7 +77,8 @@ internal sealed class PasswordResetCodes(
     /// Sets <paramref name="newPassword"/> when <paramref name="code"/> is the account's current code. A try is counted
     /// before the code is compared, and only a counted try is compared: of requests racing with one code, the ones whose
     /// count can't be saved are refused and end the code. The code is used up before the password changes, with the
-    /// user's concurrency stamp, so two requests with one code change it once.
+    /// user's concurrency stamp, so two requests with one code change it once; the code's end and the new password commit
+    /// together, so a reset whose password save fails leaves the code usable.
     /// </summary>
     public async Task<(ResetCodeOutcome Outcome, IReadOnlyList<string> Errors)> RedeemAsync(ApplicationUser user, string code, string newPassword)
     {
@@ -127,6 +129,20 @@ internal sealed class PasswordResetCodes(
             return (ResetCodeOutcome.PasswordRejected, errors);
         }
 
+        // A transaction of our own runs inside the execution strategy, so a retrying strategy retries all of it.
+        var strategy = db.Database.CreateExecutionStrategy();
+        var redeemed = await strategy.ExecuteAsync(() => UseUpAndResetAsync(user, newPassword));
+        if (redeemed.Outcome == ResetCodeOutcome.Succeeded)
+            await ClearFailuresAsync(user);
+        return redeemed;
+    }
+
+    // The code's end and the new password commit together: a reset that fails leaves the code as it was (V8-6).
+    private async Task<(ResetCodeOutcome Outcome, IReadOnlyList<string> Errors)> UseUpAndResetAsync(ApplicationUser user, string newPassword)
+    {
+        // Disposed without a commit, it rolls back.
+        await using var transaction = await db.Database.BeginTransactionAsync();
+
         // Used up first: the save carries the concurrency stamp, so the loser of a race with the same code fails here.
         if (!(await users.RemoveAuthenticationTokenAsync(user, LoginProvider, CodeToken)).Succeeded)
             return (ResetCodeOutcome.InvalidCode, []);
@@ -137,7 +153,7 @@ internal sealed class PasswordResetCodes(
         if (!reset.Succeeded)
             return (ResetCodeOutcome.PasswordRejected, reset.Errors.Select(error => error.Description).ToList());
 
-        await ClearFailuresAsync(user);
+        await transaction.CommitAsync();
         return (ResetCodeOutcome.Succeeded, []);
     }
 

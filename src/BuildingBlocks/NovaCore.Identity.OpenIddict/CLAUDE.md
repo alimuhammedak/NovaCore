@@ -133,13 +133,15 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   counts toward lockout. A try is saved (with the user's concurrency stamp) before its code is compared, and only a
   saved try is compared; a request whose count loses to a concurrent one ends the code (`ExecuteDelete`, apart from the
   change tracker that still holds the lost save), so racing guesses never get more tries than sequential ones (V8-2).
-  The code is used up with the user's concurrency stamp before the password changes through `ResetPasswordAsync`.
+  The code is used up with the user's concurrency stamp before the password changes through `ResetPasswordAsync`, both
+  in one transaction (inside the execution strategy), so a reset that fails leaves the code usable (V8-6).
   Every address gets the same `202` from `/password/forgot`. Both endpoints cost every address one hash of the codes'
   hasher (a keyed singleton, `PasswordResetCodes.HasherKey`, Identity's defaults): an address without a code hashes a
   throwaway one (`IssueToNobody`) or checks the dummy (`DummyPasswordHash.CheckCode`), and so does every refusal before
   the comparison (V8-3). The code's save on `/forgot` is the one difference left.
 - **Invitations** (D-091 (5), D-095): `AccountInvitations` (public, internal constructor) stores the SHA-256 of a 256-bit
-  token in `invitations`, 7 days, accepted once by a conditional update after the password policy passes. A confirmed
+  token in `invitations`, 7 days, accepted once by a conditional update after the password policy passes; the update, the password and the
+  confirmation commit in one transaction, so a failed password step leaves the invitation unused (V8-6). A confirmed
   account's invitation sets no password (`invitation.account_exists`), so an invitation can't take an account over.
   `InviteAsync` returns a `Result<Guid>` (`invitation.invalid_email`, `invitation.address_taken`); an account a
   concurrent request created first is invited, its lost insert reported by the user store as a duplicate (V8-5).

@@ -127,7 +127,8 @@ public sealed class AccountInvitations
     /// <summary>
     /// Accepts the invitation: sets <paramref name="password"/> and confirms the address of an account that isn't
     /// confirmed yet. The invitation is marked used first, in one conditional update, so two requests with one link
-    /// accept it once.
+    /// accept it once; the mark, the password and the confirmation commit together, so a password step that fails (its
+    /// save lost to a concurrent write of the account) leaves the invitation unused.
     /// </summary>
     internal async Task<(InvitationState State, IReadOnlyList<string> Errors)> AcceptAsync(
         string token, string password, CancellationToken cancellationToken)
@@ -143,6 +144,19 @@ public sealed class AccountInvitations
         if (errors.Count > 0)
             return (InvitationState.PasswordRejected, errors);
 
+        // A transaction of our own runs inside the execution strategy, so a retrying strategy retries all of it.
+        var strategy = _store.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(() => MarkAndSetPasswordAsync(invitation, password, cancellationToken));
+    }
+
+    // The mark, the password and the confirmation commit together: a step that fails rolls the mark back (V8-6).
+    private async Task<(InvitationState State, IReadOnlyList<string> Errors)> MarkAndSetPasswordAsync(
+        Invitation invitation, string password, CancellationToken cancellationToken)
+    {
+        // Disposed without a commit, it rolls back.
+        await using var transaction = await _store.Database.BeginTransactionAsync(cancellationToken);
+
+        // The update holds the row until the commit: a concurrent one with the same link waits, then matches nothing.
         var now = _timeProvider.GetUtcNow();
         var marked = await _store.Invitations
             .Where(entry => entry.Id == invitation.Id && entry.AcceptedAtUtc == null)
@@ -151,6 +165,7 @@ public sealed class AccountInvitations
             return (InvitationState.Used, []);
 
         // An unconfirmed account that registered with a password gets the new one: holding the link is holding the mailbox.
+        var user = invitation.User;
         var setPassword = await _users.HasPasswordAsync(user)
             ? await _users.ResetPasswordAsync(user, await _users.GeneratePasswordResetTokenAsync(user), password)
             : await _users.AddPasswordAsync(user, password);
@@ -162,6 +177,7 @@ public sealed class AccountInvitations
             throw new InvalidOperationException("Confirming the invited account's email failed: "
                                                 + string.Join(", ", confirmed.Errors.Select(error => error.Code)));
 
+        await transaction.CommitAsync(cancellationToken);
         _audit.InvitationAccepted(user.Id);
         return (InvitationState.Accepted, []);
     }
@@ -203,7 +219,7 @@ internal enum InvitationState
     // A confirmed account: the invitation sets no password (D-091 (5)).
     AccountExists,
 
-    // The password breaks the policy; the invitation stays unused.
+    // The password breaks the policy, or its save lost to a concurrent write of the account; the invitation stays unused.
     PasswordRejected,
     Accepted
 }
