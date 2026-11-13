@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `AddCoreObservability` (`NovaCore.OpenTelemetry`): the resource's `service.version` is the application's version,
+  read from the assembly `IHostEnvironment.ApplicationName` names (its informational version, else its assembly version),
+  not the add-on's own. An application name that is no assembly reports no version.
 - Identity provider: two requests creating an account with one address at the same time (registration or invitation)
   no longer answer 500: the user store reports the lost insert as a duplicate user name.
 

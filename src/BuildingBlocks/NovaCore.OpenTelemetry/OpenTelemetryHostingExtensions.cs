@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenTelemetry;
@@ -20,9 +21,10 @@ public static class OpenTelemetryHostingExtensions
     {
         var otel = builder.Services.AddOpenTelemetry();
 
+        var applicationName = builder.Environment.ApplicationName;
         otel.ConfigureResource(resource => resource.AddService(
-            serviceName: builder.Environment.ApplicationName,
-            serviceVersion: typeof(OpenTelemetryHostingExtensions).Assembly.GetName().Version?.ToString()));
+            serviceName: applicationName,
+            serviceVersion: ApplicationVersion(applicationName)));
 
         // Logs travel with the traces and metrics, as in Aspire's ServiceDefaults. A record keeps its rendered message
         // and its scopes (the request's, among others), which the OTLP record would otherwise drop.
@@ -49,5 +51,28 @@ public static class OpenTelemetryHostingExtensions
             otel.UseOtlpExporter();
 
         return builder;
+    }
+
+    // The application's version is its assembly's, the one the host environment names (as MVC finds the application's
+    // parts: Assembly.Load of IHostEnvironment.ApplicationName), not this add-on's. The informational version is the
+    // product version (with the source revision); the assembly version stands in when there is none. A name set in
+    // configuration may be no assembly at all: the resource then carries no version rather than a wrong one.
+    private static string? ApplicationVersion(string applicationName)
+    {
+        if (string.IsNullOrEmpty(applicationName))
+            return null;
+
+        Assembly application;
+        try
+        {
+            application = Assembly.Load(new AssemblyName(applicationName));
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+
+        return application.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? application.GetName().Version?.ToString();
     }
 }
