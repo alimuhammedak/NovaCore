@@ -24,6 +24,17 @@ internal static class Solution
     public static IEnumerable<Assembly> ModuleAssemblies =>
         ProductionAssemblies.Where(assembly => assembly.GetName().Name!.StartsWith(ModulePrefix, StringComparison.Ordinal));
 
+    /// <summary>
+    /// The files under <paramref name="relativeDirectory"/> (relative to the repository root) that match
+    /// <paramref name="searchPattern"/>, build output (<c>bin</c>, <c>obj</c>) excluded: every scan of the source tree
+    /// goes through here so none reads a stale copy.
+    /// </summary>
+    public static IEnumerable<string> SourceFiles(string searchPattern, params string[] relativeDirectory) => Directory
+        .EnumerateFiles(Path.Combine([RootDirectory, .. relativeDirectory]), searchPattern, SearchOption.AllDirectories)
+        .Where(path => Path.GetRelativePath(RootDirectory, path)
+            .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .All(segment => segment is not ("bin" or "obj")));
+
     private static string FindRootDirectory()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
