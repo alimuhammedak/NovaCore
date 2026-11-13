@@ -54,7 +54,7 @@
   <ItemGroup>
     <!--
       Hosting abstractions, options binding and the DbContext health check for NovaCore.EntityFrameworkCore, which has no ASP.NET Core dependency.
-      Same 10.0.12 servicing patch that EF Core 10.0.12 depends on.
+      Same 10.0.x servicing patch as the EF Core packages above.
     -->
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.14" />
