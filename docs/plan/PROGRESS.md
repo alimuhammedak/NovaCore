@@ -128,6 +128,15 @@ Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. 
 - [x] F9.2e (`7310497`): `service.version` `ApplicationName`'in gösterdiği assembly'den (R-141). `ObservabilityTests` önce kırmızı (`0.1.0.0`), sonra 4/4.
 - [x] F9.2f (`bcfd95e`): seed, secret değişmediyse hash'i korur ve hiçbir alan değişmediyse yazmaz (R-142; DA-7). `ClientSeedTests` önce kırmızı (2/3), sonra 3/3; `ClientCredentialsTests`, `IdentityServerConfigurationTests` yeşil.
 
+- [x] F9.2a2 (`8a35f87`): `PackageDependencyTests` `Update`'li paketi gerçekten sınıyor; `Directory.Build.*` yürüyüşü depo kökünde durur, okuması testli. İki kural geçici bozulup kırmızı görüldü.
+- [x] F9.2d (`9fc17b1`): `MessageResponse` üst düzey internal record; `v1.json` değişmedi. 6 sınıf 61/61.
+
+#### Doğrulama (Faz 9)
+
+| ID | Bulgu | Yer | Durum |
+|---|---|---|---|
+| V9-1 | CI `build-and-test` kırmızı (run `43395986910`): F9.2e'nin eklediği `Assembly.Load`, Y-20'yi koruyan `ExplicitRegistrationTests`'i kırıyor. Yazan yalnız `ObservabilityTests`'i koştu | `OpenTelemetryHostingExtensions.cs` (`7310497`) | açık |
+
 **geçersiz** (arşive): L17, L21, L34, L36, L43, L46, L71, L88, L108; L18 F9.3 bitince (PR #31 kapsıyor).
 **kalır:** koşul gerçekleşmedi L11–L15, L20, L33, L45, L51, L60, L62, L68, L72 (F9.3'ten sonra yeniden bak), L73, L75–L79, L84, L86, L89, L90, L92, L93, L103–L105, L107, L112, L113, L116–L118, L121–L127 · ürün/public API/tasarım kararı L22, L24, L29–L31, L41, L42, L52–L55, L61, L66, L67, L80–L83, L114 · D-031 (3)'ü yeniden açar L64 · korunan dosya L27, L49, L69, L95 · bastırma L23, L28 · ortam/upstream L19, L35, L58, L91, L102, L115, L119, L120 · kuşkulu L47.
 
