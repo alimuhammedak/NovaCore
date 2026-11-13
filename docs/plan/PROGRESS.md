@@ -51,6 +51,8 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 
 | ID | Karar | Gerekçe / kaynak |
 |---|---|---|
+| DA-1 | Şifre yenileme kodunun denemesi kod karşılaştırılmadan önce concurrency stamp ile sayılır; sayımı kaybeden istek kodu siler (kapalı tarafa düşer). | V8-2: `UserManager` yazmalarının sonucu yok sayılınca eşzamanlı tahminler 5/100 sınırını aşıyordu; `1777b77` |
+| DA-2 | Kod hasher'ı keyed singleton'dır (`PasswordResetCodes.HasherKey`); forgot ve reset'te kodu olmayan adres aynı hash işini yapar. | V8-3: D-030 (1), D-091 (4) "her adres aynı cevap" süre bakımından; `518b339` |
 
 ### Kullanıcıya kalanlar
 
@@ -88,13 +90,13 @@ Başlangıç 2026-11-09, `main` @ `f319d57`. Plan onaylandı (plan modu). Doğru
 
 | ID | Bulgu | Yer | Durum |
 |---|---|---|---|
-| V8-1 | CI `secret-scan`: 3 bulgu, `main..HEAD` aralığında | run `43310617390` | kapatıldı (`5a7a956`): iki test parolası, `tests/` altında birebir allowlist; yeniden tarama temiz |
-| V8-2 | Yanlış kod sayacının `IdentityResult`'ı yok sayılıyor: eşzamanlı yanlış tahminler sayacı düşürür, 5/100 sınırı aşılır | `PasswordResetCodes.cs:107-112` | açık |
-| V8-3 | forgot/reset'te süreyle hesap sayımı: bilinmeyen/onaysız adres hash ve yazma olmadan döner (D-030 (1), D-091 (4)) | `PasswordCodeEndpoints.cs:190-218` | açık |
+| V8-1 | CI `secret-scan`: 3 bulgu, `main..HEAD` aralığında | run `43310617390` | doğrulandı (`5a7a956`; CI `43331827821`'de `secret-scan` yeşil): iki test parolası, `tests/` altında birebir allowlist |
+| V8-2 | Yanlış kod sayacının `IdentityResult`'ı yok sayılıyor: eşzamanlı yanlış tahminler sayacı düşürür, 5/100 sınırı aşılır | `PasswordResetCodes.cs:107-112` | kapatıldı (`1777b77`): deneme karşılaştırmadan önce stamp ile sayılır, sayımı kaybeden istek kodu siler. `ResetCodeRace` + test önce kırmızı (10 eşzamanlı yanlıştan sonra doğru kod 200), sonra yeşil |
+| V8-3 | forgot/reset'te süreyle hesap sayımı: bilinmeyen/onaysız adres hash ve yazma olmadan döner (D-030 (1), D-091 (4)) | `PasswordCodeEndpoints.cs:190-218` | kapatıldı (`518b339`): kodu olmayan adres aynı hash işini yapar (keyed singleton hasher, `DummyPasswordHash.CheckCode`). Hash sayısı testi önce kırmızı (`[1,0,0]`), sonra yeşil. Kalan fark: birer veritabanı yazması |
 | V8-4 | Kilitli ve onaysız hesap hash hesaplamadan döner; D-091 (1) "aynı süre". Test kilitli hesabın hash sayısını sınamıyor | `SignInFlow.cs:51,116` | açık |
 | V8-5 | Davet oluşturmada beklenen hata (`InvalidUserName`, `DuplicateEmail`) exception → 500; `ProducesProblem` yok | `AccountInvitations.cs:156`, `InvitationEndpoints.cs:240,269` | açık |
 | V8-6 | Davet/kod "kullanıldı" işaretlendikten sonra şifre adımı düşerse yanar; yorum "kullanılmamış kalır" diyor | `AccountInvitations.cs:131-142`, `PasswordResetCodes.cs:84-91` | açık |
-| V8-7 | Kuralı yakalamayan/eksik testler: onaysız hesabın reset'i, kabul etmeden giriş (totolojik), davetin tek kullanım yarışı, `InvitationPath` doğrulaması, `/password` ve `/invitations` CORS'u (D-095 (6)), JSON 2FA'da kurtarma kodu, `A_new_code_replaces_the_old_one`'daki `if` | `PasswordCodeResetTests`, `InvitationTests`, `SessionSignInTests` | açık |
+| V8-7 | Kuralı yakalamayan/eksik testler: onaysız hesabın reset'i, kabul etmeden giriş (totolojik), davetin tek kullanım yarışı, `InvitationPath` doğrulaması, `/password` ve `/invitations` CORS'u (D-095 (6)), JSON 2FA'da kurtarma kodu, `A_new_code_replaces_the_old_one`'daki `if` | `PasswordCodeResetTests`, `InvitationTests`, `SessionSignInTests` | kısmen: şifre kodu testleri kapatıldı (`b9c6183`: onaysız hesap, koşulsuz doğrulama, `/password` CORS'u pozitif karşılaştırmayla). Kalan: davet testleri, JSON 2FA kurtarma kodu |
 
 Yanlış pozitif: kök CLAUDE.md'deki başsız giriş satırının `f6185ab` ile gitmesi (kullanıcının bilinçli küçültmesi; bilgi kimlik eklentisinin CLAUDE.md'sinde).
 
