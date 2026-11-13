@@ -1,5 +1,8 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
@@ -76,6 +79,84 @@ public sealed class IdentityServerPermissionResolverTests(IdentityServerFixture 
         await users.AddClaimAsync(user, new Claim(NovaClaims.Permission, "payments:payments:read"));
 
         Assert.Equal(["payments:payments:read"], await ResolveAsync(scope.ServiceProvider, user.Id.ToString()));
+    }
+
+    // F9.2g: the resolver used to ask for each role and then its claims, two queries per role (N+1).
+    [Fact]
+    public async Task The_number_of_queries_does_not_grow_with_the_number_of_roles()
+    {
+        var oneRole = await CreateUserWithRolesAsync("query-count-1@novacore.test", 1);
+        var fiveRoles = await CreateUserWithRolesAsync("query-count-5@novacore.test", 5);
+
+        var (oneRoleQueries, oneRolePermissions) = await ResolveCountingQueriesAsync(oneRole);
+        var (fiveRolesQueries, fiveRolesPermissions) = await ResolveCountingQueriesAsync(fiveRoles);
+
+        Assert.Single(oneRolePermissions);
+        Assert.Equal(5, fiveRolesPermissions.Count);
+        Assert.Equal(oneRoleQueries, fiveRolesQueries);
+    }
+
+    private async Task<Guid> CreateUserWithRolesAsync(string email, int roleCount)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var roles = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+        var user = new ApplicationUser { UserName = email, Email = email, CreatedAtUtc = TimeProvider.System.GetUtcNow() };
+        Assert.True((await users.CreateAsync(user)).Succeeded);
+
+        for (var index = 0; index < roleCount; index++)
+        {
+            var role = new ApplicationRole($"{email}-role-{index}");
+            Assert.True((await roles.CreateAsync(role)).Succeeded);
+            await roles.AddClaimAsync(role, new Claim(NovaClaims.Permission, $"{email}:permission:{index}"));
+            Assert.True((await users.AddToRoleAsync(user, role.Name!)).Succeeded);
+        }
+
+        return user.Id;
+    }
+
+    // A fresh scope, so nothing the setup tracked answers without a query. The listener sees every host's commands;
+    // only those of this scope's context count.
+    private async Task<(int Queries, IReadOnlyCollection<string> Permissions)> ResolveCountingQueriesAsync(Guid userId)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<IdentityServerDbContext>();
+        var counter = new CommandCounter(context);
+        using var subscription = DiagnosticListener.AllListeners.Subscribe(counter);
+
+        var permissions = await ResolveAsync(scope.ServiceProvider, userId.ToString());
+
+        return (counter.Count, permissions);
+    }
+
+    private sealed class CommandCounter(DbContext context) : IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>
+    {
+        private readonly List<IDisposable> _subscriptions = [];
+        private int _count;
+
+        public int Count => Volatile.Read(ref _count);
+
+        public void OnNext(DiagnosticListener value)
+        {
+            if (string.Equals(value.Name, DbLoggerCategory.Name, StringComparison.Ordinal))
+                lock (_subscriptions)
+                    _subscriptions.Add(value.Subscribe(this));
+        }
+
+        public void OnNext(KeyValuePair<string, object?> value)
+        {
+            if (string.Equals(value.Key, RelationalEventId.CommandExecuting.Name, StringComparison.Ordinal) && value.Value is CommandEventData data && ReferenceEquals(data.Context, context))
+                Interlocked.Increment(ref _count);
+        }
+
+        public void OnCompleted()
+        {
+        }
+
+        public void OnError(Exception error)
+        {
+        }
     }
 
     [Theory]
