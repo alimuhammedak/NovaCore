@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using NovaCore.Identity.OpenIddict;
@@ -38,10 +39,12 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
 
         public ConcurrentUserWrite Writes { get; } = new();
 
+        public InvitationAcceptRace Accepts { get; } = new();
+
         protected override void Configure(WebApplicationBuilder builder)
         {
             builder.Services.AddSingleton<IEmailSender>(Emails);
-            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Creations, Writes));
+            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Creations, Writes, Accepts));
         }
     }
 
@@ -185,15 +188,140 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
         Assert.False(string.IsNullOrEmpty((await browser.SignInAsync("invited-lost@novacore.test", NewPassword)).AccessToken));
     }
 
+    // The invited account opens unconfirmed and without a password (D-091 (5)): its status is pending, and even a
+    // password it got some other way doesn't sign it in before the invitation confirms the address.
     [Fact]
     public async Task An_invited_account_cannot_sign_in_before_accepting()
     {
+        const string email = "not-yet@novacore.test";
         await using (var scope = _host.Services.CreateAsyncScope())
-            await scope.ServiceProvider.GetRequiredService<AccountInvitations>().InviteAsync("not-yet@novacore.test", TestContext.Current.CancellationToken);
-        using var browser = new OidcFlow(_host);
-        var (_, afterPassword) = await browser.BeginSignInAsync("not-yet@novacore.test", NewPassword);
+            Assert.True((await scope.ServiceProvider.GetRequiredService<AccountInvitations>().InviteAsync(email, TestContext.Current.CancellationToken)).IsSuccess);
+        var token = await TokenSentToAsync(fixture.Emails, email);
+        using var client = _host.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Status, new { token })).StatusCode);
 
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var invited = (await users.FindByEmailAsync(email))!;
+            Assert.False(invited.EmailConfirmed);
+            Assert.False(await users.HasPasswordAsync(invited));
+            Assert.True((await users.AddPasswordAsync(invited, NewPassword)).Succeeded);
+        }
+
+        using var browser = new OidcFlow(_host);
+        var (_, afterPassword) = await browser.BeginSignInAsync(email, NewPassword);
         Assert.NotEqual(HttpStatusCode.Redirect, afterPassword.StatusCode);
+        Assert.Contains("Confirm your email address before signing in.", await afterPassword.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+    }
+
+    // Both requests find the invitation pending before either opens its transaction (InvitationAcceptRace): the
+    // conditional update lets one through, the other is told the invitation is used (D-095 (4)). Without its
+    // AcceptedAtUtc condition the other one marks it too and fails later, on the account's concurrency stamp.
+    [Fact]
+    public async Task Concurrent_accepts_of_one_invitation_accept_it_once()
+    {
+        await using (var scope = _host.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<AccountInvitations>().InviteAsync("invited-twice@novacore.test", TestContext.Current.CancellationToken);
+        var token = await TokenSentToAsync(fixture.Emails, "invited-twice@novacore.test");
+        using var client = _host.CreateClient();
+
+        fixture.Accepts.Arm(2);
+        var answers = await Task.WhenAll(
+            PostAsync(client, Accept, new { token, password = NewPassword }),
+            PostAsync(client, Accept, new { token, password = "the other passphrase here" }));
+
+        var accepted = Assert.Single(answers, answer => answer.StatusCode == HttpStatusCode.OK);
+        await AssertProblemAsync(Assert.Single(answers, answer => answer != accepted), HttpStatusCode.Conflict, "invitation.used");
+    }
+
+    // D-091 (5): an unconfirmed account that exists (registered, never confirmed) keeps its id; accepting sets the new
+    // password and confirms the address: holding the link is holding the mailbox.
+    [Fact]
+    public async Task An_unconfirmed_account_with_a_password_gets_the_new_password_and_is_confirmed()
+    {
+        const string email = "unconfirmed-invited@novacore.test";
+        Guid id;
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var registered = new ApplicationUser { UserName = email, Email = email, CreatedAtUtc = TimeProvider.System.GetUtcNow() };
+            Assert.True((await users.CreateAsync(registered, Password)).Succeeded);
+            id = registered.Id;
+        }
+
+        using var client = await InviterAsync("inviter-unconfirmed@novacore.test");
+        var created = await client.PostAsJsonAsync(new Uri(Create, UriKind.Relative), new { email }, TestContext.Current.CancellationToken);
+        using (var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)))
+            Assert.Equal(id, body.RootElement.GetProperty("userId").GetGuid());
+        var token = await TokenSentToAsync(fixture.Emails, email);
+
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Status, new { token })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Accept, new { token, password = NewPassword })).StatusCode);
+
+        using (var browser = new OidcFlow(_host))
+            Assert.False(string.IsNullOrEmpty((await browser.SignInAsync(email, NewPassword)).AccessToken));
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var accepted = (await users.FindByEmailAsync(email))!;
+            Assert.True(accepted.EmailConfirmed);
+            Assert.False(await users.CheckPasswordAsync(accepted, Password));
+        }
+    }
+
+    // RFC 9700 §2.6, D-095 (6): the invitation endpoints answer no other origin, while the same host's token endpoint,
+    // which keeps CORS for single-page apps, answers it: the configured origin works, the endpoints opt out.
+    [Fact]
+    public async Task The_invitation_endpoints_answer_no_cross_origin_request_where_the_token_endpoint_does()
+    {
+        const string origin = "https://app.novacore.test";
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal) { ["Cors:AllowedOrigins:0"] = origin }));
+        using var client = host.CreateClient();
+
+        Assert.True(await AllowsOriginAsync(client, HttpMethod.Options, "/connect/token", origin));
+        Assert.True(await AllowsOriginAsync(client, HttpMethod.Post, "/connect/token", origin));
+        foreach (var path in new[] { Status, Accept })
+        {
+            Assert.False(await AllowsOriginAsync(client, HttpMethod.Options, path, origin));
+            Assert.False(await AllowsOriginAsync(client, HttpMethod.Post, path, origin));
+        }
+    }
+
+    // D-095 (2): the link leads to the configured screen of this host; a path that could leave it stops the host.
+    [Fact]
+    public async Task The_link_leads_to_the_configured_invitation_path()
+    {
+        var emails = new CapturingEmailSender();
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+        {
+            builder.Services.AddSingleton<IEmailSender>(emails);
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal) { ["Identity:SignIn:InvitationPath"] = "/join" });
+        });
+        await using (var scope = host.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<AccountInvitations>().InviteAsync("joining@novacore.test", TestContext.Current.CancellationToken);
+
+        var sent = await emails.WaitForAsync(message => string.Equals(message.To, "joining@novacore.test", StringComparison.Ordinal));
+        var link = new Uri(WebUtility.HtmlDecode(Link().Match(sent[0].HtmlBody).Groups["link"].Value));
+        Assert.Equal(new Uri(IdentityServerTestHost.Authority).Authority, link.Authority);
+        Assert.Equal("/join", link.AbsolutePath);
+    }
+
+    [Theory]
+    [InlineData("https://evil.novacore.test/join")]
+    [InlineData("//evil.novacore.test/join")]
+    [InlineData("/\\evil.novacore.test/join")]
+    [InlineData("join")]
+    [InlineData("~/join")]
+    [InlineData("/join?next=1")]
+    [InlineData("/join#top")]
+    public async Task An_invitation_path_that_could_leave_this_host_stops_the_host(string invitationPath)
+    {
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(configure: builder =>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal) { ["Identity:SignIn:InvitationPath"] = invitationPath })));
+
+        Assert.Contains("Identity:SignIn:InvitationPath", exception.ToString(), StringComparison.Ordinal);
     }
 
     // Its own host: the clock moves, and this test signs nobody in (tests/CLAUDE.md).
@@ -234,6 +362,22 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
         var link = new Uri(WebUtility.HtmlDecode(Link().Match(sent[0].HtmlBody).Groups["link"].Value));
         Assert.Equal("/accept-invitation", link.AbsolutePath);
         return QueryHelpers.ParseQuery(link.Query)["token"].ToString();
+    }
+
+    // A preflight, or the request a script on that origin sends.
+    private static async Task<bool> AllowsOriginAsync(HttpClient client, HttpMethod method, string path, string origin)
+    {
+        using var request = new HttpRequestMessage(method, path);
+        request.Headers.Add("Origin", origin);
+        if (method == HttpMethod.Options)
+            request.Headers.Add("Access-Control-Request-Method", "POST");
+        else
+            request.Content = path.StartsWith("/connect", StringComparison.Ordinal)
+                ? new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal) { ["grant_type"] = "authorization_code" })
+                : JsonContent.Create(new { token = "not-an-invitation", password = NewPassword });
+
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        return response.Headers.Contains("Access-Control-Allow-Origin");
     }
 
     private static async Task<HttpResponseMessage> PostAsync(HttpClient client, string path, object body) =>

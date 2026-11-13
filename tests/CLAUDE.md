@@ -221,7 +221,9 @@ used code, so both read the user before either writes. `PasswordCodeResetTests` 
 reset code: `ResetCodeRace` holds every save of a reset code token until the armed number of requests wait there.
 `ConcurrentUserWrite` makes the next save of a new password lose to a concurrent write of the account (it changes the
 user's concurrency stamp through the saving context first), and `AccountCreationRace` holds the saves that add an
-account until the armed number of requests wait there (`InvitationTests`).
+account until the armed number of requests wait there (`InvitationTests`). `InvitationAcceptRace` holds the next
+transactions' start (not the conditional update: SQLite's `BEGIN IMMEDIATE` takes the write lock at the start), so two
+accepts of one invitation both find it pending first.
 `IdentityServerFixture` shares one host per class; tests that need a different host start their own
 (`IdentityServerTestHost.StartAsync(environment, configure)`). These classes run in the `IdentityServerTestGroup`
 collection, apart from the parallel tests: their CPU load made the `WebApplicationFactory` startup race (R-055) hit
