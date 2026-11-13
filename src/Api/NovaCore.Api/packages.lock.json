@@ -615,7 +615,7 @@
       "BMD.NovaCore.Scalar": {
         "type": "Project",
         "dependencies": {
-          "Scalar.AspNetCore": "[2.17.9, )"
+          "Scalar.AspNetCore": "[2.18.7, )"
         }
       },
       "BMD.NovaCore.Serilog": {
@@ -802,9 +802,9 @@
       },
       "Scalar.AspNetCore": {
         "type": "CentralTransitive",
-        "requested": "[2.17.9, )",
-        "resolved": "2.17.9",
-        "contentHash": "/HulaHnMtDfMuVIFOSzzYAqFnF4rm/Ih/bLK0hu5RBKrggbjd6UTJOzXIXqzaOGPQ7Kjy12gotQym+QhZJas+A=="
+        "requested": "[2.18.7, )",
+        "resolved": "2.18.7",
+        "contentHash": "JrNu0Sm4TVeJ//ptvAS3yRbT0oobfR8qp0ecf3HIS9zX4V7uSABr+VYEyWT7uyXjhN2ZTrZ/cpwKv7zHjlK8Gg=="
       },
       "Serilog.AspNetCore": {
         "type": "CentralTransitive",
