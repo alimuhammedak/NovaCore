@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using NovaCore.Identity.OpenIddict;
@@ -165,8 +166,9 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         var first = await RequestCodeAsync(client, user.Email!);
         var second = await RequestCodeAsync(client, user.Email!, previous: 1);
 
-        if (!string.Equals(first, second, StringComparison.Ordinal))
-            await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code = first, newPassword = NewPassword }));
+        // Two random codes are equal once in 10^8 runs; that run fails here rather than skipping the rule.
+        Assert.NotEqual(first, second, StringComparer.Ordinal);
+        await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code = first, newPassword = NewPassword }));
         Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Reset, new { email = user.Email, code = second, newPassword = NewPassword })).StatusCode);
     }
 
@@ -196,6 +198,67 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
 
         await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = "code-reset-nobody@novacore.test", code = "12345678", newPassword = NewPassword }));
         await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = "code-reset-unconfirmed@novacore.test", code = "12345678", newPassword = NewPassword }));
+    }
+
+    // An unconfirmed account can't get a code by email (above), so it is given one directly: the code is right, and
+    // the account is still refused like a wrong code, its password unchanged (D-091 (4)).
+    [Fact]
+    public async Task An_unconfirmed_account_with_a_valid_code_is_refused_like_a_wrong_code()
+    {
+        const string email = "code-unconfirmed-valid@novacore.test";
+        await CreateUnconfirmedAsync(_host, email);
+        string code;
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            code = await scope.ServiceProvider.GetRequiredService<PasswordResetCodes>().IssueAsync((await users.FindByEmailAsync(email))!);
+        }
+        using var client = _host.CreateClient();
+
+        await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email, code, newPassword = NewPassword }));
+
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = (await users.FindByEmailAsync(email))!;
+            Assert.True(await users.CheckPasswordAsync(user, Password));
+            Assert.False(await users.CheckPasswordAsync(user, NewPassword));
+        }
+    }
+
+    // RFC 9700 §2.6, D-095 (6): the code endpoints answer no other origin, while the same host's token endpoint, which
+    // keeps CORS for single-page apps, answers it: the configured origin works, the endpoints opt out.
+    [Fact]
+    public async Task The_code_endpoints_answer_no_cross_origin_request_where_the_token_endpoint_does()
+    {
+        const string origin = "https://app.novacore.test";
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal) { ["Cors:AllowedOrigins:0"] = origin }));
+        using var client = host.CreateClient();
+
+        Assert.True(await AllowsOriginAsync(client, HttpMethod.Options, "/connect/token", origin));
+        Assert.True(await AllowsOriginAsync(client, HttpMethod.Post, "/connect/token", origin));
+        foreach (var path in new[] { Forgot, Reset })
+        {
+            Assert.False(await AllowsOriginAsync(client, HttpMethod.Options, path, origin));
+            Assert.False(await AllowsOriginAsync(client, HttpMethod.Post, path, origin));
+        }
+    }
+
+    // A preflight, or the request a script on that origin sends.
+    private static async Task<bool> AllowsOriginAsync(HttpClient client, HttpMethod method, string path, string origin)
+    {
+        using var request = new HttpRequestMessage(method, path);
+        request.Headers.Add("Origin", origin);
+        if (method == HttpMethod.Options)
+            request.Headers.Add("Access-Control-Request-Method", "POST");
+        else
+            request.Content = path.StartsWith("/connect", StringComparison.Ordinal)
+                ? new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal) { ["grant_type"] = "authorization_code" })
+                : JsonContent.Create(new { email = "code-cors@novacore.test", code = "12345678", newPassword = NewPassword });
+
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        return response.Headers.Contains("Access-Control-Allow-Origin");
     }
 
     // Its own host: the clock moves, and this test signs nobody in (tests/CLAUDE.md).
