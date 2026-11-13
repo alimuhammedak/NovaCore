@@ -21,13 +21,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Identity provider: account invitations. `AccountInvitations.InviteAsync(email)` (for a product's own endpoint) and
   `POST /api/v1/admin/invitations` (the new `identity:invitations:create` permission) email a single-use, 7-day link to
   `Identity:SignIn:InvitationPath` (default `/accept-invitation`); `POST /api/v1/auth/invitations/status` and `/accept`
-  read and accept it. An invitation never sets the password of a confirmed account. **Upgrade:** a new `invitations`
+  read and accept it. An invitation never sets the password of a confirmed account. `InviteAsync` returns a
+  `Result<Guid>`: an address that can't be a user name is `invitation.invalid_email` (400), one another account holds as
+  its user name `invitation.address_taken` (409); two invitations racing to create one account both invite it. **Upgrade:** a new `invitations`
   table in the `identity` schema; add the migration to the host's identity store (the template's sets have it).
 
 ### Changed
 
 - Identity provider: the sign-in rules moved into one internal service shared by the HTML pages and the JSON
   endpoints; behaviour is unchanged. The antiforgery header name is `X-XSRF-TOKEN` (the HTML forms keep their field).
+
+### Fixed
+
+- Identity provider: two requests creating an account with one address at the same time (registration or invitation)
+  no longer answer 500: the user store reports the lost insert as a duplicate user name.
 
 ## [0.1.0] - 2026-10-27
 

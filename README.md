@@ -457,8 +457,8 @@ başarılı bir giriş ya da bağlantılı sıfırlamaya kadar çalışmaz. Her 
 hesabı kilitlemez. Başarı bütün oturumları
 kapatır, giriş yapmaz. Bağlantılı yol (`/account/forgot-password`) yedek olarak kalır.
 
-**Davet:** ürün kendi ucunda (kendi izniyle) `AccountInvitations.InviteAsync(email)` çağırır; dönen `sub` ile üyeliği
-kendisi ekler (`TenantDirectory.AddMemberAsync(tenant, sub, roles)`). Platformun yöneticileri için
+**Davet:** ürün kendi ucunda (kendi izniyle) `AccountInvitations.InviteAsync(email)` çağırır (`Result<Guid>`,
+`.ToHttpResult(...)`); dönen `sub` ile üyeliği kendisi ekler (`TenantDirectory.AddMemberAsync(tenant, sub, roles)`). Platformun yöneticileri için
 `POST /api/v1/admin/invitations` (`identity:invitations:create`). E-postadaki bağlantı `Identity:SignIn:InvitationPath`'i
 (varsayılan `/accept-invitation`) `?token=` ile açar; ekran `POST /api/v1/auth/invitations/status` (`{ token }`) ile
 adresi gösterir, `POST /api/v1/auth/invitations/accept` (`{ token, password }`) ile şifreyi kurar ve e-postayı onaylar.
@@ -479,6 +479,8 @@ Bağlantı 7 gün, bir kez geçer. Onaylı bir hesabın daveti şifre kurmaz (`i
 | `invitation.used` | 409 | "Davet kullanılmış; giriş yap" |
 | `invitation.expired` | 410 | "Davetin süresi doldu; yenisini iste" |
 | `invitation.account_exists` | 409 | "Hesabın var; şifrenle giriş yap" |
+| `invitation.invalid_email` | 400 | Davet eden: "Bu adres hesap adı olamaz" (Identity'nin `AllowedUserNameCharacters`'ı) |
+| `invitation.address_taken` | 409 | Davet eden: "Adres başka bir hesabın kullanıcı adı" |
 | (doğrulama) | 400 | `errors` alanlarını göster (ör. `newPassword`, `password`) |
 | (hız sınırı) | 429 | "Biraz bekle" |
 

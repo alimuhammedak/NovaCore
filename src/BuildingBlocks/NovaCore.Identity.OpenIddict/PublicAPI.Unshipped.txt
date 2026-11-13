@@ -1,6 +1,6 @@
 #nullable enable
 NovaCore.Identity.OpenIddict.AccountInvitations
-NovaCore.Identity.OpenIddict.AccountInvitations.InviteAsync(string! email, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Guid>!
+NovaCore.Identity.OpenIddict.AccountInvitations.InviteAsync(string! email, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<NovaCore.Abstractions.Results.Result<System.Guid>!>!
 NovaCore.Identity.OpenIddict.InvitationAcceptRequest
 NovaCore.Identity.OpenIddict.InvitationAcceptRequest.<Clone>$() -> NovaCore.Identity.OpenIddict.InvitationAcceptRequest!
 NovaCore.Identity.OpenIddict.InvitationAcceptRequest.Deconstruct(out string! Token, out string! Password) -> void

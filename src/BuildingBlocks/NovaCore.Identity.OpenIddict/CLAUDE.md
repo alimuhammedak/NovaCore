@@ -141,6 +141,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **Invitations** (D-091 (5), D-095): `AccountInvitations` (public, internal constructor) stores the SHA-256 of a 256-bit
   token in `invitations`, 7 days, accepted once by a conditional update after the password policy passes. A confirmed
   account's invitation sets no password (`invitation.account_exists`), so an invitation can't take an account over.
+  `InviteAsync` returns a `Result<Guid>` (`invitation.invalid_email`, `invitation.address_taken`); an account a
+  concurrent request created first is invited, its lost insert reported by the user store as a duplicate (V8-5).
   The token travels in request bodies, never in a path (request logs). The add-on doesn't know tenants: the product adds
   the membership with the returned `sub` (D-076 (2)).
 

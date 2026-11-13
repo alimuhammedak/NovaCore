@@ -56,6 +56,8 @@ internal static class InvitationEndpoints
             .MapPost("/invitations", Create)
             .WithName("AdminCreateInvitation")
             .WithSummary("Invite a person to an account (creates it when the address has none; changes no existing account)")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .RequirePermission(IdentityPermissions.InvitationsCreate);
     }
 
@@ -81,9 +83,10 @@ internal static class InvitationEndpoints
         };
     }
 
-    private static async Task<Ok<InvitationCreatedResponse>> Create(
+    private static async Task<Results<Ok<InvitationCreatedResponse>, ProblemHttpResult>> Create(
         InvitationCreateRequest request, AccountInvitations invitations, CancellationToken cancellationToken) =>
-        TypedResults.Ok(new InvitationCreatedResponse(await invitations.InviteAsync(request.Email, cancellationToken)));
+        (await invitations.InviteAsync(request.Email, cancellationToken))
+        .ToHttpResult(userId => TypedResults.Ok(new InvitationCreatedResponse(userId)));
 
     private static ProblemHttpResult ProblemFor(InvitationState state) => state switch
     {

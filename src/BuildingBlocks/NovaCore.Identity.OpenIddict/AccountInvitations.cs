@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using NovaCore.Abstractions.Results;
 using NovaCore.AspNetCore.Auth;
 
 namespace NovaCore.Identity.OpenIddict;
@@ -26,6 +27,12 @@ public sealed class AccountInvitations
 {
     /// <summary>How long an invitation link works.</summary>
     public static readonly TimeSpan Lifetime = TimeSpan.FromDays(7);
+
+    private static readonly Error InvalidEmail =
+        Error.Validation("invitation.invalid_email", "The address can't be an account's user name.");
+
+    private static readonly Error AddressTaken =
+        Error.Conflict("invitation.address_taken", "Another account holds the address as its user name.");
 
     private readonly UserManager<ApplicationUser> _users;
     private readonly RoleManager<ApplicationRole> _roles;
@@ -62,13 +69,22 @@ public sealed class AccountInvitations
     /// </summary>
     /// <param name="email">The invited person's email address.</param>
     /// <param name="cancellationToken">Cancels saving the invitation.</param>
-    /// <returns>The invited account's id.</returns>
-    /// <exception cref="InvalidOperationException">The account couldn't be created, e.g. the address isn't valid.</exception>
-    public async Task<Guid> InviteAsync(string email, CancellationToken cancellationToken = default)
+    /// <returns>
+    /// The invited account's id; or <c>invitation.invalid_email</c> (validation) when the address can't be an account's
+    /// user name (Identity's <c>AllowedUserNameCharacters</c>), or <c>invitation.address_taken</c> (conflict) when another
+    /// account holds it as its user name. Two invitations racing to create one account both invite the one created.
+    /// </returns>
+    public async Task<Result<Guid>> InviteAsync(string email, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
 
-        var user = await _users.FindByEmailAsync(email) ?? await CreateAccountAsync(email);
+        var account = await _users.FindByEmailAsync(email) is { } existing
+            ? Result.Success(existing)
+            : await CreateAccountAsync(email);
+        if (account.IsFailure)
+            return Result.Failure<Guid>(account.Error);
+
+        var user = account.Value;
 
         var token = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
         var now = _timeProvider.GetUtcNow();
@@ -88,7 +104,7 @@ public sealed class AccountInvitations
             $"You have been invited to an account. <a href=\"{HtmlEncoder.Default.Encode(link)}\">Accept the invitation</a>. "
             + $"The link works once, for {Lifetime.TotalDays:0} days. If you didn't expect it, ignore this email.");
         _audit.InvitationCreated(user.Id);
-        return user.Id;
+        return Result.Success(user.Id);
     }
 
     /// <summary>The invitation behind <paramref name="token"/>, if it can still be accepted.</summary>
@@ -150,18 +166,26 @@ public sealed class AccountInvitations
         return (InvitationState.Accepted, []);
     }
 
-    private async Task<ApplicationUser> CreateAccountAsync(string email)
+    private async Task<Result<ApplicationUser>> CreateAccountAsync(string email)
     {
         var user = new ApplicationUser { UserName = email, Email = email, CreatedAtUtc = _timeProvider.GetUtcNow() };
         var created = await _users.CreateAsync(user);
         if (!created.Succeeded)
-            throw new InvalidOperationException("The invited account couldn't be created: "
-                                                + string.Join(", ", created.Errors.Select(error => error.Code)));
+        {
+            if (!created.Errors.Any(error => error.Code is nameof(IdentityErrorDescriber.DuplicateEmail) or nameof(IdentityErrorDescriber.DuplicateUserName)))
+                return Result.Failure<ApplicationUser>(InvalidEmail);
+
+            // A concurrent invitation (or registration) created the account first: invite that one, as a moment later
+            // would have. A user name held by an account with another address is a conflict.
+            return await _users.FindByEmailAsync(email) is { } concurrent
+                ? Result.Success(concurrent)
+                : Result.Failure<ApplicationUser>(AddressTaken);
+        }
 
         // Like registration: the seed's User role when it exists (AccountEndpoints.Register).
         if (await _roles.RoleExistsAsync(IdentityRoles.User))
             await _users.AddToRoleAsync(user, IdentityRoles.User);
-        return user;
+        return Result.Success(user);
     }
 
     private static string Hash(string token) =>

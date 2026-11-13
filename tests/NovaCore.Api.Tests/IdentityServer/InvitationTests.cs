@@ -4,7 +4,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using NovaCore.Identity.OpenIddict;
@@ -32,7 +34,13 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
     {
         public CapturingEmailSender Emails { get; } = new();
 
-        protected override void Configure(WebApplicationBuilder builder) => builder.Services.AddSingleton<IEmailSender>(Emails);
+        public AccountCreationRace Creations { get; } = new();
+
+        protected override void Configure(WebApplicationBuilder builder)
+        {
+            builder.Services.AddSingleton<IEmailSender>(Emails);
+            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Creations));
+        }
     }
 
     [Fact]
@@ -98,6 +106,62 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
 
         using var browser = new OidcFlow(_host);
         Assert.False(string.IsNullOrEmpty((await browser.SignInAsync(existing.Email!, Password)).AccessToken));
+    }
+
+    // [EmailAddress] lets '#' through; Identity's AllowedUserNameCharacters don't (the address is the user name).
+    [Fact]
+    public async Task An_address_the_account_rules_refuse_is_a_bad_request_not_a_server_error()
+    {
+        using var client = await InviterAsync("inviter-invalid@novacore.test");
+
+        var created = await client.PostAsJsonAsync(new Uri(Create, UriKind.Relative), new { email = "a#b@novacore.test" }, TestContext.Current.CancellationToken);
+
+        await AssertProblemAsync(created, HttpStatusCode.BadRequest, "invitation.invalid_email");
+    }
+
+    // Another account holds the address as its user name: the address can't become an account of its own.
+    [Fact]
+    public async Task An_address_another_account_holds_as_its_user_name_is_a_conflict()
+    {
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            Assert.True((await users.CreateAsync(new ApplicationUser
+            {
+                UserName = "held-name@novacore.test",
+                Email = "held-elsewhere@novacore.test",
+                CreatedAtUtc = TimeProvider.System.GetUtcNow()
+            })).Succeeded);
+        }
+
+        using var client = await InviterAsync("inviter-held@novacore.test");
+
+        var created = await client.PostAsJsonAsync(new Uri(Create, UriKind.Relative), new { email = "held-name@novacore.test" }, TestContext.Current.CancellationToken);
+
+        await AssertProblemAsync(created, HttpStatusCode.Conflict, "invitation.address_taken");
+    }
+
+    // Both requests pass Identity's user validation before either inserts (AccountCreationRace): the one that loses the
+    // insert invites the account the other created, as it would have a moment later.
+    [Fact]
+    public async Task Concurrent_invitations_to_one_new_address_invite_one_account()
+    {
+        using var client = await InviterAsync("inviter-race@novacore.test");
+
+        fixture.Creations.Arm(2);
+        var answers = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ =>
+            client.PostAsJsonAsync(new Uri(Create, UriKind.Relative), new { email = "invited-race@novacore.test" }, TestContext.Current.CancellationToken)));
+
+        var ids = new List<Guid>();
+        foreach (var answer in answers)
+        {
+            Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+            using var body = JsonDocument.Parse(await answer.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            ids.Add(body.RootElement.GetProperty("userId").GetGuid());
+        }
+
+        Assert.Single(ids.Distinct());
+        await fixture.Emails.WaitForAsync(message => string.Equals(message.To, "invited-race@novacore.test", StringComparison.Ordinal), 2);
     }
 
     [Fact]
