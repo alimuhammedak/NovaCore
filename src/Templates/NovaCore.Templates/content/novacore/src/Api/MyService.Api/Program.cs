@@ -95,7 +95,7 @@ app.MapCoreScalar();                               // Scalar UI at /scalar/v1 (D
 app.MapModules();                                  // every module's endpoints
 app.MapDefaultEndpoints();                         // /health and /alive, Development only
 
-app.Run();
+await app.RunAsync();
 
 // Exposed so the integration tests can start the real host through WebApplicationFactory.
 public partial class Program;

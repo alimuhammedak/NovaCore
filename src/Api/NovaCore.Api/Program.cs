@@ -61,7 +61,7 @@ app.MapCoreIdentityServer();                       // /connect/*, the sign-in pa
 app.MapModules();                                  // every module's endpoints
 app.MapDefaultEndpoints();                         // /health (readiness) and /alive (liveness), Development only
 
-app.Run();
+await app.RunAsync();
 
 // Exposed so the integration test project can spin up the real host via WebApplicationFactory.
 public partial class Program;

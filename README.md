@@ -773,7 +773,7 @@ app.MapCoreIdentityServer();                       // /connect/*, giriş sayfas�
 app.MapModules();                                  // modüllerin endpoint'leri
 app.MapDefaultEndpoints();                         // /health, /alive (Development)
 
-app.Run();
+await app.RunAsync();
 ```
 
 ---

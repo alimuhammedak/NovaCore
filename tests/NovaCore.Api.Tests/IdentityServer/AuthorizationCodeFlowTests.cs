@@ -1,8 +1,12 @@
+using System.Collections.Concurrent;
+using System.Data.Common;
 using System.Globalization;
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
 using NovaCore.Identity.OpenIddict;
@@ -27,8 +31,55 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
     /// <summary>No reuse leeway, so a replayed refresh token counts as reuse at once (the default allows 30 s, R-059).</summary>
     public sealed class Fixture : IdentityServerFixture
     {
-        protected override void Configure(WebApplicationBuilder builder) =>
+        public AuthorizationInserts AuthorizationInserts { get; } = new();
+
+        protected override void Configure(WebApplicationBuilder builder)
+        {
             builder.Services.Configure<OpenIddictServerOptions>(server => server.RefreshTokenReuseLeeway = TimeSpan.Zero);
+            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(AuthorizationInserts));
+        }
+    }
+
+    /// <summary>Records, for every command that adds an authorization, whether its cancellation token can be cancelled.</summary>
+    public sealed class AuthorizationInserts : DbCommandInterceptor
+    {
+        private readonly ConcurrentQueue<bool> _cancellable = new();
+
+        public IReadOnlyCollection<bool> Cancellable => _cancellable;
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            Record(command, cancellationToken);
+            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            Record(command, cancellationToken);
+            return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+        }
+
+        private void Record(DbCommand command, CancellationToken cancellationToken)
+        {
+            if (command.CommandText.Contains("INSERT INTO \"OpenIddictAuthorizations\"", StringComparison.Ordinal))
+                _cancellable.Enqueue(cancellationToken.CanBeCanceled);
+        }
+    }
+
+    // F9.2h: the authorization endpoint's own store calls follow the request's abort token, like OpenIddict's handlers
+    // (they run on HttpContext.RequestAborted). The permanent authorization is the one write it makes itself.
+    [Fact]
+    public async Task The_authorization_endpoint_passes_the_request_aborted_token_to_its_store_calls()
+    {
+        await _host.CreateUserAsync("aborted@novacore.test", Password);
+        using var flow = new OidcFlow(_host);
+
+        await flow.SignInAsync("aborted@novacore.test", Password);
+
+        Assert.NotEmpty(fixture.AuthorizationInserts.Cancellable);
+        Assert.All(fixture.AuthorizationInserts.Cancellable, Assert.True);
     }
 
     [Fact]
