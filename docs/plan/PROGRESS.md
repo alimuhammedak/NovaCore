@@ -26,8 +26,8 @@
 | 6d | ✅ tamam | `faz/6d-analizor-sikilastirma` | 2026-10-23 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `231b05f`; push 2026-10-23, kullanıcı isteği) |
 | 7a | ✅ tamam | `faz/7a-veritabani-ozgurlugu` | 2026-10-23 | 2026-10-24 | 2026-10-24 (kullanıcı onayı, PR #11 merge commit'i `cf895d8`) |
 | 7b | ✅ tamam | `faz/7b-cok-kiracililik` | 2026-10-24 | 2026-10-25 | 2026-10-27 (kullanıcı onayı, PR #13 merge commit'i `dba8318`) |
-| 8 | ⏸ duraklatıldı (doğrulamayı gece koşusu yapar, D-096) | `faz/8-bassiz-giris` | 2026-11-09 | | |
-| 9 | ⏳ başlamadı | | | | |
+| 8 | ⏸ PR #35 açık, merge edilmedi: adımlar ve doğrulama bitti (V8-1…V8-10 kapalı), `sonar` kırmızı (Kullanıcıya kalanlar) | `faz/8-bassiz-giris` | 2026-11-09 | | |
+| 9 | 🔄 devam ediyor | `faz/9-bakim` (Faz 8 merge edilemediği için `faz/8-bassiz-giris`'in üstüne açıldı, `main` içine alındı: `af4e7da`) | 2026-11-13 | | |
 | 6e | ⏳ başlamadı | | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
@@ -40,8 +40,8 @@ Durum: **sürüyor (2026-11-13).** Bir kez kota sınırına takıldı, kaldığ�
 
 | # | İş | Durum | Not |
 |---|---|---|---|
-| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | 🔄 | İlk CI koşusu `43310617390` (`ee7e2b2`): `build-and-test` (üç veritabanı, coverage), `template-smoke`, `api-contract`, `workflow-lint` yeşil. **Kırmızı:** `secret-scan` (3 bulgu; `main`'de yeşil, yani Faz 8'in aralığında: ilk iş, V8-1) ve `sonar` (aşağıda) |
-| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | ⏳ | |
+| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ⏸ PR #35 | İki inceleme, on bulgu, hepsi kapalı. `sonar` dışında bütün job'lar yeşil; son push (`6e7fdb6`) run `43392510435`, sonucu Faz 9'un ilk adımında okunur. Merge koşulu `sonar` yüzünden tutmuyor |
+| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | 🔄 | Dependabot #26, #27, #29, #33, #19 merge edildi; F9.1 bitti; sıradaki F9.2a |
 | 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏳ | F6e.3 yerel Docker ister; F6e.4'ün adını verdiği iki araç kurulu değil |
 | 4 | Sabah raporu ve devir notu | ⏳ | |
 
@@ -65,6 +65,9 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | İş | Neden | Ne gerekli |
 |---|---|---|
 | `sonar` job'u | "Authentication with the server has failed"; `main`'de de 2026-11-09'dan beri kırmızı (run `42651867223`), kodla ilgisi yok | Kullanıcı `SONAR_TOKEN` secret'ını yeniler. Yenilenene kadar "bütün kontroller yeşil" koşulu tutmaz: PR'lar merge edilmez, fazlar üst üste açılır (D-096 (4)) |
+| CodeRabbit CLI incelemesi (Faz 8) | "session could not be authenticated" | `coderabbit auth login`, sonra `coderabbit review --agent --base main` |
+| Dependabot #21 (`global.json` → SDK 10.0.403) | Bu makinede yalnız 10.0.300 kurulu (F9.3 kuralı) | SDK 10.0.403 kurulur, PR merge edilir |
+| SonarCloud'un CORS bulgusunu "false positive" işaretlemek (L96) | Dış işlem; `AllowAnyOrigin` yalnız Development'ta (`CoreWebExtensions.cs:182`) | Kullanıcı SonarCloud'da işaretler |
 
 ## Adımlar
 
@@ -108,6 +111,27 @@ Başlangıç 2026-11-09, `main` @ `f319d57`. Plan onaylandı (plan modu). Doğru
 İkinci inceleme (2026-11-13, Opus, `c7bddf0..0b44d78`): V8-9, V8-10; V8-3…V8-6 ve yarış yardımcıları temiz. Yarış testleri yalnız SQLite'ta koşuyor.
 
 Yanlış pozitif: kök CLAUDE.md'deki başsız giriş satırının `f6185ab` ile gitmesi (kullanıcının bilinçli küçültmesi; bilgi kimlik eklentisinin CLAUDE.md'sinde).
+
+### Faz 9
+Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. Plan onayı D-096 (2). Dependabot, `main`'de: #26, #27, #29, #33, #19 merge edildi (kontroller yeşil, çakışmasız); #21 kullanıcıya kaldı; #2, #28, #30, #31, #32, #34 kırmızı → F9.3.
+
+- [x] F9.1: 98 madde, üç Sonnet sınıflandırıcı + Opus denetimi (`yapılacak`ların hepsi, diğerlerinden 17). Satır numaraları `SONRAYA-BIRAKILANLAR.md` @ `74d511d`.
+
+| Alt adım | Satır: madde | Model | Kırmızı test |
+|---|---|---|---|
+| F9.2a | L25 `PackageDependencyTests` boşlukları (bin/obj, `Update`'li referans); L26 tekrarlı kaynak tarama kodu | Sonnet | hayır |
+| F9.2b | L48 fazla `EnsureCreatedAsync` çağrıları (silinir); L94 Qodana cref ve `!` temizliği | Sonnet | hayır |
+| F9.2c | L63 `src/Modules/CLAUDE.md`'de Guid v7 "SQL Server clustering" cümlesi | Sonnet | hayır |
+| F9.2d | L74 `MessageResponse` üst düzeye | Sonnet | hayır |
+| F9.2e | L32 OTel `service.version` host assembly'sinden | Opus | evet |
+| F9.2f | L56 seed client secret'ı her açılışta yeniden hash'liyor | Opus | evet |
+| F9.2g | L57 `IdentityPermissionResolver` rol başına N+1 | Opus | sorgu sayısı |
+| F9.2h | L96 SonarCloud: `RequestAborted`, iki assertion'sız test, `RunAsync` | Opus | iptal için evet |
+| F9.2i | L65 `OutboxInterceptor` tamponu başarısız kayıtta | Opus | evet |
+| F9.2j | L85 eşzamanlı silinmiş satırda 409 yerine 404 | Opus | evet |
+
+**geçersiz** (arşive): L17, L21, L34, L36, L43, L46, L71, L88, L108; L18 F9.3 bitince (PR #31 kapsıyor).
+**kalır:** koşul gerçekleşmedi L11–L15, L20, L33, L45, L51, L60, L62, L68, L72 (F9.3'ten sonra yeniden bak), L73, L75–L79, L84, L86, L89, L90, L92, L93, L103–L105, L107, L112, L113, L116–L118, L121–L127 · ürün/public API/tasarım kararı L22, L24, L29–L31, L41, L42, L52–L55, L61, L66, L67, L80–L83, L114 · D-031 (3)'ü yeniden açar L64 · korunan dosya L27, L49, L69, L95 · bastırma L23, L28 · ortam/upstream L19, L35, L58, L91, L102, L115, L119, L120 · kuşkulu L47.
 
 ## Açık sorular (Q)
 
