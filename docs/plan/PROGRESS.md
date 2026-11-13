@@ -131,6 +131,9 @@ Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. 
 - [x] F9.2a2 (`8a35f87`): `PackageDependencyTests` `Update`'li paketi gerçekten sınıyor; `Directory.Build.*` yürüyüşü depo kökünde durur, okuması testli. İki kural geçici bozulup kırmızı görüldü.
 - [x] F9.2d (`9fc17b1`): `MessageResponse` üst düzey internal record; `v1.json` değişmedi. 6 sınıf 61/61.
 
+- [x] F9.2g (`c8446b9`): rol izinleri tek join'le (UserRoles→Roles→RoleClaims); rol artık id ile bulunur. Sorgu sayısı testi önce kırmızı (1 rol 5, 5 rol 13), sonra eşit (4). 8 izin sınıfı 32/32.
+- [x] F9.2h (`669b2d9`; R-143): `/connect` uçları `RequestAborted` geçirir (test önce kırmızı), `await app.RunAsync()` (Api, şablon, README), iki teste doğrulama. 11 sınıf 89/89. CORS bulgusu kullanıcıya kaldı.
+
 #### Doğrulama (Faz 9)
 
 | ID | Bulgu | Yer | Durum |
