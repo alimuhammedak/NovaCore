@@ -1414,3 +1414,12 @@ Bağlam: CRM-Nominal (çok kiracılı eğitim kurumu CRM'i, PostgreSQL) NovaCore
 - Daha basit düzeltme yok: değişiklikleri Identity kaydediyor (`acceptAllChangesOnSuccess` bizim elimizde değil). Her denemede izleyiciyi temizleyip kullanıcıyı yeniden yüklemek, V8-2/V8-9'un deneme kaydıyla kurduğu stamp korumasını kaybeder (aradaki yeni kod ya da tahmin görülmez); doğru çözüm denemeye özgü bir stamp karşılaştırması ister ve yalnız SQL Server/PostgreSQL'de yeniden deneyen stratejiyle test edilebilir.
 - Kaynak: https://learn.microsoft.com/ef/core/miscellaneous/connection-resiliency
 - Sonuç: davranış güvenli tarafta; yorumlar gerçeğe göre düzeltildi, iyileştirme Sonraya adayı.
+
+### R-140: Guid v7 anahtarları SQL Server ve PostgreSQL'de sıralı mı? (2026-11-13, faz 9, F9.2c; kaynak)
+- Soru: `src/Modules/CLAUDE.md` Guid v7 anahtarlarının "SQL Server clustering'e dost" olduğunu söylüyordu (SONRAYA L63, R-068'in izi). Doğru mu?
+- Bulgu:
+  - SQL Server: "ordering is not implemented by comparing the bit patterns of the two values"; `SqlGuid.CompareTo` "the last six bytes of a value are most significant". Guid v7'nin zaman damgası ilk 48 bitte, yani SQL Server sırasında en az anlamlı baytlarda; v7 değerleri SQL Server'da artan sırada değil, clustered PK rastgele sırayla dolar.
+  - Microsoft, SQL Server'da sıralı değerler için `NEWSEQUENTIALID` ve EF Core'un `SequentialGuidValueGenerator`'ını (SQL Server Guid anahtarlarının varsayılanı, "optimized for use in Microsoft SQL server clustered keys") gösteriyor. Rastgele Guid'ler için: "random I/O into your indexes".
+  - PostgreSQL: `uuid` için SQL Server'ın bayt sırası kuralı yok; PostgreSQL 18 `uuidv7()`'yi "time-ordered" UUID olarak sunuyor. Dokümanda `uuid` karşılaştırmasının bayt düzeni açıkça yazılı değil; PostgreSQL için "zamana göre artar" iddiası bu kaynakla "time-ordered" düzeyinde kalır.
+- Kaynak: https://learn.microsoft.com/dotnet/framework/data/adonet/sql/comparing-guid-and-uniqueidentifier-values · https://learn.microsoft.com/dotnet/api/system.data.sqltypes.sqlguid.compareto · https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.valuegeneration.sequentialguidvaluegenerator · https://learn.microsoft.com/sql/t-sql/functions/newsequentialid-transact-sql · https://www.postgresql.org/docs/current/functions-uuid.html
+- Sonuç: yalnız belge düzeltildi, sağlayıcıya göre. Anahtar stratejisi değişmedi (ürün kararı; `SequentialGuidValueGenerator` seçeneği SONRAYA L63'te duruyor).

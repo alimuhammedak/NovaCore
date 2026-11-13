@@ -30,8 +30,10 @@ they show a cross-module write through events both ways (DECISIONS D-034): a pay
   `Task<Results<Ok<ProductDto>, ProblemHttpResult>>` from `result.ToHttpResult()`; the union describes the success
   response in OpenAPI (no `.Produces<T>()`), `.ProducesProblem(status)` the failures. `EndpointContractTests` rejects a
   described handler that returns a bare `IResult`.
-- **`Domain/`** — entities derive from `AuditableEntity<Guid>` (Guid v7 keys — friendly to SQL Server
-  clustering). Keep setters private; mutate through methods.
+- **`Domain/`** — entities derive from `AuditableEntity<Guid>` (Guid v7 keys: time-ordered, which
+  suits PostgreSQL `uuid`; SQL Server's `uniqueidentifier` compares its last six bytes first, so there the keys
+  are unique but not increasing and a clustered primary key fills in random order, R-140). Keep setters private; mutate
+  through methods.
 - **`Infrastructure/`** — `<M>DbContext` (`public const string Schema`, `HasDefaultSchema(Schema)`,
   `ApplyConfigurationsFromAssembly`, `modelBuilder.AddOutbox()`) and an `IEntityTypeConfiguration<>` per entity (each
   ignores `DomainEvents`). Provider-neutral: no provider-specific column types, SQL or functions. The migrations and the
