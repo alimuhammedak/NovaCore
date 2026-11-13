@@ -89,7 +89,7 @@ internal static class LoginPage
     // Only back into this application (the authorization endpoint): never an open redirect.
     private static IResult Continue(string? returnUrl) =>
         RedirectHttpResult.IsLocalUrl(returnUrl)
-            ? Results.LocalRedirect(returnUrl!)
+            ? Results.LocalRedirect(returnUrl)
             : HtmlPage.Message("Signed in", "You are signed in. Return to the application to continue.");
 
     private static IResult PasswordForm(HttpContext context, IAntiforgery antiforgery, string? returnUrl, string? email, string? error) =>
