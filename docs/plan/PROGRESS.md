@@ -41,7 +41,7 @@ Durum: **sürüyor (2026-11-13).** Bir kez kota sınırına takıldı, kaldığ�
 | # | İş | Durum | Not |
 |---|---|---|---|
 | 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ⏸ PR #35 | İki inceleme, on bulgu, hepsi kapalı. `sonar` dışında bütün job'lar yeşil; son push (`6e7fdb6`) run `43392510435`, sonucu Faz 9'un ilk adımında okunur. Merge koşulu `sonar` yüzünden tutmuyor |
-| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | 🔄 | Dependabot #26, #27, #29, #33, #19 merge edildi; F9.1 ve F9.2'nin on alt adımı bitti, V9-1 doğrulandı; sıradaki F9.3 (kırmızı Dependabot PR'ları), F9.4 |
+| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | 🔄 | Dependabot #26, #27, #29, #33, #19 merge edildi; F9.1 ve F9.2'nin on alt adımı bitti, V9-1 doğrulandı; F9.3 bitti (inceleniyor); sıradaki F9.4, PR |
 | 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏳ | F6e.3 yerel Docker ister; F6e.4'ün adını verdiği iki araç kurulu değil |
 | 4 | Sabah raporu ve devir notu | ⏳ | |
 
@@ -67,6 +67,8 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | İş | Neden | Ne gerekli |
 |---|---|---|
 | `sonar` job'u | "Authentication with the server has failed"; `main`'de de 2026-11-09'dan beri kırmızı (run `42651867223`), kodla ilgisi yok | Kullanıcı `SONAR_TOKEN` secret'ını yeniler. Yenilenene kadar "bütün kontroller yeşil" koşulu tutmaz: PR'lar merge edilmez, fazlar üst üste açılır (D-096 (4)) |
+| `main`'de `secret-scan` kırmızı (6 bulgu) | Tarama bütün branch'lerin geçmişini `main`'in allowlist'iyle okuyor; bulgular Faz 8/9 branch'lerindeki test parolaları. `main`'e açılan her PR'da (Dependabot) da kırmızı | PR #35 merge edilince kendiliğinden düzelir (önce `SONAR_TOKEN`) |
+| Dependabot #2, #28, #30, #31, #32, #34 | Güncellemeleri Faz 9 branch'inde yapıldı (F9.3); PR'lar açık duruyor | Faz 9 merge edilince Dependabot kendisi kapatır; kapatmazsa kullanıcı kapatır |
 | CodeRabbit CLI incelemesi (Faz 8) | "session could not be authenticated" | `coderabbit auth login`, sonra `coderabbit review --agent --base main` |
 | Dependabot #21 (`global.json` → SDK 10.0.403) | Bu makinede yalnız 10.0.300 kurulu (F9.3 kuralı) | SDK 10.0.403 kurulur, PR merge edilir |
 | SonarCloud'un CORS bulgusunu "false positive" işaretlemek (L96) | Dış işlem; `AllowAnyOrigin` yalnız Development'ta (`CoreWebExtensions.cs:182`) | Kullanıcı SonarCloud'da işaretler |
@@ -137,6 +139,9 @@ Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. 
 
 - [x] F9.2i (`7d9dcc9`; R-144): event tamponu yalnız `SavedChanges`'te temizlenir, yeniden denemede izlenen outbox satırlarının event'leri atlanır; iki yeni public override. `OutboxInterceptorTests` önce kırmızı (4/14), sonra 14/14.
 - [x] F9.2j (`8a891f4`; R-145): çakışmada `GetDatabaseValuesAsync` null ise 404, değilse 409. `StockConcurrencyTests` önce kırmızı (2), sonra 6/6; OpenAPI değişmedi.
+
+- [x] F9.3 (`13375bd`, `dc06cda`, `94b6db9`, `f475897`, `003b218`; Sonnet, Opus incelemesi sürüyor): codeql init/analyze v4.39.3 (#28, #30), Scalar 2.18.7 (#34), OpenIddict 7.8.0 (#32), Microsoft paketleri 10.0.14 / 10.11.0 + şablonun props'u (#31; L18 kapanır), Jaeger 2.22.0 (#2). Kod uyarlaması yok; R-146…R-149. Kilitli restore ve build temiz. #21 kullanıcıda.
+- Faz sonu incelemesi (Opus, F9.2'nin davranış commit'leri): kapsam içi hata yok. F9.4'e: `src/Modules/CLAUDE.md:69`'daki 404 yönergesi kiracılı context'te `TenantQueryGuard`'a takılır; sorgu sayısı testine alt sınır. Gerisi Sonraya.
 
 #### Doğrulama (Faz 9)
 
