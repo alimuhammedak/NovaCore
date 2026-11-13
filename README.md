@@ -452,7 +452,9 @@ taşımalı); antiforgery çerezi `SameSite=Strict`. Token tarayıcıya giriş u
 **Şifre yenileme (kodla):** `POST /api/v1/auth/password/forgot` (`{ email }`) her adrese aynı `202`'yi döner, yalnız onaylı
 hesaba 8 haneli bir kod e-postalanır. `POST /api/v1/auth/password/reset` (`{ email, code, newPassword }`): kod 15 dakika,
 bir kez ve 5 yanlış denemeye kadar geçer; yeni kod eskisinin yerini alır; hesapta art arda 100 yanlış kod olunca kodlar
-başarılı bir giriş ya da bağlantılı sıfırlamaya kadar çalışmaz. Yanlış kod hesabı kilitlemez. Başarı bütün oturumları
+başarılı bir giriş ya da bağlantılı sıfırlamaya kadar çalışmaz. Her adres iki uçta da aynı sayıda hash işi yapar
+(yanıt süresi hesabı ele vermez); eşzamanlı yanlış denemeler de sayılır, sayılamayan deneme kodu bitirir. Yanlış kod
+hesabı kilitlemez. Başarı bütün oturumları
 kapatır, giriş yapmaz. Bağlantılı yol (`/account/forgot-password`) yedek olarak kalır.
 
 **Davet:** ürün kendi ucunda (kendi izniyle) `AccountInvitations.InviteAsync(email)` çağırır; dönen `sub` ile üyeliği

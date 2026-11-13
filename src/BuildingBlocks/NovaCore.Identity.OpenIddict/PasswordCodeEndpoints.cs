@@ -61,6 +61,12 @@ internal static class PasswordCodeEndpoints
                 + "password stays the same.");
             audit.PasswordResetRequested(user.Id);
         }
+        else
+        {
+            // The same hash as a code costs, so the answer doesn't come sooner for an address that gets none. The
+            // code's save (one write) is the difference left.
+            codes.IssueToNobody();
+        }
 
         return TypedResults.Accepted((string?)null, CodeSent);
     }
@@ -76,7 +82,11 @@ internal static class PasswordCodeEndpoints
     {
         var user = await users.FindByEmailAsync(request.Email);
         if (user is null || !await users.IsEmailConfirmedAsync(user))
+        {
+            // The hash check a code costs, so the answer doesn't come sooner than for a confirmed account.
+            codes.RedeemForNobody(request.Code);
             return ResultHttpExtensions.Problem(InvalidResetCode);
+        }
 
         var (outcome, errors) = await codes.RedeemAsync(user, request.Code, request.NewPassword);
         switch (outcome)

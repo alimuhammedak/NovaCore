@@ -34,9 +34,12 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
 
         public ResetCodeRace Race { get; } = new();
 
+        public CountingCodeHasher CodeHashes { get; } = new();
+
         protected override void Configure(WebApplicationBuilder builder)
         {
             builder.Services.AddSingleton<IEmailSender>(Emails);
+            builder.Services.AddKeyedSingleton<IPasswordHasher<ApplicationUser>>(PasswordResetCodes.HasherKey, CodeHashes);
             builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Race));
         }
     }
@@ -61,6 +64,31 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         // The confirmed account's email was queued last; once it is out, the others would have gone before it.
         await fixture.Emails.WaitForAsync(email => string.Equals(email.To, "code-known@novacore.test", StringComparison.Ordinal));
         Assert.DoesNotContain(fixture.Emails.Sent, email => email.To is "code-nobody@novacore.test" or "code-unconfirmed@novacore.test");
+    }
+
+    // The answers are alike (above) and so is their cost: a hash of the codes' hasher for every address, so the time of
+    // the answer doesn't tell a confirmed account from an unknown or unconfirmed one (D-030 (1), D-091 (4)). Counted
+    // rather than timed, like the sign-in's dummy hash (SessionSignInTests).
+    [Fact]
+    public async Task Every_address_costs_the_same_code_hashes_to_ask_for_a_code_and_to_reset()
+    {
+        await _host.CreateUserAsync("code-cost@novacore.test", Password);
+        await CreateUnconfirmedAsync(_host, "code-cost-unconfirmed@novacore.test");
+        using var client = _host.CreateClient();
+        string[] addresses = ["code-cost@novacore.test", "code-cost-nobody@novacore.test", "code-cost-unconfirmed@novacore.test"];
+
+        // The first check for an address without a code makes the dummy hash, once per host.
+        await PostAsync(client, Reset, new { email = "code-cost-warm-up@novacore.test", code = "12345678", newPassword = NewPassword });
+
+        var forgot = new List<int>();
+        foreach (var email in addresses)
+            forgot.Add(await CodeHashesOfAsync(() => PostAsync(client, Forgot, new { email })));
+        var reset = new List<int>();
+        foreach (var email in addresses)
+            reset.Add(await CodeHashesOfAsync(() => PostAsync(client, Reset, new { email, code = "12345678", newPassword = NewPassword })));
+
+        Assert.Equal([1, 1, 1], forgot);
+        Assert.Equal([1, 1, 1], reset);
     }
 
     [Fact]
@@ -198,6 +226,13 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         return CodeIn(sent[previous]);
     }
 
+    private async Task<int> CodeHashesOfAsync(Func<Task<HttpResponseMessage>> request)
+    {
+        var before = fixture.CodeHashes.Count;
+        using var response = await request();
+        return fixture.CodeHashes.Count - before;
+    }
+
     private async Task SetFailuresAsync(ApplicationUser user, int failures)
     {
         await using var scope = _host.Services.CreateAsyncScope();
@@ -233,4 +268,24 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
 
     [GeneratedRegex(@"<strong>(?<code>\d{8})</strong>", RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
     private static partial Regex Code();
+}
+
+/// <summary>The reset codes' hasher (its defaults), counting every hash it makes or checks.</summary>
+public sealed class CountingCodeHasher : PasswordHasher<ApplicationUser>
+{
+    private int _count;
+
+    public int Count => Volatile.Read(ref _count);
+
+    public override string HashPassword(ApplicationUser user, string password)
+    {
+        Interlocked.Increment(ref _count);
+        return base.HashPassword(user, password);
+    }
+
+    public override PasswordVerificationResult VerifyHashedPassword(ApplicationUser user, string hashedPassword, string providedPassword)
+    {
+        Interlocked.Increment(ref _count);
+        return base.VerifyHashedPassword(user, hashedPassword, providedPassword);
+    }
 }

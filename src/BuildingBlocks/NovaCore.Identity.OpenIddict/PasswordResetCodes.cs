@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace NovaCore.Identity.OpenIddict;
 
@@ -28,7 +29,12 @@ internal enum ResetCodeOutcome
 /// Every try is counted before its code is compared, and a try whose count is lost to a concurrent request ends the code
 /// (fails closed), so racing guesses get no more tries than sequential ones.
 /// </summary>
-internal sealed class PasswordResetCodes(UserManager<ApplicationUser> users, IdentityServerDbContext db, TimeProvider timeProvider)
+internal sealed class PasswordResetCodes(
+    UserManager<ApplicationUser> users,
+    IdentityServerDbContext db,
+    [FromKeyedServices(PasswordResetCodes.HasherKey)] IPasswordHasher<ApplicationUser> hasher,
+    DummyPasswordHash dummyHash,
+    TimeProvider timeProvider)
 {
     public const int Digits = 8;
     public const int MaxTriesPerCode = 5;
@@ -39,16 +45,32 @@ internal sealed class PasswordResetCodes(UserManager<ApplicationUser> users, Ide
     private const string CodeToken = "PasswordResetCode";
     internal const string FailuresToken = "PasswordResetCodeFailures";
 
-    // The recovery codes' hasher and defaults (D-053 (3)): a short code, many tries cost a hash each.
-    private readonly PasswordHasher<ApplicationUser> _hasher = new();
+    /// <summary>
+    /// The codes' hasher in DI: a <see cref="PasswordHasher{TUser}"/> with its defaults, like the recovery codes' (D-053
+    /// (3)), not the host's 600,000 iterations, since a short code with many tries costs a hash each. A singleton, so the
+    /// answers for an address without a code cost the same hasher's work.
+    /// </summary>
+    internal const string HasherKey = "NovaCore.PasswordResetCodes";
 
     /// <summary>Makes a new code for <paramref name="user"/>, replacing an unused one, and returns it for the email.</summary>
     public async Task<string> IssueAsync(ApplicationUser user)
     {
-        var code = RandomNumberGenerator.GetInt32(0, 100_000_000).ToString("D8", CultureInfo.InvariantCulture);
-        await SaveCodeAsync(user, new StoredCode(timeProvider.GetUtcNow() + Lifetime, Tries: 0, _hasher.HashPassword(user, code)));
+        var code = NewCode();
+        await SaveCodeAsync(user, new StoredCode(timeProvider.GetUtcNow() + Lifetime, Tries: 0, hasher.HashPassword(user, code)));
         return code;
     }
+
+    /// <summary>
+    /// The hash <see cref="IssueAsync"/> makes, for an address that gets no code (unknown or unconfirmed), so asking for a
+    /// code costs every address the same (D-030 (1), D-091 (4)). Nothing is saved.
+    /// </summary>
+    public void IssueToNobody() => hasher.HashPassword(new ApplicationUser { CreatedAtUtc = default }, NewCode());
+
+    /// <summary>
+    /// The hash check <see cref="RedeemAsync"/> makes, for an address that has no account to reset (unknown or
+    /// unconfirmed): the typed code is checked against a dummy hash of the codes' hasher.
+    /// </summary>
+    public void RedeemForNobody(string code) => dummyHash.CheckCode(hasher, code);
 
     /// <summary>
     /// Sets <paramref name="newPassword"/> when <paramref name="code"/> is the account's current code. A try is counted
@@ -58,13 +80,18 @@ internal sealed class PasswordResetCodes(UserManager<ApplicationUser> users, Ide
     /// </summary>
     public async Task<(ResetCodeOutcome Outcome, IReadOnlyList<string> Errors)> RedeemAsync(ApplicationUser user, string code, string newPassword)
     {
+        // Every refusal before the comparison checks the dummy hash instead: one hash check for every answer.
         if (await FailuresAsync(user) >= MaxConsecutiveFailures
             || await ReadCodeAsync(user) is not { } stored)
+        {
+            RedeemForNobody(code);
             return (ResetCodeOutcome.InvalidCode, []);
+        }
 
         if (stored.ExpiresAt <= timeProvider.GetUtcNow() || stored.Tries >= MaxTriesPerCode)
         {
             await EndCodeAsync(user);
+            RedeemForNobody(code);
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
@@ -74,10 +101,11 @@ internal sealed class PasswordResetCodes(UserManager<ApplicationUser> users, Ide
         if (!(await SaveCodeAsync(user, counted)).Succeeded)
         {
             await EndCodeAsync(user);
+            RedeemForNobody(code);
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
-        if (_hasher.VerifyHashedPassword(user, stored.Hash, code) == PasswordVerificationResult.Failed)
+        if (hasher.VerifyHashedPassword(user, stored.Hash, code) == PasswordVerificationResult.Failed)
         {
             await CountWrongCodeAsync(user, counted);
             return (ResetCodeOutcome.InvalidCode, []);
@@ -136,6 +164,9 @@ internal sealed class PasswordResetCodes(UserManager<ApplicationUser> users, Ide
         await db.UserTokens
             .Where(token => token.UserId == user.Id && token.LoginProvider == LoginProvider && token.Name == CodeToken)
             .ExecuteDeleteAsync();
+
+    private static string NewCode() =>
+        RandomNumberGenerator.GetInt32(0, 100_000_000).ToString("D8", CultureInfo.InvariantCulture);
 
     private async Task<int> FailuresAsync(ApplicationUser user) =>
         int.TryParse(await users.GetAuthenticationTokenAsync(user, LoginProvider, FailuresToken), NumberStyles.None, CultureInfo.InvariantCulture, out var failures)

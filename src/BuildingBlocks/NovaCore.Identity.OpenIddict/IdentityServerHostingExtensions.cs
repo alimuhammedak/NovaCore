@@ -57,6 +57,7 @@ public static class IdentityServerHostingExtensions
         services.AddSingleton<SecurityAuditLogger>();
         services.AddSingleton<DummyPasswordHash>();
         services.AddScoped<SignInFlow>();
+        services.AddKeyedSingleton<IPasswordHasher<ApplicationUser>>(PasswordResetCodes.HasherKey, new PasswordHasher<ApplicationUser>());
         services.AddScoped<PasswordResetCodes>();
         // Public with an internal constructor (Y-23): the options type behind it is internal.
         services.AddScoped(provider => new AccountInvitations(
