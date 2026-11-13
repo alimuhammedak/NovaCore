@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `OutboxInterceptor` clears an entity's domain events only after the save that writes them succeeds. A failed save
+  used to clear them anyway, so an entity added to a new context for a retry saved without its events; now it keeps
+  them, and a retry on the same context writes each event once.
 - `AddCoreObservability` (`NovaCore.OpenTelemetry`) no longer reports the add-on's own version as the resource's
   `service.version`. The new overload `AddCoreObservability(Assembly applicationAssembly)` reports the application's
   (that assembly's informational version, else its assembly version); without it no version is reported.

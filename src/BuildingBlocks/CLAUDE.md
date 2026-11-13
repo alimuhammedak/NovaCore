@@ -39,7 +39,9 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   outbox would skip its transaction too (F4c.7). Depends on Abstractions,
   EF Core and `Microsoft.Extensions` hosting/options/health-check packages only, never on AspNetCore (D-020).
   `OutboxInterceptor` adds the outbox rows in `SavingChanges`, which EF Core runs before it detects changes and saves,
-  so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068).
+  so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068). It
+  clears the entities' buffers in `SavedChanges` only: a failed save keeps them, and its retry skips the event ids whose
+  rows the context already tracks (R-144).
   `AddCorePersistence` also registers `OutboxDispatcher` (a `BackgroundService`): a pass at startup, then every 5 seconds
   on a `PeriodicTimer` driven by `TimeProvider`. It reads each outbox in `Id` order in keyset batches, gives each message
   a DI scope for its handlers and records the finished handlers in `outbox_consumers` (key: the message's `Id` + the

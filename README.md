@@ -883,7 +883,9 @@ teslimi ise düşer ve outbox onu bir sonraki turda güncel stokla yeniden dener
 Bir entity olayı `Raise(new SiparisVerildi(...))` ile kaydeder. Event, `DomainEvent`'ten türeyen bir record'dur.
 Kaydeden SaveChanges event'i modülün `outbox_messages` tablosuna aynı transaction içinde yazar (**transactional
 outbox**): entity değişikliği ve event ya birlikte kalıcı olur ya hiç olmaz. Bu işi `OutboxInterceptor` yapar;
-`AddModuleDbContext` onu her modül context'ine ekler, modül tabloyu `modelBuilder.AddOutbox()` ile map'ler.
+`AddModuleDbContext` onu her modül context'ine ekler, modül tabloyu `modelBuilder.AddOutbox()` ile map'ler. Entity
+event'lerini kayıt başarılı olana kadar tutar: başarısız bir kaydı aynı context'te yeniden denemek her event'i bir kez
+yazar, entity'yi yeni bir context'e eklemek de event'leriyle birlikte götürür.
 
 `AddCorePersistence`'ın kaydettiği `OutboxDispatcher` (bir `BackgroundService`) outbox'lardaki event'leri
 `IDomainEventHandler<T>`'lere dağıtır:
