@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -57,6 +58,51 @@ public class ObservabilityTests
         outbox.StartActivity("process", ActivityKind.Consumer, parent)?.Dispose();
 
         Assert.Equal(["process"], ended.In(trace));
+    }
+
+    [Fact]
+    public void The_service_version_is_the_given_application_assemblys_not_the_add_ons()
+    {
+        // Every NovaCore assembly carries the repository's one VersionPrefix, so the application here is an assembly whose
+        // version differs from the add-on's.
+        var application = typeof(HostApplicationBuilder).Assembly;
+        var expected = application.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+        Assert.DoesNotContain(expected, AddOnVersions(), StringComparer.Ordinal);
+
+        var resource = ResourceOf(builder => builder.AddCoreObservability(application));
+
+        Assert.Equal("an-application", resource["service.name"]);
+        Assert.Equal(expected, resource["service.version"]);
+    }
+
+    [Fact]
+    public void Without_the_application_assembly_no_service_version_is_reported()
+    {
+        // Not the add-on's own version in its place: that would name no application.
+        var resource = ResourceOf(builder => builder.AddCoreObservability());
+
+        Assert.Equal("an-application", resource["service.name"]);
+        Assert.False(resource.ContainsKey("service.version"));
+    }
+
+    private static Dictionary<string, object> ResourceOf(Action<HostApplicationBuilder> addObservability)
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { ApplicationName = "an-application" });
+        addObservability(builder);
+        using var host = builder.Build();
+
+        return host.Services.GetRequiredService<TracerProvider>().GetResource().Attributes
+            .ToDictionary(attribute => attribute.Key, attribute => attribute.Value, StringComparer.Ordinal);
+    }
+
+    private static string?[] AddOnVersions()
+    {
+        var addOn = typeof(OpenTelemetryHostingExtensions).Assembly;
+        return
+        [
+            addOn.GetName().Version?.ToString(),
+            addOn.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
+        ];
     }
 
     private sealed class EndedSpans : BaseProcessor<Activity>

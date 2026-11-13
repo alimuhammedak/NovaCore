@@ -17,7 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add-ons (third-party packages): logging and observability.
 builder.AddCoreLogging();                          // Serilog: console, plus Seq when configured
-builder.AddCoreObservability();                    // OpenTelemetry metrics + tracing, OTLP export when configured
+builder.AddCoreObservability(typeof(Program).Assembly); // OpenTelemetry logs, metrics + tracing (service.version: this app's), OTLP export when configured
 
 // Core.
 builder.AddCoreDefaults();                         // health checks + resilient HttpClients
@@ -61,7 +61,7 @@ app.MapCoreIdentityServer();                       // /connect/*, the sign-in pa
 app.MapModules();                                  // every module's endpoints
 app.MapDefaultEndpoints();                         // /health (readiness) and /alive (liveness), Development only
 
-app.Run();
+await app.RunAsync();
 
 // Exposed so the integration test project can spin up the real host via WebApplicationFactory.
 public partial class Program;

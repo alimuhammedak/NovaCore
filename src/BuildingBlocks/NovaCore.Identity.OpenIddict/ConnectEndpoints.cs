@@ -73,9 +73,9 @@ internal static class ConnectEndpoints
                 [IdentityConstants.ApplicationScheme]);
         }
 
-        var application = await applications.FindByClientIdAsync(request.ClientId!)
+        var application = await applications.FindByClientIdAsync(request.ClientId!, context.RequestAborted)
                           ?? throw new InvalidOperationException("The client application cannot be found.");
-        var applicationId = await applications.GetIdAsync(application);
+        var applicationId = await applications.GetIdAsync(application, context.RequestAborted);
         var subject = user.Id.ToString();
 
         var identity = await CreateIdentityAsync(users, user, request.GetScopes(), jwt.Value.Audience);
@@ -83,14 +83,16 @@ internal static class ConnectEndpoints
             identity.SetClaim(Claims.AuthenticationTime, signedInAt.ToUnixTimeSeconds());
 
         // Implicit consent (first-party clients): reuse the user's permanent authorization for this client, or create
-        // one. Its id ties every token of the session together, for chain revocation on refresh token reuse.
+        // one. Its id ties every token of the session together, for chain revocation on refresh token reuse. An aborted
+        // request stops here like OpenIddict's own handlers, which run on the same token: the creation is one insert,
+        // and an authorization created without its code is the one the next sign-in reuses.
         var authorization = await authorizations
-                                .FindAsync(subject, applicationId, Statuses.Valid, AuthorizationTypes.Permanent, identity.GetScopes())
-                                .LastOrDefaultAsync()
+                                .FindAsync(subject, applicationId, Statuses.Valid, AuthorizationTypes.Permanent, identity.GetScopes(), context.RequestAborted)
+                                .LastOrDefaultAsync(context.RequestAborted)
                             ?? await authorizations.CreateAsync(
-                                identity, subject, applicationId!, AuthorizationTypes.Permanent, identity.GetScopes());
+                                identity, subject, applicationId!, AuthorizationTypes.Permanent, identity.GetScopes(), context.RequestAborted);
 
-        identity.SetAuthorizationId(await authorizations.GetIdAsync(authorization));
+        identity.SetAuthorizationId(await authorizations.GetIdAsync(authorization, context.RequestAborted));
         identity.SetDestinations(GetDestinations);
 
         return Results.SignIn(new ClaimsPrincipal(identity), properties: null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -108,7 +110,7 @@ internal static class ConnectEndpoints
                       ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
         if (request.IsClientCredentialsGrantType())
-            return await ServiceTokenAsync(request, applications, jwt.Value.Audience);
+            return await ServiceTokenAsync(request, applications, jwt.Value.Audience, context.RequestAborted);
 
         if (!request.IsAuthorizationCodeGrantType() && !request.IsRefreshTokenGrantType())
             throw new InvalidOperationException("The grant type is not supported.");
@@ -142,15 +144,15 @@ internal static class ConnectEndpoints
     // OpenIddict has authenticated the client with its secret. The token speaks for the client itself: its "sub" is the
     // client id, which the permission resolver maps to the client's configured permissions.
     private static async Task<IResult> ServiceTokenAsync(
-        OpenIddictRequest request, IOpenIddictApplicationManager applications, string audience)
+        OpenIddictRequest request, IOpenIddictApplicationManager applications, string audience, CancellationToken cancellationToken)
     {
-        var application = await applications.FindByClientIdAsync(request.ClientId!)
+        var application = await applications.FindByClientIdAsync(request.ClientId!, cancellationToken)
                           ?? throw new InvalidOperationException("The client application cannot be found.");
 
         var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType, Claims.Name, Claims.Role);
         identity
             .SetClaim(Claims.Subject, request.ClientId)
-            .SetClaim(Claims.Name, await applications.GetDisplayNameAsync(application) ?? request.ClientId);
+            .SetClaim(Claims.Name, await applications.GetDisplayNameAsync(application, cancellationToken) ?? request.ClientId);
         identity.SetScopes(request.GetScopes());
         identity.SetResources(audience);
         identity.SetDestinations(GetDestinations);

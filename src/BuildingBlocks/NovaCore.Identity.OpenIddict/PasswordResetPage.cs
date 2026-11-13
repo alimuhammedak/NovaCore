@@ -80,6 +80,7 @@ internal static class PasswordResetPage
         UserManager<ApplicationUser> users,
         IOpenIddictTokenManager tokens,
         IOpenIddictAuthorizationManager authorizations,
+        PasswordResetCodes resetCodes,
         SecurityAuditLogger audit)
     {
         if (!context.Request.HasFormContentType || !await antiforgery.IsRequestValidAsync(context))
@@ -114,6 +115,8 @@ internal static class PasswordResetPage
         // ResetPasswordAsync renewed the security stamp: the link can't be used again and the provider's sign-in cookie
         // ends. The refresh tokens go too, since a reset may follow a compromise.
         await AccountEndpoints.RevokeSessionsAsync(user, tokens, authorizations, context.RequestAborted);
+        // The link proves the mailbox too, so codes work again after a run of wrong ones (D-091 (4)).
+        await resetCodes.ClearFailuresAsync(user);
         audit.PasswordReset(user.Id);
         audit.SessionsRevoked(user.Id, "password-reset");
 

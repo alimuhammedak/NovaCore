@@ -28,8 +28,10 @@ public class PermissionResolverStartupCheckTests
     {
         using var host = BuildProductionHost(registerResolver: true);
 
-        await host.StartAsync();
+        var error = await Record.ExceptionAsync(() => host.StartAsync());
         await host.StopAsync();
+
+        Assert.Null(error);
     }
 
     private static IHost BuildProductionHost(bool registerResolver)

@@ -8,6 +8,8 @@ Stack: **xUnit v3 4.x on Microsoft.Testing.Platform** (test projects are `Output
 a class, repeatable; `*` only at the start or end). A filter needs `--project`: solution-wide, a project with no
 matching test fails the run with exit code 8 (D-063). xUnit's options go after `--`; a solution goes through
 `--solution`. A writing session runs its step's classes this way and leaves the full suite to `/novacore-verify` (D-088).
+It runs the architecture tests with them (`--filter-namespace "*.Architecture"`): they read every project's source
+and references, so a change far from them can break one (a new `Assembly.Load` broke Y-20's test).
 
 ## Two projects
 
@@ -35,13 +37,15 @@ matching test fails the run with exit code 8 (D-063). xUnit's options go after `
   Catalog.Contracts; `NovaCore.Abstractions` has no ASP.NET/EF reference). The testable bans in
   `docs/plan/DECISIONS.md` are tests too: banned packages anywhere in the dependency graph (Y-01/32/33),
   core packages on Microsoft packages only plus the one-way package direction (Y-05, `PackageDependencyTests`, which
-  reads the `src/BuildingBlocks` csproj files and the built assemblies), module references only via `*.Contracts`
+  reads the `src/BuildingBlocks` csproj files, the `Directory.Build.props`/`.targets` above them up to the repo root,
+  and the built assemblies), module references only via `*.Contracts`
   and no extra per-module projects (Y-08/17), no `IRepository`/`IUnitOfWork` or `*Helper`/`*Util`/`*Manager` types
   (Y-15/29), no assembly scanning or `*FromAssembly*` service registration anywhere under `src/` (Y-20; EF's
   `ApplyConfigurationsFromAssembly` is allowed, D-023), scope + build validation on the test host (Y-26),
   no `*.Domain` types in endpoint signatures via ApiExplorer (Y-31), no TODO/FIXME under `src/` (Y-38), every GitHub
   Action pinned to one full commit SHA across the workflows, the template's included (`WorkflowPinTests`, D-051). `Solution`
-  locates the repo root and first-party assemblies.
+  locates the repo root and first-party assemblies, and lists the source files every scan reads (`SourceFiles`, no
+  `bin`/`obj`).
 - **Host wiring** (`Integration/`) — `ModuleRegistrationTests` pin the module order and every module endpoint;
   `ValidationTests` pins the 400 validation ProblemDetails (type, instance, traceId, error keys) of every validated
   request, so a module that forgets `services.AddValidation()` fails here. Update the expected lists when you add or
@@ -174,8 +178,8 @@ PostgreSQL.
 
 `StockRaceApiFactory` (a `FakeClockApiFactory`) plays a concurrent writer for `StockConcurrencyTests`.
 `ChangeStockBeforeNextSave(productId, stock)` makes the next Catalog save that modifies or deletes the product first
-see another connection set its stock. The change lands between the save's read and its write. An update that changes
-nothing sends no `UPDATE`, so the request must really change the product.
+see another connection set its stock (`DeleteProductBeforeNextSave(productId)`: delete the product). The change
+lands between the save's read and its write. An update that changes nothing sends no `UPDATE`, so the request must really change the product.
 
 ## Tokens: an in-memory OpenID Connect issuer
 
@@ -217,11 +221,21 @@ redirects) and the public client: authorize → sign-in form (antiforgery token)
 the given ones. `TokenPruningTests` moves a fake clock by an hour to run a pruning pass; it signs nobody in.
 `TwoFactorRaceTests` makes two requests verifying one authenticator code interleave on every run: its host's store
 contexts carry `UsedCodeRace`, which runs the competing request to its end just before the next save that records a
-used code, so both read the user before either writes.
+used code, so both read the user before either writes. `PasswordCodeResetTests` does the same for many guesses of one
+reset code: `ResetCodeRace` holds every save of a reset code token until the armed number of requests wait there, or
+runs a competing request to its end before the next save of the account's run of wrong codes.
+`ConcurrentUserWrite` makes the next save of a new password lose to a concurrent write of the account (it changes the
+user's concurrency stamp through the saving context first), and `AccountCreationRace` holds the saves that add an
+account until the armed number of requests wait there (`InvitationTests`). `InvitationAcceptRace` holds the next
+transactions' start (not the conditional update: SQLite's `BEGIN IMMEDIATE` takes the write lock at the start), so two
+accepts of one invitation both find it pending first.
 `IdentityServerFixture` shares one host per class; tests that need a different host start their own
 (`IdentityServerTestHost.StartAsync(environment, configure)`). These classes run in the `IdentityServerTestGroup`
 collection, apart from the parallel tests: their CPU load made the `WebApplicationFactory` startup race (R-055) hit
 most full runs.
+
+A test password or secret reuses a value already in the first allowlist of `.betterleaks.toml`; a new one goes into
+that allowlist, as the exact value, in the same commit (CI's secret scan reads the whole history).
 
 ## The core alone: `CoreWebTestHost`
 

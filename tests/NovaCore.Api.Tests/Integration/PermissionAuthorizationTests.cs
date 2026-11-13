@@ -2,10 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using NovaCore.AspNetCore.Identity;
 using NovaCore.Modules.Catalog.Authorization;
-using NovaCore.Modules.Catalog.Infrastructure;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -16,16 +14,8 @@ namespace NovaCore.Api.Tests.Integration;
 /// neither a permission claim nor the Administrator role in the token itself grants anything (PLAN F3a.2, F4c.2). Written against the dynamic policy provider before F2c.2 replaced it with
 /// <c>RequirePermissionAttribute</c> (IAuthorizationRequirementData).
 /// </summary>
-public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>, IAsyncLifetime
+public sealed class PermissionAuthorizationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>
 {
-    public async ValueTask InitializeAsync()
-    {
-        using var scope = factory.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<CatalogDbContext>().Database.EnsureCreatedAsync();
-    }
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
     [Fact]
     public async Task A_granted_permission_opens_its_endpoint()
     {

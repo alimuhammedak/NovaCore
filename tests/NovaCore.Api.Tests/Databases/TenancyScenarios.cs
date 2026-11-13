@@ -196,6 +196,28 @@ public abstract class TenancyScenarios<TFixture>(TFixture fixture) : IClassFixtu
         Assert.Equal(new[] { first, second }.Order(), tenants.Order());
     }
 
+    // After a concurrency conflict an endpoint tells "deleted since it was read" (404) from "changed" (409) by querying the
+    // row by its key with the filters on, as src/Modules/CLAUDE.md says. The entry's GetDatabaseValuesAsync() can't: EF Core
+    // reads the values with every filter off, which TenantQueryGuard refuses on a context of tenant entities.
+    [Fact]
+    public async Task After_a_conflict_a_row_deleted_since_it_was_read_is_found_gone_by_a_query_with_the_tenant_filter_on()
+    {
+        var tenant = Guid.NewGuid();
+        var (kept, deleted) = (await AddNoteAsync(tenant, "kept"), await AddNoteAsync(tenant, "deleted"));
+
+        var stillThere = await Fixture.InScopeAsync(tenant, async notes =>
+        {
+            var deletedNote = await notes.Notes.SingleAsync(n => n.Id == deleted, Cancellation);
+            await Fixture.InScopeAsync(tenant, other => other.Notes.Where(n => n.Id == deleted).ExecuteDeleteAsync(Cancellation));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => notes.Entry(deletedNote).GetDatabaseValuesAsync(Cancellation));
+            return (await notes.Notes.AnyAsync(n => n.Id == kept, Cancellation),
+                await notes.Notes.AnyAsync(n => n.Id == deleted, Cancellation));
+        });
+
+        Assert.Equal((true, false), stillThere);
+    }
+
     [Fact]
     public async Task Bulk_updates_and_deletes_reach_only_the_scopes_tenant()
     {

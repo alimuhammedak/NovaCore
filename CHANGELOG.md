@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Identity provider: a headless sign-in surface for a project's own screens, next to the HTML pages, which stay as the
+  fallback. `Identity:SignIn:LoginPath` sends a signed-out browser from `/connect/authorize` to the project's screen
+  (a path on this host only, or the host doesn't start). The screen signs in with `GET /api/v1/auth/session/antiforgery`,
+  `POST /api/v1/auth/session/login` and `POST /api/v1/auth/session/login/2fa` (the antiforgery token in the
+  `X-XSRF-TOKEN` header, no CORS, local return URLs only); they open the provider's session cookie and never return a
+  token. Failures carry a stable `code` (`account.invalid_credentials`, `account.email_not_confirmed`, ...).
+- Identity provider: password reset with an emailed 8-digit code, `POST /api/v1/auth/password/forgot` and
+  `POST /api/v1/auth/password/reset`: 15 minutes, once, 5 wrong tries per code, and codes stop after 100 wrong ones in
+  a row until the owner signs in. A wrong code doesn't count toward lockout; a reset ends every session.
+- Identity provider: account invitations. `AccountInvitations.InviteAsync(email)` (for a product's own endpoint) and
+  `POST /api/v1/admin/invitations` (the new `identity:invitations:create` permission) email a single-use, 7-day link to
+  `Identity:SignIn:InvitationPath` (default `/accept-invitation`); `POST /api/v1/auth/invitations/status` and `/accept`
+  read and accept it. An invitation never sets the password of a confirmed account. `InviteAsync` returns a
+  `Result<Guid>`: an address that can't be a user name is `invitation.invalid_email` (400), one another account holds as
+  its user name `invitation.address_taken` (409); two invitations racing to create one account both invite it. **Upgrade:** a new `invitations`
+  table in the `identity` schema; add the migration to the host's identity store (the template's sets have it).
+
+### Changed
+
+- Identity provider: the sign-in rules moved into one internal service shared by the HTML pages and the JSON
+  endpoints; behaviour is unchanged. The antiforgery header name is `X-XSRF-TOKEN` (the HTML forms keep their field).
+- Identity provider: a user's role permissions are resolved in one query, whatever the number of roles (two per role
+  before). The `/connect/*` endpoints pass the request's cancellation token to the store, so an aborted request
+  stops its database work.
+- Dependencies: OpenIddict 7.8.0; Scalar.AspNetCore 2.18.7; ASP.NET Core and EF Core packages (and the `dotnet-ef`
+  tool) 10.0.14, `Microsoft.Extensions.Caching.Hybrid` and `Microsoft.Extensions.Http.Resilience` 10.11.0; OpenTelemetry
+  1.20.1; CsCheck 5.0.1 (tests). The template pins the same EF Core, Mvc.Testing, `System.Security.Cryptography.Pkcs`
+  and `dotnet-ef` versions. Development compose images: Jaeger 2.22.0, Seq 2026.1.17526, Keycloak 26.8.2-1. CI:
+  `github/codeql-action` 4.39.3.
+
+### Fixed
+
+- Catalog: `PUT` and `DELETE /api/v1/products/{id}` answer 404 `product.not_found` instead of 409
+  `product.concurrency_conflict` when the product was deleted after it was read. A `DELETE` that connection resiliency
+  replays after its first attempt was applied gets 404 too.
+- `OutboxInterceptor` clears an entity's domain events only after the save that writes them succeeds. A failed save
+  used to clear them anyway, so an entity added to a new context for a retry saved without its events; now it keeps
+  them, and a retry on the same context writes each event once.
+- `AddCoreObservability` (`NovaCore.OpenTelemetry`) no longer reports the add-on's own version as the resource's
+  `service.version`. The new overload `AddCoreObservability(Assembly applicationAssembly)` reports the application's
+  (that assembly's informational version, else its assembly version); without it no version is reported.
+  **Upgrade:** call `builder.AddCoreObservability(typeof(Program).Assembly)` in the host (the template does).
+- Identity provider: the startup seed no longer hashes a confidential client's secret again and rewrites the client on
+  every start. A configured secret that still matches the stored hash keeps it, and a client whose fields all match is
+  not written (instances starting together no longer race on its row); a changed secret or field is written as before.
+- Identity provider: two requests creating an account with one address at the same time (registration or invitation)
+  no longer answer 500: the user store reports the lost insert as a duplicate user name.
+
 ## [0.1.0] - 2026-10-27
 
 The first stable version. Everything below is relative to 0.1.0-preview.1. Each library package's public API is now

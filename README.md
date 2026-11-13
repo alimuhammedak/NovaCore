@@ -90,7 +90,8 @@ cd SiparisServisi && dotnet build && dotnet test         # veritabanı sunucusu 
 | Kök | `nuget.config`, `Directory.Build.props` (uyarılar hata, analyzer'lar, NuGet audit), `Directory.Packages.props` (merkezi sürümler, `NovaCoreVersion`), `global.json`, `.editorconfig`, `dotnet-tools.json` (dotnet-ef, nuget-license), `eng/check-licenses.sh` (lisans kapısı ve projenin adlı istisnaları) |
 
 Log hattı tektir: `AddCoreObservability` log, metrik ve trace'i OpenTelemetry'den geçirir, `OTEL_EXPORTER_OTLP_ENDPOINT`
-varsa OTLP'ye gönderir. Serilog eklentisi (`BMD.NovaCore.Serilog`) isteyen proje için ayrıca durur.
+varsa OTLP'ye gönderir. Kaynağın `service.version`'ı host'un verdiği assembly'nin sürümüdür (`AddCoreObservability(typeof(Program).Assembly)`);
+assembly verilmezse sürüm raporlanmaz. Serilog eklentisi (`BMD.NovaCore.Serilog`) isteyen proje için ayrıca durur.
 
 ### Sorumluluk modeli
 
@@ -425,6 +426,64 @@ Bilinmesi gerekenler:
   sıfırlanırken hata ya da yanlış sonuç verebildiğini yazıyor (SQL Server 2019 CU14 ve sonrası); geçici çözüm trace flag
   11042 (`SESSION_CONTEXT`'i seri çalıştırır). Havuzlu bağlantıyla kullanılan bu kalıp tam o durumdur.
 
+### Kendi giriş ekranı
+
+Kimlik eklentisinin HTML sayfaları (`/account/*`) varsayılan yedektir. Kendi giriş, şifre yenileme ve davet ekranını
+çizen proje JSON uçlarını kullanır; güvenlik kuralları (kilit, aynı cevap, sahte hash, 2FA, kod sayımı) pakettedir,
+proje yalnız ekranı ve metinleri yazar (D-090, D-091).
+
+**Akış (Authorization Code + PKCE değişmez):**
+
+1. İstemci uygulaması `/connect/authorize`'a gider. Oturumsuz tarayıcı `Identity:SignIn:LoginPath`'e (ör. `/sign-in`)
+   yönlenir, istek `ReturnUrl` olarak sorgudadır. Ayar boşsa `/account/login`.
+2. Ekran `GET /api/v1/auth/session/antiforgery` ile token'ı alır (`{ token, headerName }`) ve her POST'ta
+   `X-XSRF-TOKEN` başlığında geri yollar.
+3. `POST /api/v1/auth/session/login` (`{ email, password, returnUrl }`) → `200 { status, returnUrl }`. `status`
+   `signed_in` ise ekran `returnUrl`'e gider; `two_factor_required` ise kod alanını gösterir ve
+   `POST /api/v1/auth/session/login/2fa` (`{ code, returnUrl }`) çağırır (authenticator ya da kurtarma kodu).
+4. Giriş ucu token vermez; sağlayıcının oturum çerezini açar. `/connect/authorize` kodu verir, istemci kodu
+   `/connect/token`'da PKCE ile token'a çevirir.
+
+**Aynı kaynak kuralı:** ekran kimlik sağlayıcıyla aynı origin'den sunulur (host'un statik dosyaları ya da önündeki ters
+proxy). Uçlarda CORS kapalıdır (RFC 9700 §2.6) ve `returnUrl` yalnız bu host'un yolu olabilir. Geliştirmede SPA'nın dev
+sunucusu (Vite vb.) `/api`, `/connect` ve `/.well-known` isteklerini host'a proxy'ler; tarayıcı tek origin görür.
+Çerezler: uygulama çerezi `Secure` + `HttpOnly`, `SameSite=Lax` (istemciden `/connect/authorize`'a gezinme onu
+taşımalı); antiforgery çerezi `SameSite=Strict`. Token tarayıcıya giriş ucundan hiç verilmez; ROPC yok.
+
+**Şifre yenileme (kodla):** `POST /api/v1/auth/password/forgot` (`{ email }`) her adrese aynı `202`'yi döner, yalnız onaylı
+hesaba 8 haneli bir kod e-postalanır. `POST /api/v1/auth/password/reset` (`{ email, code, newPassword }`): kod 15 dakika,
+bir kez ve 5 yanlış denemeye kadar geçer; yeni kod eskisinin yerini alır; hesapta art arda 100 yanlış kod olunca kodlar
+başarılı bir giriş ya da bağlantılı sıfırlamaya kadar çalışmaz. Her adres iki uçta da aynı sayıda hash işi yapar
+(yanıt süresi hesabı ele vermez); eşzamanlı yanlış denemeler de koda ve hesabın serisine sayılır, sayılamayan deneme
+karşılaştırılmaz ve kodu bitirir. Yanlış kod hesabı kilitlemez. Başarı bütün oturumları kapatır, giriş yapmaz. Bağlantılı yol (`/account/forgot-password`) yedek olarak kalır.
+
+**Davet:** ürün kendi ucunda (kendi izniyle) `AccountInvitations.InviteAsync(email)` çağırır (`Result<Guid>`,
+`.ToHttpResult(...)`); dönen `sub` ile üyeliği kendisi ekler (`TenantDirectory.AddMemberAsync(tenant, sub, roles)`). Platformun yöneticileri için
+`POST /api/v1/admin/invitations` (`identity:invitations:create`). E-postadaki bağlantı `Identity:SignIn:InvitationPath`'i
+(varsayılan `/accept-invitation`) `?token=` ile açar; ekran `POST /api/v1/auth/invitations/status` (`{ token }`) ile
+adresi gösterir, `POST /api/v1/auth/invitations/accept` (`{ token, password }`) ile şifreyi kurar ve e-postayı onaylar.
+Bağlantı 7 gün, bir kez geçer. Onaylı bir hesabın daveti şifre kurmaz (`invitation.account_exists`): kullanıcı kendi
+şifresiyle girer, davet hesabı ele geçiremez.
+
+**Hata kodları → ekran durumu** (ProblemDetails'in `code` alanı; metni ekran yazar):
+
+| Kod | Durum | Ekran |
+|---|---|---|
+| `account.invalid_credentials` | 401 | "E-posta ya da şifre yanlış" (bilinmeyen hesap, yanlış şifre ve kilitli hesap aynı) |
+| `account.email_not_confirmed` | 403 | "E-postanı onayla" (yalnız doğru şifreden sonra) |
+| `account.invalid_code` | 401 | "Kod yanlış" |
+| `account.two_factor_session_missing` | 401 | Şifre adımına dön |
+| `account.antiforgery_invalid` | 400 | Token'ı yeniden al, isteği tekrarla |
+| `account.invalid_reset_code` | 400 | "Kod geçersiz ya da süresi doldu; yeni kod iste" |
+| `invitation.not_found` | 404 | "Bağlantı geçersiz" |
+| `invitation.used` | 409 | "Davet kullanılmış; giriş yap" |
+| `invitation.expired` | 410 | "Davetin süresi doldu; yenisini iste" |
+| `invitation.account_exists` | 409 | "Hesabın var; şifrenle giriş yap" |
+| `invitation.invalid_email` | 400 | Davet eden: "Bu adres hesap adı olamaz" (Identity'nin `AllowedUserNameCharacters`'ı) |
+| `invitation.address_taken` | 409 | Davet eden: "Adres başka bir hesabın kullanıcı adı" |
+| (doğrulama) | 400 | `errors` alanlarını göster (ör. `newPassword`, `password`) |
+| (hız sınırı) | 429 | "Biraz bekle" |
+
 ### Tarayıcı uygulamaları: BFF
 
 Microsoft, web uygulamaları için tarayıcıda çalışan public OIDC/OAuth client'larını artık önermiyor; önerilen mimari
@@ -688,7 +747,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Eklentiler (üçüncü taraf paketler)
 builder.AddCoreLogging();                          // Serilog: Console + opsiyonel Seq
-builder.AddCoreObservability();                    // OpenTelemetry metrics + tracing, OTLP yalnızca konfigüre ise
+builder.AddCoreObservability(typeof(Program).Assembly); // OpenTelemetry metrics + tracing, service.version uygulamanın; OTLP yalnızca konfigüre ise
 
 // Çekirdek
 builder.AddCoreDefaults();                         // health + resilient HttpClients
@@ -715,7 +774,7 @@ app.MapCoreIdentityServer();                       // /connect/*, giriş sayfas�
 app.MapModules();                                  // modüllerin endpoint'leri
 app.MapDefaultEndpoints();                         // /health, /alive (Development)
 
-app.Run();
+await app.RunAsync();
 ```
 
 ---
@@ -816,15 +875,19 @@ Son birim için gelen iki istek ikisi de 201 alabilir, ama biri sonra Failed olu
 dispatcher turu içinde (yaklaşık 10 sn) `GET /api/v1/payments`'ta görünür; başarısız her teslim bir tur daha ekler.
 
 Stoğa aynı anda yazan iki işlem birbirinin üstüne yazamaz, çünkü `Product.Stock` bir concurrency token'dır. Ürün uç
-noktaları (`PUT`/`DELETE`) okuduktan sonra değişmiş bir stokta 409 `product.concurrency_conflict` döner; rezervasyonun
-teslimi ise düşer ve outbox onu bir sonraki turda güncel stokla yeniden dener.
+noktaları (`PUT`/`DELETE`) okuduktan sonra değişmiş bir stokta 409 `product.concurrency_conflict`, okuduktan sonra
+silinmiş bir üründe 404 `product.not_found` döner; rezervasyonun teslimi ise düşer ve outbox onu bir sonraki turda
+güncel stokla yeniden dener. Bağlantı direnci (`EnableRetryOnFailure`) ilk denemesi uygulanmış bir `DELETE`'i yeniden
+oynatırsa o istek de 404 alır: ürün silinmiştir.
 
 ### Domain event'ler ve outbox
 
 Bir entity olayı `Raise(new SiparisVerildi(...))` ile kaydeder. Event, `DomainEvent`'ten türeyen bir record'dur.
 Kaydeden SaveChanges event'i modülün `outbox_messages` tablosuna aynı transaction içinde yazar (**transactional
 outbox**): entity değişikliği ve event ya birlikte kalıcı olur ya hiç olmaz. Bu işi `OutboxInterceptor` yapar;
-`AddModuleDbContext` onu her modül context'ine ekler, modül tabloyu `modelBuilder.AddOutbox()` ile map'ler.
+`AddModuleDbContext` onu her modül context'ine ekler, modül tabloyu `modelBuilder.AddOutbox()` ile map'ler. Entity
+event'lerini kayıt başarılı olana kadar tutar: başarısız bir kaydı aynı context'te yeniden denemek her event'i bir kez
+yazar, entity'yi yeni bir context'e eklemek de event'leriyle birlikte götürür.
 
 `AddCorePersistence`'ın kaydettiği `OutboxDispatcher` (bir `BackgroundService`) outbox'lardaki event'leri
 `IDomainEventHandler<T>`'lere dağıtır:
@@ -890,7 +953,8 @@ Tasarım OWASP cheat sheet'lerine, RFC 9700 (OAuth 2.0 Security BCP) ve Microsof
 ### Kimlik sağlayıcı (`NovaCore.Identity.OpenIddict`)
 - **Akışlar:** Authorization Code + **PKCE (yalnızca S256)**, refresh token, client credentials. Uçlar `/connect/*`;
   tarayıcı girişi `/account/login` (sade HTML, antiforgery, yalnızca yerel ReturnUrl), gerekirse 2FA adımı, parola
-  sıfırlama `/account/forgot-password`.
+  sıfırlama `/account/forgot-password`. Kendi ekranını çizen proje aynı kuralları JSON uçlarıyla kullanır
+  (`Identity:SignIn:LoginPath`, `/api/v1/auth/session/*`, kodla şifre yenileme, davet; bkz. "Kendi giriş ekranı").
 - **Token'lar:** imzalı JWT access token (RFC 9068; şifresiz, çünkü çekirdek her sağlayıcıyı standart bir resource
   server gibi doğrular), **15 dk**; `sub`, `name`, `email`, `role` claim'leri, **izinler token'a girmez**. Issuer =
   `Jwt:Authority`, `aud` = `Jwt:Audience`.
@@ -923,8 +987,8 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   parola hiçbir dış servise gitmez.
 - **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**, hatalı 2FA ya da kurtarma kodu da sayılır), giriş sayfası, token ucu ve
   hesap API'sinde rate limiting (`strict`), bilinmeyen hesap / yanlış parola / kilitli hesap için **tek hata mesajı**.
-  Bilinmeyen e-posta da bir parola hash'i doğrular (host'un hasher'ıyla bir kez üretilen sahte hash), böylece yanıt
-  süresi hesabın varlığını ele vermez. Kayıt, parola sıfırlama formu ve onay e-postasını yeniden gönderme e-postayı
+  Bilinmeyen e-posta ve kilitli hesap da bir parola hash'i doğrular (host'un hasher'ıyla bir kez üretilen sahte hash),
+  böylece yanıt süresi hesabın varlığını ya da kilidini ele vermez. Kayıt, parola sıfırlama formu ve onay e-postasını yeniden gönderme e-postayı
   kuyruğa koyup hemen yanıt verir; bir arka plan servisi (`EmailQueue`) host'un `IEmailSender`'ıyla sırayla gönderir.
   Yanıt e-posta sunucusunu beklemediği için süresi de hesabın varlığını ele vermez (OWASP Forgot Password, ASVS 6.3.8).
   Kuyruk bellek içindedir: süreç dururken kuyrukta kalan e-posta kaybolur, kullanıcı linki yeniden ister; gönderim
@@ -1007,7 +1071,8 @@ kaybedemez (409).
   kendisi loglar.
 - **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü
   `Identity:Seed:UserPermissions` listesini alır (Api: `catalog:products:read`, `payments:read`, `payments:create`);
-  opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.
+  opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar. Değişmemiş bir client yeniden
+  yazılmaz, secret'ı hâlâ saklı hash'e uyan client hash'ini korur; birlikte açılan örnekler aynı satırda yarışmaz.
 - **Admin için 2FA zorunlu:** `Administrator` rolü yalnızca 2FA'sı açık hesapta sayılır (çözümleyicide; rolün kendi
   izinleri dahil). Seed admin parolayla girer, 2FA'yı API'den açar; açma ve kapama izin önbelleğini hemen düşürür.
 
@@ -1143,7 +1208,8 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
   nedeni, tekrar teslimde değişiklik olmaması, ödemenin bir kez sonuçlanması. Bir test de akışın tamamını Api host'unda
   gerçek dispatcher'la sahte saati ilerleterek dener (POST'tan Completed'a).
 - **Eşzamanlılık:** son birim için aynı anda gelen iki ödemeden biri Completed, biri Failed olur ve stok 0'da kalır.
-  Bir test interceptor'ı başka bir yazarı taklit eder: okunduktan sonra değişen stok, ürün uçlarında 409 döndürür.
+  Bir test interceptor'ı başka bir yazarı taklit eder: okunduktan sonra değişen stok ürün uçlarında 409, silinen ürün
+  404 döndürür.
   Rezervasyonun teslimi ise düşer ve güncel stokla yeniden denenir.
 - **Kimlik sağlayıcı:** eklenti, yalnızca çekirdek + eklentiden kurulan bir host'ta (`IdentityServer/`) uçtan uca test
   edilir: Authorization Code + PKCE, refresh **rotation** ve **reuse** (zincir iptali), client credentials, sertleştirmeler,

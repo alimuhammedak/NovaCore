@@ -91,7 +91,7 @@ internal static class AdminEndpoints
         return TypedResults.Ok(permissions);
     }
 
-    private static async Task<Results<NoContent, NotFound<AccountEndpoints.MessageResponse>, ValidationProblem, ForbidHttpResult>> AssignRole(
+    private static async Task<Results<NoContent, NotFound<MessageResponse>, ValidationProblem, ForbidHttpResult>> AssignRole(
         Guid userId,
         AssignRoleRequest request,
         UserManager<ApplicationUser> users,
@@ -111,7 +111,7 @@ internal static class AdminEndpoints
             return UserNotFound();
 
         if (!await roles.RoleExistsAsync(request.Role))
-            return TypedResults.NotFound(new AccountEndpoints.MessageResponse("Role not found."));
+            return TypedResults.NotFound(new MessageResponse("Role not found."));
 
         if (!await users.IsInRoleAsync(user, request.Role))
         {
@@ -131,7 +131,7 @@ internal static class AdminEndpoints
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<NoContent, NotFound<AccountEndpoints.MessageResponse>, Conflict<AccountEndpoints.MessageResponse>, ForbidHttpResult>> RemoveRole(
+    private static async Task<Results<NoContent, NotFound<MessageResponse>, Conflict<MessageResponse>, ForbidHttpResult>> RemoveRole(
         Guid userId,
         string role,
         UserManager<ApplicationUser> users,
@@ -157,7 +157,7 @@ internal static class AdminEndpoints
             // two-factor authentication has the role in effect (IdentityPermissionResolver), so one of them must remain.
             if (administrator && !(await users.GetUsersInRoleAsync(IdentityRoles.Administrator))
                     .Any(member => member.Id != user.Id && member.TwoFactorEnabled))
-                return TypedResults.Conflict(new AccountEndpoints.MessageResponse("The last administrator keeps the role."));
+                return TypedResults.Conflict(new MessageResponse("The last administrator keeps the role."));
 
             await users.RemoveFromRoleAsync(user, role);
             await RoleChangedAsync(user, cache, tokens, authorizations, cancellationToken);
@@ -186,6 +186,6 @@ internal static class AdminEndpoints
         await AccountEndpoints.RevokeSessionsAsync(user, tokens, authorizations, cancellationToken);
     }
 
-    private static NotFound<AccountEndpoints.MessageResponse> UserNotFound() =>
-        TypedResults.NotFound(new AccountEndpoints.MessageResponse("User not found."));
+    private static NotFound<MessageResponse> UserNotFound() =>
+        TypedResults.NotFound(new MessageResponse("User not found."));
 }

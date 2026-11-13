@@ -79,7 +79,7 @@ reviews:
         instructions: >-
           Fail if the change adds TODO/FIXME/HACK comments, or code, configuration or suppressions described as
           temporary ("şimdilik", "geçici", "remove in phase X", "for now"). Remaining work belongs in
-          docs/plan/PROGRESS.md under "Sonraya bırakılanlar".
+          docs/plan/SONRAYA-BIRAKILANLAR.md.
       - name: "Belgeler değişiklikle uyumlu"
         mode: warning
         instructions: >-

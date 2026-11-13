@@ -32,7 +32,7 @@ public sealed class TestIdentityProvider : IDisposable
         Handler = new MetadataHandler(SigningKey);
     }
 
-    /// <summary>The key the discovery document publishes and <see cref="CreateToken"/> signs with by default.</summary>
+    /// <summary>The key the discovery document publishes and <see cref="CreateToken(Claim[])"/> signs with by default.</summary>
     public RsaSecurityKey SigningKey { get; }
 
     /// <summary>Serves <c>/.well-known/openid-configuration</c> and the JWKS for <see cref="Issuer"/>.</summary>

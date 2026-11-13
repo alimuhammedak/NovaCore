@@ -14,6 +14,7 @@ internal static class IdentityPermissions
     public const string UsersManage = "identity:users:manage";
     public const string RolesRead = "identity:roles:read";
     public const string RolesManage = "identity:roles:manage";
+    public const string InvitationsCreate = "identity:invitations:create";
 }
 
 /// <summary>The two roles every seeded store has.</summary>
@@ -36,6 +37,7 @@ internal sealed class IdentityPermissionProvider : IPermissionDefinitionProvider
         new(IdentityPermissions.UsersRead, "View users", IdentityPermissions.Group),
         new(IdentityPermissions.UsersManage, "Manage users (roles, lockout)", IdentityPermissions.Group),
         new(IdentityPermissions.RolesRead, "View roles", IdentityPermissions.Group),
-        new(IdentityPermissions.RolesManage, "Manage roles & their permissions", IdentityPermissions.Group)
+        new(IdentityPermissions.RolesManage, "Manage roles & their permissions", IdentityPermissions.Group),
+        new(IdentityPermissions.InvitationsCreate, "Invite people to create an account", IdentityPermissions.Group)
     ];
 }

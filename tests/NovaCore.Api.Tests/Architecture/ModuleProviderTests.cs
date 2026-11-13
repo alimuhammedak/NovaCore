@@ -34,7 +34,7 @@ public partial class ModuleProviderTests
     [Fact]
     public void Module_projects_reference_no_database_provider_package()
     {
-        var projects = Directory.EnumerateFiles(Path.Combine(Solution.RootDirectory, "src"), "*.csproj", SearchOption.AllDirectories)
+        var projects = Solution.SourceFiles("*.csproj", "src")
             .Where(path => path.Contains($"{Path.DirectorySeparatorChar}Modules{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .ToList();
         Assert.Contains(projects, path => path.Contains("Templates", StringComparison.Ordinal));

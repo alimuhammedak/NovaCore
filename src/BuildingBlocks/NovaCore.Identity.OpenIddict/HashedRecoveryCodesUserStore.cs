@@ -15,7 +15,8 @@ namespace NovaCore.Identity.OpenIddict;
 /// (PBKDF2-HMAC-SHA512, 100,000 iterations), not the host's 600,000: a sign-in tries up to ten hashes. The hashes live
 /// under a token name of their own, so a plain-text code stored by Identity never matches (DECISIONS D-053 (3)).
 /// It also reports a token lost to a concurrent request as a concurrency failure, like the base class reports a user
-/// changed by one (<see cref="UpdateAsync"/>).
+/// changed by one (<see cref="UpdateAsync"/>), and an account added by one as a duplicate user name
+/// (<see cref="CreateAsync"/>).
 /// </remarks>
 internal sealed class HashedRecoveryCodesUserStore(IdentityServerDbContext context, IdentityErrorDescriber? describer = null)
     : UserStore<ApplicationUser, ApplicationRole, IdentityServerDbContext, Guid>(context, describer)
@@ -48,6 +49,31 @@ internal sealed class HashedRecoveryCodesUserStore(IdentityServerDbContext conte
                 throw;
 
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
+        }
+    }
+
+    /// <summary>
+    /// Adds the user, answering <see cref="IdentityErrorDescriber.DuplicateUserName"/> when another request added an
+    /// account with the same user name in the meantime. Both requests pass Identity's user validation before either
+    /// inserts; the loser's insert fails on the user name's unique index, which would surface as a 500 instead of the
+    /// duplicate a moment later's validation reports (V8-5).
+    /// </summary>
+    public override async Task<IdentityResult> CreateAsync(ApplicationUser user, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.CreateAsync(user, cancellationToken);
+        }
+        catch (DbUpdateException exception)
+        {
+            var added = exception.Entries.SingleOrDefault(entry => entry is { State: EntityState.Added, Entity: ApplicationUser });
+            if (added is null
+                || !await Context.Users.AsNoTracking().AnyAsync(stored => stored.NormalizedUserName == user.NormalizedUserName, cancellationToken))
+                throw;
+
+            // Detached, so a later save of this context doesn't add the account again.
+            added.State = EntityState.Detached;
+            return IdentityResult.Failed(ErrorDescriber.DuplicateUserName(user.UserName ?? string.Empty));
         }
     }
 

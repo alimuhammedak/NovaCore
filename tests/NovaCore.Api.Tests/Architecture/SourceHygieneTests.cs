@@ -4,8 +4,8 @@ using Xunit;
 namespace NovaCore.Api.Tests.Architecture;
 
 /// <summary>
-/// Line-level rules over the source under <c>src/</c>: DECISIONS Y-38 (leftover work goes to PROGRESS.md "Sonraya
-/// bırakılanlar", not into TODO comments) and PLAN F2b.3 (the time comes from an injected <see cref="TimeProvider"/>).
+/// Line-level rules over the source under <c>src/</c>: DECISIONS Y-38 (leftover work goes to
+/// docs/plan/SONRAYA-BIRAKILANLAR.md, not into TODO comments) and PLAN F2b.3 (the time comes from an injected <see cref="TimeProvider"/>).
 /// </summary>
 public class SourceHygieneTests
 {
@@ -34,10 +34,7 @@ public class SourceHygieneTests
 
     private static IEnumerable<string> LinesMatching(Regex pattern, (string Path, string Line)[]? except = null)
     {
-        var sourceFiles = Directory
-            .EnumerateFiles(Path.Combine(Solution.RootDirectory, "src"), "*.cs", SearchOption.AllDirectories)
-            .Where(path => !IsBuildOutput(path))
-            .ToList();
+        var sourceFiles = Solution.SourceFiles("*.cs", "src").ToList();
         Assert.NotEmpty(sourceFiles);
 
         return
@@ -48,8 +45,4 @@ public class SourceHygieneTests
                   && (except is null || !except.Contains((relativePath, line.text.Trim())))
             select $"{relativePath}:{line.number}";
     }
-
-    private static bool IsBuildOutput(string path) =>
-        path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) is var segments
-        && (segments.Contains("bin") || segments.Contains("obj"));
 }
