@@ -229,6 +229,9 @@ accepts of one invitation both find it pending first.
 collection, apart from the parallel tests: their CPU load made the `WebApplicationFactory` startup race (R-055) hit
 most full runs.
 
+A test password or secret reuses a value already in the first allowlist of `.betterleaks.toml`; a new one goes into
+that allowlist, as the exact value, in the same commit (CI's secret scan reads the whole history).
+
 ## The core alone: `CoreWebTestHost`
 
 `CoreWebTestHost` is a host composed only of the core web package (`AddCoreWeb`, a resolver that grants nothing,
