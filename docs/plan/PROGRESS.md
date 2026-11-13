@@ -41,7 +41,7 @@ Durum: **sürüyor (2026-11-13).** Bir kez kota sınırına takıldı, kaldığ�
 | # | İş | Durum | Not |
 |---|---|---|---|
 | 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ⏸ PR #35 | İki inceleme, on bulgu, hepsi kapalı. `sonar` dışında bütün job'lar yeşil; son push (`6e7fdb6`) run `43392510435`, sonucu Faz 9'un ilk adımında okunur. Merge koşulu `sonar` yüzünden tutmuyor |
-| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | 🔄 | Dependabot #26, #27, #29, #33, #19 merge edildi; F9.1, F9.2a–c, F9.2e, F9.2f bitti; sıradaki F9.2a2 + F9.2d, sonra F9.2g–j |
+| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | 🔄 | Dependabot #26, #27, #29, #33, #19 merge edildi; F9.1 ve F9.2'nin on alt adımı bitti, V9-1 doğrulandı; sıradaki F9.3 (kırmızı Dependabot PR'ları), F9.4 |
 | 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏳ | F6e.3 yerel Docker ister; F6e.4'ün adını verdiği iki araç kurulu değil |
 | 4 | Sabah raporu ve devir notu | ⏳ | |
 
@@ -135,13 +135,16 @@ Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. 
 - [x] F9.2g (`c8446b9`): rol izinleri tek join'le (UserRoles→Roles→RoleClaims); rol artık id ile bulunur. Sorgu sayısı testi önce kırmızı (1 rol 5, 5 rol 13), sonra eşit (4). 8 izin sınıfı 32/32.
 - [x] F9.2h (`669b2d9`; R-143): `/connect` uçları `RequestAborted` geçirir (test önce kırmızı), `await app.RunAsync()` (Api, şablon, README), iki teste doğrulama. 11 sınıf 89/89. CORS bulgusu kullanıcıya kaldı.
 
+- [x] F9.2i (`7d9dcc9`; R-144): event tamponu yalnız `SavedChanges`'te temizlenir, yeniden denemede izlenen outbox satırlarının event'leri atlanır; iki yeni public override. `OutboxInterceptorTests` önce kırmızı (4/14), sonra 14/14.
+- [x] F9.2j (`8a891f4`; R-145): çakışmada `GetDatabaseValuesAsync` null ise 404, değilse 409. `StockConcurrencyTests` önce kırmızı (2), sonra 6/6; OpenAPI değişmedi.
+
 #### Doğrulama (Faz 9)
 
 | ID | Bulgu | Yer | Durum |
 |---|---|---|---|
-| V9-1 | CI `build-and-test` kırmızı (run `43395986910`): F9.2e'nin eklediği `Assembly.Load`, Y-20'yi koruyan `ExplicitRegistrationTests`'i kırıyor. Yazan yalnız `ObservabilityTests`'i koştu | `OpenTelemetryHostingExtensions.cs` (`7310497`) | kapatıldı (`83cea0c`): yeni overload `AddCoreObservability(Assembly)`, host `typeof(Program).Assembly` verir; parametresiz olan sürüm raporlamaz. `ExplicitRegistrationTests` önce kırmızı, `*.Architecture` 27/27 (orkestratör de koştu) |
+| V9-1 | CI `build-and-test` kırmızı (run `43395986910`): F9.2e'nin eklediği `Assembly.Load`, Y-20'yi koruyan `ExplicitRegistrationTests`'i kırıyor. Yazan yalnız `ObservabilityTests`'i koştu | `OpenTelemetryHostingExtensions.cs` (`7310497`) | doğrulandı (CI `43399963544`'te `build-and-test` yeşil; `83cea0c`): yeni overload `AddCoreObservability(Assembly)`, host `typeof(Program).Assembly` verir; parametresiz olan sürüm raporlamaz. `ExplicitRegistrationTests` önce kırmızı, `*.Architecture` 27/27 (orkestratör de koştu) |
 
-**geçersiz** (arşive): L17, L21, L34, L36, L43, L46, L71, L88, L108; L18 F9.3 bitince (PR #31 kapsıyor).
+**Arşive taşındı (2026-11-13):** biten L26, L32, L48, L56, L57, L65, L74, L85; geçersiz L17, L21, L34, L36, L43, L46, L71, L88, L108. **Kısmen, listede kalır:** L25 (`GlobalPackageReference`), L63 (anahtar stratejisi), L94 (kullanılmayan `using`'ler), L96 (CORS bulgusu SonarCloud'da). L18 F9.3 bitince.
 **kalır:** koşul gerçekleşmedi L11–L15, L20, L33, L45, L51, L60, L62, L68, L72 (F9.3'ten sonra yeniden bak), L73, L75–L79, L84, L86, L89, L90, L92, L93, L103–L105, L107, L112, L113, L116–L118, L121–L127 · ürün/public API/tasarım kararı L22, L24, L29–L31, L41, L42, L52–L55, L61, L66, L67, L80–L83, L114 · D-031 (3)'ü yeniden açar L64 · korunan dosya L27, L49, L69, L95 · bastırma L23, L28 · ortam/upstream L19, L35, L58, L91, L102, L115, L119, L120 · kuşkulu L47.
 
 ## Açık sorular (Q)
