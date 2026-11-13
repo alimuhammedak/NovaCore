@@ -17,10 +17,10 @@ namespace NovaCore.Identity.OpenIddict;
 /// </summary>
 internal static class PasswordCodeEndpoints
 {
-    private static readonly AccountEndpoints.MessageResponse CodeSent =
+    private static readonly MessageResponse CodeSent =
         new("If a confirmed account uses this address, a code to reset its password has been sent to it.");
 
-    private static readonly AccountEndpoints.MessageResponse PasswordReset =
+    private static readonly MessageResponse PasswordReset =
         new("Your password has been reset. Sign in with the new password.");
 
     // One answer for an unknown account, an unconfirmed one and a wrong, expired, used or blocked code.
@@ -43,7 +43,7 @@ internal static class PasswordCodeEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest);
     }
 
-    private static async Task<Accepted<AccountEndpoints.MessageResponse>> Forgot(
+    private static async Task<Accepted<MessageResponse>> Forgot(
         PasswordForgotRequest request,
         UserManager<ApplicationUser> users,
         PasswordResetCodes codes,
@@ -71,7 +71,7 @@ internal static class PasswordCodeEndpoints
         return TypedResults.Accepted((string?)null, CodeSent);
     }
 
-    private static async Task<Results<Ok<AccountEndpoints.MessageResponse>, ValidationProblem, ProblemHttpResult>> Reset(
+    private static async Task<Results<Ok<MessageResponse>, ValidationProblem, ProblemHttpResult>> Reset(
         PasswordResetCodeRequest request,
         UserManager<ApplicationUser> users,
         PasswordResetCodes codes,

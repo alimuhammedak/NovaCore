@@ -30,9 +30,6 @@ internal static class AccountEndpoints
     private static readonly MessageResponse ConfirmationResent =
         new("If the address belongs to an account that isn't confirmed yet, a new confirmation link has been sent.");
 
-    /// <summary>A message for the caller, e.g. after registration or when a resource is missing.</summary>
-    internal sealed record MessageResponse(string Message);
-
     [SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
         Justification = "The account API's route table: one Map call per endpoint, each naming its handler and the types of its request and response (docs/plan/RESEARCH.md R-117).")]
     public static RouteGroupBuilder Map(IEndpointRouteBuilder endpoints)
