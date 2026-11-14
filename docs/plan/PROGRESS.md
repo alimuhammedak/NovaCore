@@ -70,6 +70,8 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | `main`'de `secret-scan` kırmızı (6 bulgu) | Tarama bütün branch'lerin geçmişini `main`'in allowlist'iyle okuyor; bulgular Faz 8/9 branch'lerindeki test parolaları. `main`'e açılan her PR'da (Dependabot) da kırmızı | PR #35 merge edilince kendiliğinden düzelir (önce `SONAR_TOKEN`) |
 | Dependabot #2, #28, #30, #31, #32, #34 | Güncellemeleri Faz 9 branch'inde yapıldı (F9.3); PR'lar açık duruyor | Faz 9 merge edilince Dependabot kendisi kapatır; kapatmazsa kullanıcı kapatır |
 | CodeRabbit CLI incelemesi (Faz 8) | "session could not be authenticated" | `coderabbit auth login`, sonra `coderabbit review --agent --base main` |
+| S-7: açık kaydı kapatılabilir yapmak | Ürün kararı; Y-19 bir seçenek için gerçek tüketici ister. Kayıt olan herkes platform `UserPermissions`'ını alıyor | Kullanıcı karar verir: CRM-Nominal açık kayıt kullanacak mı; kullanmayacaksa `Identity:SignIn:AllowRegistration` (ya da kaydın hiç eşlenmemesi) planlanır |
+| F6e.4'ün adlı araçları (Cloudflare `security-audit-skill`, Claude Security plugin) | Kurulu değil; indirme/kurma ön onaylı değil | Kullanıcı kurar, iki kapsamla koşar |
 | Dependabot #21 (`global.json` → SDK 10.0.403) | Bu makinede yalnız 10.0.300 kurulu (F9.3 kuralı) | SDK 10.0.403 kurulur, PR merge edilir |
 | SonarCloud'un CORS bulgusunu "false positive" işaretlemek (L96) | Dış işlem; `AllowAnyOrigin` yalnız Development'ta (`CoreWebExtensions.cs:182`) | Kullanıcı SonarCloud'da işaretler |
 
@@ -112,18 +114,7 @@ Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. 
 
 - [x] F9.1: 98 madde, üç Sonnet sınıflandırıcı + Opus denetimi (`yapılacak`ların hepsi, diğerlerinden 17). Satır numaraları `SONRAYA-BIRAKILANLAR.md` @ `74d511d`.
 
-| Alt adım | Satır: madde | Model | Kırmızı test |
-|---|---|---|---|
-| F9.2a | L25 `PackageDependencyTests` boşlukları (bin/obj, `Update`'li referans); L26 tekrarlı kaynak tarama kodu | Sonnet | hayır |
-| F9.2b | L48 fazla `EnsureCreatedAsync` çağrıları (silinir); L94 Qodana cref ve `!` temizliği | Sonnet | hayır |
-| F9.2c | L63 `src/Modules/CLAUDE.md`'de Guid v7 "SQL Server clustering" cümlesi | Sonnet | hayır |
-| F9.2d | L74 `MessageResponse` üst düzeye | Sonnet | hayır |
-| F9.2e | L32 OTel `service.version` host assembly'sinden | Opus | evet |
-| F9.2f | L56 seed client secret'ı her açılışta yeniden hash'liyor | Opus | evet |
-| F9.2g | L57 `IdentityPermissionResolver` rol başına N+1 | Opus | sorgu sayısı |
-| F9.2h | L96 SonarCloud: `RequestAborted`, iki assertion'sız test, `RunAsync` | Opus | iptal için evet |
-| F9.2i | L65 `OutboxInterceptor` tamponu başarısız kayıtta | Opus | evet |
-| F9.2j | L85 eşzamanlı silinmiş satırda 409 yerine 404 | Opus | evet |
+F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu").
 
 - [x] F9.2a (`ef2cde2`, Sonnet): kaynak taramaları `Solution.SourceFiles`'tan (bin/obj dışlı); `Update`'li referansta NRE testi önce kırmızı. `*.Architecture` 26/26. Opus incelemesi: testin paket satırı `PrivateAssets` yüzünden bir şey sınamıyor, `Directory.Build.*` okuması testsiz → F9.2a2. L25'in `GlobalPackageReference` kısmı yapılmadı (listede kalır).
 - [x] F9.2b (`90d0fde`, Sonnet; Opus incelemesi temiz): dört fazla `EnsureCreatedAsync` silindi, iki cref, `LoginPage`'de `!`, `ProductCatalog.cs` `Internal/` klasörüne. 6 sınıf 60/60. L94'ün kullanılmayan `using` kısmı doğrulanamadı (listede kalır).
@@ -156,6 +147,31 @@ Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. 
 
 **Arşive taşındı (2026-11-13):** biten L26, L32, L48, L56, L57, L65, L74, L85; geçersiz L17, L21, L34, L36, L43, L46, L71, L88, L108. **Kısmen, listede kalır:** L25 (`GlobalPackageReference`), L63 (anahtar stratejisi), L94 (kullanılmayan `using`'ler), L96 (CORS bulgusu SonarCloud'da). L18 F9.3'le kapandı, arşivde.
 **kalır:** koşul gerçekleşmedi L11–L15, L20, L33, L45, L51, L60, L62, L68, L72 (F9.3'ten sonra yeniden bak), L73, L75–L79, L84, L86, L89, L90, L92, L93, L103–L105, L107, L112, L113, L116–L118, L121–L127 · ürün/public API/tasarım kararı L22, L24, L29–L31, L41, L42, L52–L55, L61, L66, L67, L80–L83, L114 · D-031 (3)'ü yeniden açar L64 · korunan dosya L27, L49, L69, L95 · bastırma L23, L28 · ortam/upstream L19, L35, L58, L91, L102, L115, L119, L120 · kuşkulu L47.
+
+### Faz 6e
+Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docker çalışıyor; PLAN'ın adını verdiği Cloudflare `security-audit-skill` ve Claude Security plugin kurulu değil (kullanıcıya kaldı).
+
+- [x] F6e.4: kurulu `security-review` ölçütleriyle dört Opus koşusu (salt okunur): auth çekirdeği ×2 (uçtan içeri; kontrol listesi/değişmezlerden koda), bütün repo ×2 (dizin dizin; OWASP API Top 10 + tehdit modeli). Skill yalnız diff okuduğu için ölçütleri elle, bütün koda uygulandı. Faz 6b'nin düzeltmeleri yerinde; bağımlılık taraması temiz.
+
+#### F6e.4 bulguları ve F6e.5 triajı
+
+| ID | Bulgu (koşular) | Önem | Triaj |
+|---|---|---|---|
+| S-1 | Kayıtla hesabın önceden ele geçirilmesi: onaysız adrese ikinci kayıt sessizce yutulur, onay linki ilk kaydedenin şifresiyle açar; 2FA ile kalıcılaşır, davet üyeliği saldırgana gider (A1-1, A2-1, R2-2) | orta | testli düzeltme |
+| S-2 | Davetle açılmış parolasız hesaba herkes onay e-postası yollatabilir; onaylanırsa davet kullanılamaz (A2-2) | düşük | testli düzeltme (S-1 ile) |
+| S-3 | `MultiTenancy:Roles`'a `identity:*` platform izni yazılabiliyor; belge yasaklıyor, açılışta denetim yok (A1-2) | düşük-orta | testli düzeltme |
+| S-4 | Rol atamasında yükseltme koruması rolün adına bakıyor, içerdiği `identity:*` izinlerine değil (R2-5) | orta (OLASI) | testli düzeltme |
+| S-5 | Davet denetim kaydında daveti yapan yok (A2-3) | düşük | testli düzeltme |
+| S-6 | E-posta gönderen anonim uçlarda alıcı adres başına sınır yok; IPv6 /64 döndürerek posta bombası, kod geçersizleştirme, 1000'lik kuyruğun dolması (R2-1) | orta | testli düzeltme denenir |
+| S-7 | Açık kayıt kapatılamıyor; kayıt olan herkes platform `UserPermissions`'ını alır (R2-3) | orta | **kullanıcıya:** ürün kararı (Y-19: seçenek için tüketici gerekir) |
+| S-8 | Ödeme oluşturmada idempotency anahtarı yok (R2-4) | düşük | `needs_validation`: API tasarım kararı, referans modül |
+| S-9 | Testi olmayan değişmezler: scope yükseltme reddi (#17), başka client'ın token'ını iptal (#14), HTML `ReturnUrl` için `//evil` ve `/\evil`, üretimdeki 30 sn leeway sonrası zincir iptali (A2) | — | test commit'i |
+| S-10 | Bağlantıyla sıfırlama token'ı 6 saat ve onay token'ıyla ortak sağlayıcı (#31) | düşük | `needs_validation` |
+| S-11 | Outbox handler hata mesajı ileride kişisel veriyi `Error` sütununa ve loga taşıyabilir (D1) | düşük | `needs_validation` |
+| S-12 | `includeInactive=true` her ürün okuyucusuna pasif ürünleri gösteriyor; karar kaydı yok (D2) | — | `needs_validation`: ürün kararı |
+| S-13 | Şablonun `Program.cs:75`'inde `GetValue<int?>("HealthChecks:ProbePort")` (R-048'e aykırı) | — | düzeltme (güvenlik dışı) |
+
+Doğrulanamayanlar (`needs_validation`): son admin korumasında check-then-act yarışı (biliniyor, L94); CSP'nin `form_post` otomatik gönderimini engelleyip engellemediği (#8); `alg:none`/`jku` reddi (#21); kurumsal NAT arkasında `strict` kovasının `/connect/token` yenilemelerini de kapsaması. Biliniyor (Sonraya): L60, L44, L94, L95, L96, L103, L106, L107, L108, L11.
 
 ## Açık sorular (Q)
 

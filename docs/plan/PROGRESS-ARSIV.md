@@ -1159,6 +1159,21 @@ Adım notları 2026-11-13'te gece koşusunda taşındı; faz PR #35 ile açık, 
 - [x] F8.8 (163c4af): README "Kendi giriş ekranı" (akış, aynı kaynak, dev proxy, çerezler, hata kodları → ekran), kimlik eklentisinin CLAUDE.md'si (yeni değişmezler; `LoginPage` → `SignInFlow` atıfları), kök CLAUDE.md, CHANGELOG (Added/Changed, `invitations` için yükseltme notu), memory `novacore-security`.
 - **Oturum sonu koşusu (D-094 (2)):** 19 sınıf (yeni üçü + `ModuleRegistrationTests`, `ValidationTests`, `OpenApiContractTests`, `AdminTests`, `SignInFlowTests`, `SessionSignInTests`, `PasswordResetTests`, `SignInHardeningTests`, `TwoFactorTests`, `TwoFactorRaceTests`, `AuthorizationCodeFlowTests`, `SessionTests`, `IdentityServerConfigurationTests`, `RegistrationTests`, `ConfigurationValidationTests`, `IdentityServerWiringTests`) 215 test: ilk koşuda 1 kırmızı (`AdminTests`, yukarıda), düzeltmeden sonra `AdminTests` 12/12. `PostgreSqlModelTests` 4/4. Build 0 uyarı, format temiz.
 
+### Faz 9 F9.1 tablosu
+
+| Alt adım | Satır: madde | Model | Kırmızı test |
+|---|---|---|---|
+| F9.2a | L25 `PackageDependencyTests` boşlukları (bin/obj, `Update`'li referans); L26 tekrarlı kaynak tarama kodu | Sonnet | hayır |
+| F9.2b | L48 fazla `EnsureCreatedAsync` çağrıları (silinir); L94 Qodana cref ve `!` temizliği | Sonnet | hayır |
+| F9.2c | L63 `src/Modules/CLAUDE.md`'de Guid v7 "SQL Server clustering" cümlesi | Sonnet | hayır |
+| F9.2d | L74 `MessageResponse` üst düzeye | Sonnet | hayır |
+| F9.2e | L32 OTel `service.version` host assembly'sinden | Opus | evet |
+| F9.2f | L56 seed client secret'ı her açılışta yeniden hash'liyor | Opus | evet |
+| F9.2g | L57 `IdentityPermissionResolver` rol başına N+1 | Opus | sorgu sayısı |
+| F9.2h | L96 SonarCloud: `RequestAborted`, iki assertion'sız test, `RunAsync` | Opus | iptal için evet |
+| F9.2i | L65 `OutboxInterceptor` tamponu başarısız kayıtta | Opus | evet |
+| F9.2j | L85 eşzamanlı silinmiş satırda 409 yerine 404 | Opus | evet |
+
 ## Eski devir notları
 
 **2026-11-09 akşam, Faz 8: Başsız kimlik arayüzü (⏸ duraklatıldı, faz sonu doğrulaması bekliyor).** Branch `faz/8-bassiz-giris`, yerel, push edilmedi. Bu oturum kullanıcının kararıyla (D-094) F8.4–F8.8'i tek oturumda yaptı: `3d59f79`, `7e74100`, `295d1f7`, `ac3005a`, `163c4af`, `f4c5f3c`. Bütün adımlar işaretli. Doğrulanmamış aralık `f319d57..HEAD` (fazın tamamı).
