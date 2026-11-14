@@ -23,6 +23,8 @@ public sealed class NegativeProtocolTests(NegativeProtocolTests.Fixture fixture)
     // A missing verifier is a malformed request, a wrong one a bad grant (RFC 7636 §4.6).
     private static readonly string[] PkceErrors = ["invalid_grant", "invalid_request"];
 
+    private static readonly string[] WideningErrors = ["invalid_grant", "invalid_scope"];
+
     // The JWK members of a private RSA or EC key, and of a symmetric one (RFC 7518 §6).
     private static readonly string[] PrivateKeyParts = ["d", "p", "q", "dp", "dq", "qi", "k"];
 
@@ -56,6 +58,53 @@ public sealed class NegativeProtocolTests(NegativeProtocolTests.Fixture fixture)
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Null(response.Headers.Location);
+    }
+
+    // RFC 6749 §6: a refresh may narrow the granted scopes, never widen them (S-9). The spec names no error code for it;
+    // OpenIddict answers invalid_grant.
+    [Theory]
+    [InlineData("openid offline_access email")]
+    [InlineData("openid offline_access roles profile")]
+    public async Task A_refresh_cannot_ask_for_a_scope_the_sign_in_did_not_grant(string scope)
+    {
+        using var flow = new OidcFlow(_host);
+        var (code, verifier) = await CodeAsync(flow, $"widen-{Guid.NewGuid():N}@novacore.test");
+        var tokens = await flow.RedeemAsync(code, verifier);
+
+        var response = await flow.TokenRequestAsync(new(StringComparer.Ordinal)
+        {
+            ["grant_type"] = "refresh_token",
+            ["refresh_token"] = tokens.RefreshToken,
+            ["scope"] = scope
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(body.TryGetProperty("access_token", out _));
+        Assert.Contains(body.GetProperty("error").GetString(), WideningErrors, StringComparer.Ordinal);
+    }
+
+    // RFC 7009 §2.1: the server checks that the token was issued to the client asking for its revocation, so another
+    // client can't end someone else's session (S-9).
+    [Fact]
+    public async Task A_client_cannot_revoke_a_refresh_token_issued_to_another_client()
+    {
+        using var flow = new OidcFlow(_host);
+        var (code, verifier) = await CodeAsync(flow, $"revoke-other-{Guid.NewGuid():N}@novacore.test");
+        var tokens = await flow.RedeemAsync(code, verifier);
+
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["token"] = tokens.RefreshToken,
+            ["token_type_hint"] = "refresh_token",
+            ["client_id"] = OtherClientId
+        });
+        var revoke = await flow.Browser.PostAsync(new Uri("/connect/revoke", UriKind.Relative), form);
+        // OpenIddict answers 200, as for an unknown token (RFC 7009 §2.2), so the answer doesn't say the token exists.
+        Assert.Equal(HttpStatusCode.OK, revoke.StatusCode);
+
+        // The token's own client still uses it: nothing was revoked.
+        Assert.Equal(HttpStatusCode.OK, (await flow.RefreshAsync(tokens.RefreshToken)).StatusCode);
     }
 
     // RFC 6749 §4.1.2: a code is used once; a second use is refused and revokes what the first one issued.

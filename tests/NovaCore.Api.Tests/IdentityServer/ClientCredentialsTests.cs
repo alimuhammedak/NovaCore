@@ -16,6 +16,10 @@ namespace NovaCore.Api.Tests.IdentityServer;
 [Collection(IdentityServerTestGroup.Name)]
 public sealed class ClientCredentialsTests(ClientCredentialsTests.Fixture fixture) : IClassFixture<ClientCredentialsTests.Fixture>
 {
+    // RFC 6749 §5.2: a scope the client may not have is invalid_scope; OpenIddict answers a scope that needs another grant
+    // (offline_access without the refresh token grant) with invalid_request.
+    private static readonly string[] ScopeErrors = ["invalid_scope", "invalid_request"];
+
     private readonly IdentityServerTestHost _host = fixture.Host;
 
     /// <summary>Two service clients next to the host's user-facing one: one granted the probe permission, one not.</summary>
@@ -67,6 +71,23 @@ public sealed class ClientCredentialsTests(ClientCredentialsTests.Fixture fixtur
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    // A service client holds no scope permission: asking for a scope, registered or not, gets no token (S-9).
+    [Theory]
+    [InlineData("email")]
+    [InlineData("roles")]
+    [InlineData("profile email roles")]
+    [InlineData("offline_access")]
+    [InlineData("identity:users:manage")]
+    public async Task A_service_client_gets_no_token_for_a_scope_it_was_not_granted(string scope)
+    {
+        var response = await RequestTokenAsync("worker", "worker-secret-for-tests-at-least-32-chars", scope);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(body.TryGetProperty("access_token", out _));
+        Assert.Contains(body.GetProperty("error").GetString(), ScopeErrors, StringComparer.Ordinal);
+    }
+
     private async Task<string> TokenAsync(string clientId, string secret)
     {
         var response = await RequestTokenAsync(clientId, secret);
@@ -74,11 +95,13 @@ public sealed class ClientCredentialsTests(ClientCredentialsTests.Fixture fixtur
         return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("access_token").GetString()!;
     }
 
-    private async Task<HttpResponseMessage> RequestTokenAsync(string clientId, string? secret)
+    private async Task<HttpResponseMessage> RequestTokenAsync(string clientId, string? secret, string? scope = null)
     {
         var parameters = new Dictionary<string, string>(StringComparer.Ordinal) { ["grant_type"] = "client_credentials", ["client_id"] = clientId };
         if (secret is not null)
             parameters["client_secret"] = secret;
+        if (scope is not null)
+            parameters["scope"] = scope;
 
         using var form = new FormUrlEncodedContent(parameters);
         return await _host.CreateClient().PostAsync(new Uri("/connect/token", UriKind.Relative), form);
