@@ -158,12 +158,12 @@ Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docke
 | S-6 | E-posta gönderen anonim uçlarda alıcı adres başına sınır yok; IPv6 /64 döndürerek posta bombası, kod geçersizleştirme, 1000'lik kuyruğun dolması (R2-1) | orta | testli düzeltme denenir |
 | S-7 | Açık kayıt kapatılamıyor; kayıt olan herkes platform `UserPermissions`'ını alır (R2-3) | orta | **kullanıcıya:** ürün kararı (Y-19: seçenek için tüketici gerekir) |
 | S-8 | Ödeme oluşturmada idempotency anahtarı yok (R2-4) | düşük | `needs_validation`: API tasarım kararı, referans modül |
-| S-9 | Testi olmayan değişmezler: scope yükseltme reddi (#17), başka client'ın token'ını iptal (#14), HTML `ReturnUrl` için `//evil` ve `/\evil`, üretimdeki 30 sn leeway sonrası zincir iptali (A2) | — | test commit'i |
+| S-9 | Testi olmayan değişmezler: scope yükseltme reddi (#17), başka client'ın token'ını iptal (#14), HTML `ReturnUrl` için `//evil` ve `/\evil`, üretimdeki 30 sn leeway sonrası zincir iptali (A2) | — | ✅ `63d588c`: dört değişmez testte; hata bulunmadı |
 | S-10 | Bağlantıyla sıfırlama token'ı 6 saat ve onay token'ıyla ortak sağlayıcı (#31) | düşük | `needs_validation` |
 | S-11 | Outbox handler hata mesajı ileride kişisel veriyi `Error` sütununa ve loga taşıyabilir (D1) | düşük | `needs_validation` |
 | S-12 | `includeInactive=true` her ürün okuyucusuna pasif ürünleri gösteriyor; karar kaydı yok (D2) | — | `needs_validation`: ürün kararı |
-| S-13 | Şablonun `Program.cs:75`'inde `GetValue<int?>("HealthChecks:ProbePort")` (R-048'e aykırı) | — | düzeltme (güvenlik dışı) |
-| S-14 | Bozuk form girdisine 500: `/account/*` formları ve `/connect/revoke` (F6e.2'nin yerel Schemathesis denemesi) | düşük-orta | testli düzeltme |
+| S-13 | Şablonun `Program.cs:75`'inde `GetValue<int?>("HealthChecks:ProbePort")` (R-048'e aykırı) | — | ✅ `e18bd98`: `HealthCheckProbeOptions` (`[Range]`, `[OptionsValidator]`, `ValidateOnStart`); smoke CI'da |
+| S-14 | Bozuk form girdisine 500: `/account/*` formları ve `/connect/revoke` (F6e.2'nin yerel Schemathesis denemesi) | düşük-orta | ✅ `0923d61`: çekirdeğin `ExceptionMapping`'i `InvalidDataException` ve `AntiforgeryValidationException`'ı 400 yapar (R-156); `MalformedFormTests` 40/96 kırmızıydı. needs_validation: `/connect/*` artık OAuth `invalid_request` yerine ProblemDetails döner; sunucunun kendi `InvalidDataException`'ı da 400 olur |
 
 Doğrulanamayanlar (`needs_validation`): son admin korumasında check-then-act yarışı (biliniyor, L94); CSP'nin `form_post` otomatik gönderimini engelleyip engellemediği (#8); `alg:none`/`jku` reddi (#21); kurumsal NAT arkasında `strict` kovasının `/connect/token` yenilemelerini de kapsaması. Biliniyor (Sonraya): L60, L44, L94, L95, L96, L103, L106, L107, L108, L11.
 
