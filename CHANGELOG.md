@@ -74,6 +74,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Identity provider: registering an address that has an unconfirmed account with another password no longer leaves
+  the first password waiting for the owner's confirmation click (pre-account hijacking). The account's password is
+  removed, every confirmation link sent so far stops working, and the address gets a "Set your password" link to
+  `/account/reset-password`, which sets the password and confirms the address in one step. The registration's answer
+  is unchanged; registering again with the same password, or registering a confirmed address, changes nothing.
+- Identity provider: `POST /api/v1/auth/resend-confirmation-email` no longer emails an account without a password (an
+  invited one), and `GET /api/v1/auth/confirm-email` no longer confirms one: anyone could have a pending invitation's
+  account confirmed without a password, which made the invitation unusable. Such an account is confirmed only by
+  setting its password.
 - Multi-tenancy: a tenant role (`MultiTenancy:Roles`) that lists one of the identity provider's own permissions
   (`identity:*`) stops the host at startup. A request that names its tenant holds the role's permissions on every
   endpoint, so with a tenant read from a header such a role made a tenant's owner an administrator of every account.
@@ -93,15 +102,6 @@ recorded as shipped (`PublicAPI.Shipped.txt`), so a later change to it shows up 
 
 ### Security
 
-- Identity provider: `POST /api/v1/auth/resend-confirmation-email` no longer emails an account without a password (an
-  invited one), and `GET /api/v1/auth/confirm-email` no longer confirms one: anyone could have a pending invitation's
-  account confirmed without a password, which made the invitation unusable. Such an account is confirmed only by
-  setting its password.
-- Identity provider: registering an address that has an unconfirmed account with another password no longer leaves
-  the first password waiting for the owner's confirmation click (pre-account hijacking). The account's password is
-  removed, every confirmation link sent so far stops working, and the address gets a "Set your password" link to
-  `/account/reset-password`, which sets the password and confirms the address in one step. The registration's answer
-  is unchanged; registering again with the same password, or registering a confirmed address, changes nothing.
 - The repository is public. CI pins every GitHub Action to a full commit SHA, grants each job only the permissions it
   needs, keeps the checkout token off disk, and lints the workflows with actionlint and zizmor. It scans the whole git
   history for secrets (Betterleaks), runs CodeQL on the C# code and OpenSSF Scorecard on the repository, and checks
