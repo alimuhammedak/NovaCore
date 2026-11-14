@@ -1240,6 +1240,12 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 
 ## Eski devir notları
 
+**2026-11-13, faz dışı: gece koşusu kuruldu (D-096), PROGRESS bölündü (D-097), Faz 9 plana eklendi (Q-63).** Branch `faz/8-bassiz-giris`, ilk kez push edildi; CI koşuyor. Kod değişmedi.
+
+- **Sıradaki:** kullanıcı `/novacore-night` ile koşuyu başlatır; kuyruk yukarıdaki "Gece koşusu" bölümünde. `/novacore-verify 8` ayrıca çalıştırılmaz: Faz 8'in doğrulamasını koşu yapar (CI ve yazmamış bir inceleme alt ajanı).
+- **Bilinmesi gerekenler:** Faz 8'in testleri önce kırmızı görülmedi (D-094 (3)). `invitations` migration'ı SQL Server ve PostgreSQL'de, şablon smoke'u da F8.7'den beri ilk kez bu CI koşusunda çalışıyor. Bu makinede Docker kapalıydı ve SDK yalnız 10.0.300.
+- **Bekleyen soru:** yok. Q-40 sürüyor. Sürüm numarası ve yayın kullanıcının (D-090 (6)).
+
 **2026-11-09 akşam, Faz 8: Başsız kimlik arayüzü (⏸ duraklatıldı, faz sonu doğrulaması bekliyor).** Branch `faz/8-bassiz-giris`, yerel, push edilmedi. Bu oturum kullanıcının kararıyla (D-094) F8.4–F8.8'i tek oturumda yaptı: `3d59f79`, `7e74100`, `295d1f7`, `ac3005a`, `163c4af`, `f4c5f3c`. Bütün adımlar işaretli. Doğrulanmamış aralık `f319d57..HEAD` (fazın tamamı).
 
 - **Sıradaki:** `/clear`, `/novacore-verify 8`. Doğrulamanın bilmesi gerekenler: (1) Bu oturumun testleri **önce kırmızı görülmedi** (D-094 (3)); bir testin hatayı yakaladığı kanıtlı değil, code-review bunu göz önünde tutmalı. (2) Koşmayanlar: tam paket, SQL Server/PostgreSQL katmanları (`SignInScenarios` dahil; `invitations` migration'ı SQL Server'da ilk kez orada uygulanacak), `bash eng/template-smoke.sh` (sekiz bileşim; F8.7'nin kabul kriteri), coverage, `eng/check-openapi.sh`, lisans kapısı.

@@ -28,13 +28,13 @@
 | 7b | ✅ tamam | `faz/7b-cok-kiracililik` | 2026-10-24 | 2026-10-25 | 2026-10-27 (kullanıcı onayı, PR #13 merge commit'i `dba8318`) |
 | 8 | ⏸ PR #35 açık, merge edilmedi: adımlar ve doğrulama bitti (V8-1…V8-10 kapalı), `sonar` kırmızı (Kullanıcıya kalanlar) | `faz/8-bassiz-giris` | 2026-11-09 | | |
 | 9 | ⏸ PR #36 açık, merge edilmedi: adımlar ve incelemeler bitti; #35'in üstünde, `sonar` kırmızı | `faz/9-bakim` (`faz/8-bassiz-giris` + `main`) | 2026-11-13 | | |
-| 6e | 🔄 devam ediyor | `faz/6e-dinamik-denetim` (`faz/9-bakim`'in üstüne açıldı) | 2026-11-13 | | |
+| 6e | ⏸ PR #37 açık, merge edilmedi: adımlar, triaj ve faz sonu incelemesi bitti (V6e-1…V6e-3 kapalı); #36'nın üstünde, `sonar` kırmızı | `faz/6e-dinamik-denetim` (`faz/9-bakim`'in üstüne açıldı) | 2026-11-13 | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
 
 ## Gece koşusu (D-096)
 
-Durum: **sürüyor (2026-11-13).** Bir kez kota sınırına takıldı, kaldığı yerden sürdü. Kullanıcı `/novacore-night` ile başlatır; kurallar `.claude/skills/novacore-night/SKILL.md`'de. Koşu her turda bu bölümü okur ve günceller.
+Durum: **bitti (2026-11-14).** Kuyruk boşaldı; üç PR (#35, #36, #37) `sonar` yüzünden merge bekliyor. Kota sınırına birkaç kez takıldı, kaldığı yerden sürdü. Kullanıcı `/novacore-night` ile başlatır; kurallar `.claude/skills/novacore-night/SKILL.md`'de. Koşu her turda bu bölümü okur ve günceller.
 
 ### İş kuyruğu
 
@@ -42,8 +42,8 @@ Durum: **sürüyor (2026-11-13).** Bir kez kota sınırına takıldı, kaldığ�
 |---|---|---|---|
 | 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ⏸ PR #35 | İki inceleme, on bulgu, hepsi kapalı. `sonar` dışında bütün job'lar yeşil; son push (`6e7fdb6`) run `43392510435`, sonucu Faz 9'un ilk adımında okunur. Merge koşulu `sonar` yüzünden tutmuyor |
 | 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | ⏸ PR #36 | Bütün adımlar ve iki inceleme bitti; son push `1f3c034`. Merge koşulu tutmuyor (`sonar`; #35'e bağlı) |
-| 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | 🔄 | Docker bu kez çalışıyor (29.2.1). F6e.4'ün adını verdiği iki araç kurulu değil: kurulu `security-review` ile koşulur. `workflow_dispatch` ilk koşusu workflow `main`'e girmeden alınamaz |
-| 4 | Sabah raporu ve devir notu | ⏳ | |
+| 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏸ PR #37 | F6e.1, F6e.2, F6e.4, F6e.5 (S-1…S-6, S-9, S-13, S-14) ve faz sonu incelemesi bitti. Son kod push'u `12309b2`, run `43625440007`: `sonar` dışında yeşil. F6e.3 PLAN'da yok/atlandı değil: DAST'ın ilk koşusu merge'den sonra (Kullanıcıya kalanlar) |
+| 4 | Sabah raporu ve devir notu | ✅ | 2026-11-14 |
 
 ### Karar adayları (DA)
 
@@ -147,8 +147,8 @@ Yalnız cevabı beklenen sorular. Cevaplanan soru cevabıyla birlikte arşivin "
 
 > Yalnız en son not durur. Yeni not yazılırken bir önceki arşivin "Eski devir notları" bölümünün en üstüne taşınır (D-097).
 
-**2026-11-13, faz dışı: gece koşusu kuruldu (D-096), PROGRESS bölündü (D-097), Faz 9 plana eklendi (Q-63).** Branch `faz/8-bassiz-giris`, ilk kez push edildi; CI koşuyor. Kod değişmedi.
+**2026-11-14, gece koşusu bitti (D-096): Faz 8, 9, 6e'nin işleri tamam, üç PR açık.** Branch `faz/6e-dinamik-denetim`, push edildi; PR #37 (`main`'e, #36 ve #35'in üstünde).
 
-- **Sıradaki:** kullanıcı `/novacore-night` ile koşuyu başlatır; kuyruk yukarıdaki "Gece koşusu" bölümünde. `/novacore-verify 8` ayrıca çalıştırılmaz: Faz 8'in doğrulamasını koşu yapar (CI ve yazmamış bir inceleme alt ajanı).
-- **Bilinmesi gerekenler:** Faz 8'in testleri önce kırmızı görülmedi (D-094 (3)). `invitations` migration'ı SQL Server ve PostgreSQL'de, şablon smoke'u da F8.7'den beri ilk kez bu CI koşusunda çalışıyor. Bu makinede Docker kapalıydı ve SDK yalnız 10.0.300.
-- **Bekleyen soru:** yok. Q-40 sürüyor. Sürüm numarası ve yayın kullanıcının (D-090 (6)).
+- **Sıradaki:** kullanıcı `SONAR_TOKEN`'ı yeniler; #35 → #36 → #37 sırayla merge edilir (kullanıcı kararı). Sonra `gh workflow run dast.yml` ile DAST'ın ilk koşusu, raporları F6e.5 triajına. DA-1…DA-12 tek düzenlemeyle DECISIONS'a işlenir. D-032: `DECISIONS.md` `protectedPaths`'e geri eklenir (Faz 6e sonu, kullanıcı).
+- **Bilinmesi gerekenler:** tam suite, SQL Server/PostgreSQL katmanları ve şablon smoke'u yalnız CI'da koştu (yeşil). CodeRabbit CLI çalışmadı (kimlik doğrulama). ZAP yerelde denenmedi. V6e-3'ün bedeli: `UseCoreWeb` çağırmayan host kendi form okuma hatasında 500 alır. `/account/login` e-postasına 256 sınırı konmadı (lockout veritabanında, bellek durumu yok).
+- **Bekleyen karar:** Kullanıcıya kalanlar tablosu (S-6 varsayılanları, V6e-4, S-7, S-1'in kalan yolu). Q-40 sürüyor.
