@@ -254,7 +254,7 @@ rollerini de değiştirir; listede olmayan rol `tenant.unknown_role`), `RemoveMe
 kimin açacağı, davet ve onay akışı ürünündür; uçlar bu servisin üzerine kurulur. Çekirdek bütün `IPermissionResolver`'ları
 sorar: kimlik sağlayıcının platform izinleri ve üyeliğin kurum izinleri birlikte gelir. Kurumu çözülmüş bir istekte rolün
 izinleri isteğin çağırdığı her uçta geçerlidir; bu yüzden bir kurum rolü yalnız kurum uçlarının izinlerini listeler,
-platformunkileri (`identity:*`) asla. Şablonun BuiltIn + `--multitenancy` bileşiminde `Identity:Seed:UserPermissions`
+platformunkileri (`identity:*`) asla; `identity:` önekli bir izin listelenirse uygulama açılmaz. Şablonun BuiltIn + `--multitenancy` bileşiminde `Identity:Seed:UserPermissions`
 aynı nedenle boştur: platform rolünün izni her kurumda geçerli olurdu. Bir üyelik değişikliği bu sunucuda sonraki istekte
 etkilidir, başka sunucunun belleğinde en geç `Cache:PermissionExpiration` sonra.
 

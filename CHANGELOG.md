@@ -65,6 +65,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Identity provider: two requests creating an account with one address at the same time (registration or invitation)
   no longer answer 500: the user store reports the lost insert as a duplicate user name.
 
+### Security
+
+- Multi-tenancy: a tenant role (`MultiTenancy:Roles`) that lists one of the identity provider's own permissions
+  (`identity:*`) stops the host at startup. A request that names its tenant holds the role's permissions on every
+  endpoint, so with a tenant read from a header such a role made a tenant's owner an administrator of every account.
+  **Upgrade:** remove `identity:*` permissions from the tenant roles.
+
 ## [0.1.0] - 2026-10-27
 
 The first stable version. Everything below is relative to 0.1.0-preview.1. Each library package's public API is now

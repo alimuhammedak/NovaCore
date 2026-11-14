@@ -11,8 +11,14 @@ internal sealed class MultiTenancyOptions
     public const string SectionName = "MultiTenancy";
 
     /// <summary>
+    /// The prefix of the identity provider's own permissions (<c>NovaCore.Identity.OpenIddict</c>'s
+    /// <c>IdentityPermissions.Prefix</c>), the platform's: a tenant role never grants one.
+    /// </summary>
+    public const string PlatformPermissionPrefix = "identity:";
+
+    /// <summary>
     /// A role's name and the permissions it grants in the member's tenant, e.g. <c>MultiTenancy:Roles:Counselor</c> =
-    /// [<c>crm:leads:read</c>, ...]. Each permission must be one a module declares. The product names its roles; there is
+    /// [<c>crm:leads:read</c>, ...]. Each permission must be one a module declares, never an <c>identity:*</c> one. The product names its roles; there is
     /// no built-in role and no hierarchy (docs/plan/DECISIONS.md D-076 (7)).
     /// </summary>
     public Dictionary<string, string[]> Roles { get; } = new(StringComparer.Ordinal);

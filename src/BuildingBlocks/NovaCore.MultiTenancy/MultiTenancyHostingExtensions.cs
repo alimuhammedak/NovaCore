@@ -23,8 +23,8 @@ public static class MultiTenancyHostingExtensions
     /// entities are out of reach and <c>RequireTenant()</c> answers 403. In a request that works in a tenant, the caller
     /// also holds what their roles there grant: <c>MultiTenancy:Roles:&lt;role&gt;</c> lists a role's permissions, each
     /// one a module declares (the host doesn't start otherwise). A request that names the tenant holds them on whatever
-    /// endpoint it calls, so a role grants the permissions of the tenant's endpoints only, never the platform's (the
-    /// identity provider's <c>identity:*</c>). <see cref="TenantDirectory"/> manages the tenants, their members and their life cycle. The store is
+    /// endpoint it calls, so a role grants the permissions of the tenant's endpoints only, never the platform's: a role with one of the
+    /// identity provider's own permissions (<c>identity:*</c>) stops the host too. <see cref="TenantDirectory"/> manages the tenants, their members and their life cycle. The store is
     /// <see cref="MultiTenancyDbContext"/>: the host registers it with <c>AddModuleDbContext</c> and keeps its migrations.
     /// </summary>
     /// <param name="builder">The host application builder.</param>
@@ -57,6 +57,15 @@ public static class MultiTenancyHostingExtensions
                         .ToHashSet(StringComparer.Ordinal)
                         .Contains),
                 "MultiTenancy:Roles must list permissions a module declares.")
+            // A request that names its tenant holds the role's permissions on every endpoint it calls, the platform's
+            // included when the tenant comes from a header: a role with identity:* would make a tenant's owner an
+            // administrator of every account. The add-on doesn't reference the identity provider, so it knows the
+            // provider's permissions by their prefix only (the seed's User role has the same rule).
+            .Validate(
+                options => !options.Roles.Values.SelectMany(permissions => permissions).Any(
+                    permission => permission.StartsWith(MultiTenancyOptions.PlatformPermissionPrefix, StringComparison.Ordinal)),
+                "MultiTenancy:Roles can't hold the identity provider's own permissions (identity:*): a tenant role grants "
+                + "the tenant's endpoints only.")
             .ValidateOnStart();
         services.AddScoped<ITenantResolver, TenantResolver>();
         services.AddScoped<IPermissionResolver, MembershipPermissionResolver>();
