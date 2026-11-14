@@ -59,7 +59,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   stamp renews, so every confirmation link sent so far dies) and emails a `/account/reset-password` link, which sets
   the password and confirms the address in one step, like an invitation; the same password again, or a confirmed
   account, changes nothing. Never let a confirmation link activate a password the mailbox's owner didn't set.
-  Resending the confirmation answers every address alike and emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
+  Resending the confirmation answers every address alike and emails only an unconfirmed account with a password; an
+  account without one (invited, or a repeated registration's) is confirmed only together with setting its password,
+  so `confirm-email` refuses it too and nobody can turn a pending invitation into `invitation.account_exists` (S-2). The password reset form answers every address alike and emails only a confirmed
   account; the reset page answers an unknown account, and an unconfirmed one with a password, like a bad token (R-084);
   an unconfirmed one without a password is confirmed when the page sets its password (S-1). Those three never wait
   for the mail server: they queue the email (`EmailQueue`, a bounded in-memory channel read by a `BackgroundService`

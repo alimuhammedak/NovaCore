@@ -170,7 +170,9 @@ internal static class AccountEndpoints
     }
 
     // Identity's /resendConfirmationEmail sends to a confirmed account too; here only an unconfirmed one gets a link, so
-    // nobody can have emails sent to a confirmed address. The answer is the same either way (RESEARCH R-084).
+    // nobody can have emails sent to a confirmed address. The answer is the same either way (RESEARCH R-084). An account
+    // without a password (an invited one, or one whose registration was repeated) gets none either: only setting its
+    // password confirms it, through the invitation or the link the repeated registration sent (S-2).
     private static async Task<Ok<MessageResponse>> ResendConfirmationEmail(
         ResendConfirmationEmailRequest request,
         UserManager<ApplicationUser> users,
@@ -178,7 +180,7 @@ internal static class AccountEndpoints
         IOptions<JwtOptions> jwt)
     {
         var user = await users.FindByEmailAsync(request.Email);
-        if (user is not null && !await users.IsEmailConfirmedAsync(user))
+        if (user is not null && !await users.IsEmailConfirmedAsync(user) && await users.HasPasswordAsync(user))
             await SendConfirmationAsync(users, emails, jwt.Value, user);
 
         return TypedResults.Ok(ConfirmationResent);
@@ -441,8 +443,10 @@ internal static class AccountEndpoints
     {
         var invalid = TypedResults.BadRequest(new MessageResponse("Invalid or expired confirmation token."));
 
+        // An account without a password is confirmed only together with setting one (S-2): confirming it here would turn
+        // its pending invitation into invitation.account_exists, and nobody could sign in to it.
         var user = await users.FindByIdAsync(userId.ToString());
-        if (user is null || EmailLinks.DecodeToken(token) is not { } decoded)
+        if (user is null || EmailLinks.DecodeToken(token) is not { } decoded || !await users.HasPasswordAsync(user))
             return invalid;
 
         if (!(await users.ConfirmEmailAsync(user, decoded)).Succeeded)

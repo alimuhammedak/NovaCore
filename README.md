@@ -1010,8 +1010,9 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   kullanılamaz, aynı kodla yarışan iki istekten biri girer. 2FA adımı `/2fa/enable`'ın verdiği 10 kurtarma kodundan
   birini de kabul eder: her kod bir kez kullanılır, kilitli hesap kodla da giremez, kullanılan kod
   `SECURITY recovery_code_used` (Warning) olarak loglanır. Kurtarma kodları veritabanında düz metin değil, PBKDF2
-  hash'i olarak durur (ASVS 6.5.2). Onay linki `resend-confirmation-email` ile yeniden istenir; yalnızca onaylanmamış
-  hesaba gider, yanıt her adres için aynıdır.
+  hash'i olarak durur (ASVS 6.5.2). Onay linki `resend-confirmation-email` ile yeniden istenir; yalnızca onaylanmamış ve
+  şifresi olan hesaba gider, yanıt her adres için aynıdır. Şifresiz hesap (davetle açılmış ya da kaydı tekrarlanmış)
+  yalnız şifresi kurulurken onaylanır: `confirm-email` onu onaylamaz, böylece kimse bir daveti kullanılamaz yapamaz.
 - **Parola sıfırlama:** giriş sayfasındaki "Forgot your password?" linki bir e-posta formu açar. Onaylı hesaba
   `/account/reset-password` linki gider (Identity token'ı, 6 saat, tek kullanımlık: sıfırlama security stamp'i
   yeniler). Bilinmeyen ya da onaysız adres aynı sayfayı alır, e-posta gitmez. Sayfa onaysız hesabı yalnız şifresizse

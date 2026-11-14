@@ -72,6 +72,10 @@ recorded as shipped (`PublicAPI.Shipped.txt`), so a later change to it shows up 
 
 ### Security
 
+- Identity provider: `POST /api/v1/auth/resend-confirmation-email` no longer emails an account without a password (an
+  invited one), and `GET /api/v1/auth/confirm-email` no longer confirms one: anyone could have a pending invitation's
+  account confirmed without a password, which made the invitation unusable. Such an account is confirmed only by
+  setting its password.
 - Identity provider: registering an address that has an unconfirmed account with another password no longer leaves
   the first password waiting for the owner's confirmation click (pre-account hijacking). The account's password is
   removed, every confirmation link sent so far stops working, and the address gets a "Set your password" link to

@@ -346,6 +346,48 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
         await AssertProblemAsync(await PostAsync(client, Accept, new { token, password = NewPassword }), HttpStatusCode.Gone, "invitation.expired");
     }
 
+    // S-2: an invited account has no password until the invitation sets one. Anyone may ask for the confirmation again;
+    // whatever reaches the mailbox must not confirm the account without a password, or the invitation becomes useless.
+    [Fact]
+    public async Task Resending_the_confirmation_leaves_the_invitation_usable()
+    {
+        using var client = await InviterAsync("inviter-resend@novacore.test");
+        await client.PostAsJsonAsync(new Uri(Create, UriKind.Relative), new { email = "invited-resend@novacore.test" }, TestContext.Current.CancellationToken);
+        var token = await TokenSentToAsync(fixture.Emails, "invited-resend@novacore.test");
+
+        using var anonymous = _host.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(anonymous, "/api/v1/auth/resend-confirmation-email", new { email = "invited-resend@novacore.test" })).StatusCode);
+
+        // The emails go out in the order queued: once a later one has gone, the resent one would have too.
+        await client.PostAsJsonAsync(new Uri(Create, UriKind.Relative), new { email = "after-invited-resend@novacore.test" }, TestContext.Current.CancellationToken);
+        await fixture.Emails.WaitForAsync(message => string.Equals(message.To, "after-invited-resend@novacore.test", StringComparison.Ordinal));
+        Assert.Single(fixture.Emails.Sent, message => string.Equals(message.To, "invited-resend@novacore.test", StringComparison.Ordinal));
+
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(anonymous, Status, new { token })).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_confirmation_link_does_not_confirm_an_account_without_a_password()
+    {
+        using var client = await InviterAsync("inviter-confirm@novacore.test");
+        await client.PostAsJsonAsync(new Uri(Create, UriKind.Relative), new { email = "invited-confirm@novacore.test" }, TestContext.Current.CancellationToken);
+        var token = await TokenSentToAsync(fixture.Emails, "invited-confirm@novacore.test");
+
+        string link;
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = await users.FindByEmailAsync("invited-confirm@novacore.test");
+            Assert.NotNull(user);
+            var confirmation = Base64UrlTextEncoder.Encode(System.Text.Encoding.UTF8.GetBytes(await users.GenerateEmailConfirmationTokenAsync(user)));
+            link = $"/api/v1/auth/confirm-email?userId={user.Id}&token={confirmation}";
+        }
+
+        using var anonymous = _host.CreateClient();
+        Assert.Equal(HttpStatusCode.BadRequest, (await anonymous.GetAsync(new Uri(link, UriKind.Relative), TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(anonymous, Status, new { token })).StatusCode);
+    }
+
     private async Task<HttpClient> InviterAsync(string email)
     {
         await _host.CreateUserAsync(email, Password, "identity:invitations:create");
