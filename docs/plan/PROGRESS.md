@@ -60,6 +60,7 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | DA-7 | Seed bir client'ı yalnız bir alanı değiştiyse yazar; secret `ValidateClientSecretAsync` ile sınanır, eşleşiyorsa saklı hash korunur. | F9.2f (L56): her açılışta yeniden hash + yazma, çok örnekli açılışta satır yarışı; R-142; `bcfd95e` |
 | DA-8 | Bir eklenti host'un assembly'sini kendisi bulmaz (`Assembly.Load`, `GetEntryAssembly` yok); host `Program.cs`'te açıkça verir. `service.version` için `OpenTelemetry:ServiceVersion` ayarı eklenmedi (Y-19; `OTEL_RESOURCE_ATTRIBUTES` yetiyor). | V9-1 (Y-20'nin testi); `83cea0c` |
 | DA-9 | DAST job'u bulgu yüzünden kırmızı olmaz (raporlar artifact); taramanın kendisi koşamazsa kırmızı olur. Tarayıcı görüntülerinin digest'lerini Dependabot güncellemez. | F6e.2; `d07f199` |
+| DA-10 | Onaysız hesaba farklı şifreyle ikinci kayıt gelirse şifre silinir ve sahibine şifre kurma bağlantısı gider; sıfırlama sayfası şifresiz onaysız hesabı kabul edip aynı adımda onaylar (R-084'teki değişmezin yerine). Audit olayı EventId 46. | S-1; R-155 (Sudhodanan & Paverd §6.2.2); `6d709a4` |
 
 ### Kullanıcıya kalanlar
 
@@ -72,6 +73,7 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | Dependabot #2, #28, #30, #31, #32, #34 | Güncellemeleri Faz 9 branch'inde yapıldı (F9.3); PR'lar açık duruyor | Faz 9 merge edilince Dependabot kendisi kapatır; kapatmazsa kullanıcı kapatır |
 | CodeRabbit CLI incelemesi (Faz 8) | "session could not be authenticated" | `coderabbit auth login`, sonra `coderabbit review --agent --base main` |
 | DAST'ın ilk koşusu (F6e.2'nin kabulü) | `workflow_dispatch` yalnız varsayılan branch'teki workflow'u tetikler; Faz 6e merge edilmedi | Merge'den sonra `gh workflow run dast.yml`, raporlar F6e.5'e |
+| S-1'in kalan yolu: kurban kendi kaydını yapmadan saldırganın kaydından gelen onay linkine tıklarsa hesap saldırganın şifresiyle onaylanır | Kapatmanın yolu onay anında şifre istemek: her kullanıcının kayıt akışını ve `RegisterRequest` sözleşmesini değiştirir (ürün kararı) | Kullanıcı karar verir; onaylarsa kayıt "önce e-posta, sonra şifre" akışına geçer |
 | S-7: açık kaydı kapatılabilir yapmak | Ürün kararı; Y-19 bir seçenek için gerçek tüketici ister. Kayıt olan herkes platform `UserPermissions`'ını alıyor | Kullanıcı karar verir: CRM-Nominal açık kayıt kullanacak mı; kullanmayacaksa `Identity:SignIn:AllowRegistration` (ya da kaydın hiç eşlenmemesi) planlanır |
 | F6e.4'ün adlı araçları (Cloudflare `security-audit-skill`, Claude Security plugin) | Kurulu değil; indirme/kurma ön onaylı değil | Kullanıcı kurar, iki kapsamla koşar |
 | Dependabot #21 (`global.json` → SDK 10.0.403) | Bu makinede yalnız 10.0.300 kurulu (F9.3 kuralı) | SDK 10.0.403 kurulur, PR merge edilir |
@@ -140,8 +142,8 @@ Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docke
 
 | ID | Bulgu (koşular) | Önem | Triaj |
 |---|---|---|---|
-| S-1 | Kayıtla hesabın önceden ele geçirilmesi: onaysız adrese ikinci kayıt sessizce yutulur, onay linki ilk kaydedenin şifresiyle açar; 2FA ile kalıcılaşır, davet üyeliği saldırgana gider (A1-1, A2-1, R2-2) | orta | testli düzeltme |
-| S-2 | Davetle açılmış parolasız hesaba herkes onay e-postası yollatabilir; onaylanırsa davet kullanılamaz (A2-2) | düşük | testli düzeltme (S-1 ile) |
+| S-1 | Kayıtla hesabın önceden ele geçirilmesi: onaysız adrese ikinci kayıt sessizce yutulur, onay linki ilk kaydedenin şifresiyle açar; 2FA ile kalıcılaşır, davet üyeliği saldırgana gider (A1-1, A2-1, R2-2) | orta | kapatıldı (`6d709a4`; R-155): onaysız hesaba başka şifreyle ikinci kayıt şifreyi siler (stamp yenilenir, eski onay linkleri ölür), posta kutusuna şifre kurma bağlantısı gider. 2 test önce kırmızı. Kalan: kurban hiç kayıt olmadan saldırganın onay linkine tıklarsa → `needs_validation` (onayda şifre istemek ürün kararı) |
+| S-2 | Davetle açılmış parolasız hesaba herkes onay e-postası yollatabilir; onaylanırsa davet kullanılamaz (A2-2) | düşük | kapatıldı (`e4d724a`): `resend` ve `confirm-email` şifresiz hesaba dokunmaz. 2 test önce kırmızı |
 | S-3 | `MultiTenancy:Roles`'a `identity:*` platform izni yazılabiliyor; belge yasaklıyor, açılışta denetim yok (A1-2) | düşük-orta | testli düzeltme |
 | S-4 | Rol atamasında yükseltme koruması rolün adına bakıyor, içerdiği `identity:*` izinlerine değil (R2-5) | orta (OLASI) | testli düzeltme |
 | S-5 | Davet denetim kaydında daveti yapan yok (A2-3) | düşük | testli düzeltme |
