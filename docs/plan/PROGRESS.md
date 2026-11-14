@@ -59,6 +59,7 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | DA-6 | Kodun deneme sayısı ve hesabın serisi tek kayıtta (tek stamp kontrolü), karşılaştırmadan önce sayılır (DA-1'i tamamlar). | V8-9: ayrı kayıt kaybedilince tahmin seriye yazılmıyordu; `a619a94` |
 | DA-7 | Seed bir client'ı yalnız bir alanı değiştiyse yazar; secret `ValidateClientSecretAsync` ile sınanır, eşleşiyorsa saklı hash korunur. | F9.2f (L56): her açılışta yeniden hash + yazma, çok örnekli açılışta satır yarışı; R-142; `bcfd95e` |
 | DA-8 | Bir eklenti host'un assembly'sini kendisi bulmaz (`Assembly.Load`, `GetEntryAssembly` yok); host `Program.cs`'te açıkça verir. `service.version` için `OpenTelemetry:ServiceVersion` ayarı eklenmedi (Y-19; `OTEL_RESOURCE_ATTRIBUTES` yetiyor). | V9-1 (Y-20'nin testi); `83cea0c` |
+| DA-9 | DAST job'u bulgu yüzünden kırmızı olmaz (raporlar artifact); taramanın kendisi koşamazsa kırmızı olur. Tarayıcı görüntülerinin digest'lerini Dependabot güncellemez. | F6e.2; `d07f199` |
 
 ### Kullanıcıya kalanlar
 
@@ -70,6 +71,7 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | `main`'de `secret-scan` kırmızı (6 bulgu) | Tarama bütün branch'lerin geçmişini `main`'in allowlist'iyle okuyor; bulgular Faz 8/9 branch'lerindeki test parolaları. `main`'e açılan her PR'da (Dependabot) da kırmızı | PR #35 merge edilince kendiliğinden düzelir (önce `SONAR_TOKEN`) |
 | Dependabot #2, #28, #30, #31, #32, #34 | Güncellemeleri Faz 9 branch'inde yapıldı (F9.3); PR'lar açık duruyor | Faz 9 merge edilince Dependabot kendisi kapatır; kapatmazsa kullanıcı kapatır |
 | CodeRabbit CLI incelemesi (Faz 8) | "session could not be authenticated" | `coderabbit auth login`, sonra `coderabbit review --agent --base main` |
+| DAST'ın ilk koşusu (F6e.2'nin kabulü) | `workflow_dispatch` yalnız varsayılan branch'teki workflow'u tetikler; Faz 6e merge edilmedi | Merge'den sonra `gh workflow run dast.yml`, raporlar F6e.5'e |
 | S-7: açık kaydı kapatılabilir yapmak | Ürün kararı; Y-19 bir seçenek için gerçek tüketici ister. Kayıt olan herkes platform `UserPermissions`'ını alıyor | Kullanıcı karar verir: CRM-Nominal açık kayıt kullanacak mı; kullanmayacaksa `Identity:SignIn:AllowRegistration` (ya da kaydın hiç eşlenmemesi) planlanır |
 | F6e.4'ün adlı araçları (Cloudflare `security-audit-skill`, Claude Security plugin) | Kurulu değil; indirme/kurma ön onaylı değil | Kullanıcı kurar, iki kapsamla koşar |
 | Dependabot #21 (`global.json` → SDK 10.0.403) | Bu makinede yalnız 10.0.300 kurulu (F9.3 kuralı) | SDK 10.0.403 kurulur, PR merge edilir |
@@ -149,6 +151,8 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 ### Faz 6e
 Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docker çalışıyor; PLAN'ın adını verdiği Cloudflare `security-audit-skill` ve Claude Security plugin kurulu değil (kullanıcıya kaldı).
 
+- [x] F6e.1 (`2b6df56`): `dast` client yalnız `eng/dast/dast.env`'de (ortam değişkenleri, index 100); `client_credentials`, dört okuma izni, secret koşuda `openssl rand`. Kod değişmedi. `DastClientTests` (5) önce kırmızı, sonra yeşil.
+- [x] F6e.2 (`d07f199`): `dast.yml` (haftalık + `workflow_dispatch`), `eng/dast.sh`, `/connect` ve `/account` için dar hedef listesi. Schemathesis 4.33.1, ZAP 2.17.0 (digest'e sabit; D-044: CI aracı, NuGet değil). Bulgu job'u kırmızı yapmaz, taramanın koşamaması yapar (DA-9). Yerelde Schemathesis 3 örnekle: `/account/*` formlarında ve `/connect/revoke`'ta bozuk form girdisine 500 (S-14). ZAP yerelde denenmedi (indirme takıldı). İlk koşu merge'den sonra (kullanıcıya kaldı).
 - [x] F6e.4: kurulu `security-review` ölçütleriyle dört Opus koşusu (salt okunur): auth çekirdeği ×2 (uçtan içeri; kontrol listesi/değişmezlerden koda), bütün repo ×2 (dizin dizin; OWASP API Top 10 + tehdit modeli). Skill yalnız diff okuduğu için ölçütleri elle, bütün koda uygulandı. Faz 6b'nin düzeltmeleri yerinde; bağımlılık taraması temiz.
 
 #### F6e.4 bulguları ve F6e.5 triajı
@@ -168,6 +172,7 @@ Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docke
 | S-11 | Outbox handler hata mesajı ileride kişisel veriyi `Error` sütununa ve loga taşıyabilir (D1) | düşük | `needs_validation` |
 | S-12 | `includeInactive=true` her ürün okuyucusuna pasif ürünleri gösteriyor; karar kaydı yok (D2) | — | `needs_validation`: ürün kararı |
 | S-13 | Şablonun `Program.cs:75`'inde `GetValue<int?>("HealthChecks:ProbePort")` (R-048'e aykırı) | — | düzeltme (güvenlik dışı) |
+| S-14 | Bozuk form girdisine 500: `/account/*` formları ve `/connect/revoke` (F6e.2'nin yerel Schemathesis denemesi) | düşük-orta | testli düzeltme |
 
 Doğrulanamayanlar (`needs_validation`): son admin korumasında check-then-act yarışı (biliniyor, L94); CSP'nin `form_post` otomatik gönderimini engelleyip engellemediği (#8); `alg:none`/`jku` reddi (#21); kurumsal NAT arkasında `strict` kovasının `/connect/token` yenilemelerini de kapsaması. Biliniyor (Sonraya): L60, L44, L94, L95, L96, L103, L106, L107, L108, L11.
 
