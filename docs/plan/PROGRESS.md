@@ -88,26 +88,7 @@ Başlangıç 2026-11-09, `main` @ `f319d57`; giriş notu ve fazın yapılmayacak
 
 - [x] F8.1–F8.8 (`1aaf0f9` … `163c4af`): adım notları ve oturum sonu koşusu arşivde ([PROGRESS-ARSIV.md](PROGRESS-ARSIV.md), "### Faz 8"; D-097 (2)).
 
-#### Doğrulama (gece koşusu, 2026-11-13)
-
-İnceleme: iki Opus okuyan ajanı (`main...HEAD` kod incelemesi, elle: `code-review` skill'i kotaya takıldı; PLAN/DECISIONS denetimi). CodeRabbit CLI koşmadı (oturum açık değil, D-067 (3)). Kapsam ve Yapılmayacaklar temiz.
-
-| ID | Bulgu | Yer | Durum |
-|---|---|---|---|
-| V8-1 | CI `secret-scan`: 3 bulgu, `main..HEAD` aralığında | run `43310617390` | doğrulandı (`5a7a956`; CI `43331827821`'de `secret-scan` yeşil): iki test parolası, `tests/` altında birebir allowlist |
-| V8-2 | Yanlış kod sayacının `IdentityResult`'ı yok sayılıyor: eşzamanlı yanlış tahminler sayacı düşürür, 5/100 sınırı aşılır | `PasswordResetCodes.cs:107-112` | doğrulandı (`1777b77`; CI `43334884102`): deneme karşılaştırmadan önce stamp ile sayılır, sayımı kaybeden istek kodu siler. Test önce kırmızı, sonra yeşil |
-| V8-3 | forgot/reset'te süreyle hesap sayımı: bilinmeyen/onaysız adres hash ve yazma olmadan döner (D-030 (1), D-091 (4)) | `PasswordCodeEndpoints.cs:190-218` | doğrulandı (`518b339`; CI `43334884102`): kodu olmayan adres aynı hash işini yapar. Hash sayısı testi önce kırmızı, sonra yeşil. Kalan fark: birer veritabanı yazması |
-| V8-4 | Kilitli ve onaysız hesap hash hesaplamadan döner; D-091 (1) "aynı süre". Test kilitli hesabın hash sayısını sınamıyor | `SignInFlow.cs:51,116` | doğrulandı (`067821e`; CI `43336677900`; R-138): kilitli hesap şifreyi sahte hash'e karşı sınar. Test önce kırmızı (`[1,1,0,1,0]`), sonra yeşil |
-| V8-5 | Davet oluşturmada beklenen hata (`InvalidUserName`, `DuplicateEmail`) exception → 500; `ProducesProblem` yok | `AccountInvitations.cs:156`, `InvitationEndpoints.cs:240,269` | doğrulandı (CI `43390653707`; `8fc5500`): `InviteAsync` `Result<Guid>` döner; `invitation.invalid_email` 400, `invitation.address_taken` 409, `ProducesProblem`, OpenAPI yalnız ekleme. Kullanıcı deposu kaybedilen insert'i `DuplicateUserName` bildirir (kayıt yarışındaki 500 de gider). Üç test önce kırmızı (500), sonra yeşil |
-| V8-6 | Davet/kod "kullanıldı" işaretlendikten sonra şifre adımı düşerse yanar; yorum "kullanılmamış kalır" diyor | `AccountInvitations.cs:131-142`, `PasswordResetCodes.cs:84-91` | doğrulandı (CI `43390653707`; `0aeeaea`): işaret (ya da kodun silinmesi) ve şifre tek transaction'da, execution strategy içinde. Test önce kırmızı (yeniden deneme 409 `invitation.used` / 400), sonra yeşil |
-| V8-7 | Kuralı yakalamayan/eksik testler: onaysız hesabın reset'i, kabul etmeden giriş (totolojik), davetin tek kullanım yarışı, `InvitationPath` doğrulaması, `/password` ve `/invitations` CORS'u (D-095 (6)), JSON 2FA'da kurtarma kodu, `A_new_code_replaces_the_old_one`'daki `if` | `PasswordCodeResetTests`, `InvitationTests`, `SessionSignInTests` | doğrulandı (CI `43390653707`; `b9c6183`, `fe1f24f`, `0b44d78`): şifre kodu, JSON 2FA kurtarma kodu, gerçek 429 ve beş davet testi (kabul yarışı, `InvitationPath`, CORS…). Yeni testler ilk koşuda yeşil; iki kural geçici bozulup kırmızı görüldü |
-| V8-8 | CI `secret-scan` yeniden kırmızı: 3 bulgu, bu gecenin test commit'lerindeki yeni test parolaları | run `43340697870` | doğrulandı (CI `43390653707`; `b317c0b`): iki test parolası allowlist'e; `tests/CLAUDE.md`'ye "allowlist'teki değeri kullan" kuralı; yeniden tarama temiz |
-| V8-9 | Hesap başına 100'lük seri sayacı hâlâ aşılabiliyor: seri karşılaştırmadan SONRA ayrı stamp'lı kayıtla yazılıyor, kaybedilince tahmin sayılmıyor (eşzamanlı `/forgot` ile hiçbiri sayılmaz). Kod başına 5 sınırı sağlam | `PasswordResetCodes.cs:110-113,169-175` | kapatıldı (`a619a94`): deneme ve seri iki token, tek kayıtla karşılaştırmadan önce sayılır; doğru kod+reddedilen şifre ikisini geri verir. İki test önce kırmızı (karşılaştırma 2/seri 1; `/forgot` yarışında 1/0), sonra yeşil |
-| V8-10 | Yorum yanlış: "a retrying strategy retries all of it"; ilk `SaveChanges`'ten sonra stamp izleyicide yeni kaldığı için yeniden deneme kesin `ConcurrencyFailure` alır (güvenli tarafta). Keyed hasher'ın "singleton olduğu için aynı maliyet" gerekçesi de geçersiz | `PasswordResetCodes.cs:132`, `AccountInvitations.cs:147`, `IdentityServerHostingExtensions.cs:60` | kapatıldı (`6eecf96`; R-139): yalnız yorumlar; yeniden deneme hep `ConcurrencyFailure` alır (güvenli taraf). Keyed hasher kaldı: host'un hasher'ı 600k iterasyon, D-091 (4) ile çelişir. Gerisi Sonraya |
-
-İkinci inceleme (2026-11-13, Opus, `c7bddf0..0b44d78`): V8-9, V8-10; V8-3…V8-6 ve yarış yardımcıları temiz. Yarış testleri yalnız SQLite'ta koşuyor.
-
-Yanlış pozitif: kök CLAUDE.md'deki başsız giriş satırının `f6185ab` ile gitmesi (kullanıcının bilinçli küçültmesi; bilgi kimlik eklentisinin CLAUDE.md'sinde).
+#### Doğrulama: V8-1…V8-10 kapandı (DA-1…DA-6); tablo arşivde ("### Faz 8"). PR #35 açık.
 
 ### Faz 9
 Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. Plan onayı D-096 (2). Dependabot, `main`'de: #26, #27, #29, #33, #19 merge edildi (kontroller yeşil, çakışmasız); #21 kullanıcıya kaldı; #2, #28, #30, #31, #32, #34 kırmızı → F9.3.
