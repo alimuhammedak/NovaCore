@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
@@ -14,7 +15,7 @@ namespace NovaCore.Identity.OpenIddict;
 /// </summary>
 internal sealed class IdentityPermissionResolver(
     UserManager<ApplicationUser> userManager,
-    RoleManager<ApplicationRole> roleManager,
+    IdentityServerDbContext db,
     IEnumerable<IPermissionDefinitionProvider> permissionProviders,
     IOptions<IdentityServerOptions> options) : IPermissionResolver
 {
@@ -47,16 +48,19 @@ internal sealed class IdentityPermissionResolver(
         if (roleNames.Contains(IdentityRoles.Administrator))
             permissions.UnionWith(permissionProviders.SelectMany(provider => provider.GetPermissions()).Select(permission => permission.Name));
 
-        foreach (var roleName in roleNames)
-        {
-            var role = await roleManager.FindByNameAsync(roleName);
-            if (role is null)
-                continue;
+        // Every role's claims in one query, however many roles the user holds. The database narrows them to the
+        // permission type; the ordinal checks here keep its collation from deciding which role or claim type counts.
+        var roleClaims = await db.UserRoles
+            .Where(userRole => userRole.UserId == account.Id)
+            .Join(db.Roles, userRole => userRole.RoleId, role => role.Id, (userRole, role) => new { role.Id, role.Name })
+            .Join(db.RoleClaims, role => role.Id, claim => claim.RoleId, (role, claim) => new { role.Name, claim.ClaimType, claim.ClaimValue })
+            .Where(claim => claim.ClaimType == NovaClaims.Permission)
+            .ToListAsync(cancellationToken);
 
-            foreach (var claim in await roleManager.GetClaimsAsync(role))
-                if (string.Equals(claim.Type, NovaClaims.Permission, StringComparison.Ordinal))
-                    permissions.Add(claim.Value);
-        }
+        foreach (var claim in roleClaims)
+            if (claim.Name is not null && roleNames.Contains(claim.Name)
+                && string.Equals(claim.ClaimType, NovaClaims.Permission, StringComparison.Ordinal) && claim.ClaimValue is not null)
+                permissions.Add(claim.ClaimValue);
 
         foreach (var claim in await userManager.GetClaimsAsync(account))
             if (string.Equals(claim.Type, NovaClaims.Permission, StringComparison.Ordinal))

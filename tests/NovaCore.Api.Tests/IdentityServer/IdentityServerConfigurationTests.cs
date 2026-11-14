@@ -13,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using NovaCore.Identity.OpenIddict;
+using OpenIddict.Abstractions;
 using Xunit;
 
 namespace NovaCore.Api.Tests.IdentityServer;
@@ -206,6 +207,13 @@ public sealed class IdentityServerConfigurationTests
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
             builder.Configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>(StringComparer.Ordinal) { ["Identity:Clients:0:RedirectUris:0"] = "http://client.novacore.test/callback" }));
+
+        // The host started and seeded the client with the plain-http address.
+        await using var scope = host.Services.CreateAsyncScope();
+        var applications = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
+        var client = await applications.FindByClientIdAsync(IdentityServerTestHost.ClientId, TestContext.Current.CancellationToken);
+        Assert.NotNull(client);
+        Assert.Contains("http://client.novacore.test/callback", await applications.GetRedirectUrisAsync(client, TestContext.Current.CancellationToken), StringComparer.Ordinal);
     }
 
     // RFC 6749 §10.10: a secret that can be guessed is no secret; 32 characters hold 128 bits or more when generated.

@@ -88,6 +88,81 @@ public class PackageDependencyTests
         Assert.Empty(violations);
     }
 
+    [Fact]
+    public void Project_files_read_ignore_references_that_only_update_an_item()
+    {
+        // A reference with Update (no Include) changes an item that exists already; it adds nothing to the project.
+        var directory = Directory.CreateTempSubdirectory("novacore-projectfile-");
+        try
+        {
+            var path = Path.Combine(directory.FullName, "Sample.csproj");
+            File.WriteAllText(path, """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <ItemGroup>
+                    <PackageReference Include="Microsoft.Extensions.Logging" />
+                    <PackageReference Update="Microsoft.Extensions.Logging" />
+                    <ProjectReference Include="..\NovaCore.Abstractions\NovaCore.Abstractions.csproj" />
+                    <ProjectReference Update="..\NovaCore.Abstractions\NovaCore.Abstractions.csproj" />
+                    <FrameworkReference Update="Microsoft.AspNetCore.App" />
+                  </ItemGroup>
+                </Project>
+                """);
+
+            var project = ProjectFile.Load(path, directory.FullName);
+
+            Assert.Equal(["Microsoft.Extensions.Logging"], project.Packages);
+            Assert.Equal([Abstractions], project.ProjectReferences);
+            Assert.Empty(project.FrameworkReferences);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Project_files_read_include_the_references_of_the_Directory_Build_files_up_to_the_repository_root()
+    {
+        // A reference added in Directory.Build.props reaches every project below it, so a third-party package there
+        // would break Y-05 for the core packages. A file above the repository root belongs to no project of it.
+        var outside = Directory.CreateTempSubdirectory("novacore-buildfiles-");
+        try
+        {
+            var root = Directory.CreateDirectory(Path.Combine(outside.FullName, "repo"));
+            var projectDirectory = Directory.CreateDirectory(Path.Combine(root.FullName, "src", "Sample"));
+            File.WriteAllText(Path.Combine(outside.FullName, "Directory.Build.props"), """
+                <Project>
+                  <ItemGroup>
+                    <PackageReference Include="Outside.Repository" />
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(Path.Combine(root.FullName, "Directory.Build.props"), """
+                <Project>
+                  <ItemGroup>
+                    <PackageReference Include="Newtonsoft.Json" />
+                  </ItemGroup>
+                </Project>
+                """);
+            var path = Path.Combine(projectDirectory.FullName, "Sample.csproj");
+            File.WriteAllText(path, """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <ItemGroup>
+                    <PackageReference Include="Microsoft.Extensions.Logging" />
+                  </ItemGroup>
+                </Project>
+                """);
+
+            var project = ProjectFile.Load(path, root.FullName);
+
+            Assert.Equal(["Microsoft.Extensions.Logging", "Newtonsoft.Json"], project.Packages);
+        }
+        finally
+        {
+            outside.Delete(recursive: true);
+        }
+    }
+
     private static bool IsMicrosoftOrBcl(string assembly) =>
         assembly.StartsWith("System.", StringComparison.Ordinal)
         || assembly.StartsWith("Microsoft.", StringComparison.Ordinal)
@@ -102,9 +177,9 @@ public class PackageDependencyTests
         return core;
     }
 
-    private static List<ProjectFile> BuildingBlocks() => Directory
-        .EnumerateFiles(Path.Combine(Solution.RootDirectory, "src", "BuildingBlocks"), "*.csproj", SearchOption.AllDirectories)
-        .Select(ProjectFile.Load)
+    private static List<ProjectFile> BuildingBlocks() => Solution
+        .SourceFiles("*.csproj", "src", "BuildingBlocks")
+        .Select(path => ProjectFile.Load(path, Solution.RootDirectory))
         .ToList();
 
     private sealed record ProjectFile(
@@ -114,12 +189,17 @@ public class PackageDependencyTests
         IReadOnlyList<string> ProjectReferences,
         IReadOnlyList<string> FrameworkReferences)
     {
-        public static ProjectFile Load(string path)
+        public static ProjectFile Load(string path, string rootDirectory)
         {
             var project = XDocument.Load(path).Root!;
 
+            // The Directory.Build.props/targets above the project add their references to it too. An item with Update
+            // and no Include changes one that exists already and adds nothing, so it is not read. Condition attributes
+            // are not evaluated: a conditional reference counts as always there, which makes the rules stricter.
+            var documents = new[] { project }.Concat(InheritedBuildFiles(path, rootDirectory)).ToList();
+
             // Build-time-only packages (analyzers with PrivateAssets=all) never become package dependencies.
-            var packages = project.Descendants("PackageReference")
+            var packages = Included(documents, "PackageReference")
                 .Where(reference => !string.Equals(
                     (string?)reference.Attribute("PrivateAssets") ?? (string?)reference.Element("PrivateAssets"),
                     "all",
@@ -128,17 +208,44 @@ public class PackageDependencyTests
                 .ToList();
 
             // Include paths use backslashes; normalize them so this also works on Linux CI.
-            var projectReferences = project.Descendants("ProjectReference")
+            var projectReferences = Included(documents, "ProjectReference")
                 .Select(reference => Path.GetFileNameWithoutExtension(((string)reference.Attribute("Include")!).Replace('\\', '/')))
                 .ToList();
 
-            var frameworkReferences = project.Descendants("FrameworkReference")
+            var frameworkReferences = Included(documents, "FrameworkReference")
                 .Select(reference => (string)reference.Attribute("Include")!)
                 .ToList();
 
             var isPackable = string.Equals(project.Descendants("IsPackable").LastOrDefault()?.Value, "true", StringComparison.OrdinalIgnoreCase);
 
             return new ProjectFile(Path.GetFileNameWithoutExtension(path), isPackable, packages, projectReferences, frameworkReferences);
+        }
+
+        private static IEnumerable<XElement> Included(IEnumerable<XElement> documents, string item) => documents
+            .Descendants(item)
+            .Where(reference => reference.Attribute("Include") is not null);
+
+        private static IEnumerable<XElement> InheritedBuildFiles(string projectPath, string rootDirectory)
+        {
+            // MSBuild imports the nearest Directory.Build.props/targets only, but each of these files may import the next
+            // one up; the repository has one of each at its root, so walking to the root reads what the project gets.
+            // Nothing above the root is read: the files there belong to the machine, not to the repository.
+            var relative = Path.GetRelativePath(rootDirectory, projectPath);
+            if (Path.IsPathRooted(relative) || relative.StartsWith("..", StringComparison.Ordinal))
+                throw new ArgumentException($"'{projectPath}' is not under '{rootDirectory}'.", nameof(projectPath));
+
+            for (var directory = Path.GetDirectoryName(projectPath); directory is not null; directory = Path.GetDirectoryName(directory))
+            {
+                foreach (var name in new[] { "Directory.Build.props", "Directory.Build.targets" })
+                {
+                    var file = Path.Combine(directory, name);
+                    if (File.Exists(file))
+                        yield return XDocument.Load(file).Root!;
+                }
+
+                if (string.Equals(Path.TrimEndingDirectorySeparator(directory), Path.TrimEndingDirectorySeparator(rootDirectory), StringComparison.OrdinalIgnoreCase))
+                    yield break;
+            }
         }
     }
 }

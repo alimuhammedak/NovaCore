@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -50,6 +51,10 @@ internal sealed partial class IdentityServerSeeder(
                 await applications.CreateAsync(descriptor, cancellationToken);
                 LogClientCreated(client.ClientId);
             }
+            else if (await IsUpToDateAsync(applications, application, descriptor, cancellationToken))
+            {
+                LogClientUnchanged(client.ClientId);
+            }
             else
             {
                 await applications.UpdateAsync(application, descriptor, cancellationToken);
@@ -57,6 +62,54 @@ internal sealed partial class IdentityServerSeeder(
             }
         }
     }
+
+    // UpdateAsync(application, descriptor) hashes the secret again whenever the descriptor's differs from the stored one,
+    // and the descriptor holds the configured plain secret, the store its hash: every start would hash every confidential
+    // client's secret anew and write the row, and two instances starting together would race on its concurrency token.
+    // So a configured secret that still validates against the stored hash is replaced by that hash (UpdateAsync then
+    // keeps it), and a client whose stored fields all match is not written at all. A rotated secret doesn't validate and
+    // is hashed and written as before (docs/plan/RESEARCH.md R-142).
+    private static async Task<bool> IsUpToDateAsync(
+        IOpenIddictApplicationManager applications, object application, OpenIddictApplicationDescriptor descriptor,
+        CancellationToken cancellationToken)
+    {
+        // Validation first: a hash OpenIddict finds too weak is rehashed and stored by the validation itself, and the
+        // comparison below must see that hash.
+        var secretUnchanged = !string.IsNullOrEmpty(descriptor.ClientSecret)
+            && await applications.HasClientTypeAsync(application, ClientTypes.Confidential, cancellationToken)
+            && await applications.ValidateClientSecretAsync(application, descriptor.ClientSecret, cancellationToken);
+
+        var stored = new OpenIddictApplicationDescriptor();
+        await applications.PopulateAsync(stored, application, cancellationToken);
+
+        if (secretUnchanged)
+            descriptor.ClientSecret = stored.ClientSecret;
+
+        return Matches(stored, descriptor);
+    }
+
+    // Every field of the descriptor, as UpdateAsync would write it.
+    private static bool Matches(OpenIddictApplicationDescriptor stored, OpenIddictApplicationDescriptor wanted) =>
+        string.Equals(stored.ApplicationType, wanted.ApplicationType, StringComparison.Ordinal)
+        && string.Equals(stored.ClientId, wanted.ClientId, StringComparison.Ordinal)
+        && string.Equals(stored.ClientSecret, wanted.ClientSecret, StringComparison.Ordinal)
+        && string.Equals(stored.ClientType, wanted.ClientType, StringComparison.Ordinal)
+        && string.Equals(stored.ConsentType, wanted.ConsentType, StringComparison.Ordinal)
+        && string.Equals(stored.DisplayName, wanted.DisplayName, StringComparison.Ordinal)
+        && SameEntries(stored.DisplayNames, wanted.DisplayNames, string.Equals)
+        && (stored.JsonWebKeySet, wanted.JsonWebKeySet) is (null, null)
+        && stored.Permissions.SetEquals(wanted.Permissions)
+        && stored.PostLogoutRedirectUris.SetEquals(wanted.PostLogoutRedirectUris)
+        && stored.RedirectUris.SetEquals(wanted.RedirectUris)
+        && stored.Requirements.SetEquals(wanted.Requirements)
+        && SameEntries(stored.Properties, wanted.Properties, JsonElement.DeepEquals)
+        && SameEntries(stored.Settings, wanted.Settings, string.Equals);
+
+    private static bool SameEntries<TKey, TValue>(
+        Dictionary<TKey, TValue> stored, Dictionary<TKey, TValue> wanted, Func<TValue, TValue, bool> equal)
+        where TKey : notnull =>
+        stored.Count == wanted.Count
+        && stored.All(entry => wanted.TryGetValue(entry.Key, out var value) && equal(entry.Value, value));
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -187,4 +240,7 @@ internal sealed partial class IdentityServerSeeder(
 
     [LoggerMessage(EventId = 6, Level = LogLevel.Information, Message = "Identity seed: created the administrator {Email}.")]
     private partial void LogAdministratorCreated(string email);
+
+    [LoggerMessage(EventId = 7, Level = LogLevel.Debug, Message = "Identity seed: client {ClientId} is up to date.")]
+    private partial void LogClientUnchanged(string clientId);
 }

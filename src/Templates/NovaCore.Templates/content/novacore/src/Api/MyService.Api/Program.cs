@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MyService.Api;
 using MyService.Modules.Todos;
 using NovaCore.AspNetCore.Hosting;
 using NovaCore.AspNetCore.Modules;
@@ -19,7 +21,7 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.AddCoreObservability();                    // logs, metrics and traces through OpenTelemetry; OTLP when OTEL_EXPORTER_OTLP_ENDPOINT is set
+builder.AddCoreObservability(typeof(Program).Assembly); // logs, metrics and traces through OpenTelemetry, this app's version as service.version; OTLP when OTEL_EXPORTER_OTLP_ENDPOINT is set
 builder.AddCoreDefaults();                         // health checks + resilient HttpClients
 builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth (Jwt:Authority), permissions, rate limiting, CORS
 builder.AddCorePersistence();                      // audit stamping, the outbox dispatcher, opt-in startup migrations
@@ -64,6 +66,12 @@ builder.AddCoreMultiTenancy();
 builder.Services.AddModuleDbContext<MultiTenancyDbContext>(MultiTenancyDbContext.Schema, (_, _) => { });
 #endif
 
+// The management port of the probes below, validated when the host starts.
+builder.Services.AddOptions<HealthCheckProbeOptions>()
+    .BindConfiguration(HealthCheckProbeOptions.SectionName)
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<HealthCheckProbeOptions>, HealthCheckProbeOptionsValidator>();
+
 // Modules, after AddCorePersistence. Their endpoints map in this order.
 builder.AddModule<TodosModule>();
 
@@ -72,7 +80,8 @@ var app = builder.Build();
 // Probes outside Development (where MapDefaultEndpoints maps them below): only on the management port in
 // HealthChecks:ProbePort, which the host must also listen on. The check is on the connection's local port, which a client
 // can't spoof the way it can the Host header that RequireHost reads. Before UseCoreWeb, which requires a signed-in caller.
-if (!app.Environment.IsDevelopment() && app.Configuration.GetValue<int?>("HealthChecks:ProbePort") is { } probePort)
+if (!app.Environment.IsDevelopment()
+    && app.Services.GetRequiredService<IOptions<HealthCheckProbeOptions>>().Value.ProbePort is { } probePort)
 {
     app.UseHealthChecks("/health", probePort, new HealthCheckOptions());
     app.UseHealthChecks("/alive", probePort, new HealthCheckOptions { Predicate = check => check.Tags.Contains("live") });
@@ -95,7 +104,7 @@ app.MapCoreScalar();                               // Scalar UI at /scalar/v1 (D
 app.MapModules();                                  // every module's endpoints
 app.MapDefaultEndpoints();                         // /health and /alive, Development only
 
-app.Run();
+await app.RunAsync();
 
 // Exposed so the integration tests can start the real host through WebApplicationFactory.
 public partial class Program;

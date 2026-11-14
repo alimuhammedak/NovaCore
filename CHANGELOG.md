@@ -7,6 +7,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Identity provider: a headless sign-in surface for a project's own screens, next to the HTML pages, which stay as the
+  fallback. `Identity:SignIn:LoginPath` sends a signed-out browser from `/connect/authorize` to the project's screen
+  (a path on this host only, or the host doesn't start). The screen signs in with `GET /api/v1/auth/session/antiforgery`,
+  `POST /api/v1/auth/session/login` and `POST /api/v1/auth/session/login/2fa` (the antiforgery token in the
+  `X-XSRF-TOKEN` header, no CORS, local return URLs only); they open the provider's session cookie and never return a
+  token. Failures carry a stable `code` (`account.invalid_credentials`, `account.email_not_confirmed`, ...).
+- Identity provider: password reset with an emailed 8-digit code, `POST /api/v1/auth/password/forgot` and
+  `POST /api/v1/auth/password/reset`: 15 minutes, once, 5 wrong tries per code, and codes stop after 100 wrong ones in
+  a row until the owner signs in. A wrong code doesn't count toward lockout; a reset ends every session.
+- Identity provider: account invitations. `AccountInvitations.InviteAsync(email)` (for a product's own endpoint) and
+  `POST /api/v1/admin/invitations` (the new `identity:invitations:create` permission) email a single-use, 7-day link to
+  `Identity:SignIn:InvitationPath` (default `/accept-invitation`); `POST /api/v1/auth/invitations/status` and `/accept`
+  read and accept it. An invitation never sets the password of a confirmed account. `InviteAsync` returns a
+  `Result<Guid>`: an address that can't be a user name is `invitation.invalid_email` (400), one another account holds as
+  its user name `invitation.address_taken` (409); two invitations racing to create one account both invite it. **Upgrade:** a new `invitations`
+  table in the `identity` schema; add the migration to the host's identity store (the template's sets have it).
+- Repository: the DAST scan's client (`dast`, client credentials, the read permissions `catalog:products:read`,
+  `payments:read`, `identity:users:read`, `identity:roles:read`) is defined only in `eng/dast/dast.env`, the DAST run's
+  configuration; its secret is generated for each run. No committed appsettings file holds it (`DastClientTests`).
+- Repository: a DAST workflow (`dast.yml`, weekly and on demand). It starts a throwaway Api in Development on the runner
+  (a SQL Server container, the development certificate) and runs `eng/dast.sh`: Schemathesis 4.33.1 on the OpenAPI
+  document and on `eng/dast/protocol-openapi.yaml` (`/connect/*` and `/account/*`, which the document leaves out), ZAP
+  2.17.0's API scan on the document and its baseline scan on the sign-in page, images pinned by digest. A report for
+  now: findings don't fail the job, a scan that can't run does; the reports and the host's log are an artifact.
+
+### Changed
+
+- Identity provider: the sign-in rules moved into one internal service shared by the HTML pages and the JSON
+  endpoints; behaviour is unchanged. The antiforgery header name is `X-XSRF-TOKEN` (the HTML forms keep their field).
+- Identity provider: a user's role permissions are resolved in one query, whatever the number of roles (two per role
+  before). The `/connect/*` endpoints pass the request's cancellation token to the store, so an aborted request
+  stops its database work.
+- Dependencies: OpenIddict 7.8.0; Scalar.AspNetCore 2.18.7; ASP.NET Core and EF Core packages (and the `dotnet-ef`
+  tool) 10.0.14, `Microsoft.Extensions.Caching.Hybrid` and `Microsoft.Extensions.Http.Resilience` 10.11.0; OpenTelemetry
+  1.20.1; CsCheck 5.0.1 (tests). The template pins the same EF Core, Mvc.Testing, `System.Security.Cryptography.Pkcs`
+  and `dotnet-ef` versions. Development compose images: Jaeger 2.22.0, Seq 2026.1.17526, Keycloak 26.8.2-1. CI:
+  `github/codeql-action` 4.39.3.
+
+### Fixed
+
+- Template: the host reads `HealthChecks:ProbePort` through validated options (`HealthCheckProbeOptions`,
+  `ValidateOnStart`) instead of `Configuration.GetValue`, as the repository's options rule asks. A value that isn't a
+  port (1–65535) stops the host at startup; empty still maps none.
+- Catalog: `PUT` and `DELETE /api/v1/products/{id}` answer 404 `product.not_found` instead of 409
+  `product.concurrency_conflict` when the product was deleted after it was read. A `DELETE` that connection resiliency
+  replays after its first attempt was applied gets 404 too.
+- `OutboxInterceptor` clears an entity's domain events only after the save that writes them succeeds. A failed save
+  used to clear them anyway, so an entity added to a new context for a retry saved without its events; now it keeps
+  them, and a retry on the same context writes each event once.
+- `AddCoreObservability` (`NovaCore.OpenTelemetry`) no longer reports the add-on's own version as the resource's
+  `service.version`. The new overload `AddCoreObservability(Assembly applicationAssembly)` reports the application's
+  (that assembly's informational version, else its assembly version); without it no version is reported.
+  **Upgrade:** call `builder.AddCoreObservability(typeof(Program).Assembly)` in the host (the template does).
+- Identity provider: the startup seed no longer hashes a confidential client's secret again and rewrites the client on
+  every start. A configured secret that still matches the stored hash keeps it, and a client whose fields all match is
+  not written (instances starting together no longer race on its row); a changed secret or field is written as before.
+- Identity provider: two requests creating an account with one address at the same time (registration or invitation)
+  no longer answer 500: the user store reports the lost insert as a duplicate user name.
+- A form body the framework can't read (a key or value over `FormOptions`' limits, more than 1024 values, a NUL
+  character, multipart without a boundary) answers 400 instead of 500, on the identity provider's `/account/*` forms
+  and on `/connect/*` alike: the core treats the form reader's `InvalidDataException` and
+  `AntiforgeryValidationException` as the client's error (title "Bad Request", no detail, not logged).
+- An `InvalidDataException` that isn't the form reader's (a corrupt Zip, GZip, Deflate, Brotli or Tar stream a module
+  reads, a module's own parser) answers 500 and is logged again, instead of a silent 400. `UseCoreWeb` reports a form
+  body the reader can't read as a `BadHttpRequestException` with 400 where the form is read, as Minimal API form
+  binding does, so the unreadable-form answers above are unchanged. A host that calls `AddCoreInfrastructure` without
+  `UseCoreWeb` gets a 500 for an unreadable form its own code reads.
+
+### Security
+
+- Identity provider: the anonymous endpoints that email an address (`POST /api/v1/auth/register`,
+  `/resend-confirmation-email`, `/password/forgot` and the `/account/forgot-password` form) share a limit per recipient
+  address, whatever the client's IP: `Identity:EmailLimit:PermitLimit` requests (default 5) per
+  `Identity:EmailLimit:WindowSeconds` (default 3600), the address compared normalized. Over it they answer 429
+  (`account.too_many_emails`) for every address alike, with or without an account, before anything is looked up, so a
+  caller rotating client addresses can no longer flood one mailbox, keep replacing its owner's reset code or fill the
+  email queue for it. The `/account/forgot-password` form checks the address like the JSON endpoints (an email
+  address of at most 256 characters) before the limit counts it, and the limit refuses a longer one without keeping a
+  count: a caller can no longer make it hold a count for every multi-megabyte value it posts.
+- Rate limiting: an IPv6 client is counted by its /64 and an IPv4-mapped address (`::ffff:a.b.c.d`) as its IPv4
+  address, in the global limit and the `"strict"` policy. A client could pick a new address in its /64 for every
+  request and never reach either limit.
+- Identity provider: registering an address that has an unconfirmed account with another password no longer leaves
+  the first password waiting for the owner's confirmation click (pre-account hijacking). The account's password is
+  removed, every confirmation link sent so far stops working, and the address gets a "Set your password" link to
+  `/account/reset-password`, which sets the password and confirms the address in one step. The registration's answer
+  is unchanged; registering again with the same password, or registering a confirmed address, changes nothing.
+- Identity provider: `POST /api/v1/auth/resend-confirmation-email` no longer emails an account without a password (an
+  invited one), and `GET /api/v1/auth/confirm-email` no longer confirms one: anyone could have a pending invitation's
+  account confirmed without a password, which made the invitation unusable. Such an account is confirmed only by
+  setting its password.
+- Multi-tenancy: a tenant role (`MultiTenancy:Roles`) that lists one of the identity provider's own permissions
+  (`identity:*`) stops the host at startup. A request that names its tenant holds the role's permissions on every
+  endpoint, so with a tenant read from a header such a role made a tenant's owner an administrator of every account.
+  **Upgrade:** remove `identity:*` permissions from the tenant roles.
+- Identity provider: granting or removing a role that holds any `identity:*` permission now needs
+  `identity:roles:manage`, as `Administrator` already did. With `identity:users:manage` alone a caller could give
+  themselves a product's role holding `identity:roles:manage` and from there `Administrator`. Roles without
+  `identity:*` permissions are granted with `identity:users:manage` as before.
+- Identity provider: the audit event of a new invitation (`SECURITY invitation_created`) names the inviter too
+  (`By=`, the signed-in caller's id, never an address), as a role change does. `AccountInvitations.InviteAsync` reads
+  the caller itself; its signature is unchanged.
+
 ## [0.1.0] - 2026-10-27
 
 The first stable version. Everything below is relative to 0.1.0-preview.1. Each library package's public API is now

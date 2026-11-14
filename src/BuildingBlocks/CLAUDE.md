@@ -39,7 +39,9 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   outbox would skip its transaction too (F4c.7). Depends on Abstractions,
   EF Core and `Microsoft.Extensions` hosting/options/health-check packages only, never on AspNetCore (D-020).
   `OutboxInterceptor` adds the outbox rows in `SavingChanges`, which EF Core runs before it detects changes and saves,
-  so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068).
+  so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068). It
+  clears the entities' buffers in `SavedChanges` only: a failed save keeps them, and its retry skips the event ids whose
+  rows the context already tracks (R-144).
   `AddCorePersistence` also registers `OutboxDispatcher` (a `BackgroundService`): a pass at startup, then every 5 seconds
   on a `PeriodicTimer` driven by `TimeProvider`. It reads each outbox in `Id` order in keyset batches, gives each message
   a DI scope for its handlers and records the finished handlers in `outbox_consumers` (key: the message's `Id` + the
@@ -63,7 +65,8 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`: `ILogger` logs with their
 message and scopes, metrics and traces, all over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; a Serilog host keeps
 its logs in Serilog, which doesn't write to other providers; the outbox handlers' spans by the source name
-`NovaCore.EntityFrameworkCore`), `NovaCore.Scalar`
+`NovaCore.EntityFrameworkCore`; `service.version` is the assembly the host passes, `typeof(Program).Assembly`, none
+without it: the add-on finds no assembly itself, Y-20), `NovaCore.Scalar`
 (`MapCoreScalar`), `NovaCore.Identity.OpenIddict` (`AddCoreIdentityServer`: an OpenID Connect provider on ASP.NET Core
 Identity + OpenIddict, D-026), `NovaCore.MultiTenancy` (`AddCoreMultiTenancy`: tenants, memberships, their roles and the
 life cycle, with no third-party library; it uses AspNetCore for the tenant resolution and EntityFrameworkCore for
@@ -95,7 +98,10 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
 - **The core's exception mapping is no `IExceptionHandler`.** Those run in registration order and the first `true` wins
   (R-046), so a catch-all one would shadow a project's handler registered after it. The mapping is the exception
   handler middleware's fallback instead: `ExceptionHandlerOptions.StatusCodeSelector` (`AppException` → its type's
-  status, `BadHttpRequestException` → its status, else 500), `ExceptionHandlerOptions.ExceptionHandler` (writes the
+  status, `BadHttpRequestException` → its status,
+  `AntiforgeryValidationException` → 400, else 500; a form body the reader can't read is a `BadHttpRequestException`
+  400 because `UseCoreWeb` wraps the request's `IFormFeature` in `UnreadableFormFeature` before authentication, where
+  OpenIddict reads its forms, S-14, R-158; a bare `InvalidDataException`, e.g. a corrupt archive, is a logged 500, V6e-3), `ExceptionHandlerOptions.ExceptionHandler` (writes the
   ProblemDetails: title, `type`, and `detail` for an `AppException` only; it runs only when no handler handled the
   exception, so a project handler's ProblemDetails is never rewritten; not `CustomizeProblemDetails`, which sees every
   write) and `SuppressDiagnosticsCallback` (the framework logs 500s; client
@@ -106,6 +112,9 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
   and `KnownIPNetworks` (validated on start) replace the framework's loopback defaults, and only `X-Forwarded-For` and
   `X-Forwarded-Proto` apply. Empty leaves `ForwardedHeadersOptions` untouched (nothing applied). Anything that reads the
   client IP or the scheme reads `HttpContext.Connection.RemoteIpAddress`/`Request.Scheme` after this middleware.
+- **Rate limits count a client, not an address** (S-6, R-157): the global limiter and `"strict"` partition by
+  `CoreWebExtensions.ClientPartition`: an IPv4 address, an IPv6 address's /64, an IPv4-mapped IPv6 address as its IPv4
+  address. A new core policy that partitions by client uses it too, not `RemoteIpAddress.ToString()`.
 - **Authorization is closed by default:** `AddCoreAuthorization` sets `FallbackPolicy = RequireAuthenticatedUser`, so an
   endpoint without authorization metadata, and a request that matches none, needs a signed-in caller (R-073). An
   endpoint a building block maps for anonymous callers (health, the OpenAPI document, Scalar, the identity provider's

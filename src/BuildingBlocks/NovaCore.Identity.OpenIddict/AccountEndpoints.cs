@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -30,9 +31,6 @@ internal static class AccountEndpoints
     private static readonly MessageResponse ConfirmationResent =
         new("If the address belongs to an account that isn't confirmed yet, a new confirmation link has been sent.");
 
-    /// <summary>A message for the caller, e.g. after registration or when a resource is missing.</summary>
-    internal sealed record MessageResponse(string Message);
-
     [SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
         Justification = "The account API's route table: one Map call per endpoint, each naming its handler and the types of its request and response (docs/plan/RESEARCH.md R-117).")]
     public static RouteGroupBuilder Map(IEndpointRouteBuilder endpoints)
@@ -42,6 +40,7 @@ internal static class AccountEndpoints
         auth.MapPost("/register", Register)
             .WithName("Register")
             .WithSummary("Register a new account (sends an email confirmation link)")
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .AllowAnonymous();
 
         auth.MapGet("/confirm-email", ConfirmEmail)
@@ -53,6 +52,7 @@ internal static class AccountEndpoints
             .WithName("ResendConfirmationEmail")
             .WithSummary("Send the email confirmation link again (only to an account that isn't confirmed yet)")
             .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .AllowAnonymous();
 
         auth.MapGet("/me", Me)
@@ -83,15 +83,24 @@ internal static class AccountEndpoints
         return auth;
     }
 
-    private static async Task<Results<Ok<MessageResponse>, ValidationProblem>> Register(
+    private static async Task<Results<Ok<MessageResponse>, ValidationProblem, ProblemHttpResult>> Register(
         RegisterRequest request,
         UserManager<ApplicationUser> users,
         RoleManager<ApplicationRole> roles,
         EmailQueue emails,
+        EmailRecipientLimit recipientLimit,
         SecurityAuditLogger audit,
+        DummyPasswordHash dummyHash,
         IOptions<JwtOptions> jwt,
         TimeProvider timeProvider)
     {
+        // Counted before the lookup, so every address is limited alike (EmailRecipientLimit).
+        if (!recipientLimit.TryAcquire(users.NormalizeEmail(request.Email)))
+            return EmailRecipientLimit.TooManyEmails;
+
+        if (await users.FindByEmailAsync(request.Email) is { } existing)
+            return await RegisterAgainAsync(request.Password, existing, users, emails, audit, dummyHash, jwt.Value);
+
         var user = new ApplicationUser
         {
             UserName = request.Email,
@@ -103,7 +112,8 @@ internal static class AccountEndpoints
         var result = await users.CreateAsync(user, request.Password);
         if (!result.Succeeded)
         {
-            // An existing account gets the answer a new one gets: the response doesn't reveal it.
+            // An account a concurrent registration created first, or another account holding the address as its user
+            // name, gets the answer a new one gets: the response doesn't reveal it.
             if (result.Errors.All(error => error.Code.Contains("Duplicate", StringComparison.OrdinalIgnoreCase)))
                 return TypedResults.Ok(GenericAccepted);
 
@@ -121,16 +131,67 @@ internal static class AccountEndpoints
         return TypedResults.Ok(GenericAccepted);
     }
 
+    // An address that has an account answers like a new one and costs what a new one costs: the password policy, then one
+    // password hash (CreateAsync's). A confirmed account changes nothing. An unconfirmed one registered again with its own
+    // password changes nothing either (the person asks for the link again). Any other password means two people claim an
+    // address nobody has proven yet, and a confirmation link mustn't settle it in favour of the first password: whoever
+    // opens it holds the mailbox, not necessarily that password (pre-account hijacking, docs/plan/RESEARCH.md R-155). So
+    // the account's password goes, which renews the security stamp and voids every confirmation link sent so far, and
+    // the mailbox gets a link that sets the password and confirms the address in one step, as an invitation does.
+    private static async Task<Results<Ok<MessageResponse>, ValidationProblem, ProblemHttpResult>> RegisterAgainAsync(
+        string password,
+        ApplicationUser existing,
+        UserManager<ApplicationUser> users,
+        EmailQueue emails,
+        SecurityAuditLogger audit,
+        DummyPasswordHash dummyHash,
+        JwtOptions jwt)
+    {
+        var errors = new List<string>();
+        foreach (var validator in users.PasswordValidators)
+            errors.AddRange((await validator.ValidateAsync(users, existing, password)).Errors.Select(error => error.Description));
+        if (errors.Count > 0)
+            return PasswordProblem([.. errors]);
+
+        var hasPassword = await users.HasPasswordAsync(existing);
+        if (existing.EmailConfirmed || !hasPassword)
+            dummyHash.Check(users.PasswordHasher, password);
+        else if (await users.CheckPasswordAsync(existing, password))
+            return TypedResults.Ok(GenericAccepted);
+
+        if (existing.EmailConfirmed)
+            return TypedResults.Ok(GenericAccepted);
+
+        // A removal that loses to a concurrent write of the account leaves it as it was; the answer stays the same.
+        if (hasPassword && !(await users.RemovePasswordAsync(existing)).Succeeded)
+            return TypedResults.Ok(GenericAccepted);
+
+        var link = EmailLinks.Create(jwt, PasswordResetPage.ResetPath, existing.Id, await users.GeneratePasswordResetTokenAsync(existing));
+        // Queued, not sent here, like every email of the provider (EmailQueue).
+        emails.Enqueue(existing.Email!, "Set your password",
+            "This address was registered again before anyone confirmed it, so no password chosen at registration works. "
+            + $"If you are registering, set your password here; it also confirms the address: <a href=\"{HtmlEncoder.Default.Encode(link)}\">Set your password</a>. "
+            + "If you didn't register, ignore this email.");
+        audit.RegistrationRepeated(existing.Id);
+        return TypedResults.Ok(GenericAccepted);
+    }
+
     // Identity's /resendConfirmationEmail sends to a confirmed account too; here only an unconfirmed one gets a link, so
-    // nobody can have emails sent to a confirmed address. The answer is the same either way (RESEARCH R-084).
-    private static async Task<Ok<MessageResponse>> ResendConfirmationEmail(
+    // nobody can have emails sent to a confirmed address. The answer is the same either way (RESEARCH R-084). An account
+    // without a password (an invited one, or one whose registration was repeated) gets none either: only setting its
+    // password confirms it, through the invitation or the link the repeated registration sent (S-2).
+    private static async Task<Results<Ok<MessageResponse>, ProblemHttpResult>> ResendConfirmationEmail(
         ResendConfirmationEmailRequest request,
         UserManager<ApplicationUser> users,
         EmailQueue emails,
+        EmailRecipientLimit recipientLimit,
         IOptions<JwtOptions> jwt)
     {
+        if (!recipientLimit.TryAcquire(users.NormalizeEmail(request.Email)))
+            return EmailRecipientLimit.TooManyEmails;
+
         var user = await users.FindByEmailAsync(request.Email);
-        if (user is not null && !await users.IsEmailConfirmedAsync(user))
+        if (user is not null && !await users.IsEmailConfirmedAsync(user) && await users.HasPasswordAsync(user))
             await SendConfirmationAsync(users, emails, jwt.Value, user);
 
         return TypedResults.Ok(ConfirmationResent);
@@ -393,8 +454,10 @@ internal static class AccountEndpoints
     {
         var invalid = TypedResults.BadRequest(new MessageResponse("Invalid or expired confirmation token."));
 
+        // An account without a password is confirmed only together with setting one (S-2): confirming it here would turn
+        // its pending invitation into invitation.account_exists, and nobody could sign in to it.
         var user = await users.FindByIdAsync(userId.ToString());
-        if (user is null || EmailLinks.DecodeToken(token) is not { } decoded)
+        if (user is null || EmailLinks.DecodeToken(token) is not { } decoded || !await users.HasPasswordAsync(user))
             return invalid;
 
         if (!(await users.ConfirmEmailAsync(user, decoded)).Succeeded)

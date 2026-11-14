@@ -8,6 +8,7 @@ using Microsoft.Extensions.Caching.Hybrid;
 using NovaCore.Abstractions.Identity;
 using NovaCore.Abstractions.Pagination;
 using NovaCore.AspNetCore.Authorization;
+using NovaCore.AspNetCore.Identity;
 using OpenIddict.Abstractions;
 
 namespace NovaCore.Identity.OpenIddict;
@@ -32,11 +33,11 @@ internal static class AdminEndpoints
             .RequirePermission(IdentityPermissions.RolesRead);
 
         admin.MapPost("/users/{userId:guid}/roles", AssignRole)
-            .WithName("AdminAssignRole").WithSummary("Grant a role to a user (Administrator also needs identity:roles:manage; ends the user's sessions)")
+            .WithName("AdminAssignRole").WithSummary("Grant a role to a user (a role with identity:* permissions, Administrator included, also needs identity:roles:manage; ends the user's sessions)")
             .RequirePermission(IdentityPermissions.UsersManage);
 
         admin.MapDelete("/users/{userId:guid}/roles/{role}", RemoveRole)
-            .WithName("AdminRemoveRole").WithSummary("Revoke a role from a user (Administrator also needs identity:roles:manage; the last administrator keeps it)")
+            .WithName("AdminRemoveRole").WithSummary("Revoke a role from a user (a role with identity:* permissions, Administrator included, also needs identity:roles:manage; the last administrator keeps it)")
             .RequirePermission(IdentityPermissions.UsersManage);
     }
 
@@ -91,7 +92,7 @@ internal static class AdminEndpoints
         return TypedResults.Ok(permissions);
     }
 
-    private static async Task<Results<NoContent, NotFound<AccountEndpoints.MessageResponse>, ValidationProblem, ForbidHttpResult>> AssignRole(
+    private static async Task<Results<NoContent, NotFound<MessageResponse>, ValidationProblem, ForbidHttpResult>> AssignRole(
         Guid userId,
         AssignRoleRequest request,
         UserManager<ApplicationUser> users,
@@ -103,7 +104,7 @@ internal static class AdminEndpoints
         SecurityAuditLogger audit,
         CancellationToken cancellationToken)
     {
-        if (IsAdministrator(roles, request.Role) && !currentUser.HasPermission(IdentityPermissions.RolesManage))
+        if (!currentUser.HasPermission(IdentityPermissions.RolesManage) && await GrantsIdentityPermissionsAsync(roles, request.Role))
             return TypedResults.Forbid();
 
         var user = await users.FindByIdAsync(userId.ToString());
@@ -111,7 +112,7 @@ internal static class AdminEndpoints
             return UserNotFound();
 
         if (!await roles.RoleExistsAsync(request.Role))
-            return TypedResults.NotFound(new AccountEndpoints.MessageResponse("Role not found."));
+            return TypedResults.NotFound(new MessageResponse("Role not found."));
 
         if (!await users.IsInRoleAsync(user, request.Role))
         {
@@ -131,7 +132,7 @@ internal static class AdminEndpoints
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<NoContent, NotFound<AccountEndpoints.MessageResponse>, Conflict<AccountEndpoints.MessageResponse>, ForbidHttpResult>> RemoveRole(
+    private static async Task<Results<NoContent, NotFound<MessageResponse>, Conflict<MessageResponse>, ForbidHttpResult>> RemoveRole(
         Guid userId,
         string role,
         UserManager<ApplicationUser> users,
@@ -143,8 +144,7 @@ internal static class AdminEndpoints
         SecurityAuditLogger audit,
         CancellationToken cancellationToken)
     {
-        var administrator = IsAdministrator(roles, role);
-        if (administrator && !currentUser.HasPermission(IdentityPermissions.RolesManage))
+        if (!currentUser.HasPermission(IdentityPermissions.RolesManage) && await GrantsIdentityPermissionsAsync(roles, role))
             return TypedResults.Forbid();
 
         var user = await users.FindByIdAsync(userId.ToString());
@@ -155,9 +155,9 @@ internal static class AdminEndpoints
         {
             // Without an administrator nobody could grant the role again, short of editing the database. Only a member with
             // two-factor authentication has the role in effect (IdentityPermissionResolver), so one of them must remain.
-            if (administrator && !(await users.GetUsersInRoleAsync(IdentityRoles.Administrator))
+            if (IsAdministrator(roles, role) && !(await users.GetUsersInRoleAsync(IdentityRoles.Administrator))
                     .Any(member => member.Id != user.Id && member.TwoFactorEnabled))
-                return TypedResults.Conflict(new AccountEndpoints.MessageResponse("The last administrator keeps the role."));
+                return TypedResults.Conflict(new MessageResponse("The last administrator keeps the role."));
 
             await users.RemoveFromRoleAsync(user, role);
             await RoleChangedAsync(user, cache, tokens, authorizations, cancellationToken);
@@ -167,9 +167,23 @@ internal static class AdminEndpoints
         return TypedResults.NoContent();
     }
 
-    // The Administrator role holds every permission, identity:roles:manage included, so identity:users:manage alone
-    // mustn't hand it out or take it away: its holder could make themselves an administrator. Role names are compared
-    // the way the store finds them (normalized), so "administrator" is the same role.
+    // A role that grants any of the identity provider's own permissions is identity:roles:manage's to hand out or take
+    // away, not identity:users:manage's: its holder could otherwise give themselves such a role (one with
+    // identity:roles:manage, say) and from there any role, Administrator included. The Administrator role holds every
+    // permission without storing them (IdentityPermissionResolver), so it is recognized by its name; any other role by
+    // its permission claims. An unknown role grants nothing here and is answered as such later.
+    private static async Task<bool> GrantsIdentityPermissionsAsync(RoleManager<ApplicationRole> roles, string role)
+    {
+        if (IsAdministrator(roles, role))
+            return true;
+
+        var stored = await roles.FindByNameAsync(role);
+        return stored is not null && (await roles.GetClaimsAsync(stored)).Any(claim =>
+            string.Equals(claim.Type, NovaClaims.Permission, StringComparison.Ordinal)
+            && claim.Value.StartsWith(IdentityPermissions.Prefix, StringComparison.Ordinal));
+    }
+
+    // Role names are compared the way the store finds them (normalized), so "administrator" is the same role.
     private static bool IsAdministrator(RoleManager<ApplicationRole> roles, string role) =>
         string.Equals(roles.NormalizeKey(role), roles.NormalizeKey(IdentityRoles.Administrator), StringComparison.Ordinal);
 
@@ -186,6 +200,6 @@ internal static class AdminEndpoints
         await AccountEndpoints.RevokeSessionsAsync(user, tokens, authorizations, cancellationToken);
     }
 
-    private static NotFound<AccountEndpoints.MessageResponse> UserNotFound() =>
-        TypedResults.NotFound(new AccountEndpoints.MessageResponse("User not found."));
+    private static NotFound<MessageResponse> UserNotFound() =>
+        TypedResults.NotFound(new MessageResponse("User not found."));
 }

@@ -114,6 +114,80 @@ public sealed class OutboxInterceptorTests : IDisposable
         Assert.Equal(firstEventId, Assert.Single(await OutboxAsync(services)).EventId);
     }
 
+    // F9.2i: an entity keeps its events until a save of them succeeds, and a retry writes each of them once.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_retry_in_the_same_context_after_a_failed_save_writes_each_event_once(bool synchronous)
+    {
+        await using var services = await CreateServicesAsync<ShopDbContext>();
+        var orderId = Guid.CreateVersion7();
+        var firstEventId = Guid.CreateVersion7();
+        await SaveAsync<ShopDbContext>(services, new Order(orderId, firstEventId));
+        await using var scope = services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ShopDbContext>();
+        var retriedEventId = Guid.CreateVersion7();
+        var order = new Order(orderId, retriedEventId);
+        context.Add(order);
+
+        // Same key: the order insert fails, and with it the outbox row.
+        await Assert.ThrowsAsync<DbUpdateException>(() => SaveChangesAsync(context, synchronous));
+        Assert.Single(order.DomainEvents);
+        await DeleteOrderAsync(services, orderId);
+        await SaveChangesAsync(context, synchronous);
+
+        Assert.Empty(order.DomainEvents);
+        Assert.Equal([firstEventId, retriedEventId], (await OutboxAsync(services)).Select(message => message.EventId));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task An_entity_saved_by_a_new_context_after_a_failed_save_keeps_its_events(bool synchronous)
+    {
+        await using var services = await CreateServicesAsync<ShopDbContext>();
+        var orderId = Guid.CreateVersion7();
+        var firstEventId = Guid.CreateVersion7();
+        await SaveAsync<ShopDbContext>(services, new Order(orderId, firstEventId));
+        var retriedEventId = Guid.CreateVersion7();
+        var order = new Order(orderId, retriedEventId);
+        await using (var failing = services.CreateAsyncScope())
+        {
+            var context = failing.ServiceProvider.GetRequiredService<ShopDbContext>();
+            context.Add(order);
+            await Assert.ThrowsAsync<DbUpdateException>(() => SaveChangesAsync(context, synchronous));
+        }
+
+        await DeleteOrderAsync(services, orderId);
+        await using (var retrying = services.CreateAsyncScope())
+        {
+            var context = retrying.ServiceProvider.GetRequiredService<ShopDbContext>();
+            context.Add(order);
+            await SaveChangesAsync(context, synchronous);
+        }
+
+        Assert.Empty(order.DomainEvents);
+        Assert.Equal([firstEventId, retriedEventId], (await OutboxAsync(services)).Select(message => message.EventId));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_save_after_a_successful_one_writes_no_new_row(bool synchronous)
+    {
+        await using var services = await CreateServicesAsync<ShopDbContext>();
+        await using var scope = services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ShopDbContext>();
+        var order = new Order(Guid.CreateVersion7(), Guid.CreateVersion7());
+        context.Add(order);
+
+        await SaveChangesAsync(context, synchronous);
+        Assert.Empty(order.DomainEvents);
+        await SaveChangesAsync(context, synchronous);
+
+        Assert.Single(await OutboxAsync(services));
+    }
+
     [Fact]
     public async Task Events_raised_in_a_context_without_an_outbox_fail_the_save()
     {
@@ -164,6 +238,23 @@ public sealed class OutboxInterceptorTests : IDisposable
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
         context.Add(order);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    private static Task SaveChangesAsync(DbContext context, bool synchronous)
+    {
+        if (!synchronous)
+            return context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        context.SaveChanges();
+        return Task.CompletedTask;
+    }
+
+    private static async Task DeleteOrderAsync(IServiceProvider services, Guid orderId)
+    {
+        await using var scope = services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<ShopDbContext>().Orders
+            .Where(order => order.Id == orderId)
+            .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
     }
 
     private static async Task<List<Guid>> OrderIdsAsync(IServiceProvider services)

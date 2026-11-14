@@ -21,10 +21,7 @@ public class ExplicitRegistrationTests
     [Fact]
     public void Source_does_not_scan_assemblies_to_register_services()
     {
-        var sourceFiles = Directory
-            .EnumerateFiles(Path.Combine(Solution.RootDirectory, "src"), "*.cs", SearchOption.AllDirectories)
-            .Where(path => !IsBuildOutput(path))
-            .ToList();
+        var sourceFiles = Solution.SourceFiles("*.cs", "src").ToList();
         Assert.NotEmpty(sourceFiles);
 
         var hits =
@@ -35,8 +32,4 @@ public class ExplicitRegistrationTests
 
         Assert.Empty(hits);
     }
-
-    private static bool IsBuildOutput(string path) =>
-        path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) is var segments
-        && (segments.Contains("bin") || segments.Contains("obj"));
 }

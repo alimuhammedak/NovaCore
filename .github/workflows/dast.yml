@@ -1,0 +1,129 @@
+name: DAST
+
+# Dynamic security testing (docs/plan/PLAN.md F6e.2, DECISIONS D-044): a throwaway instance of the Api on this runner,
+# with a SQL Server container, scanned by Schemathesis (primary) and ZAP (secondary) through eng/dast.sh. A report, not a
+# gate yet: findings leave the job green and are in the job summary and the artifact; the job fails when the instance
+# doesn't start or a scan can't run. Weekly and on demand.
+on:
+  schedule:
+    - cron: '41 4 * * 2'
+  workflow_dispatch:
+
+permissions: {}
+
+# A run is never cancelled by another: it is a weekly report.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      # The image docker-compose.yml and the SQL Server tests run (DatabaseImageTests keeps them equal).
+      SQL_SERVER_IMAGE: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04@sha256:4402d880dd4c34bfa7d8705e56a86cd6c88da80a1f6bbbe741f999e76264a090
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      # Generated for this run only and masked in the log (Y-35): the SQL Server administrator's password (upper and lower
+      # case, digits and a symbol, as SQL Server's policy wants) and the DAST client's secret (eng/dast/dast.env).
+      - name: Generate the run's secrets
+        run: |
+          sa_password="Dast-$(openssl rand -hex 24)"
+          client_secret="$(openssl rand -hex 32)"
+          echo "::add-mask::$sa_password"
+          echo "::add-mask::$client_secret"
+          {
+            echo "DAST_SA_PASSWORD=$sa_password"
+            echo "DAST_CLIENT_SECRET=$client_secret"
+          } >> "$GITHUB_ENV"
+
+      # Started here rather than as a service container: a service starts before the steps, so its password would have to
+      # be written in this file.
+      - name: Start SQL Server
+        run: |
+          docker run -d --name sqlserver -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$DAST_SA_PASSWORD" -p 1433:1433 "$SQL_SERVER_IMAGE"
+          for _ in $(seq 1 60); do
+            if docker exec -e SQLCMDPASSWORD="$DAST_SA_PASSWORD" sqlserver \
+              /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -Q 'SELECT 1' -b > /dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs sqlserver
+          exit 1
+
+      # OpenIddict answers https only, and the Api validates its own tokens through its discovery document over https, so
+      # the instance serves the development certificate and trusts it: a hashed certificate directory in SSL_CERT_DIR,
+      # which OpenSSL and so .NET read (Microsoft Learn, "Enforce HTTPS in ASP.NET Core", Linux). The scanners get the
+      # certificate as a file.
+      - name: Development certificate
+        run: |
+          mkdir -p "$RUNNER_TEMP/dast/trust"
+          dotnet dev-certs https
+          dotnet dev-certs https --export-path "$RUNNER_TEMP/dast/host-certificate.pem" --format PEM
+          cp "$RUNNER_TEMP/dast/host-certificate.pem" "$RUNNER_TEMP/dast/trust/"
+          openssl rehash "$RUNNER_TEMP/dast/trust"
+          echo "SSL_CERT_DIR=$RUNNER_TEMP/dast/trust:/etc/ssl/certs" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: dotnet build src/Api/NovaCore.Api -c Release
+
+      # Development: the OpenAPI document and the provider's ephemeral signing keys exist only there. The host migrates
+      # the database and seeds the roles and clients, the DAST client (eng/dast/dast.env) with this run's secret; the
+      # rate limit is lifted so the scanners measure the endpoints, not the limiter.
+      - name: Start the Api
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: https://localhost:5443
+          Jwt__Authority: https://localhost:5443
+          Database__ApplyMigrations: 'true'
+          Identity__Seed__SeedOnStartup: 'true'
+          RateLimiting__PermitLimit: '1000000'
+        run: |
+          set -a
+          . eng/dast/dast.env
+          set +a
+          export Identity__Clients__100__ClientSecret="$DAST_CLIENT_SECRET"
+          export ConnectionStrings__Database="Server=localhost,1433;Database=NovaCore;User Id=sa;Password=$DAST_SA_PASSWORD;TrustServerCertificate=True;Encrypt=True"
+          nohup dotnet run --project src/Api/NovaCore.Api -c Release --no-build --no-launch-profile > "$RUNNER_TEMP/dast/host.log" 2>&1 &
+          for _ in $(seq 1 90); do
+            if curl -fs --cacert "$RUNNER_TEMP/dast/host-certificate.pem" -o /dev/null https://localhost:5443/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/dast/host.log"
+          exit 1
+
+      - name: Scan
+        env:
+          DAST_CA_FILE: ${{ runner.temp }}/dast/host-certificate.pem
+        run: bash eng/dast.sh "$RUNNER_TEMP/dast/reports"
+
+      - name: Summary
+        if: always()
+        run: if [[ -f "$RUNNER_TEMP/dast/reports/summary.md" ]]; then cat "$RUNNER_TEMP/dast/reports/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
+
+      # The reports (Schemathesis: JUnit, HTML, HAR; ZAP: HTML, JSON, XML) and the instance's log, whose stack traces
+      # explain the server errors the scanners found.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: dast-report
+          path: |
+            ${{ runner.temp }}/dast/reports/
+            ${{ runner.temp }}/dast/host.log
+          retention-days: 30

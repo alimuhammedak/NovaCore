@@ -4,8 +4,9 @@ using Microsoft.Extensions.Options;
 namespace NovaCore.AspNetCore.Web;
 
 /// <summary>
-/// Bound from the <c>RateLimiting</c> section: the per-IP fixed window every request shares. The opt-in <c>"strict"</c>
-/// policy allows a tenth of <see cref="PermitLimit"/> in the same window.
+/// Bound from the <c>RateLimiting</c> section: the per-client fixed window every request shares, a client being an IPv4
+/// address or an IPv6 /64. The opt-in <c>"strict"</c> policy allows a tenth of <see cref="PermitLimit"/> in the same
+/// window.
 /// </summary>
 internal sealed class RateLimitingOptions
 {

@@ -1,0 +1,13 @@
+# Schemathesis's settings for the DAST run (eng/dast.sh, docs/plan/PLAN.md F6e.2). The token comes from the environment
+# (the DAST client's, client credentials), never from this file; reports keep their default sanitization, which hides
+# the Authorization header.
+headers = { Authorization = "Bearer ${DAST_TOKEN}" }
+
+# A finding doesn't end the run: the first runs are a report (eng/dast.sh).
+continue-on-failure = true
+request-timeout = 10.0
+
+[generation]
+# Per operation and phase; eng/dast.sh's DAST_MAX_EXAMPLES overrides it. The access token lives 15 minutes, which bounds
+# a run that fetches one token.
+max-examples = 50

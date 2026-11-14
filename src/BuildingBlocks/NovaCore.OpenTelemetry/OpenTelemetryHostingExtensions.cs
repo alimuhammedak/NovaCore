@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenTelemetry;
@@ -16,13 +17,38 @@ public static class OpenTelemetryHostingExtensions
     /// are exported over OTLP when <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> is configured, so the host needs no second logging
     /// pipeline.
     /// </summary>
-    public static IHostApplicationBuilder AddCoreObservability(this IHostApplicationBuilder builder)
+    /// <remarks>
+    /// The resource's <c>service.name</c> is <see cref="IHostEnvironment.ApplicationName"/>. This overload reports no
+    /// <c>service.version</c> (one in <c>OTEL_RESOURCE_ATTRIBUTES</c> still applies): the overload taking the application's
+    /// assembly reports that assembly's version.
+    /// </remarks>
+    public static IHostApplicationBuilder AddCoreObservability(this IHostApplicationBuilder builder) =>
+        builder.AddObservability(serviceVersion: null);
+
+    /// <summary>
+    /// Adds OpenTelemetry like <see cref="AddCoreObservability(IHostApplicationBuilder)"/>, with the application's version
+    /// as the resource's <c>service.version</c>: the informational version of <paramref name="applicationAssembly"/>
+    /// (the product version, with the source revision), else its assembly version.
+    /// </summary>
+    /// <param name="builder">The host's builder.</param>
+    /// <param name="applicationAssembly">The application's own assembly, e.g. <c>typeof(Program).Assembly</c> in the host.</param>
+    public static IHostApplicationBuilder AddCoreObservability(this IHostApplicationBuilder builder, Assembly applicationAssembly)
+    {
+        ArgumentNullException.ThrowIfNull(applicationAssembly);
+
+        return builder.AddObservability(
+            applicationAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? applicationAssembly.GetName().Version?.ToString());
+    }
+
+    private static IHostApplicationBuilder AddObservability(this IHostApplicationBuilder builder, string? serviceVersion)
     {
         var otel = builder.Services.AddOpenTelemetry();
 
+        // The add-on's own version is no application's: without the application's assembly the resource carries none.
         otel.ConfigureResource(resource => resource.AddService(
             serviceName: builder.Environment.ApplicationName,
-            serviceVersion: typeof(OpenTelemetryHostingExtensions).Assembly.GetName().Version?.ToString()));
+            serviceVersion: serviceVersion));
 
         // Logs travel with the traces and metrics, as in Aspire's ServiceDefaults. A record keeps its rendered message
         // and its scopes (the request's, among others), which the OTLP record would otherwise drop.

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NovaCore.Identity.OpenIddict;
@@ -102,6 +103,11 @@ public sealed class EmailQueueTests
         using var log = new LogCapture();
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
         {
+            // One address fills the queue here, which the limit per recipient would stop long before (RecipientEmailLimitTests).
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["Identity:EmailLimit:PermitLimit"] = "100000"
+            });
             builder.Services.AddSingleton<IEmailSender>(sender);
             builder.Logging.AddProvider(log);
         });

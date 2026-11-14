@@ -26,7 +26,7 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   (`RequiredLength = 15`, no composition rules, NIST SP 800-63B-4) and no common password (`CommonPasswordValidator`, a
   singleton over the embedded `CommonPasswords.txt` from SecLists, MIT notice in its header; no outside call); lockout 5 attempts / 15 min, new accounts included; a wrong 2FA code
   counts as a failed access, a recovery code included (`SignInManager` neither checks lockout nor counts a wrong
-  recovery code, so `LoginPage` does both before and after redeeming it, R-085); `RequireConfirmedEmail = true`;
+  recovery code, so `SignInFlow` does both before and after redeeming it, R-085); `RequireConfirmedEmail = true`;
   `RequireUniqueEmail = true`. Cookies: the application and two-factor cookies are `Secure` always; antiforgery's is
   `Always` outside Development and `SameAsRequest` in it (its default is never Secure; `Always` fails a plain-http page,
   R-104).
@@ -50,16 +50,33 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   origins. The token endpoint keeps CORS for single-page apps.
 - **Anti-enumeration:** the sign-in page shows one message for an unknown account, a wrong password and a locked
   account; the "confirm your email" message comes only after the right password. `SignInManager` answers `NotAllowed`
-  before it looks at the password, so `LoginPage` checks the password itself and counts a wrong one (D-030 (1)).
-  An unknown email costs a password hash like a known one (`DummyPasswordHash`, made once by the host's hasher), so the
-  answer's timing doesn't reveal accounts either (R-087). Registration answers an existing address like a new one.
-  Resending the confirmation answers every address alike and emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
-  account; the reset page answers an unknown or unconfirmed account like a bad token (R-084). Those three never wait
+  before it looks at the password, so `SignInFlow` checks the password itself and counts a wrong one (D-030 (1)).
+  An unknown email and a locked account cost a password hash like a wrong password (`DummyPasswordHash`, made once by
+  the host's hasher; `SignInManager` answers a locked account before the password), so the answer's timing doesn't
+  reveal accounts either (R-087, R-138). Registration answers an existing address like a new one, at the cost of one
+  password hash either way (CreateAsync's, or the account's password check or the dummy). **Pre-account hijacking**
+  (S-1, R-155): a registration with another password for an unconfirmed account removes the account's password (the
+  stamp renews, so every confirmation link sent so far dies) and emails a `/account/reset-password` link, which sets
+  the password and confirms the address in one step, like an invitation; the same password again, or a confirmed
+  account, changes nothing. Never let a confirmation link activate a password the mailbox's owner didn't set.
+  Resending the confirmation answers every address alike and emails only an unconfirmed account with a password; an
+  account without one (invited, or a repeated registration's) is confirmed only together with setting its password,
+  so `confirm-email` refuses it too and nobody can turn a pending invitation into `invitation.account_exists` (S-2). The password reset form answers every address alike and emails only a confirmed
+  account; the reset page answers an unknown account, and an unconfirmed one with a password, like a bad token (R-084);
+  an unconfirmed one without a password is confirmed when the page sets its password (S-1). Those three never wait
   for the mail server: they queue the email (`EmailQueue`, a bounded in-memory channel read by a `BackgroundService`
   that sends through the host's `IEmailSender`, one at a time), so the response time doesn't reveal the account either
   (F6b.6a, R-105, ASVS 6.3.8). A queued email is lost if the process stops; a failed send is logged without the address
   or the body. A full queue never makes the request wait (that would reveal the account again): the email is dropped
   and logged (D-055 (1)). Send new emails the same way, never by awaiting `IEmailSender` in a handler.
+  **A limit per recipient** (S-6, R-157): the anonymous endpoints that email an address (register, resend, the reset
+  link form, `/password/forgot`) first call `EmailRecipientLimit.TryAcquire(users.NormalizeEmail(email))`, before the
+  account lookup and any side effect, and answer `EmailRecipientLimit.TooManyEmails` (429,
+  `account.too_many_emails`; the HTML form a 429 page) when it refuses: every address is counted alike, so the 429
+  reveals no account, and a refused request issues no code. `Identity:EmailLimit` (5 per 3600 s by default), in memory
+  per instance. A new anonymous endpoint that emails an address does the same. The address is validated before it is
+  counted (`EmailAddress`, at most `EmailRecipientLimit.MaxAddressLength`, 256; an HTML form checks it itself), and the
+  limit refuses a longer key without a partition (V6e-2): every partition stays for its window.
 - **Password reset:** the link carries an Identity token that `ResetPasswordAsync` uses up (it renews the security
   stamp), the new password is typed twice, and a reset revokes every token and authorization of the user like a
   password change. It never signs the user in. A missing `User` role (seeding off) leaves a new account without a role
@@ -76,6 +93,7 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   the user. No `amr`/`acr` or step-up in the token: permissions follow the person on the server, not the token.
 - **Claims contract:** access tokens carry `sub`, `name`, `email`, `role` (the names in `NovaClaims`). **Never
   permissions, never the security stamp:** the core resolves permissions per request (`IdentityPermissionResolver`: role
+  claims, read in one join whatever the number of roles (`IdentityServerPermissionResolverTests` counts the queries),
   + direct `permission` claims for a Guid `sub`, every declared permission for an `Administrator` member with
   two-factor authentication on (without it the role gives nothing, D-053 (5); turning 2FA on or off drops the cache),
   `Identity:Clients:n:Permissions` for a service client's id). The core has no super-admin role: the token's `role`
@@ -85,8 +103,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **Role changes (F6b.2, D-053 (6)):** the admin API drops the user's cached permissions
   (`HybridCache.RemovePermissionsAsync`, a tag: the stamp in the cache key is unknown here) and revokes their refresh
   tokens and authorizations on every grant or removal. Granting or removing `Administrator` (compared normalized, so
-  `administrator` is the same role) also needs `identity:roles:manage`: `identity:users:manage` alone would let its
-  holder make themselves an administrator. The last member with two-factor authentication (the only kind the role
+  `administrator` is the same role), or any role whose permission claims include an `identity:*` one, also needs
+  `identity:roles:manage`: `identity:users:manage` alone would let its holder make themselves an administrator, directly
+  or through a product's role that holds `identity:roles:manage` (S-4). The last member with two-factor authentication (the only kind the role
   counts for) keeps the role (409). The seed gives the User role the
   `Identity:Seed:UserPermissions` list (D-047, D-053 (7)), never a naming rule; the list is checked on start: declared
   by a module, no `identity:*`. Anything else that changes what the
@@ -118,6 +137,39 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   stamp; the cookie's stamp is checked on every use (`ValidationInterval = 0`), so the provider session ends at once.
   Issued access tokens stay valid until they expire. A wrong current password counts toward lockout and a locked
   account's password doesn't change, as on the sign-in page: a stolen access token mustn't guess more often (R-087).
+- **One set of sign-in rules** (D-090 (2), D-092): `SignInFlow` (internal, scoped) holds every rule of the password and
+  code steps; the HTML pages (`LoginPage`) and the JSON endpoints (`SessionEndpoints`, `/api/v1/auth/session/*`) only
+  read input and render its outcome. Never add a sign-in rule to a caller. The JSON endpoints open the cookie session
+  and never return a token; they need the antiforgery token in `X-XSRF-TOKEN`, answer no cross-origin request and take
+  local return URLs only (`LocalUrlAttribute`).
+- **A project's own screens** (D-091 (3), D-095 (2)): `Identity:SignIn:LoginPath` (the cookie's login path, so where
+  `/connect/authorize` sends a signed-out browser) and `Identity:SignIn:InvitationPath` (the invitation link's target)
+  are paths of this host only (`IdentitySignInOptions.IsLocalPath`); anything else stops the host.
+- **Password reset with a code** (D-091 (4), D-095 (5)): `PasswordResetCodes` keeps 8 random digits as a
+  `PasswordHasher` hash with expiry (15 min) and tries (5) in a user token; a run of 100 wrong codes (another user token)
+  blocks codes until `SignInFlow` signs the user in or the link reset succeeds, and both clear it. A wrong code never
+  counts toward lockout. A try is counted on the code and in the account's run in one save (both tokens, the user's
+  concurrency stamp) before its code is compared, and only a counted try is compared; a request whose count loses to a
+  concurrent write (another guess, a new code) isn't compared and ends the code (`ExecuteDelete`, apart from the change
+  tracker that still holds the lost save), so racing guesses never get more tries, on the code or the account, than
+  sequential ones (V8-2, V8-9). A right code gives both counts back.
+  The code is used up with the user's concurrency stamp before the password changes through `ResetPasswordAsync`, both
+  in one transaction (inside the execution strategy), so a reset that fails leaves the code usable (V8-6). A retrying
+  strategy's replay of that transaction fails on the stamp (Identity's saves accept their changes), the safe side (R-139).
+  Every address gets the same `202` from `/password/forgot`. Both endpoints cost every address one hash of the codes'
+  hasher (Identity's defaults, not the host's 600,000; a keyed singleton only so a test can count it,
+  `PasswordResetCodes.HasherKey`): an address without a code hashes a throwaway one (`IssueToNobody`) or checks the
+  dummy (`DummyPasswordHash.CheckCode`), and so does every refusal before the comparison (V8-3). The code's save on `/forgot` is the one difference left.
+- **Invitations** (D-091 (5), D-095): `AccountInvitations` (public, internal constructor) stores the SHA-256 of a 256-bit
+  token in `invitations`, 7 days, accepted once by a conditional update after the password policy passes; the update, the password and the
+  confirmation commit in one transaction, so a failed password step leaves the invitation unused (V8-6). A confirmed
+  account's invitation sets no password (`invitation.account_exists`), so an invitation can't take an account over.
+  `InviteAsync` returns a `Result<Guid>` (`invitation.invalid_email`, `invitation.address_taken`); an account a
+  concurrent request created first is invited, its lost insert reported by the user store as a duplicate (V8-5).
+  The audit event (`invitation_created`) names the invited account and the inviter, the signed-in caller
+  (`ICurrentUser`, none outside a request), like a role change does (S-5).
+  The token travels in request bodies, never in a path (request logs). The add-on doesn't know tenants: the product adds
+  the membership with the returned `sub` (D-076 (2)).
 
 ## Adding an account endpoint
 
