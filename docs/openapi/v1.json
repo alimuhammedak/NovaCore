@@ -652,7 +652,7 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Grant a role to a user (Administrator also needs identity:roles:manage; ends the user's sessions)",
+        "summary": "Grant a role to a user (a role with identity:* permissions, Administrator included, also needs identity:roles:manage; ends the user's sessions)",
         "operationId": "AdminAssignRole",
         "parameters": [
           {
@@ -707,7 +707,7 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Revoke a role from a user (Administrator also needs identity:roles:manage; the last administrator keeps it)",
+        "summary": "Revoke a role from a user (a role with identity:* permissions, Administrator included, also needs identity:roles:manage; the last administrator keeps it)",
         "operationId": "AdminRemoveRole",
         "parameters": [
           {

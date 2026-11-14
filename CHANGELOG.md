@@ -71,6 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`identity:*`) stops the host at startup. A request that names its tenant holds the role's permissions on every
   endpoint, so with a tenant read from a header such a role made a tenant's owner an administrator of every account.
   **Upgrade:** remove `identity:*` permissions from the tenant roles.
+- Identity provider: granting or removing a role that holds any `identity:*` permission now needs
+  `identity:roles:manage`, as `Administrator` already did. With `identity:users:manage` alone a caller could give
+  themselves a product's role holding `identity:roles:manage` and from there `Administrator`. Roles without
+  `identity:*` permissions are granted with `identity:users:manage` as before.
 
 ## [0.1.0] - 2026-10-27
 

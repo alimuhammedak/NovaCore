@@ -1046,9 +1046,10 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   refresh token'larını iptal eder. Host'ta bir `IPermissionResolver` kayıtlı değilse
   uygulama açılmaz. Token'daki hiçbir rol izin kontrolünü atlatmaz. Kimlik eklentisinde `Administrator` rolünün üyesi,
 modüllerin tanımladığı bütün izinleri sunucuda alır (seed o izni role yazmamış olsa da), 2FA'sı açıksa. Veritabanında doğrudan
-rolünden çıkarılan bir admin de izinlerini önbellek süresi dolunca kaybeder. `Administrator` rolünü vermek ya da almak
-`identity:users:manage`'e ek olarak `identity:roles:manage` ister (yalnızca admin'de var); 2FA'sı açık son admin rolünü
-kaybedemez (409).
+rolünden çıkarılan bir admin de izinlerini önbellek süresi dolunca kaybeder. `Administrator` rolünü ya da `identity:*`
+izinlerinden birini taşıyan herhangi bir rolü vermek ya da almak `identity:users:manage`'e ek olarak `identity:roles:manage`
+ister (yalnızca admin'de var): yoksa `identity:roles:manage` içeren bir rolü kendine veren, oradan `Administrator`'a
+geçerdi. 2FA'sı açık son admin rolünü kaybedemez (409).
 - **Her modül kendi izinlerini** `IPermissionDefinitionProvider` ile tanımlar; seeder `Administrator` rolüne hepsini,
   `User` rolüne `Identity:Seed:UserPermissions` listesindekileri bağlar (least privilege: isimlendirme kuralı değil,
   host'un seçtiği liste). Listede tanımsız ya da `identity:*` bir izin varsa uygulama açılmaz.
@@ -1068,7 +1069,7 @@ kaybedemez (409).
 | `POST /api/v1/auth/change-password` | Parola değiştir (tüm oturumları iptal eder) |
 | `POST /api/v1/auth/2fa/setup` · `enable` · `disable` | TOTP iki-faktör; üçü de mevcut parolayı ister (`enable`/`disable` ayrıca kodu). 2FA açıkken `setup` 409 döner (anahtar gizli kalır), `enable` yeni kurtarma kodları verir. Açma ve kapama bütün oturumları bitirir |
 | `GET /api/v1/admin/users` · `roles` · `permissions` | Listeleme (permission korumalı) |
-| `POST·DELETE /api/v1/admin/users/{id}/roles` | Rol ata/kaldır (`identity:users:manage`; `Administrator` için ayrıca `identity:roles:manage`, son admin korunur). İzinler hemen yeniden çözülür, kullanıcının oturumları biter |
+| `POST·DELETE /api/v1/admin/users/{id}/roles` | Rol ata/kaldır (`identity:users:manage`; `Administrator` ve `identity:*` izni taşıyan roller için ayrıca `identity:roles:manage`, son admin korunur). İzinler hemen yeniden çözülür, kullanıcının oturumları biter |
 
 ### Ek sertleştirme
 - **Reverse proxy arkasında:** `UseCoreWeb` pipeline'ın başında `UseForwardedHeaders`'ı çalıştırır. Yalnızca

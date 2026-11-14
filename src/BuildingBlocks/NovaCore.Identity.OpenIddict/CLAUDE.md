@@ -95,8 +95,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **Role changes (F6b.2, D-053 (6)):** the admin API drops the user's cached permissions
   (`HybridCache.RemovePermissionsAsync`, a tag: the stamp in the cache key is unknown here) and revokes their refresh
   tokens and authorizations on every grant or removal. Granting or removing `Administrator` (compared normalized, so
-  `administrator` is the same role) also needs `identity:roles:manage`: `identity:users:manage` alone would let its
-  holder make themselves an administrator. The last member with two-factor authentication (the only kind the role
+  `administrator` is the same role), or any role whose permission claims include an `identity:*` one, also needs
+  `identity:roles:manage`: `identity:users:manage` alone would let its holder make themselves an administrator, directly
+  or through a product's role that holds `identity:roles:manage` (S-4). The last member with two-factor authentication (the only kind the role
   counts for) keeps the role (409). The seed gives the User role the
   `Identity:Seed:UserPermissions` list (D-047, D-053 (7)), never a naming rule; the list is checked on start: declared
   by a module, no `identity:*`. Anything else that changes what the

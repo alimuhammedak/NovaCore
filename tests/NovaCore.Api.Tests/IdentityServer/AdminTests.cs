@@ -168,6 +168,56 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
         Assert.True(await IsInRoleAsync(target.Id, "Administrator"));
     }
 
+    // A product's role that holds a platform permission is an administrator role in all but name: identity:users:manage
+    // alone would let its holder grant themselves "Ops" (identity:roles:manage) and then Administrator (S-4).
+    [Fact]
+    public async Task Granting_or_removing_a_role_that_holds_an_identity_permission_needs_roles_manage()
+    {
+        var ops = await CreateRoleAsync($"Ops-{Guid.NewGuid():N}", IdentityPermissions.RolesManage);
+        var (flow, accessToken) = await SignedInUserManagerAsync();
+        using var ownedFlow = flow;
+        var target = await _host.CreateUserAsync($"would-be-ops-{Guid.NewGuid():N}@novacore.test", Password);
+        var path = $"/api/v1/admin/users/{target.Id}/roles";
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync(HttpMethod.Post, path, accessToken, new { role = ops })).StatusCode);
+        Assert.False(await IsInRoleAsync(target.Id, ops));
+
+        var member = await CreateUserInRoleAsync($"kept-ops-{Guid.NewGuid():N}@novacore.test", ops);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await flow.CallApiAsync(HttpMethod.Delete, $"/api/v1/admin/users/{member.Id}/roles/{ops}", accessToken, body: null)).StatusCode);
+        Assert.True(await IsInRoleAsync(member.Id, ops));
+    }
+
+    [Fact]
+    public async Task A_caller_with_roles_manage_grants_a_role_that_holds_an_identity_permission()
+    {
+        var ops = await CreateRoleAsync($"Ops-{Guid.NewGuid():N}", IdentityPermissions.RolesManage);
+        var email = $"roles-manager-{Guid.NewGuid():N}@novacore.test";
+        await _host.CreateUserAsync(email, Password, IdentityPermissions.UsersManage, IdentityPermissions.RolesManage);
+        using var flow = new OidcFlow(_host);
+        var accessToken = (await flow.SignInAsync(email, Password)).AccessToken;
+        var target = await _host.CreateUserAsync($"ops-{Guid.NewGuid():N}@novacore.test", Password);
+
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await flow.CallApiAsync(HttpMethod.Post, $"/api/v1/admin/users/{target.Id}/roles", accessToken, new { role = ops })).StatusCode);
+        Assert.True(await IsInRoleAsync(target.Id, ops));
+    }
+
+    [Fact]
+    public async Task A_role_without_identity_permissions_is_users_manages_to_grant_and_remove()
+    {
+        var reader = await CreateRoleAsync($"Reader-{Guid.NewGuid():N}", IdentityServerTestHost.ProbePermission);
+        var (flow, accessToken) = await SignedInUserManagerAsync();
+        using var ownedFlow = flow;
+        var target = await _host.CreateUserAsync($"reader-{Guid.NewGuid():N}@novacore.test", Password);
+        var path = $"/api/v1/admin/users/{target.Id}/roles";
+
+        Assert.Equal(HttpStatusCode.NoContent, (await flow.CallApiAsync(HttpMethod.Post, path, accessToken, new { role = reader })).StatusCode);
+        Assert.True(await IsInRoleAsync(target.Id, reader));
+        Assert.Equal(HttpStatusCode.NoContent, (await flow.CallApiAsync(HttpMethod.Delete, $"{path}/{reader}", accessToken, body: null)).StatusCode);
+        Assert.False(await IsInRoleAsync(target.Id, reader));
+    }
+
     [Fact]
     public async Task The_last_administrator_keeps_the_role()
     {
@@ -271,6 +321,18 @@ public sealed class AdminTests(AdminTests.Fixture fixture) : IClassFixture<Admin
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         Assert.True((await users.AddToRoleAsync((await users.FindByIdAsync(user.Id.ToString()))!, role)).Succeeded);
         return user;
+    }
+
+    // A role the product defines, holding the given permissions as role claims.
+    private async Task<string> CreateRoleAsync(string name, params string[] permissions)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var roles = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+        var role = new ApplicationRole { Name = name };
+        Assert.True((await roles.CreateAsync(role)).Succeeded);
+        foreach (var permission in permissions)
+            Assert.True((await roles.AddClaimAsync(role, new Claim(NovaClaims.Permission, permission))).Succeeded);
+        return name;
     }
 
     private async Task<bool> IsInRoleAsync(Guid userId, string role)
