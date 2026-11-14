@@ -72,6 +72,11 @@ recorded as shipped (`PublicAPI.Shipped.txt`), so a later change to it shows up 
 
 ### Security
 
+- Identity provider: registering an address that has an unconfirmed account with another password no longer leaves
+  the first password waiting for the owner's confirmation click (pre-account hijacking). The account's password is
+  removed, every confirmation link sent so far stops working, and the address gets a "Set your password" link to
+  `/account/reset-password`, which sets the password and confirms the address in one step. The registration's answer
+  is unchanged; registering again with the same password, or registering a confirmed address, changes nothing.
 - The repository is public. CI pins every GitHub Action to a full commit SHA, grants each job only the permissions it
   needs, keeps the checkout token off disk, and lints the workflows with actionlint and zizmor. It scans the whole git
   history for secrets (Betterleaks), runs CodeQL on the C# code and OpenSSF Scorecard on the repository, and checks

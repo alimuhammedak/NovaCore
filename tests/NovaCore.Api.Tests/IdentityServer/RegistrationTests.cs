@@ -21,6 +21,7 @@ namespace NovaCore.Api.Tests.IdentityServer;
 public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture) : IClassFixture<RegistrationTests.Fixture>
 {
     private const string Password = "a long passphrase for tests";
+    private const string OtherPassword = "another long passphrase";
 
     private readonly IdentityServerTestHost _host = fixture.Host;
 
@@ -138,6 +139,54 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(new Uri(new Uri(link).PathAndQuery, UriKind.Relative))).StatusCode);
     }
 
+    // Account pre-hijacking (S-1, Sudhodanan & Paverd 2022): someone registers the address with a password of their own
+    // first; the address's owner registers too and opens whatever confirmation link reaches the mailbox. No link may
+    // confirm the account with the first password.
+    [Fact]
+    public async Task A_second_registration_stops_the_first_password_from_being_confirmed()
+    {
+        const string address = "pre-hijack@novacore.test";
+        var client = _host.CreateClient();
+        await RegisterAsync(client, address);
+        await RegisterAsync(client, address, OtherPassword);
+        await ResendAsync(client, address);
+
+        foreach (var link in await LinksSentToAsync(address, "after-pre-hijack@novacore.test"))
+        {
+            if (link.AbsolutePath.EndsWith("/confirm-email", StringComparison.Ordinal))
+                await client.GetAsync(new Uri(link.PathAndQuery, UriKind.Relative));
+        }
+
+        using var browser = new OidcFlow(_host);
+        var (_, afterPassword) = await browser.BeginSignInAsync(address, Password);
+        Assert.NotEqual(HttpStatusCode.Redirect, afterPassword.StatusCode);
+    }
+
+    [Fact]
+    public async Task After_a_second_registration_the_mailbox_sets_the_password_and_confirms_the_account()
+    {
+        const string address = "claimed@novacore.test";
+        var client = _host.CreateClient();
+        await RegisterAsync(client, address);
+        await RegisterAsync(client, address, OtherPassword);
+
+        var link = Assert.Single(await LinksSentToAsync(address, "after-claimed@novacore.test"),
+            sent => sent.AbsolutePath.EndsWith("/account/reset-password", StringComparison.Ordinal));
+        using var browser = new OidcFlow(_host);
+        var page = await browser.Browser.GetAsync(new Uri(link.PathAndQuery, UriKind.Relative));
+        var set = await browser.SubmitFormAsync(page, "/account/reset-password", new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Password"] = OtherPassword,
+            ["ConfirmPassword"] = OtherPassword
+        });
+        Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+
+        using var owner = new OidcFlow(_host);
+        Assert.False(string.IsNullOrEmpty((await owner.SignInAsync(address, OtherPassword)).AccessToken));
+        using var first = new OidcFlow(_host);
+        Assert.NotEqual(HttpStatusCode.Redirect, (await first.BeginSignInAsync(address, Password)).AfterPassword.StatusCode);
+    }
+
     [Fact]
     public async Task Without_a_User_role_registration_still_sends_the_confirmation()
     {
@@ -179,8 +228,8 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         Assert.Equal("LoggingEmailSender", host.Services.GetRequiredService<IEmailSender>().GetType().Name);
     }
 
-    private static Task<HttpResponseMessage> RegisterAsync(HttpClient client, string email) =>
-        client.PostAsJsonAsync("/api/v1/auth/register", new { email, password = Password, displayName = "Test" });
+    private static Task<HttpResponseMessage> RegisterAsync(HttpClient client, string email, string password = Password) =>
+        client.PostAsJsonAsync("/api/v1/auth/register", new { email, password, displayName = "Test" });
 
     private static Task<HttpResponseMessage> ResendAsync(HttpClient client, string email) =>
         client.PostAsJsonAsync("/api/v1/auth/resend-confirmation-email", new { email });
@@ -189,6 +238,19 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
     {
         var body = Assert.Single(await fixture.Emails.WaitForAsync(sent => string.Equals(sent.To, email, StringComparison.Ordinal))).HtmlBody;
         return WebUtility.HtmlDecode(Href().Match(body).Groups["url"].Value);
+    }
+
+    // Every link emailed to the address. The emails go out in the order queued: a registration of `later` queued after
+    // them marks the end.
+    private async Task<IReadOnlyList<Uri>> LinksSentToAsync(string email, string later)
+    {
+        await RegisterAsync(_host.CreateClient(), later);
+        await fixture.Emails.WaitForAsync(sent => string.Equals(sent.To, later, StringComparison.Ordinal));
+        return fixture.Emails.Sent
+            .Where(sent => string.Equals(sent.To, email, StringComparison.Ordinal))
+            .SelectMany(sent => Href().Matches(sent.HtmlBody))
+            .Select(match => new Uri(WebUtility.HtmlDecode(match.Groups["url"].Value)))
+            .ToList();
     }
 
     // The keys a production host brings: signing and encryption, and a Data Protection key store.

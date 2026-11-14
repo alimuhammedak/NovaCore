@@ -98,9 +98,15 @@ internal static class PasswordResetPage
         if (password.Length > MaxPasswordLength)
             return PasswordForm(context, antiforgery, userId, token, $"Passwords must be at most {MaxPasswordLength} characters.");
 
-        // An unknown or unconfirmed account answers like a bad token.
+        // An unknown account answers like a bad token, and so does an unconfirmed one with a password. An unconfirmed one
+        // without a password gets its link from a repeated registration (AccountEndpoints.RegisterAgainAsync): setting the
+        // password confirms the address, since holding the link is holding the mailbox, as with an invitation (S-1).
         var user = await users.FindByIdAsync(id.ToString());
-        if (user is null || !await users.IsEmailConfirmedAsync(user) || EmailLinks.DecodeToken(token) is not { } decoded)
+        if (user is null || EmailLinks.DecodeToken(token) is not { } decoded)
+            return HtmlPage.Message("Reset your password", InvalidLink);
+
+        var confirmed = await users.IsEmailConfirmedAsync(user);
+        if (!confirmed && await users.HasPasswordAsync(user))
             return HtmlPage.Message("Reset your password", InvalidLink);
 
         // The token is checked before the password policy, so a policy error means the link is still good.
@@ -112,6 +118,15 @@ internal static class PasswordResetPage
                 : PasswordForm(context, antiforgery, userId, token, string.Join(" ", result.Errors.Select(error => error.Description)));
         }
 
+        if (!confirmed)
+        {
+            var emailConfirmed = await users.ConfirmEmailAsync(user, await users.GenerateEmailConfirmationTokenAsync(user));
+            if (!emailConfirmed.Succeeded)
+                throw new InvalidOperationException("Confirming the address after its password was set failed: "
+                                                    + string.Join(", ", emailConfirmed.Errors.Select(error => error.Code)));
+            audit.EmailConfirmed(user.Id);
+        }
+
         // ResetPasswordAsync renewed the security stamp: the link can't be used again and the provider's sign-in cookie
         // ends. The refresh tokens go too, since a reset may follow a compromise.
         await AccountEndpoints.RevokeSessionsAsync(user, tokens, authorizations, context.RequestAborted);
@@ -120,7 +135,9 @@ internal static class PasswordResetPage
         audit.PasswordReset(user.Id);
         audit.SessionsRevoked(user.Id, "password-reset");
 
-        return HtmlPage.Message("Password reset", "Your password has been reset. Return to the application and sign in with the new password.");
+        return confirmed
+            ? HtmlPage.Message("Password reset", "Your password has been reset. Return to the application and sign in with the new password.")
+            : HtmlPage.Message("Password set", "Your password has been set and your email address confirmed. Return to the application and sign in.");
     }
 
     private static IResult EmailForm(HttpContext context, IAntiforgery antiforgery, string? error) =>

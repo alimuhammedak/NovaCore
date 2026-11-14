@@ -13,6 +13,8 @@ internal sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
 
     public void EmailConfirmed(Guid userId) => logger.LogEmailConfirmed(userId);
 
+    public void RegistrationRepeated(Guid userId) => logger.LogRegistrationRepeated(userId);
+
     public void LoginSucceeded(Guid userId, string? ip) => logger.LogLoginSucceeded(userId, ip);
 
     public void LoginFailed(Guid? userId, string? ip, string reason) => logger.LogLoginFailed(userId, ip, reason);
@@ -62,6 +64,11 @@ internal static partial class SecurityAuditLog
 
     [LoggerMessage(EventId = 17, Level = LogLevel.Information, Message = "SECURITY email_confirmed User={UserId}")]
     public static partial void LogEmailConfirmed(this ILogger logger, Guid userId);
+
+    // Another password registered for an address nobody has confirmed: the account's password is gone and the mailbox
+    // got a link to set one (pre-account hijacking, S-1).
+    [LoggerMessage(EventId = 46, Level = LogLevel.Warning, Message = "SECURITY registration_repeated User={UserId}")]
+    public static partial void LogRegistrationRepeated(this ILogger logger, Guid userId);
 
     [LoggerMessage(EventId = 11, Level = LogLevel.Information, Message = "SECURITY login_succeeded User={UserId} Ip={Ip}")]
     public static partial void LogLoginSucceeded(this ILogger logger, Guid userId, string? ip);

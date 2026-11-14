@@ -53,9 +53,15 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   before it looks at the password, so `SignInFlow` checks the password itself and counts a wrong one (D-030 (1)).
   An unknown email and a locked account cost a password hash like a wrong password (`DummyPasswordHash`, made once by
   the host's hasher; `SignInManager` answers a locked account before the password), so the answer's timing doesn't
-  reveal accounts either (R-087, R-138). Registration answers an existing address like a new one.
+  reveal accounts either (R-087, R-138). Registration answers an existing address like a new one, at the cost of one
+  password hash either way (CreateAsync's, or the account's password check or the dummy). **Pre-account hijacking**
+  (S-1, R-155): a registration with another password for an unconfirmed account removes the account's password (the
+  stamp renews, so every confirmation link sent so far dies) and emails a `/account/reset-password` link, which sets
+  the password and confirms the address in one step, like an invitation; the same password again, or a confirmed
+  account, changes nothing. Never let a confirmation link activate a password the mailbox's owner didn't set.
   Resending the confirmation answers every address alike and emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
-  account; the reset page answers an unknown or unconfirmed account like a bad token (R-084). Those three never wait
+  account; the reset page answers an unknown account, and an unconfirmed one with a password, like a bad token (R-084);
+  an unconfirmed one without a password is confirmed when the page sets its password (S-1). Those three never wait
   for the mail server: they queue the email (`EmailQueue`, a bounded in-memory channel read by a `BackgroundService`
   that sends through the host's `IEmailSender`, one at a time), so the response time doesn't reveal the account either
   (F6b.6a, R-105, ASVS 6.3.8). A queued email is lost if the process stops; a failed send is logged without the address

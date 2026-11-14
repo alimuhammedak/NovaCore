@@ -465,6 +465,15 @@ adresi gösterir, `POST /api/v1/auth/invitations/accept` (`{ token, password }`)
 Bağlantı 7 gün, bir kez geçer. Onaylı bir hesabın daveti şifre kurmaz (`invitation.account_exists`): kullanıcı kendi
 şifresiyle girer, davet hesabı ele geçiremez.
 
+**Onaysız adrese ikinci kayıt (hesabın önceden ele geçirilmesi):** `POST /api/v1/auth/register` her adrese aynı `200`'ü
+döner. Adresin onaysız bir hesabı varsa ve yeni kayıt başka bir şifreyle geldiyse iki kişi aynı adresi istiyordur; onay
+linkini açan posta kutusunun sahibidir, ilk şifrenin sahibi olmayabilir (Sudhodanan ve Paverd, 2022). Bu yüzden hesabın
+şifresi silinir (security stamp yenilenir, o ana kadar gönderilen bütün onay linkleri geçersizleşir) ve adrese
+"Set your password" e-postası gider: `/account/reset-password` bağlantısı şifreyi kurar ve adresi aynı adımda onaylar,
+davetin yaptığı gibi. Aynı şifreyle tekrar kayıt hiçbir şeyi değiştirmez (link `resend-confirmation-email` ile
+istenir); onaylı hesaba kayıt da. Ekran için değişen bir şey yok: kayıt cevabı aynıdır, e-postadaki bağlantı
+sağlayıcının sayfasını açar.
+
 **Hata kodları → ekran durumu** (ProblemDetails'in `code` alanı; metni ekran yazar):
 
 | Kod | Durum | Ekran |
@@ -1005,7 +1014,8 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   hesaba gider, yanıt her adres için aynıdır.
 - **Parola sıfırlama:** giriş sayfasındaki "Forgot your password?" linki bir e-posta formu açar. Onaylı hesaba
   `/account/reset-password` linki gider (Identity token'ı, 6 saat, tek kullanımlık: sıfırlama security stamp'i
-  yeniler). Bilinmeyen ya da onaysız adres aynı sayfayı alır, e-posta gitmez. Yeni parola iki kez girilir; sıfırlama
+  yeniler). Bilinmeyen ya da onaysız adres aynı sayfayı alır, e-posta gitmez. Sayfa onaysız hesabı yalnız şifresizse
+  kabul eder (ikinci kaydın gönderdiği bağlantı, "Kendi giriş ekranı"); şifre kurulunca adres de onaylanır. Yeni parola iki kez girilir; sıfırlama
   bütün refresh token'ları ve authorization'ları iptal eder, otomatik giriş yapmaz (OWASP Forgot Password).
 - **Seed'siz kayıt:** `User` rolü yoksa (seed kapalı) hesap rolsüz oluşur; admin API'si rolü sonradan atar.
 - **Refresh ömrü mutlaktır:** refresh token girişten 7 gün sonra biter; her yenileme yeni 7 gün başlatmaz
