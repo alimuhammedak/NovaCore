@@ -82,9 +82,7 @@ Biçim: `- [x] F0.3 (abc1234): not`. Not en çok iki satırdır: ne yapıldı, k
 Biten fazların adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
 
 ### Faz 8
-Başlangıç 2026-11-09, `main` @ `f319d57`. Plan onaylandı (plan modu). Doğrulama yalnız faz sonunda (D-093, kullanıcı, 2026-11-09). Kullanıcı isteği: kod adımları Codex'e (`codex:codex-rescue`, effort high) dağıtılır; diff incelemesi, build, adımın testleri, format, commit ve PROGRESS yazan oturumda (Claude). F8.1'in araştırması ve kararları yazan oturumda (MS Learn MCP, D-079). Q-40 sürüyor. Kararlar D-091'den, araştırmalar R-137'den başlayarak yazılır.
-
-**Bu fazda yapılmayacaklar:** ROPC ya da şifre karşılığında tarayıcıya token; `/account`'a ya da yeni uçlara CORS; paketten SPA sunmak; CRM'in React ekranları ve metinleri; kilitli hesabı ayrı kodla açığa çıkarmak; BFF paketi; HTML sayfalarının tasarımı/yerelleştirilmesi; sürüm numarası ve yayın (D-090 (6)); `MapIdentityApi`; IETF First-Party Apps taslağı.
+Başlangıç 2026-11-09, `main` @ `f319d57`; giriş notu ve fazın yapılmayacakları arşivde ("### Faz 8").
 
 - [x] F8.1–F8.8 (`1aaf0f9` … `163c4af`): adım notları ve oturum sonu koşusu arşivde ([PROGRESS-ARSIV.md](PROGRESS-ARSIV.md), "### Faz 8"; D-097 (2)).
 
