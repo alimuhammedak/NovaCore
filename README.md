@@ -152,7 +152,7 @@ sonra, `services.PostConfigure<T>` bütün `Configure`'lardan sonra çalışır.
 |---|---|---|
 | `JwtBearerOptions` (`JwtBearerDefaults.AuthenticationScheme`) | `Authority`, audience, yalnızca asimetrik algoritmalar, `ClockSkew` 30 sn, `MapInboundClaims = false` | **`Configure` kullanın, `PostConfigure` değil:** JwtBearer discovery'yi kendi `PostConfigure`'ında `Authority`'den kurar, sonra değişen `Authority` etkisiz kalır |
 | `AuthorizationOptions` | `FallbackPolicy` = kimliği doğrulanmış kullanıcı | Açık uç için policy'yi gevşetmek yerine o uca `.AllowAnonymous()` |
-| `RateLimiterOptions` | IP başına global fixed-window (`RateLimiting:*`), `"strict"` policy | Kendi policy'lerinizi `AddPolicy` ile ekleyin |
+| `RateLimiterOptions` | İstemci başına (IPv4 adresi ya da IPv6 /64) global fixed-window (`RateLimiting:*`), `"strict"` policy | Kendi policy'lerinizi `AddPolicy` ile ekleyin |
 | `CorsOptions` | `CoreWebExtensions.CorsPolicyName` policy'si, `Cors:AllowedOrigins`'ten | Aynı adla `AddPolicy` policy'yi değiştirir |
 | `ForwardedHeadersOptions` | `ForwardedHeaders:*` doluysa yalnızca `X-Forwarded-For` ve `X-Forwarded-Proto`, yalnızca listedekilerden | |
 | `ExceptionHandlerOptions`, `ProblemDetailsOptions` | Exception → durum kodu ve ProblemDetails (`traceId`, `instance`) | Bir exception'ı kendiniz eşlemek için `IExceptionHandler` kaydedin: paketin eşlemesi middleware'in yedek yolunda olduğu için sizinki her zaman önce çalışır |
@@ -936,7 +936,7 @@ handler, tekrar teslime karşı iş anahtarıyla bir kayıt tutar ve onu değiş
 | **Auth** | JWT doğrulama (`Jwt:Authority`) + OpenIddict/Identity sağlayıcı eklentisi + permission-based | bkz. [Güvenlik & Yetkilendirme](#güvenlik--yetkilendirme) |
 | **Auditing** | EF Core `SaveChangesInterceptor` | `AuditableEntityInterceptor` — CreatedBy/ModifiedAt merkezî |
 | **Domain event'ler** | Transactional outbox + `BackgroundService` | `OutboxInterceptor` aynı transaction'da yazar, `OutboxDispatcher` en az bir kez dağıtır (bkz. [Modüller Arası İletişim](#modüller-arası-iletişim)) |
-| **Rate limiting** | Yerleşik `AddRateLimiter` | IP bazlı fixed-window + `"strict"` adlı policy |
+| **Rate limiting** | Yerleşik `AddRateLimiter` | İstemci (IPv4 adresi ya da IPv6 /64) bazlı fixed-window + `"strict"` adlı policy; e-posta gönderen anonim uçlarda alıcı adresi başına ayrıca bir sınır (`Identity:EmailLimit`) |
 | **Health** | Yerleşik Health Checks + `AddDbContextCheck` | `/health` (her modül DB'si, "ready" etiketi) + `/alive`, yalnızca Development |
 | **API docs** | `Microsoft.AspNetCore.OpenApi` + Scalar | Bearer security scheme transformer ile; Scalar UI `NovaCore.Scalar` eklentisinde (`MapCoreScalar`) |
 | **Modül kaydı** | Açık kayıt | `builder.AddModule<TModule>()` (assembly taraması yok) |
@@ -997,11 +997,15 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   (`CommonPasswords.txt`: SecLists xato 1M'in 15–128 karakterlik ilk 3000 parolası, MIT, büyük/küçük harf duyarsız);
   parola hiçbir dış servise gitmez.
 - **Brute-force:** hesap kilidi (**5 başarısız → 15 dk**, hatalı 2FA ya da kurtarma kodu da sayılır), giriş sayfası, token ucu ve
-  hesap API'sinde rate limiting (`strict`), bilinmeyen hesap / yanlış parola / kilitli hesap için **tek hata mesajı**.
+  hesap API'sinde rate limiting (`strict`; IPv6 istemci /64'üyle sayılır), bilinmeyen hesap / yanlış parola / kilitli hesap için **tek hata mesajı**.
   Bilinmeyen e-posta ve kilitli hesap da bir parola hash'i doğrular (host'un hasher'ıyla bir kez üretilen sahte hash),
   böylece yanıt süresi hesabın varlığını ya da kilidini ele vermez. Kayıt, parola sıfırlama formu ve onay e-postasını yeniden gönderme e-postayı
   kuyruğa koyup hemen yanıt verir; bir arka plan servisi (`EmailQueue`) host'un `IEmailSender`'ıyla sırayla gönderir.
   Yanıt e-posta sunucusunu beklemediği için süresi de hesabın varlığını ele vermez (OWASP Forgot Password, ASVS 6.3.8).
+  Bu uçlar (kayıt, onayı yeniden gönderme, sıfırlama bağlantısı ve kodu) alıcı adresi başına da sınırlıdır
+  (`Identity:EmailLimit`, varsayılan saatte 5 istek, istemcinin IP'si ne olursa olsun): adres, hesap aranmadan önce
+  sayılır, böylece sınırı aşan her adres hesabı olsun olmasın aynı 429'u alır; IP değiştiren biri bir posta kutusunu
+  dolduramaz, sahibinin sıfırlama kodunu tekrar tekrar değiştiremez.
   Kuyruk bellek içindedir: süreç dururken kuyrukta kalan e-posta kaybolur, kullanıcı linki yeniden ister; gönderim
   hatası loglanır, istek etkilenmez. Kuyruk doluysa (1000, posta sunucusu takıldığında) istek beklemez: e-posta düşer
   ve loglanır. `change-password`'da yanlış mevcut parola da lockout sayacını artırır; kilitli
@@ -1118,6 +1122,7 @@ geçerdi. 2FA'sı açık son admin rolünü kaybedemez (409).
   "Database":      { "ApplyMigrations": false },   // true: açılışta migration uygula
   "Jwt":           { "Authority": "", "Audience": "novacore.api" },   // Development: https://localhost:5443 (bu host)
   "Identity":      { "Seed": { "SeedOnStartup": false, "AdminEmail": "admin@novacore.local", "AdminPassword": "" },
+                     "EmailLimit": { "PermitLimit": 5, "WindowSeconds": 3600 },   // e-posta gönderen anonim uçlar, adres başına
                      "Clients": [] },                // { ClientId, DisplayName, ClientSecret, RedirectUris, PostLogoutRedirectUris, Permissions }
   "Cache":         { "DefaultExpiration": "00:05:00", "PermissionExpiration": "00:05:00" },
   "RateLimiting":  { "PermitLimit": 100, "WindowSeconds": 60 },   // giriş ve hesap uçları 1/10'unu kullanır ("strict")
@@ -1137,7 +1142,7 @@ host'u, ayarın adını veren bir hatayla durdurur:
 - `Jwt`: `Authority` her ortamda zorunlu mutlak bir URI (Development dışında `https`), `Audience` boş olamaz.
 - `Identity:Clients`: `ClientId` tekil ve Guid değil; redirect URI'leri mutlak; redirect URI'si olmayan (servis)
   client'ın secret'ı olmalı; `Permissions` yalnızca servis client'larında.
-- `RateLimiting`: `PermitLimit` ve `WindowSeconds` ≥ 1. `Cache:DefaultExpiration` ve `Cache:PermissionExpiration`
+- `RateLimiting` ve `Identity:EmailLimit`: `PermitLimit` ve `WindowSeconds` ≥ 1. `Cache:DefaultExpiration` ve `Cache:PermissionExpiration`
   pozitif birer süre.
 - `Cors:AllowedOrigins`: her giriş çıplak bir origin olmalı (`https://app.example.com`): yol, sondaki `/` ve `*` yok.
 - `ForwardedHeaders:KnownProxies`: IP adresleri (IPv4 dört bölümüyle, `10.0.0` gibi kısaltma yok);

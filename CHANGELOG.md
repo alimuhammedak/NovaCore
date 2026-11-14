@@ -74,6 +74,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Identity provider: the anonymous endpoints that email an address (`POST /api/v1/auth/register`,
+  `/resend-confirmation-email`, `/password/forgot` and the `/account/forgot-password` form) share a limit per recipient
+  address, whatever the client's IP: `Identity:EmailLimit:PermitLimit` requests (default 5) per
+  `Identity:EmailLimit:WindowSeconds` (default 3600), the address compared normalized. Over it they answer 429
+  (`account.too_many_emails`) for every address alike, with or without an account, before anything is looked up, so a
+  caller rotating client addresses can no longer flood one mailbox, keep replacing its owner's reset code or fill the
+  email queue for it.
+- Rate limiting: an IPv6 client is counted by its /64 and an IPv4-mapped address (`::ffff:a.b.c.d`) as its IPv4
+  address, in the global limit and the `"strict"` policy. A client could pick a new address in its /64 for every
+  request and never reach either limit.
 - Identity provider: registering an address that has an unconfirmed account with another password no longer leaves
   the first password waiting for the owner's confirmation click (pre-account hijacking). The account's password is
   removed, every confirmation link sent so far stops working, and the address gets a "Set your password" link to

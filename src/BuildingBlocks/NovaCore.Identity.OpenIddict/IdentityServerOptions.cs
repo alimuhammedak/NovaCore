@@ -21,6 +21,23 @@ internal sealed class IdentityServerOptions
     public IdentitySeedOptions Seed { get; set; } = new();
 
     public IdentitySignInOptions SignIn { get; set; } = new();
+
+    [ValidateObjectMembers]
+    public IdentityEmailLimitOptions EmailLimit { get; set; } = new();
+}
+
+/// <summary>
+/// How many emails the anonymous endpoints may send one address (<c>Identity:EmailLimit</c>): registration, resending
+/// the confirmation, the reset link and the reset code share <see cref="PermitLimit"/> requests per address in a fixed
+/// window of <see cref="WindowSeconds"/>, whatever the client's IP address (<see cref="EmailRecipientLimit"/>).
+/// </summary>
+internal sealed class IdentityEmailLimitOptions
+{
+    [Range(1, int.MaxValue)]
+    public int PermitLimit { get; set; } = 5;
+
+    [Range(1, int.MaxValue)]
+    public int WindowSeconds { get; set; } = 3600;
 }
 
 /// <summary>The provider's sign-in screen (<c>Identity:SignIn</c>).</summary>

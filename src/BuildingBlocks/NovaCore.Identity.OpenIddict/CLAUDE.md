@@ -69,6 +69,12 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   (F6b.6a, R-105, ASVS 6.3.8). A queued email is lost if the process stops; a failed send is logged without the address
   or the body. A full queue never makes the request wait (that would reveal the account again): the email is dropped
   and logged (D-055 (1)). Send new emails the same way, never by awaiting `IEmailSender` in a handler.
+  **A limit per recipient** (S-6, R-157): the anonymous endpoints that email an address (register, resend, the reset
+  link form, `/password/forgot`) first call `EmailRecipientLimit.TryAcquire(users.NormalizeEmail(email))`, before the
+  account lookup and any side effect, and answer `EmailRecipientLimit.TooManyEmails` (429,
+  `account.too_many_emails`; the HTML form a 429 page) when it refuses: every address is counted alike, so the 429
+  reveals no account, and a refused request issues no code. `Identity:EmailLimit` (5 per 3600 s by default), in memory
+  per instance. A new anonymous endpoint that emails an address does the same.
 - **Password reset:** the link carries an Identity token that `ResetPasswordAsync` uses up (it renews the security
   stamp), the new password is typed twice, and a reset revokes every token and authorization of the user like a
   password change. It never signs the user in. A missing `User` role (seeding off) leaves a new account without a role

@@ -178,6 +178,8 @@ public static class IdentityServerHostingExtensions
         // the background, so the response time doesn't reveal whether an address has an account (R-105).
         services.AddSingleton<EmailQueue>();
         services.AddHostedService(provider => provider.GetRequiredService<EmailQueue>());
+        // The anonymous endpoints that email an address ask this first: a limit per address, whatever the client's IP.
+        services.AddSingleton<EmailRecipientLimit>();
     }
 
     private static void AddOpenIddictServer(IServiceCollection services, IHostEnvironment environment)

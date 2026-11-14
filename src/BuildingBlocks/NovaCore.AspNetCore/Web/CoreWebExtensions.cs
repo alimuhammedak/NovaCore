@@ -135,10 +135,10 @@ public static class CoreWebExtensions
             var permitLimit = limits.Value.PermitLimit;
             var window = TimeSpan.FromSeconds(limits.Value.WindowSeconds);
 
-            // Global fixed-window limiter partitioned by caller IP.
+            // Global fixed-window limiter partitioned by client (ClientPartition: an IPv4 address or an IPv6 /64).
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+                    partitionKey: ClientPartition(httpContext.Connection.RemoteIpAddress),
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = permitLimit,
@@ -150,7 +150,7 @@ public static class CoreWebExtensions
             // caller IP: an unpartitioned limiter is one shared counter, so a single client could lock everyone out.
             options.AddPolicy("strict", httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+                    partitionKey: ClientPartition(httpContext.Connection.RemoteIpAddress),
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = Math.Max(1, permitLimit / 10),
@@ -158,6 +158,25 @@ public static class CoreWebExtensions
                         QueueLimit = 0
                     }));
         });
+    }
+
+    // The rate limits' partition of a client address. An IPv6 client counts by its /64: one site gets a /64 or more
+    // (RFC 6177), and SLAAC lets a host pick any interface identifier in it (RFC 4862, RFC 8981), so a partition per
+    // address would let one client rotate through 2^64 of them. An IPv4 client a dual-mode socket reports as
+    // ::ffff:a.b.c.d counts as a.b.c.d: its /64 would be every IPv4 client at once (S-6, docs/plan/RESEARCH.md R-157).
+    internal static string ClientPartition(IPAddress? address)
+    {
+        if (address is null)
+            return "anonymous";
+        if (address.IsIPv4MappedToIPv6)
+            return address.MapToIPv4().ToString();
+        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetworkV6)
+            return address.ToString();
+
+        Span<byte> bytes = stackalloc byte[16];
+        address.TryWriteBytes(bytes, out _);
+        bytes[8..].Clear();
+        return new IPAddress(bytes).ToString() + "/64";
     }
 
     private static void AddCors(IServiceCollection services)

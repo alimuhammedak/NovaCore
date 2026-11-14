@@ -110,6 +110,9 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
   and `KnownIPNetworks` (validated on start) replace the framework's loopback defaults, and only `X-Forwarded-For` and
   `X-Forwarded-Proto` apply. Empty leaves `ForwardedHeadersOptions` untouched (nothing applied). Anything that reads the
   client IP or the scheme reads `HttpContext.Connection.RemoteIpAddress`/`Request.Scheme` after this middleware.
+- **Rate limits count a client, not an address** (S-6, R-157): the global limiter and `"strict"` partition by
+  `CoreWebExtensions.ClientPartition`: an IPv4 address, an IPv6 address's /64, an IPv4-mapped IPv6 address as its IPv4
+  address. A new core policy that partitions by client uses it too, not `RemoteIpAddress.ToString()`.
 - **Authorization is closed by default:** `AddCoreAuthorization` sets `FallbackPolicy = RequireAuthenticatedUser`, so an
   endpoint without authorization metadata, and a request that matches none, needs a signed-in caller (R-073). An
   endpoint a building block maps for anonymous callers (health, the OpenAPI document, Scalar, the identity provider's

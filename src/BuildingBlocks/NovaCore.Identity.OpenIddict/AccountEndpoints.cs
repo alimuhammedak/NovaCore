@@ -40,6 +40,7 @@ internal static class AccountEndpoints
         auth.MapPost("/register", Register)
             .WithName("Register")
             .WithSummary("Register a new account (sends an email confirmation link)")
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .AllowAnonymous();
 
         auth.MapGet("/confirm-email", ConfirmEmail)
@@ -51,6 +52,7 @@ internal static class AccountEndpoints
             .WithName("ResendConfirmationEmail")
             .WithSummary("Send the email confirmation link again (only to an account that isn't confirmed yet)")
             .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .AllowAnonymous();
 
         auth.MapGet("/me", Me)
@@ -81,16 +83,21 @@ internal static class AccountEndpoints
         return auth;
     }
 
-    private static async Task<Results<Ok<MessageResponse>, ValidationProblem>> Register(
+    private static async Task<Results<Ok<MessageResponse>, ValidationProblem, ProblemHttpResult>> Register(
         RegisterRequest request,
         UserManager<ApplicationUser> users,
         RoleManager<ApplicationRole> roles,
         EmailQueue emails,
+        EmailRecipientLimit recipientLimit,
         SecurityAuditLogger audit,
         DummyPasswordHash dummyHash,
         IOptions<JwtOptions> jwt,
         TimeProvider timeProvider)
     {
+        // Counted before the lookup, so every address is limited alike (EmailRecipientLimit).
+        if (!recipientLimit.TryAcquire(users.NormalizeEmail(request.Email)))
+            return EmailRecipientLimit.TooManyEmails;
+
         if (await users.FindByEmailAsync(request.Email) is { } existing)
             return await RegisterAgainAsync(request.Password, existing, users, emails, audit, dummyHash, jwt.Value);
 
@@ -131,7 +138,7 @@ internal static class AccountEndpoints
     // opens it holds the mailbox, not necessarily that password (pre-account hijacking, docs/plan/RESEARCH.md R-155). So
     // the account's password goes, which renews the security stamp and voids every confirmation link sent so far, and
     // the mailbox gets a link that sets the password and confirms the address in one step, as an invitation does.
-    private static async Task<Results<Ok<MessageResponse>, ValidationProblem>> RegisterAgainAsync(
+    private static async Task<Results<Ok<MessageResponse>, ValidationProblem, ProblemHttpResult>> RegisterAgainAsync(
         string password,
         ApplicationUser existing,
         UserManager<ApplicationUser> users,
@@ -173,12 +180,16 @@ internal static class AccountEndpoints
     // nobody can have emails sent to a confirmed address. The answer is the same either way (RESEARCH R-084). An account
     // without a password (an invited one, or one whose registration was repeated) gets none either: only setting its
     // password confirms it, through the invitation or the link the repeated registration sent (S-2).
-    private static async Task<Ok<MessageResponse>> ResendConfirmationEmail(
+    private static async Task<Results<Ok<MessageResponse>, ProblemHttpResult>> ResendConfirmationEmail(
         ResendConfirmationEmailRequest request,
         UserManager<ApplicationUser> users,
         EmailQueue emails,
+        EmailRecipientLimit recipientLimit,
         IOptions<JwtOptions> jwt)
     {
+        if (!recipientLimit.TryAcquire(users.NormalizeEmail(request.Email)))
+            return EmailRecipientLimit.TooManyEmails;
+
         var user = await users.FindByEmailAsync(request.Email);
         if (user is not null && !await users.IsEmailConfirmedAsync(user) && await users.HasPasswordAsync(user))
             await SendConfirmationAsync(users, emails, jwt.Value, user);

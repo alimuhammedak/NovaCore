@@ -46,16 +46,16 @@ internal static class HtmlPage
             """);
     }
 
-    /// <summary>A page with a heading and one paragraph of text.</summary>
-    public static IResult Message(string title, string text) =>
-        Render(title, $"<h1>{HtmlEncoder.Default.Encode(title)}</h1><p>{HtmlEncoder.Default.Encode(text)}</p>");
+    /// <summary>A page with a heading and one paragraph of text, answered with <paramref name="statusCode"/>.</summary>
+    public static IResult Message(string title, string text, int statusCode = StatusCodes.Status200OK) =>
+        Render(title, $"<h1>{HtmlEncoder.Default.Encode(title)}</h1><p>{HtmlEncoder.Default.Encode(text)}</p>", statusCode);
 
     /// <summary>A paragraph with a link to <paramref name="path"/> in this application.</summary>
     public static string Link(HttpContext context, string path, string text) =>
         $"<p><a href=\"{HtmlEncoder.Default.Encode(context.Request.PathBase + path)}\">{HtmlEncoder.Default.Encode(text)}</a></p>";
 
     /// <summary>A whole page around <paramref name="body"/>, which is markup the caller encoded.</summary>
-    public static IResult Render(string title, string body) => Results.Content(
+    public static IResult Render(string title, string body, int statusCode = StatusCodes.Status200OK) => Results.Content(
         $"""
          <!doctype html>
          <html lang="en">
@@ -65,5 +65,6 @@ internal static class HtmlPage
          </main></body>
          </html>
          """,
-        "text/html; charset=utf-8");
+        "text/html; charset=utf-8",
+        statusCode: statusCode);
 }

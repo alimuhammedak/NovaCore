@@ -26,6 +26,8 @@ internal static class PasswordResetPage
     // One answer for an unknown account, an unconfirmed one, a malformed token and an expired or used one.
     private const string InvalidLink = "This link is invalid or has expired. Ask for a new one from the sign-in page.";
 
+    private const string TooManyEmails = "Too many emails were asked for this address. Try again later.";
+
     private const string Mismatch = "The passwords do not match.";
 
     // The account API's limit (AccountRequests): the password policy sets the minimum.
@@ -48,6 +50,7 @@ internal static class PasswordResetPage
         IAntiforgery antiforgery,
         UserManager<ApplicationUser> users,
         EmailQueue emails,
+        EmailRecipientLimit recipientLimit,
         IOptions<JwtOptions> jwt,
         SecurityAuditLogger audit)
     {
@@ -58,6 +61,10 @@ internal static class PasswordResetPage
         string? email = form["Email"];
         if (string.IsNullOrWhiteSpace(email))
             return EmailForm(context, antiforgery, "Enter your email address.");
+
+        // Counted before the lookup, so every address is limited alike (EmailRecipientLimit).
+        if (!recipientLimit.TryAcquire(users.NormalizeEmail(email)))
+            return HtmlPage.Message("Check your email", TooManyEmails, StatusCodes.Status429TooManyRequests);
 
         // Only a confirmed account gets a link; the answer is the same either way.
         var user = await users.FindByEmailAsync(email);

@@ -30,6 +30,30 @@ public class StrictRateLimitTests(StrictRateLimitApiFactory factory) : IClassFix
         Assert.Equal(StatusCodes.Status400BadRequest, await PostEmptyTokenRequestFromAsync(server, "198.51.100.20"));
     }
 
+    [Fact]
+    public async Task Strict_policy_counts_an_ipv6_client_by_its_64_bit_prefix()
+    {
+        var server = factory.Server;
+
+        Assert.Equal(StatusCodes.Status400BadRequest, await PostEmptyTokenRequestFromAsync(server, "2001:db8:1:2::10"));
+        // Another address of the same /64, the block one site gets (RFC 6177), shares its budget.
+        Assert.Equal(StatusCodes.Status429TooManyRequests, await PostEmptyTokenRequestFromAsync(server, "2001:db8:1:2:ffff::1"));
+
+        // The next /64 is another client.
+        Assert.Equal(StatusCodes.Status400BadRequest, await PostEmptyTokenRequestFromAsync(server, "2001:db8:1:3::10"));
+    }
+
+    [Fact]
+    public async Task Strict_policy_counts_an_ipv4_mapped_address_as_its_ipv4_address()
+    {
+        var server = factory.Server;
+
+        // A dual-mode socket reports an IPv4 client as ::ffff:a.b.c.d; its /64 would be every IPv4 client at once.
+        Assert.Equal(StatusCodes.Status400BadRequest, await PostEmptyTokenRequestFromAsync(server, "::ffff:203.0.113.40"));
+        Assert.Equal(StatusCodes.Status429TooManyRequests, await PostEmptyTokenRequestFromAsync(server, "203.0.113.40"));
+        Assert.Equal(StatusCodes.Status400BadRequest, await PostEmptyTokenRequestFromAsync(server, "::ffff:203.0.113.41"));
+    }
+
     // HttpClient can't choose the client IP, so the request is built directly against TestServer. That path doesn't
     // flag the request as having a body, so it is set explicitly (RequestHasBody). HTTPS: OpenIddict refuses plain HTTP.
     private static async Task<int> PostEmptyTokenRequestFromAsync(TestServer server, string clientIp)
