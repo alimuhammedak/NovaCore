@@ -69,8 +69,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no longer answer 500: the user store reports the lost insert as a duplicate user name.
 - A form body the framework can't read (a key or value over `FormOptions`' limits, more than 1024 values, a NUL
   character, multipart without a boundary) answers 400 instead of 500, on the identity provider's `/account/*` forms
-  and on `/connect/*` alike: the core's exception mapping treats `InvalidDataException` and
+  and on `/connect/*` alike: the core treats the form reader's `InvalidDataException` and
   `AntiforgeryValidationException` as the client's error (title "Bad Request", no detail, not logged).
+- An `InvalidDataException` that isn't the form reader's (a corrupt Zip, GZip, Deflate, Brotli or Tar stream a module
+  reads, a module's own parser) answers 500 and is logged again, instead of a silent 400. `UseCoreWeb` reports a form
+  body the reader can't read as a `BadHttpRequestException` with 400 where the form is read, as Minimal API form
+  binding does, so the unreadable-form answers above are unchanged. A host that calls `AddCoreInfrastructure` without
+  `UseCoreWeb` gets a 500 for an unreadable form its own code reads.
 
 ### Security
 

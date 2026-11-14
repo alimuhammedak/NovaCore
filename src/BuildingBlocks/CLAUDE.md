@@ -99,7 +99,9 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
   (R-046), so a catch-all one would shadow a project's handler registered after it. The mapping is the exception
   handler middleware's fallback instead: `ExceptionHandlerOptions.StatusCodeSelector` (`AppException` → its type's
   status, `BadHttpRequestException` → its status,
-  `InvalidDataException`/`AntiforgeryValidationException` → 400: a form body the framework can't read, S-14, else 500), `ExceptionHandlerOptions.ExceptionHandler` (writes the
+  `AntiforgeryValidationException` → 400, else 500; a form body the reader can't read is a `BadHttpRequestException`
+  400 because `UseCoreWeb` wraps the request's `IFormFeature` in `UnreadableFormFeature` before authentication, where
+  OpenIddict reads its forms, S-14, R-158; a bare `InvalidDataException`, e.g. a corrupt archive, is a logged 500, V6e-3), `ExceptionHandlerOptions.ExceptionHandler` (writes the
   ProblemDetails: title, `type`, and `detail` for an `AppException` only; it runs only when no handler handled the
   exception, so a project handler's ProblemDetails is never rewritten; not `CustomizeProblemDetails`, which sees every
   write) and `SuppressDiagnosticsCallback` (the framework logs 500s; client

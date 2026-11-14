@@ -14,6 +14,7 @@ using NovaCore.Abstractions.Identity;
 using NovaCore.AspNetCore.Auth;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.DependencyInjection;
+using NovaCore.AspNetCore.Exceptions;
 using NovaCore.AspNetCore.Identity;
 using NovaCore.AspNetCore.OpenApi;
 using NovaCore.AspNetCore.Security;
@@ -68,6 +69,9 @@ public static class CoreWebExtensions
         app.UseSecurityHeaders();            // defensive response headers first, so every response carries them
         app.UseExceptionHandler();
         app.UseStatusCodePages();
+        // Inside the exception handler and before authentication, where OpenIddict reads its forms: a form the reader
+        // can't read becomes a 400 BadHttpRequestException, and no other InvalidDataException does (V6e-3).
+        app.Use(UnreadableFormFeature.Install);
 
         // HSTS in non-dev. (HTTPS redirection is intentionally left to the gateway/host so the in-memory
         // test server and plain-HTTP local runs keep working; enable UseHttpsRedirection at the edge.)

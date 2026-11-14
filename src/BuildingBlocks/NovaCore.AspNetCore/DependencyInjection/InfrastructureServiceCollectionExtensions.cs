@@ -15,9 +15,10 @@ public static class InfrastructureServiceCollectionExtensions
     /// Wires the cross-cutting infrastructure: ProblemDetails, exception handling and caching. An exception no
     /// <c>IExceptionHandler</c> handles becomes a ProblemDetails response through the exception handler middleware's own
     /// fallback, so a project's handlers run first, registered before or after this call. An <see cref="AppException"/>
-    /// answers with its status and message, a <c>BadHttpRequestException</c> with its status, a form body the framework
-    /// can't read (<c>InvalidDataException</c>) or an <c>AntiforgeryValidationException</c> with 400, anything else with
-    /// 500 and no message; only the 500s are logged.
+    /// answers with its status and message, a <c>BadHttpRequestException</c> with its status (a form body the form reader
+    /// can't read is one, with 400, behind <c>UseCoreWeb</c>), an <c>AntiforgeryValidationException</c> with 400,
+    /// anything else with 500 and no message, an <c>InvalidDataException</c> from an archive or a parser included; only
+    /// the 500s are logged.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns><paramref name="services"/>, for chaining.</returns>
