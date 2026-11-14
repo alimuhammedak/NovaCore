@@ -80,7 +80,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Identity:EmailLimit:WindowSeconds` (default 3600), the address compared normalized. Over it they answer 429
   (`account.too_many_emails`) for every address alike, with or without an account, before anything is looked up, so a
   caller rotating client addresses can no longer flood one mailbox, keep replacing its owner's reset code or fill the
-  email queue for it.
+  email queue for it. The `/account/forgot-password` form checks the address like the JSON endpoints (an email
+  address of at most 256 characters) before the limit counts it, and the limit refuses a longer one without keeping a
+  count: a caller can no longer make it hold a count for every multi-megabyte value it posts.
 - Rate limiting: an IPv6 client is counted by its /64 and an IPv4-mapped address (`::ffff:a.b.c.d`) as its IPv4
   address, in the global limit and the `"strict"` policy. A client could pick a new address in its /64 for every
   request and never reach either limit.

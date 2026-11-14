@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NovaCore.Identity.OpenIddict;
 using Xunit;
 
@@ -115,6 +116,48 @@ public sealed partial class RecipientEmailLimitTests(RecipientEmailLimitTests.Fi
         // Another address keeps its own budget.
         Assert.Equal(StatusCodes.Status200OK,
             (await PostFromAsync("/api/v1/auth/resend-confirmation-email", new { email = "limit-other@novacore.test" }, "198.51.100.3")).Status);
+    }
+
+    [Theory]
+    [InlineData(257)]
+    [InlineData(1_000_000)]
+    public async Task The_reset_link_form_refuses_an_over_long_address_before_the_limit_counts_it(int length)
+    {
+        // An address no account can have: the account API's limit is 256 characters (AccountRequests). Counted, every
+        // such value would hold a partition of the limit for its whole window, megabytes each (V6e-2).
+        var email = new string('a', length - "@novacore.test".Length) + "@novacore.test";
+
+        using var browser = new OidcFlow(_host);
+        for (var i = 0; i <= Limit; i++)
+        {
+            using var page = await RequestResetLinkAsync(browser, email);
+            Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+            var html = await page.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            Assert.Contains("Enter a valid email address.", html, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain(fixture.Emails.Sent, sent => string.Equals(sent.To, email, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task The_reset_link_form_refuses_a_malformed_address_like_the_account_api()
+    {
+        using var browser = new OidcFlow(_host);
+        using var page = await RequestResetLinkAsync(browser, "not-an-address");
+
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Contains("Enter a valid email address.",
+            await page.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_limit_refuses_an_over_long_key_whatever_its_budget()
+    {
+        using var limit = new EmailRecipientLimit(Options.Create(new IdentityServerOptions()));
+        var longest = new string('A', EmailRecipientLimit.MaxAddressLength);
+
+        Assert.False(limit.TryAcquire(longest + "A"));
+        Assert.True(limit.TryAcquire(longest));
     }
 
     private static void AssertTooManyRequests((int Status, string Body) response)

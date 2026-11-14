@@ -22,7 +22,8 @@ namespace NovaCore.Identity.OpenIddict;
 /// <item>The key is Identity's normalized email (<c>UserManager.NormalizeEmail</c>), the form the store looks accounts up
 /// by, so a change of case is the same address.</item>
 /// <item>The counts live in this process's memory, like the rate limiter's: each instance of a scaled-out host counts
-/// its own. A partition goes once its window has passed unused.</item>
+/// its own. A partition goes once its window has passed unused, so only an address of at most
+/// <see cref="MaxAddressLength"/> characters gets one.</item>
 /// </list>
 /// </remarks>
 internal sealed class EmailRecipientLimit : IDisposable
@@ -34,6 +35,11 @@ internal sealed class EmailRecipientLimit : IDisposable
         title: "Too many requests",
         type: $"https://httpstatuses.io/{StatusCodes.Status429TooManyRequests}",
         extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = "account.too_many_emails" });
+
+    /// <summary>
+    /// The longest address the account API takes (<c>MaxLength</c> on the requests' <c>Email</c>, Identity's column).
+    /// </summary>
+    public const int MaxAddressLength = 256;
 
     private readonly PartitionedRateLimiter<string> _limiter;
 
@@ -55,10 +61,15 @@ internal sealed class EmailRecipientLimit : IDisposable
 
     /// <summary>
     /// Counts a request for <paramref name="normalizedEmail"/> and answers whether it may go on. Call it before the
-    /// account is looked up.
+    /// account is looked up. A key longer than <see cref="MaxAddressLength"/> is refused without a partition: no
+    /// account can have it, and every partition stays for its window, so counting such values would let a caller fill
+    /// the memory with them (V6e-2). The callers validate the address first; this is the limit's own guard.
     /// </summary>
     public bool TryAcquire(string? normalizedEmail)
     {
+        if (normalizedEmail?.Length > MaxAddressLength)
+            return false;
+
         using var lease = _limiter.AttemptAcquire(normalizedEmail ?? string.Empty);
         return lease.IsAcquired;
     }

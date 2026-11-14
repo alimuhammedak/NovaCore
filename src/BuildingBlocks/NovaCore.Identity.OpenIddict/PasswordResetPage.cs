@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
@@ -27,6 +28,10 @@ internal static class PasswordResetPage
     private const string InvalidLink = "This link is invalid or has expired. Ask for a new one from the sign-in page.";
 
     private const string TooManyEmails = "Too many emails were asked for this address. Try again later.";
+
+    private const string InvalidEmail = "Enter a valid email address.";
+
+    private static readonly EmailAddressAttribute EmailAddressCheck = new();
 
     private const string Mismatch = "The passwords do not match.";
 
@@ -61,6 +66,12 @@ internal static class PasswordResetPage
         string? email = form["Email"];
         if (string.IsNullOrWhiteSpace(email))
             return EmailForm(context, antiforgery, "Enter your email address.");
+
+        // The account API's checks on an address (AccountRequests: EmailAddress, MaxLength), before the limit counts it:
+        // a form value may be megabytes long, and the limit keeps a partition per address for its whole window (V6e-2).
+        // The answer depends on the input only, so it reveals no account.
+        if (email.Length > EmailRecipientLimit.MaxAddressLength || !EmailAddressCheck.IsValid(email))
+            return EmailForm(context, antiforgery, InvalidEmail);
 
         // Counted before the lookup, so every address is limited alike (EmailRecipientLimit).
         if (!recipientLimit.TryAcquire(users.NormalizeEmail(email)))
