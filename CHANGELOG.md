@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Result<Guid>`: an address that can't be a user name is `invitation.invalid_email` (400), one another account holds as
   its user name `invitation.address_taken` (409); two invitations racing to create one account both invite it. **Upgrade:** a new `invitations`
   table in the `identity` schema; add the migration to the host's identity store (the template's sets have it).
+- Repository: the DAST scan's client (`dast`, client credentials, the read permissions `catalog:products:read`,
+  `payments:read`, `identity:users:read`, `identity:roles:read`) is defined only in `eng/dast/dast.env`, the DAST run's
+  configuration; its secret is generated for each run. No committed appsettings file holds it (`DastClientTests`).
 
 ### Changed
 
