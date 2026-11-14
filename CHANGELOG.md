@@ -49,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Template: the host reads `HealthChecks:ProbePort` through validated options (`HealthCheckProbeOptions`,
+  `ValidateOnStart`) instead of `Configuration.GetValue`, as the repository's options rule asks. A value that isn't a
+  port (1–65535) stops the host at startup; empty still maps none.
 - Catalog: `PUT` and `DELETE /api/v1/products/{id}` answer 404 `product.not_found` instead of 409
   `product.concurrency_conflict` when the product was deleted after it was read. A `DELETE` that connection resiliency
   replays after its first attempt was applied gets 404 too.
