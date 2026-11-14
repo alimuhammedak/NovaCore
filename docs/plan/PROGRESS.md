@@ -79,6 +79,8 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | S-7: açık kaydı kapatılabilir yapmak | Ürün kararı; Y-19 bir seçenek için gerçek tüketici ister. Kayıt olan herkes platform `UserPermissions`'ını alıyor | Kullanıcı karar verir: CRM-Nominal açık kayıt kullanacak mı; kullanmayacaksa `Identity:SignIn:AllowRegistration` (ya da kaydın hiç eşlenmemesi) planlanır |
 | F6e.4'ün adlı araçları (Cloudflare `security-audit-skill`, Claude Security plugin) | Kurulu değil; indirme/kurma ön onaylı değil | Kullanıcı kurar, iki kapsamla koşar |
 | Dependabot #21 (`global.json` → SDK 10.0.403) | Bu makinede yalnız 10.0.300 kurulu (F9.3 kuralı) | SDK 10.0.403 kurulur, PR merge edilir |
+| S-6 varsayılanları (`Identity:EmailLimit` 5/saat, aşınca 429) | Ürün ayarı; R-157 | Kullanıcı değerleri onaylar ya da değiştirir |
+| V6e-4: bekleyen daveti olan şifresiz hesaba anonim kayıt | Hiçbir şey yapmamak ya da ayrı metin/audit: ürün davranışı | Kullanıcı seçer |
 | SonarCloud'un CORS bulgusunu "false positive" işaretlemek (L96) | Dış işlem; `AllowAnyOrigin` yalnız Development'ta (`CoreWebExtensions.cs:182`) | Kullanıcı SonarCloud'da işaretler |
 
 ## Adımlar
@@ -145,6 +147,9 @@ Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docke
 | ID | Bulgu | Yer | Durum |
 |---|---|---|---|
 | V6e-1 | CI `secret-scan` kırmızı: 1 bulgu, `1f3c034..4814ed1` aralığında (F6e.1/F6e.2 ya da S-1/S-2 commit'leri) | run `43579950658` | doğrulandı yerelde (`d5954f4`): `dast.yml:44`'teki çalışma anında üretilen parola ifadesi (generic-password FP); yalnız bu yol ve bu ifade için allowlist; yerel tam tarama temiz, CI bekleniyor |
+| V6e-2 | Bellek DoS: HTML `/account/forgot-password` e-postasının uzunluğu sınırsız (4 MB'a kadar); `EmailRecipientLimit` her farklı değeri bir saat partition olarak tutar | Opus inceleme, `PasswordResetPage.cs:60-67`, `EmailRecipientLimit.cs:56-60` | açık (yüksek): yazan düzeltir |
+| V6e-3 | `InvalidDataException`→400 kaynağa bakmıyor: modülün bozuk arşiv açması (Zip/GZip/Brotli) 500 yerine logsuz 400 olur | Opus inceleme, `ExceptionMapping.cs:28,50-51,61-62` | açık (orta): yazan düzeltir |
+| V6e-4 | Bekleyen daveti olan şifresiz hesaba anonim `register`: davetliye "yeniden kayıt" metinli şifre bağlantısı ve Warning audit gider (güvenlik açığı değil) | Opus inceleme, `AccountEndpoints.cs:741-760` | kullanıcıya: davranış ürün kararı (Kullanıcıya kalanlar) |
 
 #### F6e.4 bulguları ve F6e.5 triajı
 
