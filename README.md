@@ -463,7 +463,8 @@ karşılaştırılmaz ve kodu bitirir. Yanlış kod hesabı kilitlemez. Başarı
 (varsayılan `/accept-invitation`) `?token=` ile açar; ekran `POST /api/v1/auth/invitations/status` (`{ token }`) ile
 adresi gösterir, `POST /api/v1/auth/invitations/accept` (`{ token, password }`) ile şifreyi kurar ve e-postayı onaylar.
 Bağlantı 7 gün, bir kez geçer. Onaylı bir hesabın daveti şifre kurmaz (`invitation.account_exists`): kullanıcı kendi
-şifresiyle girer, davet hesabı ele geçiremez.
+şifresiyle girer, davet hesabı ele geçiremez. Denetim kaydı (`SECURITY invitation_created`) davet edilen hesabın ve
+daveti yapanın (ucu çağıran oturum açmış kullanıcı, `ICurrentUser`) id'sini yazar.
 
 **Onaysız adrese ikinci kayıt (hesabın önceden ele geçirilmesi):** `POST /api/v1/auth/register` her adrese aynı `200`'ü
 döner. Adresin onaysız bir hesabı varsa ve yeni kayıt başka bir şifreyle geldiyse iki kişi aynı adresi istiyordur; onay
@@ -1080,7 +1081,7 @@ geçerdi. 2FA'sı açık son admin rolünü kaybedemez (409).
 - **Security headers** (her yanıtta): `X-Content-Type-Options`, `X-Frame-Options: DENY`,
   `Referrer-Policy`, `Content-Security-Policy: default-src 'none'`, `Server` başlığı kaldırılır; prod'da **HSTS**.
 - **Audit logging:** giriş (başarılı/başarısız), lockout, 2FA, refresh, çıkış, parola değişimi ve sıfırlama, oturum
-  iptali, rol atama; `SECURITY` önekli, hesap id'siyle; e-posta (maskeli bile) ve parola/kod/token loglanmaz. Refresh token tekrar kullanımını OpenIddict
+  iptali, rol atama, davet; `SECURITY` önekli, hesap id'siyle (rol atama ve davette yapanınkiyle de); e-posta (maskeli bile) ve parola/kod/token loglanmaz. Refresh token tekrar kullanımını OpenIddict
   kendisi loglar.
 - **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü
   `Identity:Seed:UserPermissions` listesini alır (Api: `catalog:products:read`, `payments:read`, `payments:create`);

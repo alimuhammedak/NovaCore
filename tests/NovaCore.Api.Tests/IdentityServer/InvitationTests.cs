@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using NovaCore.Identity.OpenIddict;
 using Xunit;
@@ -41,8 +42,11 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
 
         public InvitationAcceptRace Accepts { get; } = new();
 
+        public LogCapture Log { get; } = new();
+
         protected override void Configure(WebApplicationBuilder builder)
         {
+            builder.Logging.AddProvider(Log);
             builder.Services.AddSingleton<IEmailSender>(Emails);
             builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Creations, Writes, Accepts));
         }
@@ -68,6 +72,25 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
 
         await AssertProblemAsync(await PostAsync(client, Accept, new { token, password = "yet another passphrase" }), HttpStatusCode.Conflict, "invitation.used");
         await AssertProblemAsync(await PostAsync(client, Status, new { token }), HttpStatusCode.Conflict, "invitation.used");
+    }
+
+    // The audit trail names who invited, as it does for a role change (S-5): by the account's id, never its address (Y-35).
+    [Fact]
+    public async Task The_audit_log_names_the_inviter()
+    {
+        var inviter = await _host.CreateUserAsync("inviter-audit@novacore.test", Password, "identity:invitations:create");
+        using var browser = new OidcFlow(_host);
+        using var client = _host.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", (await browser.SignInAsync("inviter-audit@novacore.test", Password)).AccessToken);
+
+        var created = await PostAsync(client, Create, new { email = "invited-audit@novacore.test" });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        using var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var invited = body.RootElement.GetProperty("userId").GetGuid();
+
+        var entry = Assert.Single(fixture.Log.Messages, message => message.StartsWith($"SECURITY invitation_created User={invited}", StringComparison.Ordinal));
+        Assert.Equal($"SECURITY invitation_created User={invited} By={inviter.Id}", entry);
     }
 
     [Fact]

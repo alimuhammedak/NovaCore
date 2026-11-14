@@ -75,6 +75,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `identity:roles:manage`, as `Administrator` already did. With `identity:users:manage` alone a caller could give
   themselves a product's role holding `identity:roles:manage` and from there `Administrator`. Roles without
   `identity:*` permissions are granted with `identity:users:manage` as before.
+- Identity provider: the audit event of a new invitation (`SECURITY invitation_created`) names the inviter too
+  (`By=`, the signed-in caller's id, never an address), as a role change does. `AccountInvitations.InviteAsync` reads
+  the caller itself; its signature is unchanged.
 
 ## [0.1.0] - 2026-10-27
 

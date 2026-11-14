@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using NovaCore.Abstractions.Identity;
 using NovaCore.Abstractions.Results;
 using NovaCore.AspNetCore.Auth;
 
@@ -42,6 +43,7 @@ public sealed class AccountInvitations
     private readonly IdentitySignInOptions _signIn;
     private readonly TimeProvider _timeProvider;
     private readonly SecurityAuditLogger _audit;
+    private readonly ICurrentUser _currentUser;
 
     internal AccountInvitations(
         UserManager<ApplicationUser> users,
@@ -51,7 +53,8 @@ public sealed class AccountInvitations
         IOptions<JwtOptions> jwt,
         IOptions<IdentityServerOptions> identity,
         TimeProvider timeProvider,
-        SecurityAuditLogger audit)
+        SecurityAuditLogger audit,
+        ICurrentUser currentUser)
     {
         _users = users;
         _roles = roles;
@@ -61,11 +64,13 @@ public sealed class AccountInvitations
         _signIn = identity.Value.SignIn;
         _timeProvider = timeProvider;
         _audit = audit;
+        _currentUser = currentUser;
     }
 
     /// <summary>
     /// Emails an invitation to <paramref name="email"/>, creating the account when the address has none, and returns the
-    /// account's id, the <c>sub</c> of its tokens.
+    /// account's id, the <c>sub</c> of its tokens. The security audit log records the invitation with the signed-in
+    /// caller's id as the inviter (none outside a request).
     /// </summary>
     /// <param name="email">The invited person's email address.</param>
     /// <param name="cancellationToken">Cancels saving the invitation.</param>
@@ -103,7 +108,8 @@ public sealed class AccountInvitations
         _emails.Enqueue(user.Email!, "You're invited",
             $"You have been invited to an account. <a href=\"{HtmlEncoder.Default.Encode(link)}\">Accept the invitation</a>. "
             + $"The link works once, for {Lifetime.TotalDays:0} days. If you didn't expect it, ignore this email.");
-        _audit.InvitationCreated(user.Id);
+        // The audit names who invited, the signed-in caller of the endpoint that called this (none outside a request).
+        _audit.InvitationCreated(user.Id, _currentUser.UserId);
         return Result.Success(user.Id);
     }
 

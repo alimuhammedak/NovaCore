@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using NovaCore.Abstractions.Identity;
 using NovaCore.AspNetCore.Auth;
 using NovaCore.AspNetCore.Authorization;
 using OpenIddict.Server;
@@ -69,7 +70,8 @@ public static class IdentityServerHostingExtensions
             provider.GetRequiredService<IOptions<JwtOptions>>(),
             provider.GetRequiredService<IOptions<IdentityServerOptions>>(),
             provider.GetRequiredService<TimeProvider>(),
-            provider.GetRequiredService<SecurityAuditLogger>()));
+            provider.GetRequiredService<SecurityAuditLogger>(),
+            provider.GetRequiredService<ICurrentUser>()));
 
         AddEmail(services, builder.Environment);
 
