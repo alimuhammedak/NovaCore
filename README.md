@@ -587,6 +587,7 @@ Repo public'tir (DECISIONS D-042). Kararlar D-048, D-051 ve D-052'de; kaynaklar 
 | Kullanılmayan kod | `unused-code.yml` | Haftalık ve elle: Roslynator, referansı olmayan internal/private tip, alan ve sabitler (`eng/find-unused.sh`, D-066) |
 | Mutation testi | `mutation.yml` | Haftalık ve elle: Stryker.NET, `NovaCore.Abstractions` ve modüllerin `Domain/` kodu, `NovaCore.Domain.Tests`'e karşı; skor job özetinde, raporlar artifact (`eng/mutation.sh`, D-063) |
 | Tedarik zinciri puanı | `scorecard.yml` | OpenSSF Scorecard, main'e push'ta ve haftalık |
+| Dinamik tarama (DAST) | `dast.yml` | Haftalık ve elle: runner'da atılabilir bir Api örneği (Development, SQL Server container'ı, geliştirme sertifikası) ve `eng/dast.sh`: Schemathesis OpenAPI belgesini ve `eng/dast/protocol-openapi.yaml`'daki `/connect/*`, `/account/*` uçlarını, ZAP API scan belgeyi, ZAP baseline giriş sayfasını tarar; imajlar digest'e sabit. Token, yalnız `eng/dast/dast.env`'de tanımlı, okuma izinli `dast` client'ının (`client_credentials`); secret koşu anında üretilir. Şimdilik rapor: bulgu job'u kırmızı yapmaz, taramanın koşamaması yapar; özet job özetinde, raporlar ve host logu artifact (D-044, F6e.2) |
 | Güncellemeler | `.github/dependabot.yml` | NuGet, action'lar, SDK, compose imajları; 7 gün bekleme |
 | Yayın | `release.yml` | `build` ve `publish` ayrı job'lar; `publish` `release` environment'ında onay bekler |
 
@@ -1285,6 +1286,7 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
 | Polly.Core / Extensions / RateLimiting | Geçişli: `Microsoft.Extensions.Http.Resilience`'ın bağımlılığı | **BSD-3-Clause** (adlı istisna, D-052) |
 | nuget-license, CycloneDX (dotnet tool) | Lisans kapısı, SBOM (yalnızca CI ve yayın, pakete girmez) | **Apache-2.0** |
 | Roslynator CLI (dotnet tool) | Haftalık kullanılmayan kod raporu (pakete girmez) | **Apache-2.0** |
+| Schemathesis, ZAP (Docker imajları) | Haftalık DAST taraması, `dast.yml` (pakete girmez, hiçbir projeye referans değildir) | **MIT** / **Apache-2.0** |
 | dotnet-sonarscanner | Yalnızca CI'daki `sonar` job'unda kurulur, hiçbir projeye referans değildir; indirdiği Sonar analizörleri SSALv1 (D-045, K4: kullanıcı onayı) | **LGPL-3.0** |
 
 CI'daki lisans kapısı (`eng/check-licenses.sh`) geçişliler dahil her paketi denetler: MIT ya da Apache-2.0 olmalı;

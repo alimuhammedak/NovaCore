@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Repository: the DAST scan's client (`dast`, client credentials, the read permissions `catalog:products:read`,
   `payments:read`, `identity:users:read`, `identity:roles:read`) is defined only in `eng/dast/dast.env`, the DAST run's
   configuration; its secret is generated for each run. No committed appsettings file holds it (`DastClientTests`).
+- Repository: a DAST workflow (`dast.yml`, weekly and on demand). It starts a throwaway Api in Development on the runner
+  (a SQL Server container, the development certificate) and runs `eng/dast.sh`: Schemathesis 4.33.1 on the OpenAPI
+  document and on `eng/dast/protocol-openapi.yaml` (`/connect/*` and `/account/*`, which the document leaves out), ZAP
+  2.17.0's API scan on the document and its baseline scan on the sign-in page, images pinned by digest. A report for
+  now: findings don't fail the job, a scan that can't run does; the reports and the host's log are an artifact.
 
 ### Changed
 
