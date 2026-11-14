@@ -927,7 +927,7 @@ handler, tekrar teslime karşı iş anahtarıyla bir kayıt tutar ve onu değiş
 
 | Concern | Yaklaşım (.NET 10) | NovaCore'da |
 |---|---|---|
-| **Exception handling** | `UseExceptionHandler` + `AddProblemDetails` (RFC 9457), `StatusCodeSelector` | Eşleme middleware'in kendi yedek yolunda: projenin `IExceptionHandler`'ları her zaman önce çalışır. `AppException` → durumu + mesajı, `BadHttpRequestException` → kendi durumu, diğer her şey → 500, mesajsız; yalnızca 500'ler loglanır |
+| **Exception handling** | `UseExceptionHandler` + `AddProblemDetails` (RFC 9457), `StatusCodeSelector` | Eşleme middleware'in kendi yedek yolunda: projenin `IExceptionHandler`'ları her zaman önce çalışır. `AppException` → durumu + mesajı, `BadHttpRequestException` → kendi durumu, okunamayan form gövdesi (`InvalidDataException`) ve `AntiforgeryValidationException` → 400, diğer her şey → 500, mesajsız; yalnızca 500'ler loglanır |
 | **Logging** | Serilog (structured) + OTel korelasyon | `AddCoreLogging` (`NovaCore.Serilog` eklentisi) — Console + opsiyonel Seq |
 | **Tracing/Metrics/Logs** | OpenTelemetry | `AddCoreObservability` (`NovaCore.OpenTelemetry` eklentisi) — `ILogger` log'ları da (biçimlenmiş mesaj ve scope'larla); OTLP yalnızca endpoint konfigüre ise. Serilog kullanan host'ta log'lar Serilog'dan gider |
 | **Caching** | HybridCache (L1 + opsiyonel L2) | `HybridCache` doğrudan enjekte edilir (zaten soyut bir sınıf, sarmalayıcı yok). `AddCoreCaching` varsayılan süreyi `Cache:DefaultExpiration`'dan alır |

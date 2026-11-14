@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -14,7 +15,9 @@ namespace NovaCore.AspNetCore.Exceptions;
 /// <see cref="IExceptionHandler"/>, so the handlers a project registers run first, before or after <c>AddCoreWeb</c>,
 /// and the responses they write stay theirs.
 /// <see cref="AppException"/>s keep their status and their message, which is written for clients;
-/// <see cref="BadHttpRequestException"/> keeps its status; anything else is a bug: 500, its message in the log only.
+/// <see cref="BadHttpRequestException"/> keeps its status; a request body the framework can't read as a form, or whose
+/// antiforgery token it can't read or validate, is a 400 (<see cref="IsMalformedRequest"/>); anything else is a bug:
+/// 500, its message in the log only.
 /// </summary>
 internal static class ExceptionMapping
 {
@@ -22,8 +25,20 @@ internal static class ExceptionMapping
     {
         AppException app => ResultHttpExtensions.StatusFor(app.Type),
         BadHttpRequestException badRequest => badRequest.StatusCode,
+        _ when IsMalformedRequest(exception) => StatusCodes.Status400BadRequest,
         _ => StatusCodes.Status500InternalServerError
     };
+
+    /// <summary>
+    /// What the framework throws for a request it can't read, outside the Minimal API binding that answers these with 400
+    /// itself: <see cref="InvalidDataException"/> from the form reader (a key or value over <c>FormOptions</c>' limits, too
+    /// many values, a NUL character, multipart without a boundary), which <c>HttpRequest.ReadFormAsync</c> and OpenIddict's
+    /// request extraction let through, and <see cref="AntiforgeryValidationException"/>, which
+    /// <c>IAntiforgery.IsRequestValidAsync</c> wraps such a form in and <c>ValidateRequestAsync</c> throws for a bad token.
+    /// Both are the client's, as the framework's own antiforgery and form binding treat them (docs/plan/RESEARCH.md R-156).
+    /// </summary>
+    private static bool IsMalformedRequest(Exception exception) =>
+        exception is InvalidDataException or AntiforgeryValidationException;
 
     /// <summary>
     /// The middleware's diagnostics (the <c>UnhandledException</c> error log, the <c>error.type</c> metric tag) are for
@@ -32,7 +47,8 @@ internal static class ExceptionMapping
     /// </summary>
     public static bool SuppressDiagnostics(ExceptionHandlerSuppressDiagnosticsContext context) =>
         context.ExceptionHandledBy == ExceptionHandledType.ExceptionHandlerService
-        || context.Exception is AppException { Type: not ErrorType.Failure } or BadHttpRequestException;
+        || context.Exception is AppException { Type: not ErrorType.Failure } or BadHttpRequestException
+        || IsMalformedRequest(context.Exception);
 
     /// <summary>
     /// Writes the response for an exception no <see cref="IExceptionHandler"/> handled, with the status
@@ -59,6 +75,7 @@ internal static class ExceptionMapping
                 {
                     AppException app => ResultHttpExtensions.TitleFor(app.Type),
                     BadHttpRequestException => ReasonPhrases.GetReasonPhrase(status),
+                    _ when IsMalformedRequest(exception) => ReasonPhrases.GetReasonPhrase(status),
                     _ => ResultHttpExtensions.TitleFor(ErrorType.Failure)
                 },
                 // Any other message (ArgumentException, framework exceptions, ...) can carry internals such as

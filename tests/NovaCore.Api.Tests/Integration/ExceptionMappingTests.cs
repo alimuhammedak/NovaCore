@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
@@ -19,7 +20,7 @@ namespace NovaCore.Api.Tests.Integration;
 /// PLAN F4c.4: an unhandled exception becomes an RFC 9457 response through the exception handler middleware's own
 /// fallback (<c>StatusCodeSelector</c> and the ProblemDetails customization), not through an <c>IExceptionHandler</c>, so
 /// a project's handlers run first whenever they were registered. <see cref="AppException"/>s keep their status and
-/// message; <c>BadHttpRequestException</c> keeps its status; every other exception is a bug: 500, its message in the
+/// message; <c>BadHttpRequestException</c> keeps its status; a form the framework can't read is a 400; every other exception is a bug: 500, its message in the
 /// server log only (Y-35). The <c>instance</c> member is the request path, a URI reference without the query (R-051).
 /// </summary>
 public sealed class ExceptionMappingTests
@@ -120,6 +121,24 @@ public sealed class ExceptionMappingTests
         Assert.Contains(log.Messages, message => message.Contains("unhandled exception", StringComparison.OrdinalIgnoreCase));
     }
 
+    // What the form reader and antiforgery throw for a body the framework can't read (S-14): the client's error, not logged.
+    [Theory]
+    [InlineData(nameof(InvalidDataException))]
+    [InlineData(nameof(AntiforgeryValidationException))]
+    public async Task An_unreadable_form_is_a_bad_request_and_is_not_logged(string exceptionType)
+    {
+        using var log = new LogCapture();
+        await using var host = await StartAsync(builder => builder.Logging.AddProvider(log));
+
+        var (status, problem) = await GetProblemAsync(host, $"/throw/{exceptionType}");
+
+        Assert.Equal(StatusCodes.Status400BadRequest, status);
+        Assert.Equal("Bad Request", problem.GetProperty("title").GetString());
+        Assert.False(problem.TryGetProperty("detail", out _));
+        Assert.DoesNotContain("hunter2", problem.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain(log.Messages, message => message.Contains("unhandled exception", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public async Task A_malformed_JSON_body_is_a_bad_request()
     {
@@ -152,6 +171,8 @@ public sealed class ExceptionMappingTests
             nameof(KeyNotFoundException) => new KeyNotFoundException(Secret),
             nameof(OperationCanceledException) => new OperationCanceledException(Secret),
             nameof(TimeoutException) => new TimeoutException(Secret),
+            nameof(InvalidDataException) => new InvalidDataException(Secret),
+            nameof(AntiforgeryValidationException) => new AntiforgeryValidationException(Secret),
             "not-found" => NotFoundException.For("Product", 42),
             "conflict" => new ConflictException("Already there."),
             "forbidden" => new ForbiddenException(),
