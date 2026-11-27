@@ -51,9 +51,13 @@ public static class CoreWebExtensions
         services.AddCoreAuthentication();
         services.AddCoreAuthorization(); // the handler behind RequirePermission(...)
 
-        services.AddOpenApi(options => options
-            .AddDocumentTransformer<BearerSecuritySchemeTransformer>()
-            .AddOperationTransformer<AuthorizationResponsesTransformer>());
+        services.AddOpenApi(options =>
+        {
+            options.CreateSchemaReferenceId = SchemaReferenceIds.Create;
+            options
+                .AddDocumentTransformer<BearerSecuritySchemeTransformer>()
+                .AddOperationTransformer<AuthorizationResponsesTransformer>();
+        });
 
         AddForwardedHeaders(services);
         AddRateLimiting(services);

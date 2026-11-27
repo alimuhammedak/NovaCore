@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenAPI: request schemas carry their validation limits (`maxLength`, `minLength`, `minimum`, `exclusiveMinimum`): the
   request records' DataAnnotations target their properties (`[property: Required, MaxLength(200)]`), the only place the
   document reads them. The template's `CreateTodo` does the same.
+- OpenAPI: a type nested in a public type has a schema named with its declaring types (`CreatePaymentRequest`,
+  `CreateProductResponse`, ...). The features' nested `Request` and `Response` records used to share one `Request` and
+  one `Response` schema, so `POST /api/v1/payments` was documented with the product's body. Other schemas keep their
+  names.
 - Security headers: the Content-Security-Policy adds `base-uri 'none'`, which `default-src` doesn't cover. No
   `form-action`: Chrome applies it to the redirects after a sign-in form's post too.
 - Identity provider: the sign-in rules moved into one internal service shared by the HTML pages and the JSON

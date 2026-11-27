@@ -73,6 +73,7 @@ public class OpenApiTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreAp
     [InlineData("/api/v1/auth/session/login", "returnUrl", "maxLength", 4096)]
     [InlineData("/api/v1/admin/users/{userId}/roles", "role", "maxLength", 256)]
     [InlineData("/api/v1/products", "name", "maxLength", 200)]
+    [InlineData("/api/v1/payments", "quantity", "minimum", 1)]
     public async Task Request_schemas_carry_the_validation_limits(string path, string property, string keyword, int value)
     {
         var client = _factory.CreateClient();
@@ -86,6 +87,30 @@ public class OpenApiTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreAp
 
         Assert.Equal(value, schema.GetProperty("properties").GetProperty(property).GetProperty(keyword).GetInt32());
     }
+
+    // Nested request and response types share their names across features (CreateProduct.Request,
+    // CreatePayment.Request); each needs a schema of its own, or one operation is documented with another's body (S-20).
+    [Fact]
+    public async Task Nested_types_of_different_features_get_schemas_of_their_own()
+    {
+        var client = _factory.CreateClient();
+
+        using var document = JsonDocument.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative)));
+        var paths = document.RootElement.GetProperty("paths");
+        var payment = paths.GetProperty("/api/v1/payments").GetProperty("post");
+        var product = paths.GetProperty("/api/v1/products").GetProperty("post");
+
+        Assert.NotEqual(RequestReference(product), RequestReference(payment), StringComparer.Ordinal);
+        Assert.NotEqual(ResponseReference(product, "201"), ResponseReference(payment, "201"), StringComparer.Ordinal);
+    }
+
+    private static string? RequestReference(JsonElement operation) =>
+        operation.GetProperty("requestBody").GetProperty("content").GetProperty("application/json").GetProperty("schema")
+            .GetProperty("$ref").GetString();
+
+    private static string? ResponseReference(JsonElement operation, string status) =>
+        operation.GetProperty("responses").GetProperty(status).GetProperty("content").GetProperty("application/json")
+            .GetProperty("schema").GetProperty("$ref").GetString();
 
     // confirm-email answers a token it refuses with its own message, and a query value the framework can't bind with
     // ProblemDetails; the document lists both bodies under 400 (DAST S-15, ST105).
