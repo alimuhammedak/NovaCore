@@ -26,23 +26,23 @@
 | 6d | ✅ tamam | `faz/6d-analizor-sikilastirma` | 2026-10-23 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `231b05f`; push 2026-10-23, kullanıcı isteği) |
 | 7a | ✅ tamam | `faz/7a-veritabani-ozgurlugu` | 2026-10-23 | 2026-10-24 | 2026-10-24 (kullanıcı onayı, PR #11 merge commit'i `cf895d8`) |
 | 7b | ✅ tamam | `faz/7b-cok-kiracililik` | 2026-10-24 | 2026-10-25 | 2026-10-27 (kullanıcı onayı, PR #13 merge commit'i `dba8318`) |
-| 8 | ⏸ PR #35 açık, merge edilmedi: adımlar ve doğrulama bitti (V8-1…V8-10 kapalı); `sonar` 2026-11-27'de yeşil, CodeRabbit'in 12 yorumu bekliyor | `faz/8-bassiz-giris` | 2026-11-09 | | |
-| 9 | ⏸ PR #36 açık, merge edilmedi: adımlar ve incelemeler bitti; #35'in üstünde | `faz/9-bakim` (`faz/8-bassiz-giris` + `main`) | 2026-11-13 | | |
-| 6e | ⏸ PR #37 açık, merge edilmedi: adımlar, triaj ve faz sonu incelemesi bitti (V6e-1…V6e-3 kapalı); #36'nın üstünde | `faz/6e-dinamik-denetim` (`faz/9-bakim`'in üstüne açıldı) | 2026-11-13 | | |
+| 8 | ✅ tamam | `faz/8-bassiz-giris` | 2026-11-09 | 2026-11-14 | 2026-11-27 (kullanıcı onayı, PR #35 merge commit'i `611903f`; CodeRabbit'in 12 yorumu sonradan bulgu olarak okunur) |
+| 9 | ✅ tamam | `faz/9-bakim` (`faz/8-bassiz-giris` + `main`) | 2026-11-13 | 2026-11-14 | 2026-11-27 (kullanıcı onayı, PR #36 merge commit'i `06316de`) |
+| 6e | ⏸ merge edildi (PR #37, `d2be1d1`, 2026-11-27, kullanıcı onayı); açık: F6e.3 (kullanıcıya) ve DAST'ın ilk koşusunun F6e.5 triajı (run `46002347264`) | `faz/6e-dinamik-denetim` (`faz/9-bakim`'in üstüne açıldı) | 2026-11-13 | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
 
 ## Gece koşusu (D-096)
 
-Durum: **bitti (2026-11-14).** Kuyruk boşaldı; üç PR (#35, #36, #37) merge bekliyor (`sonar` 2026-11-27'de yeşile döndü). Kota sınırına birkaç kez takıldı, kaldığı yerden sürdü. Kullanıcı `/novacore-night` ile başlatır; kurallar `.claude/skills/novacore-night/SKILL.md`'de. Koşu her turda bu bölümü okur ve günceller.
+Durum: **bitti (2026-11-14).** Kuyruk boşaldı; üç PR (#35, #36, #37) 2026-11-27'de merge edildi. Kota sınırına birkaç kez takıldı, kaldığı yerden sürdü. Kullanıcı `/novacore-night` ile başlatır; kurallar `.claude/skills/novacore-night/SKILL.md`'de. Koşu her turda bu bölümü okur ve günceller.
 
 ### İş kuyruğu
 
 | # | İş | Durum | Not |
 |---|---|---|---|
-| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ⏸ PR #35 | İki inceleme, on bulgu, hepsi kapalı. `sonar` dışında bütün job'lar yeşil; son push (`6e7fdb6`) run `43392510435`, sonucu Faz 9'un ilk adımında okunur. `sonar` 2026-11-27'de yeşil (yeni token); merge kullanıcıda |
-| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | ⏸ PR #36 | Bütün adımlar ve iki inceleme bitti; son push `1f3c034`. #35'e bağlı; `sonar` 2026-11-27'de yeşil |
-| 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏸ PR #37 | F6e.1, F6e.2, F6e.4, F6e.5 (S-1…S-6, S-9, S-13, S-14) ve faz sonu incelemesi bitti. Son kod push'u `12309b2`, run `43625440007`: `sonar` dışında yeşil. **F6e.3 (OpenID conformance suite) yapılmadı:** suite'in indirilip kurulması ön onaylı değil (F6e.4'ün araçlarıyla aynı gerekçe); PLAN'a göre sürüm öncesi şart → Kullanıcıya kalanlar |
+| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ✅ `611903f` | İki inceleme, on bulgu, hepsi kapalı. Bütün kontroller yeşil (`17790b1`); PR #35 2026-11-27'de merge edildi (kullanıcı) |
+| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | ✅ `06316de` | Bütün adımlar ve iki inceleme bitti; kontroller yeşil (`d33a33c`); PR #36 2026-11-27'de merge edildi (kullanıcı) |
+| 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏸ merge `d2be1d1` | F6e.1, F6e.2, F6e.4, F6e.5 (S-1…S-6, S-9, S-13, S-14) ve faz sonu incelemesi bitti. Kontroller yeşil (`1b0c22d`; SonarCloud kalite kapısı yalnız `dast.yml:43` S2068 yüzünden kırmızı, V6e-1'in false positive'i); PR #37 2026-11-27'de merge edildi (kullanıcı). DAST ilk koşusu: run `46002347264`. **F6e.3 (OpenID conformance suite) yapılmadı:** suite'in indirilip kurulması ön onaylı değil (F6e.4'ün araçlarıyla aynı gerekçe); PLAN'a göre sürüm öncesi şart → Kullanıcıya kalanlar |
 | 4 | Sabah raporu ve devir notu | ✅ | 2026-11-14 |
 
 ### Karar adayları (DA)
@@ -70,11 +70,10 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 
 | İş | Neden | Ne gerekli |
 |---|---|---|
-| `main`'de `secret-scan` kırmızı (6 bulgu) | Tarama bütün branch'lerin geçmişini `main`'in allowlist'iyle okuyor; bulgular Faz 8/9 branch'lerindeki test parolaları. `main`'e açılan her PR'da (Dependabot) da kırmızı | PR #35 merge edilince kendiliğinden düzelir (#47 de bu yüzden kırmızı) |
-| Dependabot #2, #28, #30, #31, #32, #34 | Güncellemeleri Faz 9 branch'inde yapıldı (F9.3); PR'lar açık duruyor | Faz 9 merge edilince Dependabot kendisi kapatır; kapatmazsa kullanıcı kapatır |
+| Dependabot PR'ları | Faz 9 merge edildi (F9.3'ün güncellemeleri `main`'de); açık PR'lar eski `main`'e karşı, `secret-scan` o yüzden kırmızıydı | Dependabot üstü kalanları kapatır; kalanlar `@dependabot rebase` ile yeni `main`'e karşı koşar |
 | CodeRabbit CLI incelemesi (Faz 8) | "session could not be authenticated" | `coderabbit auth login`, sonra `coderabbit review --agent --base main` |
 | CodeRabbit PR incelemesi | Repo 10 yıldızın altında, otomatik inceleme yok; bot PR'larını hiç incelemez | PR başına `@coderabbitai review` (2026-11-27'de #35, #36, #37'ye yazıldı; yorumlar bir sonraki oturumda bulgu olarak okunur) |
-| DAST'ın ilk koşusu (F6e.2'nin kabulü) | `workflow_dispatch` yalnız varsayılan branch'teki workflow'u tetikler; Faz 6e merge edilmedi | Merge'den sonra `gh workflow run dast.yml`, raporlar F6e.5'e |
+| SonarCloud: `dast.yml:43` S2068 ("password") | V6e-1'in false positive'i (değer `openssl rand` ifadesi); kalite kapısını kırmızı yapıyor | Kullanıcı SonarCloud'da "Safe/False positive" işaretler (L96 ile birlikte) |
 | S-1'in kalan yolu: kurban kendi kaydını yapmadan saldırganın kaydından gelen onay linkine tıklarsa hesap saldırganın şifresiyle onaylanır | Kapatmanın yolu onay anında şifre istemek: her kullanıcının kayıt akışını ve `RegisterRequest` sözleşmesini değiştirir (ürün kararı) | Kullanıcı karar verir; onaylarsa kayıt "önce e-posta, sonra şifre" akışına geçer |
 | S-7: açık kaydı kapatılabilir yapmak | Ürün kararı; Y-19 bir seçenek için gerçek tüketici ister. Kayıt olan herkes platform `UserPermissions`'ını alıyor | Kullanıcı karar verir: CRM-Nominal açık kayıt kullanacak mı; kullanmayacaksa `Identity:SignIn:AllowRegistration` (ya da kaydın hiç eşlenmemesi) planlanır |
 | F6e.4'ün adlı araçları (Cloudflare `security-audit-skill`, Claude Security plugin) | Kurulu değil; indirme/kurma ön onaylı değil | Kullanıcı kurar, iki kapsamla koşar |
@@ -89,16 +88,6 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 Biçim: `- [x] F0.3 (abc1234): not`. Not en çok iki satırdır: ne yapıldı, koşulan test sınıfları, doğrulamaya kalan. Gerekçe D/R kaydına, ayrıntı commit mesajına yazılır.
 
 Biten fazların adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
-
-### Faz 8
-Başlangıç 2026-11-09, `main` @ `f319d57`; giriş notu ve fazın yapılmayacakları arşivde ("### Faz 8").
-
-- [x] F8.1–F8.8 (`1aaf0f9` … `163c4af`): adım notları ve oturum sonu koşusu arşivde ([PROGRESS-ARSIV.md](PROGRESS-ARSIV.md), "### Faz 8"; D-097 (2)).
-
-#### Doğrulama: V8-1…V8-10 kapandı (DA-1…DA-6); tablo arşivde ("### Faz 8"). PR #35 açık.
-
-### Faz 9
-Adımlar (F9.1…F9.4, F9.2a2/k, F9.3f), incelemeler ve V9-1 arşivde (PROGRESS-ARSIV.md, "### Faz 9 adımları"). PR #36 açık.
 
 ### Faz 6e
 Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docker çalışıyor; PLAN'ın adını verdiği Cloudflare `security-audit-skill` ve Claude Security plugin kurulu değil (kullanıcıya kaldı).
@@ -148,8 +137,8 @@ Yalnız cevabı beklenen sorular. Cevaplanan soru cevabıyla birlikte arşivin "
 
 > Yalnız en son not durur. Yeni not yazılırken bir önceki arşivin "Eski devir notları" bölümünün en üstüne taşınır (D-097).
 
-**2026-11-27, faz dışı: ücretli araçların denetimi.** `SONAR_TOKEN` yenilendi; `sonar` #35, #36, #37'de yeşil. Greptile'ın kredisi bitmişti, plandan çıkarıldı (D-098). V6e-1'in allowlist kaydı `faz/8` ve `faz/9`'a da eklendi: tarama bütün branch'lerin geçmişini okuduğu için oralarda da `secret-scan`'i kırmızı yapıyordu. CodeRabbit #35'e 12 yorum yazdı; #36 ve #37'de "rate limited".
+**2026-11-27, faz dışı: ücretli araçların denetimi.** `SONAR_TOKEN` yenilendi; `sonar` #35, #36, #37'de yeşil. Greptile'ın kredisi bitmişti, plandan çıkarıldı (D-098). V6e-1'in allowlist kaydı `faz/8` ve `faz/9`'a da eklendi: tarama bütün branch'lerin geçmişini okuduğu için oralarda da `secret-scan`'i kırmızı yapıyordu. CodeRabbit #35'e 12 yorum yazdı; #36 ve #37'de "rate limited". Kullanıcının isteğiyle #35 → #36 → #37 sırayla merge edildi (`611903f`, `06316de`, `d2be1d1`); Faz 8 ve 9 tamam. DAST'ın ilk koşusu başlatıldı (run `46002347264`).
 
-- **Sıradaki:** CodeRabbit'in #35 yorumları bulgu olarak sınıflandırılır (`novacore-verify` §4.2); #36 ve #37 için `@coderabbitai review` yeniden istenir. Bütün kontroller yeşilse #35 → #36 → #37 sırayla merge edilir (kullanıcı kararı). Sonra `gh workflow run dast.yml` ile DAST'ın ilk koşusu, raporları F6e.5 triajına. DA-1…DA-12 tek düzenlemeyle DECISIONS'a işlenir. D-032: `DECISIONS.md` `protectedPaths`'e geri eklenir (Faz 6e sonu, kullanıcı).
+- **Sıradaki:** DAST raporları F6e.5 triajına (artifact'lar run `46002347264`'te). CodeRabbit'in #35 yorumları bulgu olarak sınıflandırılır (`novacore-verify` §4.2); merge edilmiş kod üzerinde, gerekirse yeni bir PR'la. DA-1…DA-12 tek düzenlemeyle DECISIONS'a işlenir. D-032: `DECISIONS.md` `protectedPaths`'e geri eklenir (Faz 6e sonu, kullanıcı).
 - **Bilinmesi gerekenler:** tam suite, SQL Server/PostgreSQL katmanları ve şablon smoke'u yalnız CI'da koştu (yeşil). CodeRabbit CLI çalışmadı (kimlik doğrulama). ZAP yerelde denenmedi. V6e-3'ün bedeli: `UseCoreWeb` çağırmayan host kendi form okuma hatasında 500 alır. `/account/login` e-postasına 256 sınırı konmadı (lockout veritabanında, bellek durumu yok).
 - **Bekleyen karar:** Kullanıcıya kalanlar tablosu (S-6 varsayılanları, V6e-4, S-7, S-1'in kalan yolu). Q-40 sürüyor.
