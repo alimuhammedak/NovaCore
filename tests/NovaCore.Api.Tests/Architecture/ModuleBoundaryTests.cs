@@ -28,8 +28,8 @@ public class ModuleBoundaryTests
     [Fact]
     public void Module_projects_are_only_the_module_and_its_contracts()
     {
-        var projects = Directory
-            .EnumerateFiles(Path.Combine(Solution.RootDirectory, "src", "Modules"), "*.csproj", SearchOption.AllDirectories)
+        var projects = Solution
+            .SourceFiles("*.csproj", "src", "Modules")
             .Select(Path.GetFileNameWithoutExtension)
             .ToList();
         Assert.NotEmpty(projects);

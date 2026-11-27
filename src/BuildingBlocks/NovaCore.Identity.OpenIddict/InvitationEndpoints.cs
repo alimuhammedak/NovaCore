@@ -24,7 +24,7 @@ internal static class InvitationEndpoints
     private static readonly Error AccountExists =
         Error.Conflict("invitation.account_exists", "The account already exists. Sign in with its password.");
 
-    private static readonly AccountEndpoints.MessageResponse Accepted =
+    private static readonly MessageResponse Accepted =
         new("The invitation has been accepted. Sign in with the new password.");
 
     /// <summary>The invited address and until when the link works.</summary>
@@ -70,7 +70,7 @@ internal static class InvitationEndpoints
             : ProblemFor(state);
     }
 
-    private static async Task<Results<Ok<AccountEndpoints.MessageResponse>, ValidationProblem, ProblemHttpResult>> Accept(
+    private static async Task<Results<Ok<MessageResponse>, ValidationProblem, ProblemHttpResult>> Accept(
         InvitationAcceptRequest request, AccountInvitations invitations, CancellationToken cancellationToken)
     {
         var (state, errors) = await invitations.AcceptAsync(request.Token, request.Password, cancellationToken);

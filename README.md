@@ -90,7 +90,8 @@ cd SiparisServisi && dotnet build && dotnet test         # veritabanı sunucusu 
 | Kök | `nuget.config`, `Directory.Build.props` (uyarılar hata, analyzer'lar, NuGet audit), `Directory.Packages.props` (merkezi sürümler, `NovaCoreVersion`), `global.json`, `.editorconfig`, `dotnet-tools.json` (dotnet-ef, nuget-license), `eng/check-licenses.sh` (lisans kapısı ve projenin adlı istisnaları) |
 
 Log hattı tektir: `AddCoreObservability` log, metrik ve trace'i OpenTelemetry'den geçirir, `OTEL_EXPORTER_OTLP_ENDPOINT`
-varsa OTLP'ye gönderir. Serilog eklentisi (`BMD.NovaCore.Serilog`) isteyen proje için ayrıca durur.
+varsa OTLP'ye gönderir. Kaynağın `service.version`'ı host'un verdiği assembly'nin sürümüdür (`AddCoreObservability(typeof(Program).Assembly)`);
+assembly verilmezse sürüm raporlanmaz. Serilog eklentisi (`BMD.NovaCore.Serilog`) isteyen proje için ayrıca durur.
 
 ### Sorumluluk modeli
 
@@ -746,7 +747,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Eklentiler (üçüncü taraf paketler)
 builder.AddCoreLogging();                          // Serilog: Console + opsiyonel Seq
-builder.AddCoreObservability();                    // OpenTelemetry metrics + tracing, OTLP yalnızca konfigüre ise
+builder.AddCoreObservability(typeof(Program).Assembly); // OpenTelemetry metrics + tracing, service.version uygulamanın; OTLP yalnızca konfigüre ise
 
 // Çekirdek
 builder.AddCoreDefaults();                         // health + resilient HttpClients
@@ -773,7 +774,7 @@ app.MapCoreIdentityServer();                       // /connect/*, giriş sayfas�
 app.MapModules();                                  // modüllerin endpoint'leri
 app.MapDefaultEndpoints();                         // /health, /alive (Development)
 
-app.Run();
+await app.RunAsync();
 ```
 
 ---
@@ -874,15 +875,19 @@ Son birim için gelen iki istek ikisi de 201 alabilir, ama biri sonra Failed olu
 dispatcher turu içinde (yaklaşık 10 sn) `GET /api/v1/payments`'ta görünür; başarısız her teslim bir tur daha ekler.
 
 Stoğa aynı anda yazan iki işlem birbirinin üstüne yazamaz, çünkü `Product.Stock` bir concurrency token'dır. Ürün uç
-noktaları (`PUT`/`DELETE`) okuduktan sonra değişmiş bir stokta 409 `product.concurrency_conflict` döner; rezervasyonun
-teslimi ise düşer ve outbox onu bir sonraki turda güncel stokla yeniden dener.
+noktaları (`PUT`/`DELETE`) okuduktan sonra değişmiş bir stokta 409 `product.concurrency_conflict`, okuduktan sonra
+silinmiş bir üründe 404 `product.not_found` döner; rezervasyonun teslimi ise düşer ve outbox onu bir sonraki turda
+güncel stokla yeniden dener. Bağlantı direnci (`EnableRetryOnFailure`) ilk denemesi uygulanmış bir `DELETE`'i yeniden
+oynatırsa o istek de 404 alır: ürün silinmiştir.
 
 ### Domain event'ler ve outbox
 
 Bir entity olayı `Raise(new SiparisVerildi(...))` ile kaydeder. Event, `DomainEvent`'ten türeyen bir record'dur.
 Kaydeden SaveChanges event'i modülün `outbox_messages` tablosuna aynı transaction içinde yazar (**transactional
 outbox**): entity değişikliği ve event ya birlikte kalıcı olur ya hiç olmaz. Bu işi `OutboxInterceptor` yapar;
-`AddModuleDbContext` onu her modül context'ine ekler, modül tabloyu `modelBuilder.AddOutbox()` ile map'ler.
+`AddModuleDbContext` onu her modül context'ine ekler, modül tabloyu `modelBuilder.AddOutbox()` ile map'ler. Entity
+event'lerini kayıt başarılı olana kadar tutar: başarısız bir kaydı aynı context'te yeniden denemek her event'i bir kez
+yazar, entity'yi yeni bir context'e eklemek de event'leriyle birlikte götürür.
 
 `AddCorePersistence`'ın kaydettiği `OutboxDispatcher` (bir `BackgroundService`) outbox'lardaki event'leri
 `IDomainEventHandler<T>`'lere dağıtır:
@@ -1066,7 +1071,8 @@ kaybedemez (409).
   kendisi loglar.
 - **Seed** (`Identity:Seed:SeedOnStartup`): `Administrator` rolü tüm beyan edilmiş izinleri, `User` rolü
   `Identity:Seed:UserPermissions` listesini alır (Api: `catalog:products:read`, `payments:read`, `payments:create`);
-  opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar.
+  opsiyonel admin (parola user-secrets ile) ve `Identity:Clients`'taki client'lar. Değişmemiş bir client yeniden
+  yazılmaz, secret'ı hâlâ saklı hash'e uyan client hash'ini korur; birlikte açılan örnekler aynı satırda yarışmaz.
 - **Admin için 2FA zorunlu:** `Administrator` rolü yalnızca 2FA'sı açık hesapta sayılır (çözümleyicide; rolün kendi
   izinleri dahil). Seed admin parolayla girer, 2FA'yı API'den açar; açma ve kapama izin önbelleğini hemen düşürür.
 
@@ -1202,7 +1208,8 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
   nedeni, tekrar teslimde değişiklik olmaması, ödemenin bir kez sonuçlanması. Bir test de akışın tamamını Api host'unda
   gerçek dispatcher'la sahte saati ilerleterek dener (POST'tan Completed'a).
 - **Eşzamanlılık:** son birim için aynı anda gelen iki ödemeden biri Completed, biri Failed olur ve stok 0'da kalır.
-  Bir test interceptor'ı başka bir yazarı taklit eder: okunduktan sonra değişen stok, ürün uçlarında 409 döndürür.
+  Bir test interceptor'ı başka bir yazarı taklit eder: okunduktan sonra değişen stok ürün uçlarında 409, silinen ürün
+  404 döndürür.
   Rezervasyonun teslimi ise düşer ve güncel stokla yeniden denenir.
 - **Kimlik sağlayıcı:** eklenti, yalnızca çekirdek + eklentiden kurulan bir host'ta (`IdentityServer/`) uçtan uca test
   edilir: Authorization Code + PKCE, refresh **rotation** ve **reuse** (zincir iptali), client credentials, sertleştirmeler,

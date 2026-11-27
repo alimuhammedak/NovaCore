@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using NovaCore.Api.Tests.IdentityServer;
 using NovaCore.Identity.OpenIddict;
 using NovaCore.Modules.Catalog.Authorization;
-using NovaCore.Modules.Catalog.Infrastructure;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -64,13 +63,12 @@ public sealed class IdentityServerWiringTests(IdentityServerWiringTests.ApiFacto
         Assert.Equal(HttpStatusCode.Forbidden, (await flow.CallApiAsync("/api/v1/payments", tokens.AccessToken)).StatusCode);
     }
 
-    // The schemas (SQLite: no migrations), the user-facing client and a user holding one module permission.
+    // The identity schema (SQLite: no migrations), the user-facing client and a user holding one module permission.
     private async Task PrepareAsync(string email, string permission)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var services = scope.ServiceProvider;
         await services.GetRequiredService<IdentityServerDbContext>().Database.EnsureCreatedAsync();
-        await services.GetRequiredService<CatalogDbContext>().Database.EnsureCreatedAsync();
         await HostAccounts.AddClientAndUserAsync(services, email, permission);
     }
 }

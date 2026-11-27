@@ -3,11 +3,9 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using NovaCore.AspNetCore.Identity;
 using NovaCore.Modules.Catalog.Authorization;
-using NovaCore.Modules.Catalog.Infrastructure;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -18,13 +16,9 @@ namespace NovaCore.Api.Tests.Integration;
 /// signature and an unexpired lifetime. A valid token of a caller holding the permission reaches a permission-guarded
 /// endpoint (200); every broken token is turned away as unauthenticated (401).
 /// </summary>
-public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>, IAsyncLifetime
+public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreApiFactory>
 {
     private const string ProtectedEndpoint = "/api/v1/products";
-
-    public async ValueTask InitializeAsync() => await EnsureCatalogCreatedAsync(factory);
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task A_token_signed_by_the_authority_is_accepted()
@@ -66,7 +60,6 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
     public async Task Outside_development_the_authority_is_trusted_over_https_metadata()
     {
         await using var production = new ProductionApiFactory();
-        await EnsureCatalogCreatedAsync(production);
 
         var accepted = await GetWithTokenAsync(production, production.IdentityProvider.CreateToken(Reader(production)));
 
@@ -82,7 +75,6 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
         // issuer and audience is still refused, in Development too.
         await using var production = string.Equals(environment, "Production", StringComparison.Ordinal) ? new ProductionApiFactory() : null;
         var host = production ?? factory;
-        await EnsureCatalogCreatedAsync(host);
         var symmetricKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("a-symmetric-key-that-is-long-enough-0123456789"));
 
         var response = await GetWithTokenAsync(host,
@@ -106,13 +98,5 @@ public sealed class JwtValidationTests(NovaCoreApiFactory factory) : IClassFixtu
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return await client.GetAsync(new Uri(ProtectedEndpoint, UriKind.Relative));
-    }
-
-    private static async Task EnsureCatalogCreatedAsync<TEntryPoint>(
-        Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<TEntryPoint> factory)
-        where TEntryPoint : class
-    {
-        using var scope = factory.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<CatalogDbContext>().Database.EnsureCreatedAsync();
     }
 }

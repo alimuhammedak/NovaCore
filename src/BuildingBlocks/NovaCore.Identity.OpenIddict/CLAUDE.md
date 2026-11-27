@@ -77,6 +77,7 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   the user. No `amr`/`acr` or step-up in the token: permissions follow the person on the server, not the token.
 - **Claims contract:** access tokens carry `sub`, `name`, `email`, `role` (the names in `NovaClaims`). **Never
   permissions, never the security stamp:** the core resolves permissions per request (`IdentityPermissionResolver`: role
+  claims, read in one join whatever the number of roles (`IdentityServerPermissionResolverTests` counts the queries),
   + direct `permission` claims for a Guid `sub`, every declared permission for an `Administrator` member with
   two-factor authentication on (without it the role gives nothing, D-053 (5); turning 2FA on or off drops the cache),
   `Identity:Clients:n:Permissions` for a service client's id). The core has no super-admin role: the token's `role`

@@ -26,8 +26,8 @@
 | 6d | ✅ tamam | `faz/6d-analizor-sikilastirma` | 2026-10-23 | 2026-10-23 | 2026-10-23 (kullanıcı onayı, `--no-ff`, `231b05f`; push 2026-10-23, kullanıcı isteği) |
 | 7a | ✅ tamam | `faz/7a-veritabani-ozgurlugu` | 2026-10-23 | 2026-10-24 | 2026-10-24 (kullanıcı onayı, PR #11 merge commit'i `cf895d8`) |
 | 7b | ✅ tamam | `faz/7b-cok-kiracililik` | 2026-10-24 | 2026-10-25 | 2026-10-27 (kullanıcı onayı, PR #13 merge commit'i `dba8318`) |
-| 8 | ⏸ duraklatıldı (doğrulamayı gece koşusu yapar, D-096) | `faz/8-bassiz-giris` | 2026-11-09 | | |
-| 9 | ⏳ başlamadı | | | | |
+| 8 | ⏸ PR #35 açık, merge edilmedi: adımlar ve doğrulama bitti (V8-1…V8-10 kapalı), `sonar` kırmızı (Kullanıcıya kalanlar) | `faz/8-bassiz-giris` | 2026-11-09 | | |
+| 9 | 🔄 devam ediyor | `faz/9-bakim` (Faz 8 merge edilemediği için `faz/8-bassiz-giris`'in üstüne açıldı, `main` içine alındı: `af4e7da`) | 2026-11-13 | | |
 | 6e | ⏳ başlamadı | | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
@@ -40,8 +40,8 @@ Durum: **sürüyor (2026-11-13).** Bir kez kota sınırına takıldı, kaldığ�
 
 | # | İş | Durum | Not |
 |---|---|---|---|
-| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | 🔄 | İlk CI koşusu `43310617390` (`ee7e2b2`): `build-and-test` (üç veritabanı, coverage), `template-smoke`, `api-contract`, `workflow-lint` yeşil. **Kırmızı:** `secret-scan` (3 bulgu; `main`'de yeşil, yani Faz 8'in aralığında: ilk iş, V8-1) ve `sonar` (aşağıda) |
-| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | ⏳ | |
+| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ⏸ PR #35 | İki inceleme, on bulgu, hepsi kapalı. `sonar` dışında bütün job'lar yeşil; son push (`6e7fdb6`) run `43392510435`, sonucu Faz 9'un ilk adımında okunur. Merge koşulu `sonar` yüzünden tutmuyor |
+| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | 🔄 | Dependabot #26, #27, #29, #33, #19 merge edildi; F9.1 ve F9.2'nin on alt adımı bitti, V9-1 doğrulandı; Bütün adımlar bitti (F9.1–F9.4), iki inceleme temiz; PR açılıyor |
 | 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏳ | F6e.3 yerel Docker ister; F6e.4'ün adını verdiği iki araç kurulu değil |
 | 4 | Sabah raporu ve devir notu | ⏳ | |
 
@@ -57,6 +57,8 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | DA-4 | Aynı adrese eşzamanlı iki davet ikisi de 200 alır ve aynı hesabı davet eder (biri 409 almaz); kullanıcı deposu kaybedilen insert'i `DuplicateUserName` olarak bildirir. | V8-5; `8fc5500` |
 | DA-5 | Davetin "kullanıldı" işareti ve şifre yenileme kodunun silinmesi yeni şifreyle aynı transaction'da commit edilir. | V8-6: şifre kaydı eşzamanlı yazmaya yenilince davet/kod yanıyordu; `0aeeaea` |
 | DA-6 | Kodun deneme sayısı ve hesabın serisi tek kayıtta (tek stamp kontrolü), karşılaştırmadan önce sayılır (DA-1'i tamamlar). | V8-9: ayrı kayıt kaybedilince tahmin seriye yazılmıyordu; `a619a94` |
+| DA-7 | Seed bir client'ı yalnız bir alanı değiştiyse yazar; secret `ValidateClientSecretAsync` ile sınanır, eşleşiyorsa saklı hash korunur. | F9.2f (L56): her açılışta yeniden hash + yazma, çok örnekli açılışta satır yarışı; R-142; `bcfd95e` |
+| DA-8 | Bir eklenti host'un assembly'sini kendisi bulmaz (`Assembly.Load`, `GetEntryAssembly` yok); host `Program.cs`'te açıkça verir. `service.version` için `OpenTelemetry:ServiceVersion` ayarı eklenmedi (Y-19; `OTEL_RESOURCE_ATTRIBUTES` yetiyor). | V9-1 (Y-20'nin testi); `83cea0c` |
 
 ### Kullanıcıya kalanlar
 
@@ -65,6 +67,11 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | İş | Neden | Ne gerekli |
 |---|---|---|
 | `sonar` job'u | "Authentication with the server has failed"; `main`'de de 2026-11-09'dan beri kırmızı (run `42651867223`), kodla ilgisi yok | Kullanıcı `SONAR_TOKEN` secret'ını yeniler. Yenilenene kadar "bütün kontroller yeşil" koşulu tutmaz: PR'lar merge edilmez, fazlar üst üste açılır (D-096 (4)) |
+| `main`'de `secret-scan` kırmızı (6 bulgu) | Tarama bütün branch'lerin geçmişini `main`'in allowlist'iyle okuyor; bulgular Faz 8/9 branch'lerindeki test parolaları. `main`'e açılan her PR'da (Dependabot) da kırmızı | PR #35 merge edilince kendiliğinden düzelir (önce `SONAR_TOKEN`) |
+| Dependabot #2, #28, #30, #31, #32, #34 | Güncellemeleri Faz 9 branch'inde yapıldı (F9.3); PR'lar açık duruyor | Faz 9 merge edilince Dependabot kendisi kapatır; kapatmazsa kullanıcı kapatır |
+| CodeRabbit CLI incelemesi (Faz 8) | "session could not be authenticated" | `coderabbit auth login`, sonra `coderabbit review --agent --base main` |
+| Dependabot #21 (`global.json` → SDK 10.0.403) | Bu makinede yalnız 10.0.300 kurulu (F9.3 kuralı) | SDK 10.0.403 kurulur, PR merge edilir |
+| SonarCloud'un CORS bulgusunu "false positive" işaretlemek (L96) | Dış işlem; `AllowAnyOrigin` yalnız Development'ta (`CoreWebExtensions.cs:182`) | Kullanıcı SonarCloud'da işaretler |
 
 ## Adımlar
 
@@ -77,16 +84,7 @@ Başlangıç 2026-11-09, `main` @ `f319d57`. Plan onaylandı (plan modu). Doğru
 
 **Bu fazda yapılmayacaklar:** ROPC ya da şifre karşılığında tarayıcıya token; `/account`'a ya da yeni uçlara CORS; paketten SPA sunmak; CRM'in React ekranları ve metinleri; kilitli hesabı ayrı kodla açığa çıkarmak; BFF paketi; HTML sayfalarının tasarımı/yerelleştirilmesi; sürüm numarası ve yayın (D-090 (6)); `MapIdentityApi`; IETF First-Party Apps taslağı.
 
-- [x] F8.1 (1aaf0f9): Tasarım kararları D-091, araştırma R-137 (MS Learn antiforgery ve Identity token sağlayıcıları, OWASP Forgot Password, NIST SP 800-63B-4 §3.1.3/§4.2 — NIST bölümleri araçtan özet olarak geldi, değerler R-137'de işaretli —, openiddict-samples Velusia). Kod yok; build/test gerekmedi. Ön karardan sapma: yok; davetin platform ucu ve ürünün kendi ucu ayrıldı (D-091 (5)).
-- [x] F8.2 (8df7b64): Giriş kuralları `SignInFlow`'da (internal, scoped; D-092), `LoginPage` yalnız form ve HTML. Codex iki kez denendi, ikisinde de model reddedildi (`gpt-6.1-sol`, `gpt-6.1`: "not supported when using Codex with a ChatGPT account"), kod yazmadı; kullanıcı kararıyla adımı yazan oturum yazdı. Kimlik eklentisine `InternalsVisibleTo NovaCore.Api.Tests` (depoda ilk). Yeni `SignInFlowTests` (6) önce kırmızı (servis kayıtlı değil), sonra yeşil; `SignInHardeningTests`, `TwoFactorTests`, `AuthorizationCodeFlowTests`, `TwoFactorRaceTests`, `PasswordResetTests`, `SessionTests` değişmeden yeşil: 87/87. Build 0 uyarı, format temiz. Doğrulamaya kalan: tam paket, SQL Server/PostgreSQL `SignInScenarios`.
-- [x] F8.3 (b7107ee): JSON giriş uçları `/api/v1/auth/session` (`GET antiforgery`, `POST login`, `POST login/2fa`; `SessionEndpoints`): `SignInFlow`'u çağırır, grup `strict` + `DisableCors` + `AllowAnonymous`, OpenAPI'de (yalnız ekleme, `docs/openapi/v1.json`). Antiforgery `HeaderName = X-XSRF-TOKEN` (HTML formları değişmeden yeşil). İstekler public record (`SessionSignInRequest`, `SessionCodeRequest`, PublicAPI.Unshipped), `returnUrl` için internal `[LocalUrl]` (`RedirectHttpResult.IsLocalUrl`) → 400 `ValidationProblem`. D-091 (1)'e ek: antiforgery'siz istek 400 ProblemDetails `account.antiforgery_invalid` (D-091 yalnız "400" diyordu). Yeni `SessionSignInTests` (16) önce kırmızı (16/16), sonra yeşil: üç hesap durumu aynı gövde/durum, hash sayısı eşit (süre), onaysız hesap, antiforgery'siz istek, üç yerel olmayan `returnUrl`, başarıdan sonra `/connect/authorize` kod verir ve yanıtta token yok, 2FA kodu (yanlış/doğru), oturumsuz kod adımı, `strict`, CORS preflight. `ModuleRegistrationTests`, `ValidationTests` (+2 satır), `OpenApiContractTests` güncellendi; HTML/2FA/sıfırlama/oturum sınıflarıyla 102/102 yeşil. Build 0 uyarı, format temiz. Doğrulamaya kalan: tam paket, SQL Server/PostgreSQL katmanları, `eng/check-openapi.sh`.
-- **Oturum kuralı değişti (D-094, kullanıcı, 2026-11-09):** F8.4–F8.8 tek oturumda; testler adımla yazılıp commit'lendi, sonda bir kez koşuldu ("önce kırmızı" görülmedi).
-- [x] F8.4 (3d59f79): `Identity:SignIn:LoginPath` (validated options, `IdentitySignInOptions.IsLocalPath`: tek `/`, şema/host/sorgu/parça yok) çerezin `LoginPath`'ini kurar; boşsa `/account/login`. Yeni `LoginPathTests` (10): ayarlı yol + `ReturnUrl`, ekran → oturum ucu → `/connect/authorize` kod verir, varsayılan yol, 7 geçersiz yol host'u açmaz.
-- [x] F8.5 (7e74100): `PasswordResetCodes` (internal, scoped) + `/api/v1/auth/password/{forgot,reset}` (strict, anonim, CORS kapalı, OpenAPI'de). Kurallar D-091 (4) ve D-095 (5); `SignInFlow` ve bağlantılı sıfırlama hesap sayacını siler. Yeni `PasswordCodeResetTests` (8): aynı 202 ve yalnız onaylı hesaba e-posta, tek kullanım + oturumların kapanması + giriş yok, 5 yanlıştan sonra doğru kod geçmez, yanlış kod kilitlemez, yeni kod eskisinin yerini alır, 100'lük seri girişle açılır, bilinmeyen/onaysız hesap aynı cevap, süresi dolan kod (`FakeTimeProvider`, kendi host'u). `ModuleRegistrationTests`, `ValidationTests` (+2), `docs/openapi/v1.json` (yalnız ekleme).
-- [x] F8.6 (295d1f7, f4c5f3c): `AccountInvitations` (public, internal yapıcı) + `invitations` tablosu (SQL Server migration'ı Api'de, PostgreSQL'inki testlerde) + `/api/v1/auth/invitations/{status,accept}` ve `POST /api/v1/admin/invitations` (`identity:invitations:create`). D-095 (1)–(4), (6), (7): durum POST gövdesiyle (token yolda/logda değil), bağlantı `Identity:SignIn:InvitationPath`'e, 410 uçta kurulur. Yeni `InvitationTests` (6): bir kez kabul + şifre kurulur + giriş, kullanılmış 409, bilinmeyen 404, izinsiz 403/anonim 401, onaylı hesap ele geçirilemez (409, eski şifre geçer), kabul etmeden giriş yok, süresi dolan 410 (kendi host'u). `ModuleRegistrationTests`, `ValidationTests` (+3), OpenAPI (yalnız ekleme). Sondaki koşuda `AdminTests`'in Administrator izin listesi yeni izni içermiyordu → güncellendi (f4c5f3c). `PostgreSqlModelTests` yeşil, SQL Server `has-pending-model-changes` temiz.
-- [x] F8.7 (ac3005a): şablonun BuiltIn kimlik setlerine `Invitations` migration'ı (paketlenmiş şablondan `MyService` projeleri, iki sağlayıcı; `has-pending-model-changes` ikisinde temiz), `appsettings.json`'a `Identity:SignIn` (yorumlu). **Smoke (sekiz bileşim) koşmadı** → doğrulamada.
-- [x] F8.8 (163c4af): README "Kendi giriş ekranı" (akış, aynı kaynak, dev proxy, çerezler, hata kodları → ekran), kimlik eklentisinin CLAUDE.md'si (yeni değişmezler; `LoginPage` → `SignInFlow` atıfları), kök CLAUDE.md, CHANGELOG (Added/Changed, `invitations` için yükseltme notu), memory `novacore-security`.
-- **Oturum sonu koşusu (D-094 (2)):** 19 sınıf (yeni üçü + `ModuleRegistrationTests`, `ValidationTests`, `OpenApiContractTests`, `AdminTests`, `SignInFlowTests`, `SessionSignInTests`, `PasswordResetTests`, `SignInHardeningTests`, `TwoFactorTests`, `TwoFactorRaceTests`, `AuthorizationCodeFlowTests`, `SessionTests`, `IdentityServerConfigurationTests`, `RegistrationTests`, `ConfigurationValidationTests`, `IdentityServerWiringTests`) 215 test: ilk koşuda 1 kırmızı (`AdminTests`, yukarıda), düzeltmeden sonra `AdminTests` 12/12. `PostgreSqlModelTests` 4/4. Build 0 uyarı, format temiz.
+- [x] F8.1–F8.8 (`1aaf0f9` … `163c4af`): adım notları ve oturum sonu koşusu arşivde ([PROGRESS-ARSIV.md](PROGRESS-ARSIV.md), "### Faz 8"; D-097 (2)).
 
 #### Doğrulama (gece koşusu, 2026-11-13)
 
@@ -108,6 +106,56 @@ Başlangıç 2026-11-09, `main` @ `f319d57`. Plan onaylandı (plan modu). Doğru
 İkinci inceleme (2026-11-13, Opus, `c7bddf0..0b44d78`): V8-9, V8-10; V8-3…V8-6 ve yarış yardımcıları temiz. Yarış testleri yalnız SQLite'ta koşuyor.
 
 Yanlış pozitif: kök CLAUDE.md'deki başsız giriş satırının `f6185ab` ile gitmesi (kullanıcının bilinçli küçültmesi; bilgi kimlik eklentisinin CLAUDE.md'sinde).
+
+### Faz 9
+Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. Plan onayı D-096 (2). Dependabot, `main`'de: #26, #27, #29, #33, #19 merge edildi (kontroller yeşil, çakışmasız); #21 kullanıcıya kaldı; #2, #28, #30, #31, #32, #34 kırmızı → F9.3.
+
+- [x] F9.1: 98 madde, üç Sonnet sınıflandırıcı + Opus denetimi (`yapılacak`ların hepsi, diğerlerinden 17). Satır numaraları `SONRAYA-BIRAKILANLAR.md` @ `74d511d`.
+
+| Alt adım | Satır: madde | Model | Kırmızı test |
+|---|---|---|---|
+| F9.2a | L25 `PackageDependencyTests` boşlukları (bin/obj, `Update`'li referans); L26 tekrarlı kaynak tarama kodu | Sonnet | hayır |
+| F9.2b | L48 fazla `EnsureCreatedAsync` çağrıları (silinir); L94 Qodana cref ve `!` temizliği | Sonnet | hayır |
+| F9.2c | L63 `src/Modules/CLAUDE.md`'de Guid v7 "SQL Server clustering" cümlesi | Sonnet | hayır |
+| F9.2d | L74 `MessageResponse` üst düzeye | Sonnet | hayır |
+| F9.2e | L32 OTel `service.version` host assembly'sinden | Opus | evet |
+| F9.2f | L56 seed client secret'ı her açılışta yeniden hash'liyor | Opus | evet |
+| F9.2g | L57 `IdentityPermissionResolver` rol başına N+1 | Opus | sorgu sayısı |
+| F9.2h | L96 SonarCloud: `RequestAborted`, iki assertion'sız test, `RunAsync` | Opus | iptal için evet |
+| F9.2i | L65 `OutboxInterceptor` tamponu başarısız kayıtta | Opus | evet |
+| F9.2j | L85 eşzamanlı silinmiş satırda 409 yerine 404 | Opus | evet |
+
+- [x] F9.2a (`ef2cde2`, Sonnet): kaynak taramaları `Solution.SourceFiles`'tan (bin/obj dışlı); `Update`'li referansta NRE testi önce kırmızı. `*.Architecture` 26/26. Opus incelemesi: testin paket satırı `PrivateAssets` yüzünden bir şey sınamıyor, `Directory.Build.*` okuması testsiz → F9.2a2. L25'in `GlobalPackageReference` kısmı yapılmadı (listede kalır).
+- [x] F9.2b (`90d0fde`, Sonnet; Opus incelemesi temiz): dört fazla `EnsureCreatedAsync` silindi, iki cref, `LoginPage`'de `!`, `ProductCatalog.cs` `Internal/` klasörüne. 6 sınıf 60/60. L94'ün kullanılmayan `using` kısmı doğrulanamadı (listede kalır).
+- [x] F9.2c (`bc5f29f`, Sonnet; Opus incelemesi temiz): `src/Modules/CLAUDE.md`'de Guid v7 cümlesi sağlayıcıya göre; R-140. Anahtar stratejisi listede kalır.
+- [x] F9.2e (`7310497`): `service.version` `ApplicationName`'in gösterdiği assembly'den (R-141). `ObservabilityTests` önce kırmızı (`0.1.0.0`), sonra 4/4.
+- [x] F9.2f (`bcfd95e`): seed, secret değişmediyse hash'i korur ve hiçbir alan değişmediyse yazmaz (R-142; DA-7). `ClientSeedTests` önce kırmızı (2/3), sonra 3/3; `ClientCredentialsTests`, `IdentityServerConfigurationTests` yeşil.
+
+- [x] F9.2a2 (`8a35f87`): `PackageDependencyTests` `Update`'li paketi gerçekten sınıyor; `Directory.Build.*` yürüyüşü depo kökünde durur, okuması testli. İki kural geçici bozulup kırmızı görüldü.
+- [x] F9.2d (`9fc17b1`): `MessageResponse` üst düzey internal record; `v1.json` değişmedi. 6 sınıf 61/61.
+
+- [x] F9.2g (`c8446b9`): rol izinleri tek join'le (UserRoles→Roles→RoleClaims); rol artık id ile bulunur. Sorgu sayısı testi önce kırmızı (1 rol 5, 5 rol 13), sonra eşit (4). 8 izin sınıfı 32/32.
+- [x] F9.2h (`669b2d9`; R-143): `/connect` uçları `RequestAborted` geçirir (test önce kırmızı), `await app.RunAsync()` (Api, şablon, README), iki teste doğrulama. 11 sınıf 89/89. CORS bulgusu kullanıcıya kaldı.
+
+- [x] F9.2i (`7d9dcc9`; R-144): event tamponu yalnız `SavedChanges`'te temizlenir, yeniden denemede izlenen outbox satırlarının event'leri atlanır; iki yeni public override. `OutboxInterceptorTests` önce kırmızı (4/14), sonra 14/14.
+- [x] F9.2j (`8a891f4`; R-145): çakışmada `GetDatabaseValuesAsync` null ise 404, değilse 409. `StockConcurrencyTests` önce kırmızı (2), sonra 6/6; OpenAPI değişmedi.
+
+- [x] F9.3 (`13375bd`, `dc06cda`, `94b6db9`, `f475897`, `003b218`; Sonnet, Opus incelemesi sürüyor): codeql init/analyze v4.39.3 (#28, #30), Scalar 2.18.7 (#34), OpenIddict 7.8.0 (#32), Microsoft paketleri 10.0.14 / 10.11.0 + şablonun props'u (#31; L18 kapanır), Jaeger 2.22.0 (#2). Kod uyarlaması yok; R-146…R-149. Kilitli restore ve build temiz. #21 kullanıcıda.
+- Faz sonu incelemesi (Opus, F9.2'nin davranış commit'leri): kapsam içi hata yok. F9.4'e: `src/Modules/CLAUDE.md:69`'daki 404 yönergesi kiracılı context'te `TenantQueryGuard`'a takılır; sorgu sayısı testine alt sınır. Gerisi Sonraya.
+
+- F9.3'ün Opus incelemesi: temiz (sürümler Dependabot'la aynı, kilitli restore hatasız, codeql SHA'sı `v4.39.3`'ün commit'i, yeni geçişli paket yok); üç eksik → F9.3f, F9.4.
+- [x] F9.3f (`38af086`): `dotnet-ef` 10.0.14 (kök ve şablon), bayat servis yorumu. Pkcs: SqlClient 6.1.7 net10'da hâlâ 9.0.11 istiyor, doğrudan referans kalır (Sonraya metni düzeltildi).
+- [x] F9.2k (`82c672d`; R-150): `GetDatabaseValuesAsync` kiracılı context'te `TenantQueryGuard`'a takılıyor (test önce kırmızı); yönerge ve Catalog'un iki handler'ı filtreli `AnyAsync` kalıbına geçti; sorgu sayısı testine alt sınır. 3 sınıf 48/48.
+- [x] F9.4 (`a623cb1`): CHANGELOG `[Unreleased]` (F9.2g/h, bağımlılıklar), README, `tests/CLAUDE.md` (yazan oturum `*.Architecture`'ı da koşar), kimlik eklentisinin CLAUDE.md'si.
+
+#### Doğrulama (Faz 9)
+
+| ID | Bulgu | Yer | Durum |
+|---|---|---|---|
+| V9-1 | CI `build-and-test` kırmızı (run `43395986910`): F9.2e'nin eklediği `Assembly.Load`, Y-20'yi koruyan `ExplicitRegistrationTests`'i kırıyor. Yazan yalnız `ObservabilityTests`'i koştu | `OpenTelemetryHostingExtensions.cs` (`7310497`) | doğrulandı (CI `43399963544`'te `build-and-test` yeşil; `83cea0c`): yeni overload `AddCoreObservability(Assembly)`, host `typeof(Program).Assembly` verir; parametresiz olan sürüm raporlamaz. `ExplicitRegistrationTests` önce kırmızı, `*.Architecture` 27/27 (orkestratör de koştu) |
+
+**Arşive taşındı (2026-11-13):** biten L26, L32, L48, L56, L57, L65, L74, L85; geçersiz L17, L21, L34, L36, L43, L46, L71, L88, L108. **Kısmen, listede kalır:** L25 (`GlobalPackageReference`), L63 (anahtar stratejisi), L94 (kullanılmayan `using`'ler), L96 (CORS bulgusu SonarCloud'da). L18 F9.3'le kapandı, arşivde.
+**kalır:** koşul gerçekleşmedi L11–L15, L20, L33, L45, L51, L60, L62, L68, L72 (F9.3'ten sonra yeniden bak), L73, L75–L79, L84, L86, L89, L90, L92, L93, L103–L105, L107, L112, L113, L116–L118, L121–L127 · ürün/public API/tasarım kararı L22, L24, L29–L31, L41, L42, L52–L55, L61, L66, L67, L80–L83, L114 · D-031 (3)'ü yeniden açar L64 · korunan dosya L27, L49, L69, L95 · bastırma L23, L28 · ortam/upstream L19, L35, L58, L91, L102, L115, L119, L120 · kuşkulu L47.
 
 ## Açık sorular (Q)
 

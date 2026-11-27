@@ -39,7 +39,9 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   outbox would skip its transaction too (F4c.7). Depends on Abstractions,
   EF Core and `Microsoft.Extensions` hosting/options/health-check packages only, never on AspNetCore (D-020).
   `OutboxInterceptor` adds the outbox rows in `SavingChanges`, which EF Core runs before it detects changes and saves,
-  so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068).
+  so they share the save's transaction and a retrying execution strategy replays them with the entities (R-068). It
+  clears the entities' buffers in `SavedChanges` only: a failed save keeps them, and its retry skips the event ids whose
+  rows the context already tracks (R-144).
   `AddCorePersistence` also registers `OutboxDispatcher` (a `BackgroundService`): a pass at startup, then every 5 seconds
   on a `PeriodicTimer` driven by `TimeProvider`. It reads each outbox in `Id` order in keyset batches, gives each message
   a DI scope for its handlers and records the finished handlers in `outbox_consumers` (key: the message's `Id` + the
@@ -63,7 +65,8 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
 `NovaCore.Serilog` (`AddCoreLogging`), `NovaCore.OpenTelemetry` (`AddCoreObservability`: `ILogger` logs with their
 message and scopes, metrics and traces, all over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; a Serilog host keeps
 its logs in Serilog, which doesn't write to other providers; the outbox handlers' spans by the source name
-`NovaCore.EntityFrameworkCore`), `NovaCore.Scalar`
+`NovaCore.EntityFrameworkCore`; `service.version` is the assembly the host passes, `typeof(Program).Assembly`, none
+without it: the add-on finds no assembly itself, Y-20), `NovaCore.Scalar`
 (`MapCoreScalar`), `NovaCore.Identity.OpenIddict` (`AddCoreIdentityServer`: an OpenID Connect provider on ASP.NET Core
 Identity + OpenIddict, D-026), `NovaCore.MultiTenancy` (`AddCoreMultiTenancy`: tenants, memberships, their roles and the
 life cycle, with no third-party library; it uses AspNetCore for the tenant resolution and EntityFrameworkCore for

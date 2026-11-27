@@ -19,7 +19,7 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.AddCoreObservability();                    // logs, metrics and traces through OpenTelemetry; OTLP when OTEL_EXPORTER_OTLP_ENDPOINT is set
+builder.AddCoreObservability(typeof(Program).Assembly); // logs, metrics and traces through OpenTelemetry, this app's version as service.version; OTLP when OTEL_EXPORTER_OTLP_ENDPOINT is set
 builder.AddCoreDefaults();                         // health checks + resilient HttpClients
 builder.AddCoreWeb();                              // ProblemDetails, OpenAPI, JWT auth (Jwt:Authority), permissions, rate limiting, CORS
 builder.AddCorePersistence();                      // audit stamping, the outbox dispatcher, opt-in startup migrations
@@ -95,7 +95,7 @@ app.MapCoreScalar();                               // Scalar UI at /scalar/v1 (D
 app.MapModules();                                  // every module's endpoints
 app.MapDefaultEndpoints();                         // /health and /alive, Development only
 
-app.Run();
+await app.RunAsync();
 
 // Exposed so the integration tests can start the real host through WebApplicationFactory.
 public partial class Program;

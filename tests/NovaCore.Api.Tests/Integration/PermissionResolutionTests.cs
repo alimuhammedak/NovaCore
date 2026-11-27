@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.AspNetCore.Identity;
 using NovaCore.Modules.Catalog.Authorization;
-using NovaCore.Modules.Catalog.Infrastructure;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -15,22 +14,14 @@ namespace NovaCore.Api.Tests.Integration;
 /// (PLAN F3a.2, D-024): a change reaches a signed-in caller once the cached entry expires, not before, and a token with
 /// a new security stamp skips the cache. The clock is fake, so "expires" is a clock advance, not a wait. The tests here
 /// use the test issuer's tokens, which read the real clock, so advancing the shared fake clock cannot invalidate them;
-/// the Identity-issued variant is <see cref="RoleChangeTests"/>.
+/// the Identity-issued variant is <see cref="IdentityServer.IdentityServerRoleChangeTests"/>.
 /// </summary>
 public sealed class PermissionResolutionTests(FakeClockApiFactory factory)
-    : IClassFixture<FakeClockApiFactory>, IAsyncLifetime
+    : IClassFixture<FakeClockApiFactory>
 {
     // Cache:PermissionExpiration's default; the test host leaves it unset.
     private static readonly TimeSpan PermissionExpiration = TimeSpan.FromMinutes(5);
     private static readonly Uri Products = new("/api/v1/products", UriKind.Relative);
-
-    public async ValueTask InitializeAsync()
-    {
-        using var scope = factory.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<CatalogDbContext>().Database.EnsureCreatedAsync();
-    }
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task A_revoked_permission_is_honoured_until_the_cached_entry_expires()

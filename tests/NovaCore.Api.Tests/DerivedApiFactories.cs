@@ -45,7 +45,8 @@ public class FakeClockApiFactory : NovaCoreApiFactory
 
 /// <summary>
 /// The fake-clock host for concurrency tests: <see cref="ChangeStockBeforeNextSave"/> makes another writer change a
-/// product's stock between the next save's read of that product and its write.
+/// product's stock, and <see cref="DeleteProductBeforeNextSave"/> delete the product, between the next save's read of
+/// that product and its write.
 /// </summary>
 public sealed class StockRaceApiFactory : FakeClockApiFactory
 {
@@ -59,6 +60,12 @@ public sealed class StockRaceApiFactory : FakeClockApiFactory
     /// </summary>
     public void ChangeStockBeforeNextSave(Guid productId, int stock) => _competingWrite.Arm(productId, stock);
 
+    /// <summary>
+    /// Once: the next Catalog save that modifies or deletes <paramref name="productId"/> first sees another writer delete
+    /// the product.
+    /// </summary>
+    public void DeleteProductBeforeNextSave(Guid productId) => _competingWrite.Arm(productId, stock: null);
+
     protected override void UseDatabase(DbContextOptionsBuilder options)
     {
         base.UseDatabase(options);
@@ -70,9 +77,10 @@ public sealed class StockRaceApiFactory : FakeClockApiFactory
     private sealed class CompetingStockWrite(string connectionString) : SaveChangesInterceptor
     {
         private readonly Lock _gate = new();
-        private (Guid ProductId, int Stock)? _armed;
+        // A null stock deletes the product.
+        private (Guid ProductId, int? Stock)? _armed;
 
-        public void Arm(Guid productId, int stock)
+        public void Arm(Guid productId, int? stock)
         {
             lock (_gate)
                 _armed = (productId, stock);
@@ -85,15 +93,17 @@ public sealed class StockRaceApiFactory : FakeClockApiFactory
             {
                 await using var other = new CatalogDbContext(
                     new DbContextOptionsBuilder<CatalogDbContext>().UseSqlite(connectionString).Options);
-                await other.Products
-                    .Where(product => product.Id == write.ProductId)
-                    .ExecuteUpdateAsync(set => set.SetProperty(product => product.Stock, write.Stock), cancellationToken);
+                var product = other.Products.Where(product => product.Id == write.ProductId);
+                if (write.Stock is { } stock)
+                    await product.ExecuteUpdateAsync(set => set.SetProperty(p => p.Stock, stock), cancellationToken);
+                else
+                    await product.ExecuteDeleteAsync(cancellationToken);
             }
 
             return await base.SavingChangesAsync(eventData, result, cancellationToken);
         }
 
-        private (Guid ProductId, int Stock)? Take(DbContext context)
+        private (Guid ProductId, int? Stock)? Take(DbContext context)
         {
             lock (_gate)
             {
