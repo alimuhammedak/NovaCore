@@ -20,6 +20,8 @@ Bu prosedürün her adımı bu üç nedenden birine karşılık gelir. Kısaca: 
 
 Bu skill **yazan** oturumdur (D-088). Her adımda build'i ve adımın kendi testlerini çalıştırır. Tam test paketini, code-review'u, CodeRabbit CLI'ı, PR'ı ve bulguların sınıflandırılmasını ayrı bir oturumda `/novacore-verify` yapar: kodu yazılırken izlememiş bir oturum en kolay bağımsız incelemecidir (R-135). Bulguları düzeltmek yine bu skill'in işidir.
 
+**Bir çağrı fazı bitirir (D-104).** Ana oturum orkestratördür: planı okur, kapsamı onaylatır, kullanıcıya soruları sorar, her adımı taze bağlamlı bir **yazan alt ajana** verir, sonucu denetler ve PROGRESS'i tutar. Kodu, testi ve belgeyi alt ajan yazar; ana oturumun bağlamı küçük kalır, bu yüzden oturum bütçesi yoktur ve faz sonuna kadar `/clear` gerekmez (D-082 (1)'in yerine).
+
 Kapsam disiplini sıkıdır, soru sayısı düşüktür (D-016). Kullanıcı bir mühendis gibi düşünmeni ister. Microsoft dokümanı bir şey söylüyorsa öyle yap. Söylemiyorsa maliyeti (uygulama + bakım + risk) hesapla, mantıklı olanı seç ve kaydet. Bariz şeyleri sorma, geçici kod bırakma (Y-45).
 
 Kullanıcı Türkçe konuşur. Raporlar ve sorular Türkçe yazılır.
@@ -46,7 +48,7 @@ Ardından şunları kontrol et. Biri başarısızsa **dur ve kullanıcıya bildi
 - **Devam eden faz:** Faz `🔄 devam ediyor` veya `⏸ duraklatıldı` durumundaysa bu bir devamdır. Son devir notunu esas al ve tamamlanmış adımları tekrar yapma. Plan fazın ilk oturumunda onaylandı: §2'yi atla. Açık bulguları kapattıktan sonra işaretlenmemiş adım varsa ilkinden §3'e geç; kalmadıysa §5'e (faz sonu) geç.
 - **PR'ı açık faz:** Faz `✅ tamam` ve PR'ı açıksa (doğrulama oturumu açtı) bu bir PR düzeltme oturumudur: yalnız açık bulguları kapat, aynı branch'e push'la ve §5.4'e göre doğrulamaya yönlendir. Yeni adım yoktur.
 
-**Açık bir bulguyu kapatmak** (her biri ayrı commit; oturum bütçesine bir adım gibi sayılır):
+**Açık bir bulguyu kapatmak** (her biri ayrı commit; §3'teki gibi bir yazan alt ajan yapar, aşağıdaki adımlar onun brifine girer):
 1. Hatayı gösteren testi koş ve kırmızı olduğunu gör. Kaynak `test` ise o test; `code-review`, `CLI` ya da `PR` ise hatayı gösteren mevcut bir test ya da önce yazılan yeni bir test (Genel kurallar: test önce gelir). Komut §3.2'deki gibidir. Bulgu bir testle gösterilemiyorsa (belge, yapılandırma, yorum) nedenini PROGRESS notuna yaz.
 2. Düzelt. Kapsam dışına taşıyorsa §4.
 3. `dotnet build NovaCore.slnx -v q`, testi yeniden koş ve yeşil gör.
@@ -74,26 +76,57 @@ Kullanıcı onaylamadan hiçbir dosyayı değiştirme. Onaydan sonra:
 
 ## 3. Adım adım uygula
 
-Her adım için aynı döngü:
+Ana oturum kod, test ya da belge yazmaz (D-104); her adımı bir yazan alt ajan yazar. Ana oturumun yazdığı dosyalar yalnız `docs/plan/PROGRESS.md`, `PROGRESS-ARSIV.md`, `SONRAYA-BIRAKILANLAR.md` ve DECISIONS'a eklenen D-kayıtlarıdır.
 
-1. **Başlat:** PROGRESS'te adıma "devam ediyor" notu düş.
-2. **Test:** Adım bir hata düzeltmesi veya yeni davranış içeriyorsa önce testi yaz, adımın test sınıfını koş ve kırmızı olduğunu gör: `dotnet test --project tests/<Proje> -- --filter-class "*.<Sınıf>"` (birden çok sınıf için `--filter-class` tekrarlanır). Çözüm genelinde filtre kullanma: eşleşen testi olmayan proje exit 8 verir (D-063). Sınıf birden çok veritabanında varsa (ör. `TenancyScenarios`: `SqliteTenancyTests`, `SqlServerTenancyTests`, `PostgreSqlTenancyTests`) SQLite olanı koş; diğerleri doğrulamada çalışır.
-3. **Uygula:** Yalnızca o adımın kapsamı. Aynı dosyada yan bir şey gözüne çarparsa dokunma, §4'ü uygula. Bir sembole dokunmadan önce çağıranlarını LSP'yle bul (`findReferences`, `incomingCalls`, `goToImplementation`); metin, yapılandırma ve şablon içeriği için grep (D-079). Adımın konusuna uyan .NET skill'ini (`dotnet-data`, `dotnet-test`, `dotnet-aspnetcore`, `dotnet`) kontrol listesi olarak aç; DECISIONS, PLAN ya da CLAUDE.md ile çelişirse onlar geçerlidir.
-4. **Doğrula (yalnız bunlar, D-088 (1)):**
+### 3.1 Ana oturumun döngüsü
+
+1. **Gönder:** Adımı (ya da aynı alana dokunan en çok üç küçük adımı, her biri ayrı commit) bir yazan alt ajana ver: `Agent`, `subagent_type: "general-purpose"`, aşağıdaki brifle. Çalışma ağacında aynı anda tek yazan olur. Model işe göre: güvenlik, kimlik, yetki, hata düzeltmesi, yeni davranış, public API, migration ve tasarım kararı isteyen adım **Opus**; belge, sürüm ve lock dosyası, yeniden adlandırma gibi mekanik iş **Sonnet**; kuşkuluysa Opus. Sıradaki adımın araştırması gibi okuyan işler yazan çalışırken paralel bir okuyan alt ajanda yürüyebilir.
+2. **Denetle** (alt ajanın raporu kanıt değildir):
+   - `git status --short`: izlenen dosyada değişiklik kalmamış olmalı,
+   - `git log -1 --stat | tail -15`: commit yalnız adımın dosyalarına dokunmuş olmalı,
+   - `dotnet build NovaCore.slnx -v q 2>&1 | tail -5`: 0 uyarı, 0 hata.
+   Biri tutmuyorsa aynı alt ajana (`SendMessage`) düzelttir. Sonnet'in commit'ini, kaydetmeden önce bir Opus okuyan alt ajan `git show <hash>` ile adımın PLAN satırına ve kabul kriterine karşı okur; bulgu varsa bir Opus yazan ayrı commit'le düzeltir.
+3. **Sor:** Rapor §4'ün "Sor" satırına düşen bir şey getirdiyse `AskUserQuestion` ile sor, cevabı aynı alt ajana (`SendMessage`) ya da yeni bir yazana ver. Alt ajan soru soramaz; soru her zaman ana oturumdandır.
+4. **Kaydet:** PROGRESS'te `- [x] <adım-id> (<kısa-hash>): <kısa not>`. Not en çok iki satırdır (D-097 (4)): ne yapıldı, koşulan test sınıfları, doğrulamaya kalanlar (ör. SQL Server ve PostgreSQL katmanları). Rapordaki D-kaydı adaylarını DECISIONS'a tek düzenlemede ekle. Gerekçe D/R kaydına, ayrıntı commit mesajına yazılır. Bir soru cevaplandıysa satırını cevabıyla arşivin "Cevaplanmış sorular" bölümüne taşı. Commit `faz<id>: record <adım-id>`, sonuna attribution satırı.
+5. **Bilgilendir:** Kullanıcıya tek satır yaz, ör. "F0.3 tamam: strict limiter IP bazlı, 2 yeni test." Adımda alınan bir karar varsa aynı satıra ekle. Plan onaylandığı için adımlar arasında onay bekleme; sıradaki adıma geç. Faz bitene kadar `/clear` ya da yeni oturum gerekmez.
+
+Alt ajanın dökümünü okuma, yalnız raporunu oku. Bağlam yine de özetlenirse (compaction) devam etmeden önce PROGRESS.md'yi ve PLAN'daki faz bölümünü **yeniden oku**; kapsam için konuşma özetine güvenme. Oturum bir nedenle yarıda kalırsa (kota, kesinti) PROGRESS her adımda güncel olduğu için `/novacore-phase <id>` kaldığı yerden sürer (§1, "Devam eden faz"); yarım kalmış, commit'lenmemiş bir değişiklik varsa diff'in özetini bir yazana "yarım kalanı tamamla" diye ver.
+
+### 3.2 Yazan alt ajanın döngüsü
+
+Alt ajan bu konuşmayı görmez; brif her seferinde eksiksizdir:
+
+```
+NovaCore deposunda Faz <id>'nin <adım-id> adımını yaz.
+
+Önce oku: docs/plan/DECISIONS.md'nin "Yapılmayacaklar" bölümü ve adımla ilgili D-kayıtları (grep); docs/plan/PLAN.md'nin "Genel kurallar" ve "<faz başlığı>" bölümleri; docs/plan/PROGRESS.md; dokunacağın dizinin CLAUDE.md'si.
+
+Adım: <PLAN'daki satırın alıntısı, kabul kriteriyle>.
+<Bulgu kapatılıyorsa: bulgunun ID'si, yeri, hata satırı. Kullanıcının bir cevabı varsa: cevabın kendisi.>
+<Bilinen tuzaklar, dokunulacak dosyalar.>
+
+`.claude/skills/novacore-phase/SKILL.md`'nin §3.2 (adım döngüsü) ve §4 (sapma protokolü) bölümlerini uygula:
+- PROGRESS.md, DECISIONS.md, PLAN.md ve `.claude/` altına yazma. Push etme.
+- §4'ün "Sor" satırına düşen işi yapma; raporda "kullanıcıya soru" olarak yaz (seçenekler, önerin, kaynak) ve adımın ondan bağımsız kısmını bitir.
+- Kalıcı bir karar verdiysen D-kaydı biçiminde rapora yaz. Araştırmanı RESEARCH.md'ye R-kaydı olarak yaz.
+- Commit: `faz<id>(<adım-id>): <özet>`, sonuna şu satır: <oturumun attribution satırı>. Yalnız adımın dosyalarını `git add <yol>` ile stage'le; `.agents/`, `.codex/`, `AGENTS.md`'ye dokunma.
+
+Rapor, en çok 150 kelime: commit hash'i; koşulan test sınıfları ve sonuçları (kırmızı, sonra yeşil); D-kaydı adayları; kullanıcıya sorular; yapmadıkların ve kontrol etmediklerin.
+```
+
+Alt ajanın adım döngüsü:
+
+1. **Test:** Adım bir hata düzeltmesi veya yeni davranış içeriyorsa önce testi yaz, adımın test sınıfını koş ve kırmızı olduğunu gör: `dotnet test --project tests/<Proje> -- --filter-class "*.<Sınıf>"` (birden çok sınıf için `--filter-class` tekrarlanır). Çözüm genelinde filtre kullanma: eşleşen testi olmayan proje exit 8 verir (D-063). Sınıf birden çok veritabanında varsa (ör. `TenancyScenarios`: `SqliteTenancyTests`, `SqlServerTenancyTests`, `PostgreSqlTenancyTests`) SQLite olanı koş; diğerleri doğrulamada çalışır.
+2. **Uygula:** Yalnızca o adımın kapsamı. Aynı dosyada yan bir şey gözüne çarparsa dokunma, §4'ü uygula. Bir sembole dokunmadan önce çağıranlarını LSP'yle bul (`findReferences`, `incomingCalls`, `goToImplementation`); metin, yapılandırma ve şablon içeriği için grep (D-079). Adımın konusuna uyan .NET skill'ini (`dotnet-data`, `dotnet-test`, `dotnet-aspnetcore`, `dotnet`) kontrol listesi olarak aç; DECISIONS, PLAN ya da CLAUDE.md ile çelişirse onlar geçerlidir.
+3. **Doğrula (yalnız bunlar, D-088 (1)):**
    - `dotnet build NovaCore.slnx -v q` (analizörler dahil, 0 uyarı).
-   - Adımın yeni ya da değişen test sınıfları, 2'deki komutla: önce kırmızı görüldüyse şimdi yeşil.
+   - Adımın yeni ya da değişen test sınıfları, 1'deki komutla: önce kırmızı görüldüyse şimdi yeşil.
    - Adım bir uç noktanın yolunu, isteğini, yanıtını ya da yetkisini değiştirdiyse `OpenApiContractTests`'i de koş. Yayımlanan belge eskiyse test `docs/openapi/v1.json`'u yeniden yazar ve kırmızı olur. Diff'ini incele, adımın commit'ine kat ve testi yeniden koş.
    - Paket değiştiyse `dotnet restore NovaCore.slnx --force`; sürüm değiştiyse `--force-evaluate` ile lock dosyalarını yeniden yaz ve onları da commit'le.
    - Adım kod ya da proje dosyasına dokunduysa commit'ten önce `dotnet format NovaCore.slnx` (CI `--verify-no-changes` koşar); adımın dosyalarında yaptığı değişikliği commit'e kat.
 
    Kırmızıysa düzelt; düzeltme kapsam dışına taşıyorsa §4. Çıktının tamamını bağlama alma: özeti ve hata satırlarını oku. Tam test paketi, coverage, smoke, `check-openapi`, code-review ve CodeRabbit CLI burada **çalışmaz**: `/novacore-verify`'ın işi.
-5. **Commit:** `faz<id>(<adım-id>): <özet>`, sonuna oturumun attribution satırını ekle. Sadece o adımın dosyalarını stage'le (`git add <yol>`); `git add -A` kullanma.
-6. **Kaydet:** PROGRESS'te `- [x] <adım-id> (<kısa-hash>): <kısa not>`. Not en çok iki satırdır (D-097 (4)): ne yapıldı, koşulan test sınıfları, doğrulamaya kalanlar (ör. SQL Server ve PostgreSQL katmanları). Gerekçe D/R kaydına, ayrıntı commit mesajına yazılır. Bir soru cevaplandıysa satırını cevabıyla arşivin "Cevaplanmış sorular" bölümüne taşı.
-7. **Bilgilendir:** Kullanıcıya tek satır yaz, ör. "F0.3 tamam: strict limiter IP bazlı, 2 yeni test." Adımda kendi aldığın bir karar varsa aynı satıra ekle. Plan onaylandığı için adımlar arasında onay bekleme. Yalnızca §4'teki "sor" durumunda dur.
-
-Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'yi ve PLAN'daki faz bölümünü **yeniden oku**. Kapsam için konuşma özetine güvenme.
-
-**Oturum bütçesi (D-082, D-088):** bir oturumda en fazla 3 adım (kapatılan bulgular dahil) commit'le; adımlar büyükse ya da uzun bir hata ayıklama olduysa daha önce dur. Model her araç çağrısında bütün bağlamı yeniden okur, bu yüzden uzayan oturumun her adımı bir öncekinden pahalıdır ve kullanıcının kotasını eritir. Durunca PROGRESS'e devir notu yaz (nerede kalındı, sıradaki adım, yarım kalan bir şey varsa ne, doğrulamaya kalan test katmanları) ve bir önceki notu arşivin "Eski devir notları" bölümünün en üstüne taşı (D-097 (2)); fazı `⏸ duraklatıldı` yap ve commit'le. Mesajının son satırı kopyalanacak komut olsun: "Devam: `/clear`, ardından `/novacore-phase <id>`" (`/clear` bağlamı sıfırlar; maliyet açısından yeni oturumla aynıdır). Ara doğrulama yoktur (D-093); yeni oturum §1'deki "Devam eden faz" kuralıyla sürer, plan yeniden onaylatılmaz.
+4. **Commit:** `faz<id>(<adım-id>): <özet>`, sonuna oturumun attribution satırını ekle. Sadece o adımın dosyalarını stage'le (`git add <yol>`); `git add -A` kullanma.
 
 ## 4. Sapma protokolü
 
@@ -152,7 +185,7 @@ Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'
 ```
 ## Faz <id> raporu: <ad>
 
-**Durum:** ⏸ duraklatıldı (neden) | ⏸ duraklatıldı (faz sonu doğrulaması bekliyor)
+**Durum:** ⏸ duraklatıldı (faz sonu doğrulaması bekliyor) | ⏸ duraklatıldı (neden: kullanıcının cevabı, kesinti)
 **Branch:** faz/...  ·  **Commit sayısı:** N  ·  **Doğrulanmamış aralık:** `<taban>..<hash>`
 
 ### Yapılan adımlar
@@ -177,5 +210,5 @@ Bağlam uzarsa ya da özetlenirse (compaction), devam etmeden önce PROGRESS.md'
 ### Sonraya bırakılanlar (bu oturumda eklenenler)
 - ...
 
-Devam: `/clear`, ardından `/novacore-phase <id>`   (faz sonunda: Doğrulama: `/clear`, ardından `/novacore-verify <id>`)
+Doğrulama: `/clear`, ardından `/novacore-verify <id>`   (fazın ortasında kesildiyse: Devam: `/novacore-phase <id>`)
 ```
