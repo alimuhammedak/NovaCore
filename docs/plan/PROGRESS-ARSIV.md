@@ -1618,3 +1618,16 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | DA-10 | Onaysız hesaba farklı şifreyle ikinci kayıt gelirse şifre silinir ve sahibine şifre kurma bağlantısı gider; sıfırlama sayfası şifresiz onaysız hesabı kabul edip aynı adımda onaylar (R-084'teki değişmezin yerine). Audit olayı EventId 46. | S-1; R-155 (Sudhodanan & Paverd §6.2.2); `6d709a4` |
 | DA-11 | Rol atamasında yükseltme koruması rolün adına değil izinlerine bakar: rolün izinlerinde `identity:*` varsa `identity:roles:manage` gerekir (D-053 (6)'yı genişletir). | S-4; `a484278` |
 | DA-12 | Çok kiracılılık eklentisi kurum rollerinde `identity:` önekli izni açılışta reddeder (D-080 (3)'ün "eklenti denetlemez" cümlesinin yerine). | S-3; `a39e0e7` |
+
+## Kapanan "Kullanıcıya kalanlar" satırları (2026-11-27, D-102)
+
+| İş | Neden | Ne gerekli |
+|---|---|---|
+| Dependabot PR'ları | Faz 9 merge edildi (F9.3'ün güncellemeleri `main`'de); açık PR'lar eski `main`'e karşı, `secret-scan` o yüzden kırmızıydı | Dependabot üstü kalanları kapatır; kalanlar `@dependabot rebase` ile yeni `main`'e karşı koşar → **F10.4** |
+| CodeRabbit PR incelemesi | Repo 10 yıldızın altında, otomatik inceleme yok; bot PR'larını hiç incelemez | PR başına `@coderabbitai review` (2026-11-27'de #35, #36, #37'ye yazıldı; yorumlar bir sonraki oturumda bulgu olarak okunur) → **F10.2** |
+| S-1'in kalan yolu: kurban kendi kaydını yapmadan saldırganın kaydından gelen onay linkine tıklarsa hesap saldırganın şifresiyle onaylanır | Kapatmanın yolu onay anında şifre istemek: her kullanıcının kayıt akışını ve `RegisterRequest` sözleşmesini değiştirir (ürün kararı) | Kullanıcı karar verir; onaylarsa kayıt "önce e-posta, sonra şifre" akışına geçer → **D-102 (4): kabul edilmiş risk, README** |
+| S-7: açık kaydı kapatılabilir yapmak | Ürün kararı; Y-19 bir seçenek için gerçek tüketici ister. Kayıt olan herkes platform `UserPermissions`'ını alıyor | Kullanıcı karar verir: CRM-Nominal açık kayıt kullanacak mı; kullanmayacaksa `Identity:SignIn:AllowRegistration` (ya da kaydın hiç eşlenmemesi) planlanır → **D-102 (3): `AllowRegistration`, F10.3** |
+| F6e.4'ün adlı araçları (Cloudflare `security-audit-skill`, Claude Security plugin) | Kurulu değil; indirme/kurma ön onaylı değil | Kullanıcı kurar, iki kapsamla koşar → **D-102 (2): Sonraya** |
+| F6e.3: OpenID conformance suite (yerel Docker) | Suite'in kaynağı/imajları indirilip kurulmalı, ön onaylı değil; PLAN "sürüm öncesi" diyor (D-089 (2) yalnız 0.1.0 için muaf tuttu) | Kullanıcı suite'i kurar ya da indirmeyi onaylar; bir sonraki sürümden önce koşulur, bulgular F6e.5 kuralıyla → **D-102 (2): bu sürümde muaf** |
+| S-6 varsayılanları (`Identity:EmailLimit` 5/saat, aşınca 429) | Ürün ayarı; R-157 | Kullanıcı değerleri onaylar ya da değiştirir → **D-102 (5): 5/saat kalır** |
+| V6e-4: bekleyen daveti olan şifresiz hesaba anonim kayıt | Hiçbir şey yapmamak ya da ayrı metin/audit: ürün davranışı | Kullanıcı seçer → **D-102 (6): değişmez, README** |
