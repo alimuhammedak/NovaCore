@@ -1240,6 +1240,12 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 
 ## Eski devir notları
 
+**2026-11-27, Faz 6e: DAST'ın ilk koşusu.** Run `46002347264` hiçbir tarama koşmadan kırmızıydı (V6e-5): Schemathesis rapor klasörünü açamadı. `045f686` (`faz/6e-dast-ilk-kosu`, `main`'den) klasörü ZAP'ınki gibi önceden açar; yerelde Docker Desktop bunu göstermez, yalnız `bash -n` koşuldu.
+
+- **Sıradaki:** branch push'lanır, `gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu` ile DAST koşulur; raporu (artifact `dast-report`) F6e.5 kuralıyla triaj edilir, bulgular `S-15…` olarak; düzeltmeler ve PR `main`'e. ZAP CI'da ilk kez koşacak. Sonra: CodeRabbit'in #35 yorumları (Faz 8), D-032 (`DECISIONS.md` `protectedPaths`'e, kullanıcı).
+- **Bilinmesi gerekenler:** Schemathesis'in `.hypothesis/examples` veritabanı da `/dast`'a yazamaz; belgesine göre uyarı verip başka yer kullanır. V6e-3'ün bedeli ve `/account/login`'in 256 sınırı arşivdeki notta.
+- **Bekleyen karar:** push. Kullanıcıya kalanlar tablosu (S-6 varsayılanları, V6e-4, S-7, S-1'in kalan yolu). Q-40 sürüyor.
+
 **2026-11-27, faz dışı: ücretli araçların denetimi.** `SONAR_TOKEN` yenilendi; `sonar` #35, #36, #37'de yeşil. Greptile'ın kredisi bitmişti, plandan çıkarıldı (D-098). V6e-1'in allowlist kaydı `faz/8` ve `faz/9`'a da eklendi: tarama bütün branch'lerin geçmişini okuduğu için oralarda da `secret-scan`'i kırmızı yapıyordu. CodeRabbit #35'e 12 yorum yazdı; #36 ve #37'de "rate limited". Kullanıcının isteğiyle #35 → #36 → #37 sırayla merge edildi (`611903f`, `06316de`, `d2be1d1`); Faz 8 ve 9 tamam. DAST'ın ilk koşusu başlatıldı (run `46002347264`).
 
 - **Sıradaki:** DAST raporları F6e.5 triajına (artifact'lar run `46002347264`'te). CodeRabbit'in #35 yorumları bulgu olarak sınıflandırılır (`novacore-verify` §4.2); merge edilmiş kod üzerinde, gerekirse yeni bir PR'la. DA-1…DA-12 tek düzenlemeyle DECISIONS'a işlenir. D-032: `DECISIONS.md` `protectedPaths`'e geri eklenir (Faz 6e sonu, kullanıcı).

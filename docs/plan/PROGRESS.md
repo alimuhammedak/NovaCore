@@ -28,7 +28,7 @@
 | 7b | ✅ tamam | `faz/7b-cok-kiracililik` | 2026-10-24 | 2026-10-25 | 2026-10-27 (kullanıcı onayı, PR #13 merge commit'i `dba8318`) |
 | 8 | ✅ tamam | `faz/8-bassiz-giris` | 2026-11-09 | 2026-11-14 | 2026-11-27 (kullanıcı onayı, PR #35 merge commit'i `611903f`; CodeRabbit'in 12 yorumu sonradan bulgu olarak okunur) |
 | 9 | ✅ tamam | `faz/9-bakim` (`faz/8-bassiz-giris` + `main`) | 2026-11-13 | 2026-11-14 | 2026-11-27 (kullanıcı onayı, PR #36 merge commit'i `06316de`) |
-| 6e | ⏸ merge edildi (PR #37, `d2be1d1`, 2026-11-27, kullanıcı onayı); açık: F6e.3 (kullanıcıya), V6e-5'in DAST koşusu (`faz/6e-dast-ilk-kosu`, push bekliyor) ve raporunun F6e.5 triajı | `faz/6e-dinamik-denetim` (`faz/9-bakim`'in üstüne açıldı) | 2026-11-13 | | |
+| 6e | ⏸ merge edildi (PR #37, `d2be1d1`, 2026-11-27, kullanıcı onayı); açık: F6e.3 (kullanıcıya), DAST bulgularının (S-15…S-19) düzeltmesi (`faz/6e-dast-ilk-kosu`) | `faz/6e-dinamik-denetim` (`faz/9-bakim`'in üstüne açıldı) | 2026-11-13 | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
 
@@ -89,7 +89,8 @@ Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docke
 | V6e-2 | Bellek DoS: HTML `/account/forgot-password` e-postasının uzunluğu sınırsız (4 MB'a kadar); `EmailRecipientLimit` her farklı değeri bir saat partition olarak tutar | Opus inceleme, `PasswordResetPage.cs:60-67`, `EmailRecipientLimit.cs:56-60` | kapandı (`3144da9`): form e-postası `EmailAddress` + 256; `TryAcquire` uzun anahtarı reddeder; 4 kırmızı → yeşil |
 | V6e-3 | `InvalidDataException`→400 kaynağa bakmıyor: modülün bozuk arşiv açması (Zip/GZip/Brotli) 500 yerine logsuz 400 olur | Opus inceleme, `ExceptionMapping.cs:28,50-51,61-62` | kapandı (`c8b3d17`, R-158): form okuyucunun `InvalidDataException`'ı okunduğu yerde `BadHttpRequestException`'a sarılır; çıplak `InvalidDataException` 500 + log; 2 kırmızı → yeşil |
 | V6e-4 | Bekleyen daveti olan şifresiz hesaba anonim `register`: davetliye "yeniden kayıt" metinli şifre bağlantısı ve Warning audit gider (güvenlik açığı değil) | Opus inceleme, `AccountEndpoints.cs:741-760` | kullanıcıya: davranış ürün kararı (Kullanıcıya kalanlar) |
-| V6e-5 | DAST'ın ilk koşusu hiçbir tarama koşmadan kırmızı: Schemathesis imajı (uid 1000) runner'ın (uid 1001) rapor klasöründe `--report-dir` açamadı | run `46002347264`, `eng/dast.sh:72-84` | kapatıldı (`045f686`, branch `faz/6e-dast-ilk-kosu`): rapor klasörü ZAP'ınki gibi önceden açılıp yazılabilir yapılır. xUnit'le gösterilemez (CI betiği, kapsayıcı kullanıcısı); kontrolü push sonrası `workflow_dispatch` koşusu |
+| V6e-5 | DAST'ın ilk koşusu hiçbir tarama koşmadan kırmızı: Schemathesis imajı (uid 1000) runner'ın (uid 1001) rapor klasöründe `--report-dir` açamadı | run `46002347264`, `eng/dast.sh:72-84` | kapatıldı (`045f686`, branch `faz/6e-dast-ilk-kosu`): rapor klasörü ZAP'ınki gibi önceden açılıp yazılabilir yapılır. xUnit'le gösterilemez (CI betiği, kapsayıcı kullanıcısı); run `46007644116` taramaları koşturdu |
+| V6e-6 | Run `46007644116` yeşil ve "bulgulu" ama Schemathesis'in bütün işlemleri JUnit `<error>`: sertifikayı okuyamadı (`dotnet dev-certs` PEM'i yalnız sahibine açar); betik exit 1'i bulgu saydı | run `46007644116`, `eng/dast.sh` | kapatıldı (`8dfc457`): kopya herkese okunur; JUnit'te `<error>` varsa tarama eksik sayılır, job kırmızı (D-101 (1)). Run `46008665907`: 0 hata, 33 kontrol bulgusu |
 
 #### F6e.4 bulguları ve F6e.5 triajı
 
@@ -109,6 +110,13 @@ Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docke
 | S-12 | `includeInactive=true` her ürün okuyucusuna pasif ürünleri gösteriyor; karar kaydı yok (D2) | — | `needs_validation`: ürün kararı |
 | S-13 | Şablonun `Program.cs:75`'inde `GetValue<int?>("HealthChecks:ProbePort")` (R-048'e aykırı) | — | ✅ `e18bd98`: `HealthCheckProbeOptions` (`[Range]`, `[OptionsValidator]`, `ValidateOnStart`); smoke CI'da |
 | S-14 | Bozuk form girdisine 500: `/account/*` formları ve `/connect/revoke` (F6e.2'nin yerel Schemathesis denemesi) | düşük-orta | ✅ `0923d61`: çekirdeğin `ExceptionMapping`'i `InvalidDataException` ve `AntiforgeryValidationException`'ı 400 yapar (R-156); `MalformedFormTests` 40/96 kırmızıydı. needs_validation: `/connect/*` artık OAuth `invalid_request` yerine ProblemDetails döner; sunucunun kendi `InvalidDataException`'ı da 400 olur |
+| S-15 | OpenAPI belgesi 401/403'ü belgelemiyor: izin isteyen uçlar (`/admin/*`, `/products`, `/payments`, `/auth/2fa/*`, `logout-all`) ve bazı 400'ler `application/json` diye belgeli, dönen `problem+json` (DAST run `46008665907`: ST103 15 uç, ST105 3) | düşük-orta (üretilen istemciler) | açık: testle gösterilebilir (belge testi); çekirdek yetki metadata'sından 401/403 ekler, `docs/openapi/v1.json` değişir |
+| S-16 | Şemaya uyan istek 400 alıyor: gövde şemasında DataAnnotations kısıtları eksik (boş `Email`, `ReturnUrl` 4096), sayfa parametreleri `integer\|string` ve sınırsız (ST202, `/api/v1/auth/*`, liste uçları) | düşük | açık: .NET 10 OpenAPI'nin hangi attribute'u şemaya taşıdığı ölçülecek (R-kaydı); `ReturnUrl`'nin "bu host'ta yol" kuralı şemaya giremez (FP) |
+| S-17 | Elle yazılan protokol şeması eksik: `/account/forgot-password` ve `/account/login/2fa`'nın GET'i yok (ST204/ST205); OpenIddict TRACE'e 405 yerine OAuth `invalid_request` 400 döner | — | açık: GET'ler `eng/dast/protocol-openapi.yaml`'a (tarama girdisi, xUnit gerekmez); TRACE OpenIddict'in davranışı, FP |
+| S-18 | CSP'de `form-action` ve `base-uri` yok; ikisi `default-src`'ye düşmez (ZAP, `/account/*`) | orta | açık: testle gösterilebilir; `form-action 'self'` OpenIddict'in `form_post` yanıtını kırabilir (#8), yol ayrımı R-kaydıyla seçilir |
+| S-19 | ZAP'ın kalanı: HSTS yok, COEP ve Permissions-Policy yok, giriş formunda "kullanıcı girdisi attribute'ta" (`Password=ZAP`), bilgi satırları | düşük | HSTS FP (DAST Development'ta, `UseHsts` yalnız dışında); yansıma FP (şifre alanında `value` yok, e-posta encode'lu); COEP/Permissions-Policy `needs_validation` |
+
+DAST'ta sunucu hatası (5xx) çıkmadı.
 
 Doğrulanamayanlar (`needs_validation`): son admin korumasında check-then-act yarışı (biliniyor, L94); CSP'nin `form_post` otomatik gönderimini engelleyip engellemediği (#8); `alg:none`/`jku` reddi (#21); kurumsal NAT arkasında `strict` kovasının `/connect/token` yenilemelerini de kapsaması. Biliniyor (Sonraya): L60, L44, L94, L95, L96, L103, L106, L107, L108, L11.
 
@@ -123,8 +131,8 @@ Yalnız cevabı beklenen sorular. Cevaplanan soru cevabıyla birlikte arşivin "
 
 > Yalnız en son not durur. Yeni not yazılırken bir önceki arşivin "Eski devir notları" bölümünün en üstüne taşınır (D-097).
 
-**2026-11-27, Faz 6e: DAST'ın ilk koşusu.** Run `46002347264` hiçbir tarama koşmadan kırmızıydı (V6e-5): Schemathesis rapor klasörünü açamadı. `045f686` (`faz/6e-dast-ilk-kosu`, `main`'den) klasörü ZAP'ınki gibi önceden açar; yerelde Docker Desktop bunu göstermez, yalnız `bash -n` koşuldu.
+**2026-11-27, Faz 6e: DAST koşuyor, bulgular triajlı.** İki betik hatası kapandı (V6e-5 `045f686`, V6e-6 `8dfc457`); run `46008665907` dört taramayı da koşturdu: 5xx yok, 33 Schemathesis kontrol bulgusu ve ZAP uyarıları S-15…S-19 olarak triajlı. DA-1…DA-12 D-099…D-101'e işlendi (`0a091e4`). Branch `faz/6e-dast-ilk-kosu` push'lu, PR yok. Oturum bütçesi doldu.
 
-- **Sıradaki:** branch push'lanır, `gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu` ile DAST koşulur; raporu (artifact `dast-report`) F6e.5 kuralıyla triaj edilir, bulgular `S-15…` olarak; düzeltmeler ve PR `main`'e. ZAP CI'da ilk kez koşacak. Sonra: CodeRabbit'in #35 yorumları (Faz 8), D-032 (`DECISIONS.md` `protectedPaths`'e, kullanıcı).
-- **Bilinmesi gerekenler:** Schemathesis'in `.hypothesis/examples` veritabanı da `/dast`'a yazamaz; belgesine göre uyarı verip başka yer kullanır. V6e-3'ün bedeli ve `/account/login`'in 256 sınırı arşivdeki notta.
-- **Bekleyen karar:** push. Kullanıcıya kalanlar tablosu (S-6 varsayılanları, V6e-4, S-7, S-1'in kalan yolu). Q-40 sürüyor.
+- **Sıradaki:** S-17 (protokol şeması), S-18 (CSP, önce kırmızı test), S-15 (401/403 belgesi, önce kırmızı belge testi, `OpenApiContractTests`), S-16 (ölç, R-kaydı). Sonra DAST yeniden koşulur ve `faz/6e-dast-ilk-kosu` → `main` PR'ı (`/novacore-verify 6e`). CodeRabbit'in #35 yorumları Faz 8'in işi.
+- **Bilinmesi gerekenler:** raporlar run `46008665907`'nin `dast-report` artifact'ında (30 gün). Betik Schemathesis'in bir işlemi deneyememesini artık kırmızı sayar; bir uç zaman aşımına düşerse de job kırmızı olur.
+- **Bekleyen karar:** Kullanıcıya kalanlar tablosu (S-6 varsayılanları, V6e-4, S-7, S-1'in kalan yolu, F6e.3, D-032). Q-40 sürüyor.
