@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using NovaCore.Abstractions.Identity;
 using NovaCore.AspNetCore.Auth;
 using NovaCore.AspNetCore.Authorization;
 using OpenIddict.Server;
@@ -69,7 +70,8 @@ public static class IdentityServerHostingExtensions
             provider.GetRequiredService<IOptions<JwtOptions>>(),
             provider.GetRequiredService<IOptions<IdentityServerOptions>>(),
             provider.GetRequiredService<TimeProvider>(),
-            provider.GetRequiredService<SecurityAuditLogger>()));
+            provider.GetRequiredService<SecurityAuditLogger>(),
+            provider.GetRequiredService<ICurrentUser>()));
 
         AddEmail(services, builder.Environment);
 
@@ -176,6 +178,8 @@ public static class IdentityServerHostingExtensions
         // the background, so the response time doesn't reveal whether an address has an account (R-105).
         services.AddSingleton<EmailQueue>();
         services.AddHostedService(provider => provider.GetRequiredService<EmailQueue>());
+        // The anonymous endpoints that email an address ask this first: a limit per address, whatever the client's IP.
+        services.AddSingleton<EmailRecipientLimit>();
     }
 
     private static void AddOpenIddictServer(IServiceCollection services, IHostEnvironment environment)

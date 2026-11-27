@@ -53,14 +53,30 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   before it looks at the password, so `SignInFlow` checks the password itself and counts a wrong one (D-030 (1)).
   An unknown email and a locked account cost a password hash like a wrong password (`DummyPasswordHash`, made once by
   the host's hasher; `SignInManager` answers a locked account before the password), so the answer's timing doesn't
-  reveal accounts either (R-087, R-138). Registration answers an existing address like a new one.
-  Resending the confirmation answers every address alike and emails only an unconfirmed account. The password reset form answers every address alike and emails only a confirmed
-  account; the reset page answers an unknown or unconfirmed account like a bad token (R-084). Those three never wait
+  reveal accounts either (R-087, R-138). Registration answers an existing address like a new one, at the cost of one
+  password hash either way (CreateAsync's, or the account's password check or the dummy). **Pre-account hijacking**
+  (S-1, R-155): a registration with another password for an unconfirmed account removes the account's password (the
+  stamp renews, so every confirmation link sent so far dies) and emails a `/account/reset-password` link, which sets
+  the password and confirms the address in one step, like an invitation; the same password again, or a confirmed
+  account, changes nothing. Never let a confirmation link activate a password the mailbox's owner didn't set.
+  Resending the confirmation answers every address alike and emails only an unconfirmed account with a password; an
+  account without one (invited, or a repeated registration's) is confirmed only together with setting its password,
+  so `confirm-email` refuses it too and nobody can turn a pending invitation into `invitation.account_exists` (S-2). The password reset form answers every address alike and emails only a confirmed
+  account; the reset page answers an unknown account, and an unconfirmed one with a password, like a bad token (R-084);
+  an unconfirmed one without a password is confirmed when the page sets its password (S-1). Those three never wait
   for the mail server: they queue the email (`EmailQueue`, a bounded in-memory channel read by a `BackgroundService`
   that sends through the host's `IEmailSender`, one at a time), so the response time doesn't reveal the account either
   (F6b.6a, R-105, ASVS 6.3.8). A queued email is lost if the process stops; a failed send is logged without the address
   or the body. A full queue never makes the request wait (that would reveal the account again): the email is dropped
   and logged (D-055 (1)). Send new emails the same way, never by awaiting `IEmailSender` in a handler.
+  **A limit per recipient** (S-6, R-157): the anonymous endpoints that email an address (register, resend, the reset
+  link form, `/password/forgot`) first call `EmailRecipientLimit.TryAcquire(users.NormalizeEmail(email))`, before the
+  account lookup and any side effect, and answer `EmailRecipientLimit.TooManyEmails` (429,
+  `account.too_many_emails`; the HTML form a 429 page) when it refuses: every address is counted alike, so the 429
+  reveals no account, and a refused request issues no code. `Identity:EmailLimit` (5 per 3600 s by default), in memory
+  per instance. A new anonymous endpoint that emails an address does the same. The address is validated before it is
+  counted (`EmailAddress`, at most `EmailRecipientLimit.MaxAddressLength`, 256; an HTML form checks it itself), and the
+  limit refuses a longer key without a partition (V6e-2): every partition stays for its window.
 - **Password reset:** the link carries an Identity token that `ResetPasswordAsync` uses up (it renews the security
   stamp), the new password is typed twice, and a reset revokes every token and authorization of the user like a
   password change. It never signs the user in. A missing `User` role (seeding off) leaves a new account without a role
@@ -87,8 +103,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **Role changes (F6b.2, D-053 (6)):** the admin API drops the user's cached permissions
   (`HybridCache.RemovePermissionsAsync`, a tag: the stamp in the cache key is unknown here) and revokes their refresh
   tokens and authorizations on every grant or removal. Granting or removing `Administrator` (compared normalized, so
-  `administrator` is the same role) also needs `identity:roles:manage`: `identity:users:manage` alone would let its
-  holder make themselves an administrator. The last member with two-factor authentication (the only kind the role
+  `administrator` is the same role), or any role whose permission claims include an `identity:*` one, also needs
+  `identity:roles:manage`: `identity:users:manage` alone would let its holder make themselves an administrator, directly
+  or through a product's role that holds `identity:roles:manage` (S-4). The last member with two-factor authentication (the only kind the role
   counts for) keeps the role (409). The seed gives the User role the
   `Identity:Seed:UserPermissions` list (D-047, D-053 (7)), never a naming rule; the list is checked on start: declared
   by a module, no `identity:*`. Anything else that changes what the
@@ -149,6 +166,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   account's invitation sets no password (`invitation.account_exists`), so an invitation can't take an account over.
   `InviteAsync` returns a `Result<Guid>` (`invitation.invalid_email`, `invitation.address_taken`); an account a
   concurrent request created first is invited, its lost insert reported by the user store as a duplicate (V8-5).
+  The audit event (`invitation_created`) names the invited account and the inviter, the signed-in caller
+  (`ICurrentUser`, none outside a request), like a role change does (S-5).
   The token travels in request bodies, never in a path (request logs). The add-on doesn't know tenants: the product adds
   the membership with the returned `sub` (D-076 (2)).
 

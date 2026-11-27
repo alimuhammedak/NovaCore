@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using NovaCore.Identity.OpenIddict;
 using Xunit;
@@ -41,8 +42,11 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
 
         public InvitationAcceptRace Accepts { get; } = new();
 
+        public LogCapture Log { get; } = new();
+
         protected override void Configure(WebApplicationBuilder builder)
         {
+            builder.Logging.AddProvider(Log);
             builder.Services.AddSingleton<IEmailSender>(Emails);
             builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Creations, Writes, Accepts));
         }
@@ -68,6 +72,25 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
 
         await AssertProblemAsync(await PostAsync(client, Accept, new { token, password = "yet another passphrase" }), HttpStatusCode.Conflict, "invitation.used");
         await AssertProblemAsync(await PostAsync(client, Status, new { token }), HttpStatusCode.Conflict, "invitation.used");
+    }
+
+    // The audit trail names who invited, as it does for a role change (S-5): by the account's id, never its address (Y-35).
+    [Fact]
+    public async Task The_audit_log_names_the_inviter()
+    {
+        var inviter = await _host.CreateUserAsync("inviter-audit@novacore.test", Password, "identity:invitations:create");
+        using var browser = new OidcFlow(_host);
+        using var client = _host.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", (await browser.SignInAsync("inviter-audit@novacore.test", Password)).AccessToken);
+
+        var created = await PostAsync(client, Create, new { email = "invited-audit@novacore.test" });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        using var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var invited = body.RootElement.GetProperty("userId").GetGuid();
+
+        var entry = Assert.Single(fixture.Log.Messages, message => message.StartsWith($"SECURITY invitation_created User={invited}", StringComparison.Ordinal));
+        Assert.Equal($"SECURITY invitation_created User={invited} By={inviter.Id}", entry);
     }
 
     [Fact]
@@ -344,6 +367,48 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
 
         await AssertProblemAsync(await PostAsync(client, Status, new { token }), HttpStatusCode.Gone, "invitation.expired");
         await AssertProblemAsync(await PostAsync(client, Accept, new { token, password = NewPassword }), HttpStatusCode.Gone, "invitation.expired");
+    }
+
+    // S-2: an invited account has no password until the invitation sets one. Anyone may ask for the confirmation again;
+    // whatever reaches the mailbox must not confirm the account without a password, or the invitation becomes useless.
+    [Fact]
+    public async Task Resending_the_confirmation_leaves_the_invitation_usable()
+    {
+        using var client = await InviterAsync("inviter-resend@novacore.test");
+        await client.PostAsJsonAsync(new Uri(Create, UriKind.Relative), new { email = "invited-resend@novacore.test" }, TestContext.Current.CancellationToken);
+        var token = await TokenSentToAsync(fixture.Emails, "invited-resend@novacore.test");
+
+        using var anonymous = _host.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(anonymous, "/api/v1/auth/resend-confirmation-email", new { email = "invited-resend@novacore.test" })).StatusCode);
+
+        // The emails go out in the order queued: once a later one has gone, the resent one would have too.
+        await client.PostAsJsonAsync(new Uri(Create, UriKind.Relative), new { email = "after-invited-resend@novacore.test" }, TestContext.Current.CancellationToken);
+        await fixture.Emails.WaitForAsync(message => string.Equals(message.To, "after-invited-resend@novacore.test", StringComparison.Ordinal));
+        Assert.Single(fixture.Emails.Sent, message => string.Equals(message.To, "invited-resend@novacore.test", StringComparison.Ordinal));
+
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(anonymous, Status, new { token })).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_confirmation_link_does_not_confirm_an_account_without_a_password()
+    {
+        using var client = await InviterAsync("inviter-confirm@novacore.test");
+        await client.PostAsJsonAsync(new Uri(Create, UriKind.Relative), new { email = "invited-confirm@novacore.test" }, TestContext.Current.CancellationToken);
+        var token = await TokenSentToAsync(fixture.Emails, "invited-confirm@novacore.test");
+
+        string link;
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = await users.FindByEmailAsync("invited-confirm@novacore.test");
+            Assert.NotNull(user);
+            var confirmation = Base64UrlTextEncoder.Encode(System.Text.Encoding.UTF8.GetBytes(await users.GenerateEmailConfirmationTokenAsync(user)));
+            link = $"/api/v1/auth/confirm-email?userId={user.Id}&token={confirmation}";
+        }
+
+        using var anonymous = _host.CreateClient();
+        Assert.Equal(HttpStatusCode.BadRequest, (await anonymous.GetAsync(new Uri(link, UriKind.Relative), TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(anonymous, Status, new { token })).StatusCode);
     }
 
     private async Task<HttpClient> InviterAsync(string email)

@@ -98,7 +98,10 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
 - **The core's exception mapping is no `IExceptionHandler`.** Those run in registration order and the first `true` wins
   (R-046), so a catch-all one would shadow a project's handler registered after it. The mapping is the exception
   handler middleware's fallback instead: `ExceptionHandlerOptions.StatusCodeSelector` (`AppException` → its type's
-  status, `BadHttpRequestException` → its status, else 500), `ExceptionHandlerOptions.ExceptionHandler` (writes the
+  status, `BadHttpRequestException` → its status,
+  `AntiforgeryValidationException` → 400, else 500; a form body the reader can't read is a `BadHttpRequestException`
+  400 because `UseCoreWeb` wraps the request's `IFormFeature` in `UnreadableFormFeature` before authentication, where
+  OpenIddict reads its forms, S-14, R-158; a bare `InvalidDataException`, e.g. a corrupt archive, is a logged 500, V6e-3), `ExceptionHandlerOptions.ExceptionHandler` (writes the
   ProblemDetails: title, `type`, and `detail` for an `AppException` only; it runs only when no handler handled the
   exception, so a project handler's ProblemDetails is never rewritten; not `CustomizeProblemDetails`, which sees every
   write) and `SuppressDiagnosticsCallback` (the framework logs 500s; client
@@ -109,6 +112,9 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
   and `KnownIPNetworks` (validated on start) replace the framework's loopback defaults, and only `X-Forwarded-For` and
   `X-Forwarded-Proto` apply. Empty leaves `ForwardedHeadersOptions` untouched (nothing applied). Anything that reads the
   client IP or the scheme reads `HttpContext.Connection.RemoteIpAddress`/`Request.Scheme` after this middleware.
+- **Rate limits count a client, not an address** (S-6, R-157): the global limiter and `"strict"` partition by
+  `CoreWebExtensions.ClientPartition`: an IPv4 address, an IPv6 address's /64, an IPv4-mapped IPv6 address as its IPv4
+  address. A new core policy that partitions by client uses it too, not `RemoteIpAddress.ToString()`.
 - **Authorization is closed by default:** `AddCoreAuthorization` sets `FallbackPolicy = RequireAuthenticatedUser`, so an
   endpoint without authorization metadata, and a request that matches none, needs a signed-in caller (R-073). An
   endpoint a building block maps for anonymous callers (health, the OpenAPI document, Scalar, the identity provider's

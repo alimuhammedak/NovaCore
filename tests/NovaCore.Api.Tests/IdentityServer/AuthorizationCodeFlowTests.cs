@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Microsoft.IdentityModel.JsonWebTokens;
 using NovaCore.Identity.OpenIddict;
 using OpenIddict.Server;
@@ -160,6 +162,40 @@ public sealed class AuthorizationCodeFlowTests(AuthorizationCodeFlowTests.Fixtur
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("You are signed in", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    // The HTML form's twin of SessionSignInTests' JSON cases (S-9): protocol-relative, backslash and encoded forms of
+    // another host are not local: the page shows its message, or redirects to a path of this host only.
+    [Theory]
+    [InlineData("//evil.example/")]
+    [InlineData(@"/\evil.example/")]
+    [InlineData(@"\\evil.example/")]
+    [InlineData("%2F%2Fevil.example/")]
+    [InlineData("%2F%5Cevil.example/")]
+    [InlineData("/%2F%2Fevil.example/")]
+    public async Task Sign_in_treats_a_disguised_other_host_as_not_local(string returnUrl)
+    {
+        var email = $"disguised-{Guid.NewGuid():N}@novacore.test";
+        await _host.CreateUserAsync(email, Password);
+        using var flow = new OidcFlow(_host);
+
+        var loginPage = await flow.Browser.GetAsync(new Uri(
+            QueryHelpers.AddQueryString("/account/login", "ReturnUrl", returnUrl), UriKind.Relative));
+        var response = await flow.SubmitLoginAsync(loginPage, email, Password);
+
+        if (response.StatusCode == HttpStatusCode.Redirect)
+        {
+            // A local path of this host only, which a browser can't read as another host.
+            var location = response.Headers.Location!.OriginalString;
+            Assert.False(response.Headers.Location.IsAbsoluteUri);
+            Assert.StartsWith("/", location, StringComparison.Ordinal);
+            Assert.DoesNotMatch(@"^/[/\\]", location);
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains("You are signed in", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -363,5 +399,57 @@ public sealed class SignInAgeTests(FakeClockIdentityServerFixture fixture) : ICl
         var response = await flow.Browser.GetAsync(OidcFlow.AuthorizeUri(challenge, extra));
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         return response.Headers.Location!;
+    }
+}
+
+/// <summary>
+/// Refresh token reuse under OpenIddict's default 30-second leeway, which production keeps (the class above sets it to
+/// zero): a redeemed refresh token used again within the leeway still works, so a retried request isn't punished; used
+/// again after it, it revokes the whole chain, the legitimate successor included (S-9, R-059).
+/// </summary>
+[Collection(IdentityServerTestGroup.Name)]
+public sealed class RefreshTokenLeewayTests(RefreshTokenLeewayTests.Fixture fixture) : IClassFixture<RefreshTokenLeewayTests.Fixture>
+{
+    private const string Password = "Passw0rd!-for-tests";
+
+    private static readonly TimeSpan DefaultLeeway = TimeSpan.FromSeconds(30);
+
+    /// <summary>The provider's clock, moved by the test; OpenIddict's leeway is left at its default.</summary>
+    public sealed class Fixture : IdentityServerFixture
+    {
+        public FakeTimeProvider Clock { get; } = new(TimeProvider.System.GetUtcNow());
+
+        protected override void Configure(WebApplicationBuilder builder) =>
+            builder.Services.AddSingleton<TimeProvider>(Clock);
+    }
+
+    [Fact]
+    public void The_host_keeps_OpenIddicts_default_leeway()
+    {
+        var options = fixture.Host.Services.GetRequiredService<IOptions<OpenIddictServerOptions>>().Value;
+
+        Assert.Equal(DefaultLeeway, options.RefreshTokenReuseLeeway);
+    }
+
+    [Fact]
+    public async Task Reuse_after_the_leeway_revokes_the_whole_chain()
+    {
+        await fixture.Host.CreateUserAsync("leeway@novacore.test", Password);
+        using var flow = new OidcFlow(fixture.Host);
+        var tokens = await flow.SignInAsync("leeway@novacore.test", Password);
+        var rotated = await OidcFlow.TokensFrom(await flow.RefreshAsync(tokens.RefreshToken));
+
+        // Within the leeway, the redeemed token still works (a retried request).
+        var retried = await OidcFlow.TokensFrom(await flow.RefreshAsync(tokens.RefreshToken));
+
+        fixture.Clock.Advance(DefaultLeeway + TimeSpan.FromSeconds(1));
+
+        var replay = await flow.RefreshAsync(tokens.RefreshToken);
+        Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
+        Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(replay));
+
+        // Every token of the authorization dies with it, both successors included.
+        Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(await flow.RefreshAsync(rotated.RefreshToken)));
+        Assert.Equal("invalid_grant", await OidcFlow.ErrorFrom(await flow.RefreshAsync(retried.RefreshToken)));
     }
 }

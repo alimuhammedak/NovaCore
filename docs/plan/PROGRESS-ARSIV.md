@@ -1146,6 +1146,31 @@ Başlangıç 2026-10-24, `main` @ `6204b04` (7a'nın merge kaydı, başka bir ot
 - PR #13 (2026-10-25): **Greptile** (3 satır yorumu) ve **CodeRabbit** (5 satır yorumu) inceledi. Kapsam içi ve doğru, düzeltildi (D-087), testler üç veritabanında önce kırmızı görüldü: kopuk bir kopyanın başka kurumun satırını anahtarıyla değiştirebilmesi (`TenantId` concurrency token; ikisi de buldu), `TenantData`'nın modülün kendi filtrelerinin gizlediği satırları silmemesi (ikisi de buldu), `RemoveMemberAsync`'in izlenen kopyayı bırakması (Greptile). Belgeler: D-076 ve D-083 (2)'ye revizyon işaretleri, devir notunun sayımı (CodeRabbit). Yanıtlandı, değişmedi: kurum rolünün `identity:*` verebilmesi (D-080 (3): eklenti kimlik eklentisini tanımıyor, kural belgede). Doğrulama: testler 544/544 (atlanan yok), smoke sekiz bileşimde yeşil (şablonun Todos modeli concurrency token'la değişti, `has-pending-model-changes` temiz), format temiz. İkinci CodeRabbit incelemesi (1 yorum): token'ı açıkça kapatan bir modelin korumayı sessizce düşürmesi → model hata veriyor, test önce kırmızı.
 
 ### Faz 8
+#### Doğrulama (gece koşusu, 2026-11-13)
+
+İnceleme: iki Opus okuyan ajanı (`main...HEAD` kod incelemesi, elle: `code-review` skill'i kotaya takıldı; PLAN/DECISIONS denetimi). CodeRabbit CLI koşmadı (oturum açık değil, D-067 (3)). Kapsam ve Yapılmayacaklar temiz.
+
+| ID | Bulgu | Yer | Durum |
+|---|---|---|---|
+| V8-1 | CI `secret-scan`: 3 bulgu, `main..HEAD` aralığında | run `43310617390` | doğrulandı (`5a7a956`; CI `43331827821`'de `secret-scan` yeşil): iki test parolası, `tests/` altında birebir allowlist |
+| V8-2 | Yanlış kod sayacının `IdentityResult`'ı yok sayılıyor: eşzamanlı yanlış tahminler sayacı düşürür, 5/100 sınırı aşılır | `PasswordResetCodes.cs:107-112` | doğrulandı (`1777b77`; CI `43334884102`): deneme karşılaştırmadan önce stamp ile sayılır, sayımı kaybeden istek kodu siler. Test önce kırmızı, sonra yeşil |
+| V8-3 | forgot/reset'te süreyle hesap sayımı: bilinmeyen/onaysız adres hash ve yazma olmadan döner (D-030 (1), D-091 (4)) | `PasswordCodeEndpoints.cs:190-218` | doğrulandı (`518b339`; CI `43334884102`): kodu olmayan adres aynı hash işini yapar. Hash sayısı testi önce kırmızı, sonra yeşil. Kalan fark: birer veritabanı yazması |
+| V8-4 | Kilitli ve onaysız hesap hash hesaplamadan döner; D-091 (1) "aynı süre". Test kilitli hesabın hash sayısını sınamıyor | `SignInFlow.cs:51,116` | doğrulandı (`067821e`; CI `43336677900`; R-138): kilitli hesap şifreyi sahte hash'e karşı sınar. Test önce kırmızı (`[1,1,0,1,0]`), sonra yeşil |
+| V8-5 | Davet oluşturmada beklenen hata (`InvalidUserName`, `DuplicateEmail`) exception → 500; `ProducesProblem` yok | `AccountInvitations.cs:156`, `InvitationEndpoints.cs:240,269` | doğrulandı (CI `43390653707`; `8fc5500`): `InviteAsync` `Result<Guid>` döner; `invitation.invalid_email` 400, `invitation.address_taken` 409, `ProducesProblem`, OpenAPI yalnız ekleme. Kullanıcı deposu kaybedilen insert'i `DuplicateUserName` bildirir (kayıt yarışındaki 500 de gider). Üç test önce kırmızı (500), sonra yeşil |
+| V8-6 | Davet/kod "kullanıldı" işaretlendikten sonra şifre adımı düşerse yanar; yorum "kullanılmamış kalır" diyor | `AccountInvitations.cs:131-142`, `PasswordResetCodes.cs:84-91` | doğrulandı (CI `43390653707`; `0aeeaea`): işaret (ya da kodun silinmesi) ve şifre tek transaction'da, execution strategy içinde. Test önce kırmızı (yeniden deneme 409 `invitation.used` / 400), sonra yeşil |
+| V8-7 | Kuralı yakalamayan/eksik testler: onaysız hesabın reset'i, kabul etmeden giriş (totolojik), davetin tek kullanım yarışı, `InvitationPath` doğrulaması, `/password` ve `/invitations` CORS'u (D-095 (6)), JSON 2FA'da kurtarma kodu, `A_new_code_replaces_the_old_one`'daki `if` | `PasswordCodeResetTests`, `InvitationTests`, `SessionSignInTests` | doğrulandı (CI `43390653707`; `b9c6183`, `fe1f24f`, `0b44d78`): şifre kodu, JSON 2FA kurtarma kodu, gerçek 429 ve beş davet testi (kabul yarışı, `InvitationPath`, CORS…). Yeni testler ilk koşuda yeşil; iki kural geçici bozulup kırmızı görüldü |
+| V8-8 | CI `secret-scan` yeniden kırmızı: 3 bulgu, bu gecenin test commit'lerindeki yeni test parolaları | run `43340697870` | doğrulandı (CI `43390653707`; `b317c0b`): iki test parolası allowlist'e; `tests/CLAUDE.md`'ye "allowlist'teki değeri kullan" kuralı; yeniden tarama temiz |
+| V8-9 | Hesap başına 100'lük seri sayacı hâlâ aşılabiliyor: seri karşılaştırmadan SONRA ayrı stamp'lı kayıtla yazılıyor, kaybedilince tahmin sayılmıyor (eşzamanlı `/forgot` ile hiçbiri sayılmaz). Kod başına 5 sınırı sağlam | `PasswordResetCodes.cs:110-113,169-175` | kapatıldı (`a619a94`): deneme ve seri iki token, tek kayıtla karşılaştırmadan önce sayılır; doğru kod+reddedilen şifre ikisini geri verir. İki test önce kırmızı (karşılaştırma 2/seri 1; `/forgot` yarışında 1/0), sonra yeşil |
+| V8-10 | Yorum yanlış: "a retrying strategy retries all of it"; ilk `SaveChanges`'ten sonra stamp izleyicide yeni kaldığı için yeniden deneme kesin `ConcurrencyFailure` alır (güvenli tarafta). Keyed hasher'ın "singleton olduğu için aynı maliyet" gerekçesi de geçersiz | `PasswordResetCodes.cs:132`, `AccountInvitations.cs:147`, `IdentityServerHostingExtensions.cs:60` | kapatıldı (`6eecf96`; R-139): yalnız yorumlar; yeniden deneme hep `ConcurrencyFailure` alır (güvenli taraf). Keyed hasher kaldı: host'un hasher'ı 600k iterasyon, D-091 (4) ile çelişir. Gerisi Sonraya |
+
+İkinci inceleme (2026-11-13, Opus, `c7bddf0..0b44d78`): V8-9, V8-10; V8-3…V8-6 ve yarış yardımcıları temiz. Yarış testleri yalnız SQLite'ta koşuyor.
+
+Yanlış pozitif: kök CLAUDE.md'deki başsız giriş satırının `f6185ab` ile gitmesi (kullanıcının bilinçli küçültmesi; bilgi kimlik eklentisinin CLAUDE.md'sinde).
+
+Başlangıç 2026-11-09, `main` @ `f319d57`. Plan onaylandı (plan modu). Doğrulama yalnız faz sonunda (D-093, kullanıcı, 2026-11-09). Kullanıcı isteği: kod adımları Codex'e (`codex:codex-rescue`, effort high) dağıtılır; diff incelemesi, build, adımın testleri, format, commit ve PROGRESS yazan oturumda (Claude). F8.1'in araştırması ve kararları yazan oturumda (MS Learn MCP, D-079). Q-40 sürüyor. Kararlar D-091'den, araştırmalar R-137'den başlayarak yazılır.
+
+**Bu fazda yapılmayacaklar:** ROPC ya da şifre karşılığında tarayıcıya token; `/account`'a ya da yeni uçlara CORS; paketten SPA sunmak; CRM'in React ekranları ve metinleri; kilitli hesabı ayrı kodla açığa çıkarmak; BFF paketi; HTML sayfalarının tasarımı/yerelleştirilmesi; sürüm numarası ve yayın (D-090 (6)); `MapIdentityApi`; IETF First-Party Apps taslağı.
+
 Adım notları 2026-11-13'te gece koşusunda taşındı; faz PR #35 ile açık, doğrulama tablosu PROGRESS'te.
 
 - [x] F8.1 (1aaf0f9): Tasarım kararları D-091, araştırma R-137 (MS Learn antiforgery ve Identity token sağlayıcıları, OWASP Forgot Password, NIST SP 800-63B-4 §3.1.3/§4.2 — NIST bölümleri araçtan özet olarak geldi, değerler R-137'de işaretli —, openiddict-samples Velusia). Kod yok; build/test gerekmedi. Ön karardan sapma: yok; davetin platform ucu ve ürünün kendi ucu ayrıldı (D-091 (5)).
@@ -1159,7 +1184,73 @@ Adım notları 2026-11-13'te gece koşusunda taşındı; faz PR #35 ile açık, 
 - [x] F8.8 (163c4af): README "Kendi giriş ekranı" (akış, aynı kaynak, dev proxy, çerezler, hata kodları → ekran), kimlik eklentisinin CLAUDE.md'si (yeni değişmezler; `LoginPage` → `SignInFlow` atıfları), kök CLAUDE.md, CHANGELOG (Added/Changed, `invitations` için yükseltme notu), memory `novacore-security`.
 - **Oturum sonu koşusu (D-094 (2)):** 19 sınıf (yeni üçü + `ModuleRegistrationTests`, `ValidationTests`, `OpenApiContractTests`, `AdminTests`, `SignInFlowTests`, `SessionSignInTests`, `PasswordResetTests`, `SignInHardeningTests`, `TwoFactorTests`, `TwoFactorRaceTests`, `AuthorizationCodeFlowTests`, `SessionTests`, `IdentityServerConfigurationTests`, `RegistrationTests`, `ConfigurationValidationTests`, `IdentityServerWiringTests`) 215 test: ilk koşuda 1 kırmızı (`AdminTests`, yukarıda), düzeltmeden sonra `AdminTests` 12/12. `PostgreSqlModelTests` 4/4. Build 0 uyarı, format temiz.
 
+### Faz 9 adımları
+Başlangıç 2026-11-13, `faz/8-bassiz-giris` @ `6e7fdb6` + `main` @ `aeb9f38`. Plan onayı D-096 (2). Dependabot, `main`'de: #26, #27, #29, #33, #19 merge edildi (kontroller yeşil, çakışmasız); #21 kullanıcıya kaldı; #2, #28, #30, #31, #32, #34 kırmızı → F9.3.
+
+- [x] F9.1: 98 madde, üç Sonnet sınıflandırıcı + Opus denetimi (`yapılacak`ların hepsi, diğerlerinden 17). Satır numaraları `SONRAYA-BIRAKILANLAR.md` @ `74d511d`.
+
+F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu").
+
+- [x] F9.2a (`ef2cde2`, Sonnet): kaynak taramaları `Solution.SourceFiles`'tan (bin/obj dışlı); `Update`'li referansta NRE testi önce kırmızı. `*.Architecture` 26/26. Opus incelemesi: testin paket satırı `PrivateAssets` yüzünden bir şey sınamıyor, `Directory.Build.*` okuması testsiz → F9.2a2. L25'in `GlobalPackageReference` kısmı yapılmadı (listede kalır).
+- [x] F9.2b (`90d0fde`, Sonnet; Opus incelemesi temiz): dört fazla `EnsureCreatedAsync` silindi, iki cref, `LoginPage`'de `!`, `ProductCatalog.cs` `Internal/` klasörüne. 6 sınıf 60/60. L94'ün kullanılmayan `using` kısmı doğrulanamadı (listede kalır).
+- [x] F9.2c (`bc5f29f`, Sonnet; Opus incelemesi temiz): `src/Modules/CLAUDE.md`'de Guid v7 cümlesi sağlayıcıya göre; R-140. Anahtar stratejisi listede kalır.
+- [x] F9.2e (`7310497`): `service.version` `ApplicationName`'in gösterdiği assembly'den (R-141). `ObservabilityTests` önce kırmızı (`0.1.0.0`), sonra 4/4.
+- [x] F9.2f (`bcfd95e`): seed, secret değişmediyse hash'i korur ve hiçbir alan değişmediyse yazmaz (R-142; DA-7). `ClientSeedTests` önce kırmızı (2/3), sonra 3/3; `ClientCredentialsTests`, `IdentityServerConfigurationTests` yeşil.
+
+- [x] F9.2a2 (`8a35f87`): `PackageDependencyTests` `Update`'li paketi gerçekten sınıyor; `Directory.Build.*` yürüyüşü depo kökünde durur, okuması testli. İki kural geçici bozulup kırmızı görüldü.
+- [x] F9.2d (`9fc17b1`): `MessageResponse` üst düzey internal record; `v1.json` değişmedi. 6 sınıf 61/61.
+
+- [x] F9.2g (`c8446b9`): rol izinleri tek join'le (UserRoles→Roles→RoleClaims); rol artık id ile bulunur. Sorgu sayısı testi önce kırmızı (1 rol 5, 5 rol 13), sonra eşit (4). 8 izin sınıfı 32/32.
+- [x] F9.2h (`669b2d9`; R-143): `/connect` uçları `RequestAborted` geçirir (test önce kırmızı), `await app.RunAsync()` (Api, şablon, README), iki teste doğrulama. 11 sınıf 89/89. CORS bulgusu kullanıcıya kaldı.
+
+- [x] F9.2i (`7d9dcc9`; R-144): event tamponu yalnız `SavedChanges`'te temizlenir, yeniden denemede izlenen outbox satırlarının event'leri atlanır; iki yeni public override. `OutboxInterceptorTests` önce kırmızı (4/14), sonra 14/14.
+- [x] F9.2j (`8a891f4`; R-145): çakışmada `GetDatabaseValuesAsync` null ise 404, değilse 409. `StockConcurrencyTests` önce kırmızı (2), sonra 6/6; OpenAPI değişmedi.
+
+- [x] F9.3 (`13375bd`, `dc06cda`, `94b6db9`, `f475897`, `003b218`; Sonnet, Opus incelemesi sürüyor): codeql init/analyze v4.39.3 (#28, #30), Scalar 2.18.7 (#34), OpenIddict 7.8.0 (#32), Microsoft paketleri 10.0.14 / 10.11.0 + şablonun props'u (#31; L18 kapanır), Jaeger 2.22.0 (#2). Kod uyarlaması yok; R-146…R-149. Kilitli restore ve build temiz. #21 kullanıcıda.
+- Faz sonu incelemesi (Opus, F9.2'nin davranış commit'leri): kapsam içi hata yok. F9.4'e: `src/Modules/CLAUDE.md:69`'daki 404 yönergesi kiracılı context'te `TenantQueryGuard`'a takılır; sorgu sayısı testine alt sınır. Gerisi Sonraya.
+
+- F9.3'ün Opus incelemesi: temiz (sürümler Dependabot'la aynı, kilitli restore hatasız, codeql SHA'sı `v4.39.3`'ün commit'i, yeni geçişli paket yok); üç eksik → F9.3f, F9.4.
+- [x] F9.3f (`38af086`): `dotnet-ef` 10.0.14 (kök ve şablon), bayat servis yorumu. Pkcs: SqlClient 6.1.7 net10'da hâlâ 9.0.11 istiyor, doğrudan referans kalır (Sonraya metni düzeltildi).
+- [x] F9.2k (`82c672d`; R-150): `GetDatabaseValuesAsync` kiracılı context'te `TenantQueryGuard`'a takılıyor (test önce kırmızı); yönerge ve Catalog'un iki handler'ı filtreli `AnyAsync` kalıbına geçti; sorgu sayısı testine alt sınır. 3 sınıf 48/48.
+- [x] F9.4 (`a623cb1`): CHANGELOG `[Unreleased]` (F9.2g/h, bağımlılıklar), README, `tests/CLAUDE.md` (yazan oturum `*.Architecture`'ı da koşar), kimlik eklentisinin CLAUDE.md'si.
+
+#### Doğrulama (Faz 9)
+
+| ID | Bulgu | Yer | Durum |
+|---|---|---|---|
+| V9-1 | CI `build-and-test` kırmızı (run `43395986910`): F9.2e'nin eklediği `Assembly.Load`, Y-20'yi koruyan `ExplicitRegistrationTests`'i kırıyor. Yazan yalnız `ObservabilityTests`'i koştu | `OpenTelemetryHostingExtensions.cs` (`7310497`) | doğrulandı (CI `43399963544`'te `build-and-test` yeşil; `83cea0c`): yeni overload `AddCoreObservability(Assembly)`, host `typeof(Program).Assembly` verir; parametresiz olan sürüm raporlamaz. `ExplicitRegistrationTests` önce kırmızı, `*.Architecture` 27/27 (orkestratör de koştu) |
+
+**Arşive taşındı (2026-11-13):** biten L26, L32, L48, L56, L57, L65, L74, L85; geçersiz L17, L21, L34, L36, L43, L46, L71, L88, L108. **Kısmen, listede kalır:** L25 (`GlobalPackageReference`), L63 (anahtar stratejisi), L94 (kullanılmayan `using`'ler), L96 (CORS bulgusu SonarCloud'da). L18 F9.3'le kapandı, arşivde.
+**kalır:** koşul gerçekleşmedi L11–L15, L20, L33, L45, L51, L60, L62, L68, L72 (F9.3'ten sonra yeniden bak), L73, L75–L79, L84, L86, L89, L90, L92, L93, L103–L105, L107, L112, L113, L116–L118, L121–L127 · ürün/public API/tasarım kararı L22, L24, L29–L31, L41, L42, L52–L55, L61, L66, L67, L80–L83, L114 · D-031 (3)'ü yeniden açar L64 · korunan dosya L27, L49, L69, L95 · bastırma L23, L28 · ortam/upstream L19, L35, L58, L91, L102, L115, L119, L120 · kuşkulu L47.
+
+### Faz 9 F9.1 tablosu
+
+| Alt adım | Satır: madde | Model | Kırmızı test |
+|---|---|---|---|
+| F9.2a | L25 `PackageDependencyTests` boşlukları (bin/obj, `Update`'li referans); L26 tekrarlı kaynak tarama kodu | Sonnet | hayır |
+| F9.2b | L48 fazla `EnsureCreatedAsync` çağrıları (silinir); L94 Qodana cref ve `!` temizliği | Sonnet | hayır |
+| F9.2c | L63 `src/Modules/CLAUDE.md`'de Guid v7 "SQL Server clustering" cümlesi | Sonnet | hayır |
+| F9.2d | L74 `MessageResponse` üst düzeye | Sonnet | hayır |
+| F9.2e | L32 OTel `service.version` host assembly'sinden | Opus | evet |
+| F9.2f | L56 seed client secret'ı her açılışta yeniden hash'liyor | Opus | evet |
+| F9.2g | L57 `IdentityPermissionResolver` rol başına N+1 | Opus | sorgu sayısı |
+| F9.2h | L96 SonarCloud: `RequestAborted`, iki assertion'sız test, `RunAsync` | Opus | iptal için evet |
+| F9.2i | L65 `OutboxInterceptor` tamponu başarısız kayıtta | Opus | evet |
+| F9.2j | L85 eşzamanlı silinmiş satırda 409 yerine 404 | Opus | evet |
+
 ## Eski devir notları
+
+**2026-11-14, gece koşusu bitti (D-096): Faz 8, 9, 6e'nin işleri tamam, üç PR açık.** Branch `faz/6e-dinamik-denetim`, push edildi; PR #37 (`main`'e, #36 ve #35'in üstünde).
+
+- **Sıradaki:** kullanıcı `SONAR_TOKEN`'ı yeniler; #35 → #36 → #37 sırayla merge edilir (kullanıcı kararı). Sonra `gh workflow run dast.yml` ile DAST'ın ilk koşusu, raporları F6e.5 triajına. DA-1…DA-12 tek düzenlemeyle DECISIONS'a işlenir. D-032: `DECISIONS.md` `protectedPaths`'e geri eklenir (Faz 6e sonu, kullanıcı).
+- **Bilinmesi gerekenler:** tam suite, SQL Server/PostgreSQL katmanları ve şablon smoke'u yalnız CI'da koştu (yeşil). CodeRabbit CLI çalışmadı (kimlik doğrulama). ZAP yerelde denenmedi. V6e-3'ün bedeli: `UseCoreWeb` çağırmayan host kendi form okuma hatasında 500 alır. `/account/login` e-postasına 256 sınırı konmadı (lockout veritabanında, bellek durumu yok).
+- **Bekleyen karar:** Kullanıcıya kalanlar tablosu (S-6 varsayılanları, V6e-4, S-7, S-1'in kalan yolu). Q-40 sürüyor.
+
+**2026-11-13, faz dışı: gece koşusu kuruldu (D-096), PROGRESS bölündü (D-097), Faz 9 plana eklendi (Q-63).** Branch `faz/8-bassiz-giris`, ilk kez push edildi; CI koşuyor. Kod değişmedi.
+
+- **Sıradaki:** kullanıcı `/novacore-night` ile koşuyu başlatır; kuyruk yukarıdaki "Gece koşusu" bölümünde. `/novacore-verify 8` ayrıca çalıştırılmaz: Faz 8'in doğrulamasını koşu yapar (CI ve yazmamış bir inceleme alt ajanı).
+- **Bilinmesi gerekenler:** Faz 8'in testleri önce kırmızı görülmedi (D-094 (3)). `invitations` migration'ı SQL Server ve PostgreSQL'de, şablon smoke'u da F8.7'den beri ilk kez bu CI koşusunda çalışıyor. Bu makinede Docker kapalıydı ve SDK yalnız 10.0.300.
+- **Bekleyen soru:** yok. Q-40 sürüyor. Sürüm numarası ve yayın kullanıcının (D-090 (6)).
 
 **2026-11-09 akşam, Faz 8: Başsız kimlik arayüzü (⏸ duraklatıldı, faz sonu doğrulaması bekliyor).** Branch `faz/8-bassiz-giris`, yerel, push edilmedi. Bu oturum kullanıcının kararıyla (D-094) F8.4–F8.8'i tek oturumda yaptı: `3d59f79`, `7e74100`, `295d1f7`, `ac3005a`, `163c4af`, `f4c5f3c`. Bütün adımlar işaretli. Doğrulanmamış aralık `f319d57..HEAD` (fazın tamamı).
 

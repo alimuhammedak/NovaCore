@@ -35,7 +35,8 @@ internal static class PasswordCodeEndpoints
         password.MapPost("/forgot", Forgot)
             .WithName("PasswordForgot")
             .WithSummary("Email a code to reset the password (only to a confirmed account; the same answer for every address)")
-            .ProducesValidationProblem();
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         password.MapPost("/reset", Reset)
             .WithName("PasswordReset")
@@ -43,13 +44,19 @@ internal static class PasswordCodeEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest);
     }
 
-    private static async Task<Accepted<MessageResponse>> Forgot(
+    private static async Task<Results<Accepted<MessageResponse>, ProblemHttpResult>> Forgot(
         PasswordForgotRequest request,
         UserManager<ApplicationUser> users,
         PasswordResetCodes codes,
         EmailQueue emails,
+        EmailRecipientLimit recipientLimit,
         SecurityAuditLogger audit)
     {
+        // Counted before the lookup, so every address is limited alike; a refused request issues no code, so it can't
+        // replace the one the owner got last (EmailRecipientLimit).
+        if (!recipientLimit.TryAcquire(users.NormalizeEmail(request.Email)))
+            return EmailRecipientLimit.TooManyEmails;
+
         var user = await users.FindByEmailAsync(request.Email);
         if (user is not null && await users.IsEmailConfirmedAsync(user))
         {

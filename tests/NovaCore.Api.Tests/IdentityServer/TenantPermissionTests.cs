@@ -91,6 +91,26 @@ public sealed class TenantPermissionTests(TenantPermissionTests.Fixture fixture)
         Assert.Equal(["probe:audit:read"], await PermissionsAsync(user, tenant: null));
     }
 
+    // A request that names its tenant holds the role's permissions on every endpoint, and a host reading the tenant from a
+    // header (AddCoreMultiTenancy(Func)) names it on the platform's endpoints too: a tenant role holding identity:* would
+    // make a tenant's owner an administrator of every account (S-3). The identity provider declares those permissions,
+    // so "a module declares it" alone lets them through.
+    [Fact]
+    public async Task A_tenant_role_that_grants_the_identity_providers_own_permission_stops_the_host()
+    {
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => IdentityServerTestHost.StartAsync(configure: builder =>
+        {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                [$"MultiTenancy:Roles:{Member}:0"] = IdentityPermissions.UsersManage
+            });
+            builder.AddCoreMultiTenancy(context => context.Request.Headers["X-Tenant"]);
+            builder.Services.AddModuleDbContext<MultiTenancyDbContext>(MultiTenancyDbContext.Schema, (_, _) => { });
+        }));
+
+        Assert.Contains("MultiTenancy:Roles can't hold the identity provider's own permissions", exception.Message, StringComparison.Ordinal);
+    }
+
     private async Task<ApplicationUser> AdministratorAsync(string email, bool twoFactor)
     {
         var user = await _host.CreateUserAsync(email, "a long passphrase for tests");

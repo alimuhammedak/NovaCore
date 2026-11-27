@@ -1,0 +1,147 @@
+# The identity provider's protocol endpoints and sign-in pages, which the API's OpenAPI document leaves out
+# (ExcludeFromDescription in ConnectEndpoints and the /account group): a narrow target list for the DAST run
+# (docs/plan/PLAN.md F6e.2), fuzzed by Schemathesis like the document. The parameters are the ones the handlers and
+# OpenIddict read; the answers are left open (default), so what counts is a server error, a slow answer or a crash, not a
+# status the protocol allows. Not a contract: the protocol is OpenID Connect's.
+openapi: 3.0.3
+info:
+  title: NovaCore identity provider (DAST targets)
+  version: '1'
+paths:
+  /connect/authorize:
+    get:
+      operationId: authorize
+      parameters:
+        - { name: client_id, in: query, schema: { type: string } }
+        - { name: response_type, in: query, schema: { type: string, enum: [code, token, id_token] } }
+        - { name: redirect_uri, in: query, schema: { type: string } }
+        - { name: scope, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string } }
+        - { name: nonce, in: query, schema: { type: string } }
+        - { name: code_challenge, in: query, schema: { type: string } }
+        - { name: code_challenge_method, in: query, schema: { type: string, enum: [S256, plain] } }
+        - { name: prompt, in: query, schema: { type: string } }
+        - { name: max_age, in: query, schema: { type: string } }
+      responses:
+        default: { description: Any answer the protocol allows. }
+  /connect/token:
+    post:
+      operationId: token
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type: { type: string, enum: [client_credentials, authorization_code, refresh_token, password] }
+                client_id: { type: string }
+                client_secret: { type: string }
+                code: { type: string }
+                code_verifier: { type: string }
+                redirect_uri: { type: string }
+                refresh_token: { type: string }
+                scope: { type: string }
+      responses:
+        default: { description: Any answer the protocol allows. }
+  /connect/revoke:
+    post:
+      operationId: revoke
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                token: { type: string }
+                token_type_hint: { type: string, enum: [access_token, refresh_token] }
+                client_id: { type: string }
+                client_secret: { type: string }
+      responses:
+        default: { description: Any answer the protocol allows. }
+  /connect/endsession:
+    get:
+      operationId: endSession
+      parameters:
+        - { name: id_token_hint, in: query, schema: { type: string } }
+        - { name: client_id, in: query, schema: { type: string } }
+        - { name: post_logout_redirect_uri, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string } }
+      responses:
+        default: { description: Any answer the protocol allows. }
+  /account/login:
+    get:
+      operationId: loginPage
+      parameters:
+        - { name: ReturnUrl, in: query, schema: { type: string } }
+      responses:
+        default: { description: The sign-in page or a redirect. }
+    post:
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                Email: { type: string }
+                Password: { type: string }
+                ReturnUrl: { type: string }
+                __RequestVerificationToken: { type: string }
+      responses:
+        default: { description: The sign-in page again or a redirect. }
+  /account/login/2fa:
+    post:
+      operationId: loginTwoFactor
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                Code: { type: string }
+                ReturnUrl: { type: string }
+                __RequestVerificationToken: { type: string }
+      responses:
+        default: { description: The code page again or a redirect. }
+  /account/forgot-password:
+    post:
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                Email: { type: string }
+                __RequestVerificationToken: { type: string }
+      responses:
+        default: { description: The same answer for every address. }
+  /account/reset-password:
+    get:
+      operationId: resetPasswordPage
+      parameters:
+        - { name: userId, in: query, schema: { type: string } }
+        - { name: token, in: query, schema: { type: string } }
+      responses:
+        default: { description: The reset page. }
+    post:
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                UserId: { type: string }
+                Token: { type: string }
+                Password: { type: string }
+                ConfirmPassword: { type: string }
+                __RequestVerificationToken: { type: string }
+      responses:
+        default: { description: The reset page again or a redirect. }
