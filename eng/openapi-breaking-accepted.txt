@@ -1,3 +1,104 @@
 # Breaking API changes made on purpose: one line per change, oasdiff's message for it (eng/check-openapi.sh).
 # Delete a line once the change is on main and main's own check has passed it: a line left here would excuse the same
 # break again later.
+# Faz 6e (S-16, S-20; D-103, D-105): the document now states the validation the server already applied, and the payment
+# operation's own body (it was documented with the product's). The server's behaviour is unchanged.
+GET /api/v1/admin/users for the `query` request parameter `pageSize`, the max was set to `2147483647.00`
+GET /api/v1/admin/users for the `query` request parameter `pageSize`, the min was set to `-2147483648.00`
+GET /api/v1/admin/users for the `query` request parameter `page`, the max was set to `2147483647.00`
+GET /api/v1/admin/users for the `query` request parameter `page`, the min was set to `-2147483648.00`
+GET /api/v1/payments for the `query` request parameter `pageSize`, the max was set to `2147483647.00`
+GET /api/v1/payments for the `query` request parameter `pageSize`, the min was set to `-2147483648.00`
+GET /api/v1/payments for the `query` request parameter `page`, the max was set to `2147483647.00`
+GET /api/v1/payments for the `query` request parameter `page`, the min was set to `-2147483648.00`
+GET /api/v1/products for the `query` request parameter `pageSize`, the max was set to `2147483647.00`
+GET /api/v1/products for the `query` request parameter `pageSize`, the min was set to `-2147483648.00`
+GET /api/v1/products for the `query` request parameter `page`, the max was set to `2147483647.00`
+GET /api/v1/products for the `query` request parameter `page`, the min was set to `-2147483648.00`
+POST /api/v1/admin/invitations added the pattern `[^\s\u0085]` to the request property `email`
+POST /api/v1/admin/invitations the `email` request property `format` changed from `none` to `email`
+POST /api/v1/admin/invitations the `email` request property's maxLength was set to `256`
+POST /api/v1/admin/invitations the `email` request property's minLength was set to `1`
+POST /api/v1/admin/users/{userId}/roles added the pattern `[^\s\u0085]` to the request property `role`
+POST /api/v1/admin/users/{userId}/roles the `role` request property's maxLength was set to `256`
+POST /api/v1/admin/users/{userId}/roles the `role` request property's minLength was set to `1`
+POST /api/v1/auth/2fa/disable added the pattern `[^\s\u0085]` to the request property `code`
+POST /api/v1/auth/2fa/disable added the pattern `[^\s\u0085]` to the request property `password`
+POST /api/v1/auth/2fa/disable the `code` request property's maxLength was set to `8`
+POST /api/v1/auth/2fa/disable the `code` request property's minLength was set to `6`
+POST /api/v1/auth/2fa/disable the `password` request property's minLength was set to `1`
+POST /api/v1/auth/2fa/enable added the pattern `[^\s\u0085]` to the request property `code`
+POST /api/v1/auth/2fa/enable added the pattern `[^\s\u0085]` to the request property `password`
+POST /api/v1/auth/2fa/enable the `code` request property's maxLength was set to `8`
+POST /api/v1/auth/2fa/enable the `code` request property's minLength was set to `6`
+POST /api/v1/auth/2fa/enable the `password` request property's minLength was set to `1`
+POST /api/v1/auth/2fa/setup added the pattern `[^\s\u0085]` to the request property `password`
+POST /api/v1/auth/2fa/setup the `password` request property's minLength was set to `1`
+POST /api/v1/auth/change-password added the pattern `[^\s\u0085]` to the request property `currentPassword`
+POST /api/v1/auth/change-password added the pattern `[^\s\u0085]` to the request property `newPassword`
+POST /api/v1/auth/change-password the `currentPassword` request property's minLength was set to `1`
+POST /api/v1/auth/change-password the `newPassword` request property's maxLength was set to `128`
+POST /api/v1/auth/change-password the `newPassword` request property's minLength was set to `15`
+POST /api/v1/auth/invitations/accept added the pattern `[^\s\u0085]` to the request property `password`
+POST /api/v1/auth/invitations/accept added the pattern `[^\s\u0085]` to the request property `token`
+POST /api/v1/auth/invitations/accept the `password` request property's maxLength was set to `128`
+POST /api/v1/auth/invitations/accept the `password` request property's minLength was set to `15`
+POST /api/v1/auth/invitations/accept the `token` request property's maxLength was set to `128`
+POST /api/v1/auth/invitations/accept the `token` request property's minLength was set to `1`
+POST /api/v1/auth/invitations/status added the pattern `[^\s\u0085]` to the request property `token`
+POST /api/v1/auth/invitations/status the `token` request property's maxLength was set to `128`
+POST /api/v1/auth/invitations/status the `token` request property's minLength was set to `1`
+POST /api/v1/auth/password/forgot added the pattern `[^\s\u0085]` to the request property `email`
+POST /api/v1/auth/password/forgot the `email` request property `format` changed from `none` to `email`
+POST /api/v1/auth/password/forgot the `email` request property's maxLength was set to `256`
+POST /api/v1/auth/password/forgot the `email` request property's minLength was set to `1`
+POST /api/v1/auth/password/reset added the pattern `[^\s\u0085]` to the request property `code`
+POST /api/v1/auth/password/reset added the pattern `[^\s\u0085]` to the request property `email`
+POST /api/v1/auth/password/reset added the pattern `[^\s\u0085]` to the request property `newPassword`
+POST /api/v1/auth/password/reset the `code` request property's maxLength was set to `8`
+POST /api/v1/auth/password/reset the `code` request property's minLength was set to `8`
+POST /api/v1/auth/password/reset the `email` request property `format` changed from `none` to `email`
+POST /api/v1/auth/password/reset the `email` request property's maxLength was set to `256`
+POST /api/v1/auth/password/reset the `email` request property's minLength was set to `1`
+POST /api/v1/auth/password/reset the `newPassword` request property's maxLength was set to `128`
+POST /api/v1/auth/password/reset the `newPassword` request property's minLength was set to `15`
+POST /api/v1/auth/register added the pattern `[^\s\u0085]` to the request property `email`
+POST /api/v1/auth/register added the pattern `[^\s\u0085]` to the request property `password`
+POST /api/v1/auth/register the `displayName` request property's maxLength was set to `128`
+POST /api/v1/auth/register the `email` request property `format` changed from `none` to `email`
+POST /api/v1/auth/register the `email` request property's maxLength was set to `256`
+POST /api/v1/auth/register the `email` request property's minLength was set to `1`
+POST /api/v1/auth/register the `password` request property's maxLength was set to `128`
+POST /api/v1/auth/register the `password` request property's minLength was set to `15`
+POST /api/v1/auth/resend-confirmation-email added the pattern `[^\s\u0085]` to the request property `email`
+POST /api/v1/auth/resend-confirmation-email the `email` request property `format` changed from `none` to `email`
+POST /api/v1/auth/resend-confirmation-email the `email` request property's maxLength was set to `256`
+POST /api/v1/auth/resend-confirmation-email the `email` request property's minLength was set to `1`
+POST /api/v1/auth/session/login added the pattern `[^\s\u0085]` to the request property `email`
+POST /api/v1/auth/session/login added the pattern `[^\s\u0085]` to the request property `password`
+POST /api/v1/auth/session/login the `email` request property's maxLength was set to `256`
+POST /api/v1/auth/session/login the `email` request property's minLength was set to `1`
+POST /api/v1/auth/session/login the `password` request property's maxLength was set to `1024`
+POST /api/v1/auth/session/login the `password` request property's minLength was set to `1`
+POST /api/v1/auth/session/login the `returnUrl` request property's maxLength was set to `4096`
+POST /api/v1/auth/session/login/2fa added the pattern `[^\s\u0085]` to the request property `code`
+POST /api/v1/auth/session/login/2fa the `code` request property's maxLength was set to `64`
+POST /api/v1/auth/session/login/2fa the `code` request property's minLength was set to `1`
+POST /api/v1/auth/session/login/2fa the `returnUrl` request property's maxLength was set to `4096`
+POST /api/v1/payments added the new required request property `productId`
+POST /api/v1/payments added the new required request property `quantity`
+POST /api/v1/payments removed the required property `id` from the response with the `201` status
+POST /api/v1/products added the pattern `[^\s\u0085]` to the request property `name`
+POST /api/v1/products the `description` request property's maxLength was set to `2000`
+POST /api/v1/products the `name` request property's maxLength was set to `200`
+POST /api/v1/products the `name` request property's minLength was set to `1`
+POST /api/v1/products the `price` request property's exclusiveMinimum was set to `0.00`
+POST /api/v1/products the `stock` request property's max was set to `2147483647.00`
+POST /api/v1/products the `stock` request property's min was set to `0.00`
+PUT /api/v1/products/{id} added the pattern `[^\s\u0085]` to the request property `name`
+PUT /api/v1/products/{id} the `description` request property's maxLength was set to `2000`
+PUT /api/v1/products/{id} the `name` request property's maxLength was set to `200`
+PUT /api/v1/products/{id} the `name` request property's minLength was set to `1`
+PUT /api/v1/products/{id} the `price` request property's exclusiveMinimum was set to `0.00`
+PUT /api/v1/products/{id} the `stock` request property's max was set to `2147483647.00`
+PUT /api/v1/products/{id} the `stock` request property's min was set to `0.00`
