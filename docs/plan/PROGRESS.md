@@ -56,6 +56,7 @@ DA-1…DA-12 2026-11-27'de DECISIONS'a işlendi: D-099 (DA-1…6), D-100 (DA-7, 
 
 | İş | Neden | Ne gerekli |
 |---|---|---|
+| Tam test paketinin SQL Server ve PostgreSQL katmanları (Faz 6e doğrulaması, 98 test) | Kullanıcı kararı (2026-11-27): 6e'de koşmaz | Faz 10 bittikten sonra, 0.2.0 tag'inden önce Docker açıkken `dotnet test --solution NovaCore.slnx` |
 | CodeRabbit CLI incelemesi (Faz 8) | "session could not be authenticated" | `coderabbit auth login`, sonra `coderabbit review --agent --base main` |
 | SonarCloud: `dast.yml:43` S2068 ("password") | V6e-1'in false positive'i (değer `openssl rand` ifadesi); kalite kapısını kırmızı yapıyor | Kullanıcı SonarCloud'da "Safe/False positive" işaretler (L96 ile birlikte) |
 | Dependabot #21 (`global.json` → SDK 10.0.403) | Bu makinede yalnız 10.0.300 kurulu (F9.3 kuralı) | SDK 10.0.403 kurulur, PR merge edilir |
@@ -76,14 +77,18 @@ Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docke
 
 #### Doğrulama (Faz 6e)
 
+Son doğrulanan commit: `28663cc` (2026-11-27; aralık `ce56885..28663cc`, 13 kod commit'i; test 726/824, atlanan 98: SQL Server ve PostgreSQL katmanları, Docker yok; code-review 4 bulgu: 2 açık, 2 Sonraya). Docker katmanları kullanıcı kararıyla 6e'de koşmaz: Faz 10 bittikten sonra, 0.2.0 tag'inden önce koşar (2026-11-27). Restore `--locked-mode`, build (0 uyarı) ve format geçti.
+
 | ID | Bulgu | Yer | Durum |
 |---|---|---|---|
 | V6e-1 | CI `secret-scan` kırmızı: 1 bulgu, `1f3c034..4814ed1` aralığında (F6e.1/F6e.2 ya da S-1/S-2 commit'leri) | run `43579950658` | doğrulandı yerelde (`d5954f4`): `dast.yml:44`'teki çalışma anında üretilen parola ifadesi (generic-password FP); yalnız bu yol ve bu ifade için allowlist; yerel tam tarama temiz, CI bekleniyor |
 | V6e-2 | Bellek DoS: HTML `/account/forgot-password` e-postasının uzunluğu sınırsız (4 MB'a kadar); `EmailRecipientLimit` her farklı değeri bir saat partition olarak tutar | Opus inceleme, `PasswordResetPage.cs:60-67`, `EmailRecipientLimit.cs:56-60` | kapandı (`3144da9`): form e-postası `EmailAddress` + 256; `TryAcquire` uzun anahtarı reddeder; 4 kırmızı → yeşil |
 | V6e-3 | `InvalidDataException`→400 kaynağa bakmıyor: modülün bozuk arşiv açması (Zip/GZip/Brotli) 500 yerine logsuz 400 olur | Opus inceleme, `ExceptionMapping.cs:28,50-51,61-62` | kapandı (`c8b3d17`, R-158): form okuyucunun `InvalidDataException`'ı okunduğu yerde `BadHttpRequestException`'a sarılır; çıplak `InvalidDataException` 500 + log; 2 kırmızı → yeşil |
 | V6e-4 | Bekleyen daveti olan şifresiz hesaba anonim `register`: davetliye "yeniden kayıt" metinli şifre bağlantısı ve Warning audit gider (güvenlik açığı değil) | Opus inceleme, `AccountEndpoints.cs:741-760` | D-102 (6): davranış değişmez, README'ye (F10.3) |
-| V6e-5 | DAST'ın ilk koşusu hiçbir tarama koşmadan kırmızı: Schemathesis imajı (uid 1000) runner'ın (uid 1001) rapor klasöründe `--report-dir` açamadı | run `46002347264`, `eng/dast.sh:72-84` | kapatıldı (`045f686`, branch `faz/6e-dast-ilk-kosu`): rapor klasörü ZAP'ınki gibi önceden açılıp yazılabilir yapılır. xUnit'le gösterilemez (CI betiği, kapsayıcı kullanıcısı); run `46007644116` taramaları koşturdu |
-| V6e-6 | Run `46007644116` yeşil ve "bulgulu" ama Schemathesis'in bütün işlemleri JUnit `<error>`: sertifikayı okuyamadı (`dotnet dev-certs` PEM'i yalnız sahibine açar); betik exit 1'i bulgu saydı | run `46007644116`, `eng/dast.sh` | kapatıldı (`8dfc457`): kopya herkese okunur; JUnit'te `<error>` varsa tarama eksik sayılır, job kırmızı (D-101 (1)). Run `46008665907`: 0 hata, 33 kontrol bulgusu |
+| V6e-5 | DAST'ın ilk koşusu hiçbir tarama koşmadan kırmızı: Schemathesis imajı (uid 1000) runner'ın (uid 1001) rapor klasöründe `--report-dir` açamadı | run `46002347264`, `eng/dast.sh:72-84` | kapatıldı (`045f686`, branch `faz/6e-dast-ilk-kosu`): rapor klasörü ZAP'ınki gibi önceden açılıp yazılabilir yapılır. xUnit'le gösterilemez (CI betiği, kapsayıcı kullanıcısı); run `46007644116` taramaları koşturdu; **doğrulandı** (`28663cc`) |
+| V6e-6 | Run `46007644116` yeşil ve "bulgulu" ama Schemathesis'in bütün işlemleri JUnit `<error>`: sertifikayı okuyamadı (`dotnet dev-certs` PEM'i yalnız sahibine açar); betik exit 1'i bulgu saydı | run `46007644116`, `eng/dast.sh` | kapatıldı (`8dfc457`): kopya herkese okunur; JUnit'te `<error>` varsa tarama eksik sayılır, job kırmızı (D-101 (1)). Run `46008665907`: 0 hata, 33 kontrol bulgusu; **doğrulandı** (`28663cc`): CI yolu düzgün; yerel yeniden koşu ve JUnit'siz çıkış V6e-7 |
+| V6e-7 | `<error>` denetimi tek bir JUnit dosyası varsayıyor: dosya yoksa (Schemathesis exit 1 ile rapor yazmadan çıkarsa) `errors` boş → 0; aynı rapor klasörüne yeniden koşuda iki dosya varsa `errors` iki satır olur, `[[ -gt ]]` hata verir ve yanlış sayılır. İki durumda da eksik tarama "bulgu" diye yazılır, betik 0 döner (D-101 (1)'e aykırı) | code-review, `eng/dast.sh:127-133` | açık: JUnit yoksa tarama eksik sayılır; birden çok dosyanın `errors`'u toplanır (ya da klasör koşu başında temizlenir) |
+| V6e-8 | Mekanik `[`→`[property: ` değişikliği bir yorumu bozmuş: "`[property: Required] can't reject Guid.Empty`" (yorum attribute'un hedefini değil kendisini anlatıyor) | code-review, `CreatePayment.cs:34` | açık: yorum `[Required]`'a döner |
 
 #### F6e.4 bulguları ve F6e.5 triajı
 
