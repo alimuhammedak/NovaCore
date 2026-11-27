@@ -36,6 +36,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- OpenAPI: every operation that isn't anonymous documents its 401, and one that names a permission, tenant, policy or
+  roles its 403, both as `application/problem+json` (what the authorization gate answers).
+- OpenAPI: `GET /api/v1/auth/confirm-email` documents both bodies of its 400: the message for a refused token and the
+  ProblemDetails for a query value the framework can't bind.
+- OpenAPI: request schemas carry their validation limits (`maxLength`, `minLength`, `minimum`, `exclusiveMinimum`): the
+  request records' DataAnnotations target their properties (`[property: Required, MaxLength(200)]`), the only place the
+  document reads them. The template's `CreateTodo` does the same.
+- OpenAPI: a type nested in a public type has a schema named with its declaring types (`CreatePaymentRequest`,
+  `CreateProductResponse`, ...). The features' nested `Request` and `Response` records used to share one `Request` and
+  one `Response` schema, so `POST /api/v1/payments` was documented with the product's body. Other schemas keep their
+  names.
+- Security headers: the Content-Security-Policy adds `base-uri 'none'`, which `default-src` doesn't cover. No
+  `form-action`: Chrome applies it to the redirects after a sign-in form's post too.
 - Identity provider: the sign-in rules moved into one internal service shared by the HTML pages and the JSON
   endpoints; behaviour is unchanged. The antiforgery header name is `X-XSRF-TOKEN` (the HTML forms keep their field).
 - Identity provider: a user's role permissions are resolved in one query, whatever the number of roles (two per role

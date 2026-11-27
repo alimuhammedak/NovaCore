@@ -1240,6 +1240,43 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 
 ## Eski devir notları
 
+**2026-11-27, Faz 6e: S-16 kapandı; DAST bulgularının bütün testli düzeltmeleri bitti.** İki commit (`06acc8a`, `f7f54b4`) `faz/6e-dast-ilk-kosu`'da, push edilmedi. Sürpriz: sunucu sayfa parametrelerinde her int32'yi kabul edip kırpıyor; şema bu yüzden `minimum: 1` değil tipin aralığını yazar. Kararlar D-105, R-161.
+
+- **Sıradaki (kullanıcı onayıyla):** branch push, DAST yeniden (`gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu`), ST202'nin kalktığı görülür; ardından `/novacore-verify 6e`. F6e.3 D-102 (2) gereği bu sürümde koşmaz.
+- **Doğrulamaya kalanlar:** tam paket, SQL Server/PostgreSQL katmanları, `check-openapi` (şema adları, yeni `maxLength`/`minLength`/`pattern`/`format`, parametre tipi `integer|string` → `integer`; oasdiff'in kırıcı sayıp saymadığı, izin listesi boş), şablon smoke (`CreateTodo`'nun `property:` hedefi), coverage.
+- **Bekleyen karar:** push. Q-40 sürüyor.
+
+**2026-11-27, Faz 6e: S-15 kapandı, S-16 kısmen, S-20 bulundu ve kapandı.** Üç commit (`965100b`, `79ebf69`, `19fdd59`) `faz/6e-dast-ilk-kosu`'da, push edilmedi. Sürprizler: .NET 10 bir durum kodu için yalnız son `Produces*`'ı tutar; record attribute'ları `property:` hedefi olmadan şemaya girmez; aynı adlı iç içe `Request`/`Response` tipleri tek şemayı paylaşıyordu (`/payments` ürünün gövdesiyle belgeliydi, S-20). Kararlar D-103, R-160.
+
+- **Akış (D-104):** `/novacore-phase 6e` bir çağrıda fazın kalanını bitirir; adımları yazan alt ajanlar yazar.
+- **Sıradaki:** S-16'nın kalanı: `[Required]` (boş dizgi yasak) → `minLength: 1` ve `[EmailAddress]` → `format: email` için çekirdekte bir şema transformer'ı (seçenekler R-160'ta; önce `OpenApiTests`'te kırmızı), sayfa parametrelerinin sınırı (`PaginationRequest`, Abstractions). Sonra branch push, DAST yeniden koşulur (`gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu`), ardından `/novacore-verify 6e`.
+- **Doğrulamaya kalanlar:** tam paket, SQL Server/PostgreSQL katmanları, `check-openapi` (şema adları `Request`/`Response` → `Create*Request` vb., yeni `maxLength`/`minLength`; oasdiff'in kırıcı saymadığı görülmeli), şablon smoke (`CreateTodo`'nun `property:` hedefi), coverage.
+- **Bekleyen karar:** yok. Q-40 sürüyor.
+
+**2026-11-27, Faz 6e: S-15, S-17, S-18 kapandı.** Üç commit (`d1a244c`, `b12ebdc`, `dfb1dd3`) `faz/6e-dast-ilk-kosu`'da, push edilmedi (plan commit'i `83e700c` de). Sürpriz: Chrome `form-action`'ı form gönderiminden sonraki yönlendirmelere de uygular; giriş zinciri istemcinin başka origin'deki `redirect_uri`'sinde bittiği için `form-action` eklenmedi (R-159, README).
+
+- **Sıradaki:** S-16 (.NET 10 OpenAPI'nin DataAnnotations'tan şemaya ne taşıdığını ölç, R-kaydı); S-15'in ST105 kısmı (3 uçta `application/json` belgeli 400 ama `problem+json` dönüyor; raporu (run `46008665907`, `dast-report` artifact'ı) okumadan hangi uçlar olduğu belli değil: aday `confirm-email`'in bağlama hatası). Sonra branch push, DAST yeniden koşulur (`gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu`), ardından `/novacore-verify 6e`.
+- **Doğrulamaya kalanlar:** tam paket, SQL Server/PostgreSQL katmanları, `check-openapi` (19 işleme 401/403 eklendi; oasdiff'te yanıt eklemek kırıcı olmamalı), coverage, şablon smoke.
+- **Bekleyen karar:** yok. Q-40 sürüyor.
+
+**2026-11-27, Faz 6e: DAST koşuyor, bulgular triajlı.** İki betik hatası kapandı (V6e-5 `045f686`, V6e-6 `8dfc457`); run `46008665907` dört taramayı da koşturdu: 5xx yok, 33 Schemathesis kontrol bulgusu ve ZAP uyarıları S-15…S-19 olarak triajlı. DA-1…DA-12 D-099…D-101'e işlendi (`0a091e4`). Branch `faz/6e-dast-ilk-kosu` push'lu, PR yok. Oturum bütçesi doldu.
+
+- **Sıradaki:** S-17 (protokol şeması), S-18 (CSP, önce kırmızı test), S-15 (401/403 belgesi, önce kırmızı belge testi, `OpenApiContractTests`), S-16 (ölç, R-kaydı). Sonra DAST yeniden koşulur ve `faz/6e-dast-ilk-kosu` → `main` PR'ı (`/novacore-verify 6e`). CodeRabbit'in #35 yorumları Faz 8'in işi.
+- **Bilinmesi gerekenler:** raporlar run `46008665907`'nin `dast-report` artifact'ında (30 gün). Betik Schemathesis'in bir işlemi deneyememesini artık kırmızı sayar; bir uç zaman aşımına düşerse de job kırmızı olur.
+- **Bekleyen karar:** yok; sürüm öncesi kararlar D-102'de (2026-11-27), 6e'den sonra Faz 10 (`/novacore-phase 10`). D-032 sürümden sonra (kullanıcı). Q-40 sürüyor.
+
+**2026-11-27, Faz 6e: DAST'ın ilk koşusu.** Run `46002347264` hiçbir tarama koşmadan kırmızıydı (V6e-5): Schemathesis rapor klasörünü açamadı. `045f686` (`faz/6e-dast-ilk-kosu`, `main`'den) klasörü ZAP'ınki gibi önceden açar; yerelde Docker Desktop bunu göstermez, yalnız `bash -n` koşuldu.
+
+- **Sıradaki:** branch push'lanır, `gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu` ile DAST koşulur; raporu (artifact `dast-report`) F6e.5 kuralıyla triaj edilir, bulgular `S-15…` olarak; düzeltmeler ve PR `main`'e. ZAP CI'da ilk kez koşacak. Sonra: CodeRabbit'in #35 yorumları (Faz 8), D-032 (`DECISIONS.md` `protectedPaths`'e, kullanıcı).
+- **Bilinmesi gerekenler:** Schemathesis'in `.hypothesis/examples` veritabanı da `/dast`'a yazamaz; belgesine göre uyarı verip başka yer kullanır. V6e-3'ün bedeli ve `/account/login`'in 256 sınırı arşivdeki notta.
+- **Bekleyen karar:** push. Kullanıcıya kalanlar tablosu (S-6 varsayılanları, V6e-4, S-7, S-1'in kalan yolu). Q-40 sürüyor.
+
+**2026-11-27, faz dışı: ücretli araçların denetimi.** `SONAR_TOKEN` yenilendi; `sonar` #35, #36, #37'de yeşil. Greptile'ın kredisi bitmişti, plandan çıkarıldı (D-098). V6e-1'in allowlist kaydı `faz/8` ve `faz/9`'a da eklendi: tarama bütün branch'lerin geçmişini okuduğu için oralarda da `secret-scan`'i kırmızı yapıyordu. CodeRabbit #35'e 12 yorum yazdı; #36 ve #37'de "rate limited". Kullanıcının isteğiyle #35 → #36 → #37 sırayla merge edildi (`611903f`, `06316de`, `d2be1d1`); Faz 8 ve 9 tamam. DAST'ın ilk koşusu başlatıldı (run `46002347264`).
+
+- **Sıradaki:** DAST raporları F6e.5 triajına (artifact'lar run `46002347264`'te). CodeRabbit'in #35 yorumları bulgu olarak sınıflandırılır (`novacore-verify` §4.2); merge edilmiş kod üzerinde, gerekirse yeni bir PR'la. DA-1…DA-12 tek düzenlemeyle DECISIONS'a işlenir. D-032: `DECISIONS.md` `protectedPaths`'e geri eklenir (Faz 6e sonu, kullanıcı).
+- **Bilinmesi gerekenler:** tam suite, SQL Server/PostgreSQL katmanları ve şablon smoke'u yalnız CI'da koştu (yeşil). CodeRabbit CLI çalışmadı (kimlik doğrulama). ZAP yerelde denenmedi. V6e-3'ün bedeli: `UseCoreWeb` çağırmayan host kendi form okuma hatasında 500 alır. `/account/login` e-postasına 256 sınırı konmadı (lockout veritabanında, bellek durumu yok).
+- **Bekleyen karar:** Kullanıcıya kalanlar tablosu (S-6 varsayılanları, V6e-4, S-7, S-1'in kalan yolu). Q-40 sürüyor.
+
 **2026-11-14, gece koşusu bitti (D-096): Faz 8, 9, 6e'nin işleri tamam, üç PR açık.** Branch `faz/6e-dinamik-denetim`, push edildi; PR #37 (`main`'e, #36 ve #35'in üstünde).
 
 - **Sıradaki:** kullanıcı `SONAR_TOKEN`'ı yeniler; #35 → #36 → #37 sırayla merge edilir (kullanıcı kararı). Sonra `gh workflow run dast.yml` ile DAST'ın ilk koşusu, raporları F6e.5 triajına. DA-1…DA-12 tek düzenlemeyle DECISIONS'a işlenir. D-032: `DECISIONS.md` `protectedPaths`'e geri eklenir (Faz 6e sonu, kullanıcı).
@@ -1587,3 +1624,35 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 | Q-61 | İkinci sürüm hangi numarayla çıksın, açık PR #14 ne olsun? | Sürüm (6e'den önce) | **`v0.1.0` kararlı; önce PR #14 merge edilir** (2026-10-27, kullanıcı; ikisi de önerilen). Kullanıcı önizlemeyi bitirdi, 6e ve diğer denetimleri beklemeden yayın istedi ("gerekirse yeniden çıkarız"); seçim sürüm commit'inin main'e push'u ve tag için onaydır → D-089. **Yayın:** PR #14 merge (`a6dd278`), sürüm commit'i `83b0610` (main CI yeşil), `v0.1.0` tag'i; release.yml run 40510807822 yeşil (`publish` kullanıcı onayıyla), 9 paket (`BMD.NovaCore.*` 8 kütüphane + şablon) GitHub Packages'ta 0.1.0, provenance attestation 60387462 |
 | Q-62 | CRM-Nominal'in React giriş ve davet ekranları (CRM ADR-022) kimlik eklentisine bağlanamıyor: JSON giriş ucu yok, giriş yolu ayar değil, yenileme bağlantıyla, davet yok. D-038 (1) ve D-076 (10) yeniden açılıp "başsız giriş" için bir faz planlansın mı? (evet / şimdilik demo kalsın) | Faz dışı (2026-11-09) | **Evet, fazı planla** (2026-11-09, kullanıcı; önerilen). Kullanıcı ayrıca "kurallara uymayan göstermelik ya da test amaçlı alanlar" araştırmasını istedi: `src/` taramasında yalnız Development'a kilitli parçalar (`LoggingEmailSender`, geçici anahtarlar) ve referans modüller çıktı, açık yok (R-136) → D-090, PLAN Faz 8 |
 | Q-63 | Gece koşusu (kullanıcı: "bütün görevleri yapana kadar durmayacak bir şey istiyorum sabaha kadar çalışacak. Ama testleri beklemeyecek"): (1) kapsam: plan (Faz 8 + 6e) / plan + Sonraya bırakılanlar / plan + Dependabot PR'ları; (2) tam test: GitHub CI'da / yerelde arka planda / gece hiç; (3) faz sınırı: 6e Faz 8'in üstüne / CI yeşilse model merge eder / Faz 8 bitince dur; (4) DECISIONS onayları: sabaha toplansın / hook'u kullanıcı gevşetir / olduğu gibi | Faz dışı (2026-11-13) | **(1) Hepsi; (2) GitHub CI'da; (3) CI yeşilse model merge eder; (4) sabaha toplansın** (2026-11-13, kullanıcı; önerilenler: plan, CI, 6e Faz 8'in üstüne, sabaha toplansın). Aynı oturumda: "progress'i arşiv yaptık ama işe yaramadı galiba. ona tam çözüm bul artık şişip durmasın. Claude.md dosyasını da hafiflet" → D-096, D-097, PLAN Faz 9 |
+
+## Gece koşusunun karar adayları (2026-11-14, D-099…D-101'e işlendi)
+
+Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-096 (6)).
+
+| ID | Karar | Gerekçe / kaynak |
+|---|---|---|
+| DA-1 | Şifre yenileme kodunun denemesi kod karşılaştırılmadan önce concurrency stamp ile sayılır; sayımı kaybeden istek kodu siler (kapalı tarafa düşer). | V8-2: `UserManager` yazmalarının sonucu yok sayılınca eşzamanlı tahminler 5/100 sınırını aşıyordu; `1777b77` |
+| DA-2 | Kod hasher'ı keyed singleton'dır (`PasswordResetCodes.HasherKey`); forgot ve reset'te kodu olmayan adres aynı hash işini yapar. | V8-3: D-030 (1), D-091 (4) "her adres aynı cevap" süre bakımından; `518b339` |
+| DA-3 | Kilitli hesabın şifresi gerçek hash'e değil yalnız sahte hash'e karşı sınanır: kilitliyken doğru şifre de bir şey açığa vurmaz, süre diğer retlerle aynıdır. | V8-4; R-138 (`SignInManager.CheckPasswordSignInCoreAsync`); `067821e` |
+| DA-4 | Aynı adrese eşzamanlı iki davet ikisi de 200 alır ve aynı hesabı davet eder (biri 409 almaz); kullanıcı deposu kaybedilen insert'i `DuplicateUserName` olarak bildirir. | V8-5; `8fc5500` |
+| DA-5 | Davetin "kullanıldı" işareti ve şifre yenileme kodunun silinmesi yeni şifreyle aynı transaction'da commit edilir. | V8-6: şifre kaydı eşzamanlı yazmaya yenilince davet/kod yanıyordu; `0aeeaea` |
+| DA-6 | Kodun deneme sayısı ve hesabın serisi tek kayıtta (tek stamp kontrolü), karşılaştırmadan önce sayılır (DA-1'i tamamlar). | V8-9: ayrı kayıt kaybedilince tahmin seriye yazılmıyordu; `a619a94` |
+| DA-7 | Seed bir client'ı yalnız bir alanı değiştiyse yazar; secret `ValidateClientSecretAsync` ile sınanır, eşleşiyorsa saklı hash korunur. | F9.2f (L56): her açılışta yeniden hash + yazma, çok örnekli açılışta satır yarışı; R-142; `bcfd95e` |
+| DA-8 | Bir eklenti host'un assembly'sini kendisi bulmaz (`Assembly.Load`, `GetEntryAssembly` yok); host `Program.cs`'te açıkça verir. `service.version` için `OpenTelemetry:ServiceVersion` ayarı eklenmedi (Y-19; `OTEL_RESOURCE_ATTRIBUTES` yetiyor). | V9-1 (Y-20'nin testi); `83cea0c` |
+| DA-9 | DAST job'u bulgu yüzünden kırmızı olmaz (raporlar artifact); taramanın kendisi koşamazsa kırmızı olur. Tarayıcı görüntülerinin digest'lerini Dependabot güncellemez. | F6e.2; `d07f199` |
+| DA-10 | Onaysız hesaba farklı şifreyle ikinci kayıt gelirse şifre silinir ve sahibine şifre kurma bağlantısı gider; sıfırlama sayfası şifresiz onaysız hesabı kabul edip aynı adımda onaylar (R-084'teki değişmezin yerine). Audit olayı EventId 46. | S-1; R-155 (Sudhodanan & Paverd §6.2.2); `6d709a4` |
+| DA-11 | Rol atamasında yükseltme koruması rolün adına değil izinlerine bakar: rolün izinlerinde `identity:*` varsa `identity:roles:manage` gerekir (D-053 (6)'yı genişletir). | S-4; `a484278` |
+| DA-12 | Çok kiracılılık eklentisi kurum rollerinde `identity:` önekli izni açılışta reddeder (D-080 (3)'ün "eklenti denetlemez" cümlesinin yerine). | S-3; `a39e0e7` |
+
+## Kapanan "Kullanıcıya kalanlar" satırları (2026-11-27, D-102)
+
+| İş | Neden | Ne gerekli |
+|---|---|---|
+| Dependabot PR'ları | Faz 9 merge edildi (F9.3'ün güncellemeleri `main`'de); açık PR'lar eski `main`'e karşı, `secret-scan` o yüzden kırmızıydı | Dependabot üstü kalanları kapatır; kalanlar `@dependabot rebase` ile yeni `main`'e karşı koşar → **F10.4** |
+| CodeRabbit PR incelemesi | Repo 10 yıldızın altında, otomatik inceleme yok; bot PR'larını hiç incelemez | PR başına `@coderabbitai review` (2026-11-27'de #35, #36, #37'ye yazıldı; yorumlar bir sonraki oturumda bulgu olarak okunur) → **F10.2** |
+| S-1'in kalan yolu: kurban kendi kaydını yapmadan saldırganın kaydından gelen onay linkine tıklarsa hesap saldırganın şifresiyle onaylanır | Kapatmanın yolu onay anında şifre istemek: her kullanıcının kayıt akışını ve `RegisterRequest` sözleşmesini değiştirir (ürün kararı) | Kullanıcı karar verir; onaylarsa kayıt "önce e-posta, sonra şifre" akışına geçer → **D-102 (4): kabul edilmiş risk, README** |
+| S-7: açık kaydı kapatılabilir yapmak | Ürün kararı; Y-19 bir seçenek için gerçek tüketici ister. Kayıt olan herkes platform `UserPermissions`'ını alıyor | Kullanıcı karar verir: CRM-Nominal açık kayıt kullanacak mı; kullanmayacaksa `Identity:SignIn:AllowRegistration` (ya da kaydın hiç eşlenmemesi) planlanır → **D-102 (3): `AllowRegistration`, F10.3** |
+| F6e.4'ün adlı araçları (Cloudflare `security-audit-skill`, Claude Security plugin) | Kurulu değil; indirme/kurma ön onaylı değil | Kullanıcı kurar, iki kapsamla koşar → **D-102 (2): Sonraya** |
+| F6e.3: OpenID conformance suite (yerel Docker) | Suite'in kaynağı/imajları indirilip kurulmalı, ön onaylı değil; PLAN "sürüm öncesi" diyor (D-089 (2) yalnız 0.1.0 için muaf tuttu) | Kullanıcı suite'i kurar ya da indirmeyi onaylar; bir sonraki sürümden önce koşulur, bulgular F6e.5 kuralıyla → **D-102 (2): bu sürümde muaf** |
+| S-6 varsayılanları (`Identity:EmailLimit` 5/saat, aşınca 429) | Ürün ayarı; R-157 | Kullanıcı değerleri onaylar ya da değiştirir → **D-102 (5): 5/saat kalır** |
+| V6e-4: bekleyen daveti olan şifresiz hesaba anonim kayıt | Hiçbir şey yapmamak ya da ayrı metin/audit: ürün davranışı | Kullanıcı seçer → **D-102 (6): değişmez, README** |

@@ -841,8 +841,9 @@ Handler'ın dönüş tipi yanıt sözleşmesidir: `Task<Results<Ok<ProductDto>, 
 ile bildirilir, çünkü ProblemDetails'in durumu çalışma anında belli olur. `EndpointContractTests` OpenAPI'de görünen hiçbir
 handler'ın düz `IResult` dönmediğini doğrular.
 
-Validation, .NET 10'un yerleşik Minimal API validation'ıdır. Kurallar request record'unun parametrelerindeki
-DataAnnotations'tır (`[Required, MaxLength(200)] string Name`). Hazır bir attribute'un ifade edemediği kural, tek bir
+Validation, .NET 10'un yerleşik Minimal API validation'ıdır. Kurallar request record'unun özelliklerindeki
+DataAnnotations'tır (`[property: Required, MaxLength(200)] string Name`). `property:` hedefi şart: OpenAPI belgesi
+attribute'u yalnız özellikte okur (`maxLength`, `minLength`, `minimum`), parametredeki attribute şemaya girmez (S-16). Hazır bir attribute'un ifade edemediği kural, tek bir
 değer için özel bir `ValidationAttribute`'tur (ör. `CreatePayment`'taki `NotEmpty`), birden çok özellik için
 `IValidatableObject`'tir. Geçersiz istek handler'a ulaşmadan 400 validation ProblemDetails alır (`errors` alan adına
 göre). Modül `services.AddValidation()` çağırmazsa hiçbir şey doğrulanmaz ve bir hata da oluşmaz. Bu yüzden
@@ -1083,7 +1084,9 @@ geçerdi. 2FA'sı açık son admin rolünü kaybedemez (409).
   Liste boşsa hiç kimsenin başlığı uygulanmaz (framework varsayılanı, loopback dahil). `X-Forwarded-Host` işlenmez:
   public adres `Jwt:Authority`'den gelir.
 - **Security headers** (her yanıtta): `X-Content-Type-Options`, `X-Frame-Options: DENY`,
-  `Referrer-Policy`, `Content-Security-Policy: default-src 'none'`, `Server` başlığı kaldırılır; prod'da **HSTS**.
+  `Referrer-Policy`, `Content-Security-Policy: default-src 'none'; base-uri 'none'; frame-ancestors 'none'` (`form-action` yok: Chrome onu
+  form gönderiminden sonraki yönlendirmelere de uygular, girişin son durağı istemcinin başka origin'deki
+  `redirect_uri`'sidir; R-159), `Server` başlığı kaldırılır; prod'da **HSTS**.
 - **Audit logging:** giriş (başarılı/başarısız), lockout, 2FA, refresh, çıkış, parola değişimi ve sıfırlama, oturum
   iptali, rol atama, davet; `SECURITY` önekli, hesap id'siyle (rol atama ve davette yapanınkiyle de); e-posta (maskeli bile) ve parola/kod/token loglanmaz. Refresh token tekrar kullanımını OpenIddict
   kendisi loglar.

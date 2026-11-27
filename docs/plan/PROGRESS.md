@@ -28,7 +28,8 @@
 | 7b | ✅ tamam | `faz/7b-cok-kiracililik` | 2026-10-24 | 2026-10-25 | 2026-10-27 (kullanıcı onayı, PR #13 merge commit'i `dba8318`) |
 | 8 | ✅ tamam | `faz/8-bassiz-giris` | 2026-11-09 | 2026-11-14 | 2026-11-27 (kullanıcı onayı, PR #35 merge commit'i `611903f`; CodeRabbit'in 12 yorumu sonradan bulgu olarak okunur) |
 | 9 | ✅ tamam | `faz/9-bakim` (`faz/8-bassiz-giris` + `main`) | 2026-11-13 | 2026-11-14 | 2026-11-27 (kullanıcı onayı, PR #36 merge commit'i `06316de`) |
-| 6e | ⏸ merge edildi (PR #37, `d2be1d1`, 2026-11-27, kullanıcı onayı); açık: F6e.3 (kullanıcıya) ve DAST'ın ilk koşusunun F6e.5 triajı (run `46002347264`) | `faz/6e-dinamik-denetim` (`faz/9-bakim`'in üstüne açıldı) | 2026-11-13 | | |
+| 6e | ✅ tamam (PR açık; merge kullanıcıda; F6e.3 D-102 (2); SQL Server/PostgreSQL katmanları Faz 10'dan sonra, tag'den önce) | `faz/6e-dinamik-denetim` (PR #37, `d2be1d1`) + `faz/6e-dast-ilk-kosu` | 2026-11-13 | 2026-11-27 | |
+| 10 | ⏳ başlamadı (6e'nin merge'ünden sonra, D-102) | `faz/10-surum-0.2.0` (`main`'den) | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
 
@@ -42,27 +43,12 @@ Durum: **bitti (2026-11-14).** Kuyruk boşaldı; üç PR (#35, #36, #37) 2026-11
 |---|---|---|---|
 | 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ✅ `611903f` | İki inceleme, on bulgu, hepsi kapalı. Bütün kontroller yeşil (`17790b1`); PR #35 2026-11-27'de merge edildi (kullanıcı) |
 | 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | ✅ `06316de` | Bütün adımlar ve iki inceleme bitti; kontroller yeşil (`d33a33c`); PR #36 2026-11-27'de merge edildi (kullanıcı) |
-| 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏸ merge `d2be1d1` | F6e.1, F6e.2, F6e.4, F6e.5 (S-1…S-6, S-9, S-13, S-14) ve faz sonu incelemesi bitti. Kontroller yeşil (`1b0c22d`; SonarCloud kalite kapısı yalnız `dast.yml:43` S2068 yüzünden kırmızı, V6e-1'in false positive'i); PR #37 2026-11-27'de merge edildi (kullanıcı). DAST ilk koşusu: run `46002347264`. **F6e.3 (OpenID conformance suite) yapılmadı:** suite'in indirilip kurulması ön onaylı değil (F6e.4'ün araçlarıyla aynı gerekçe); PLAN'a göre sürüm öncesi şart → Kullanıcıya kalanlar |
+| 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ✅ PR açık | F6e.1, F6e.2, F6e.4, F6e.5 (S-1…S-6, S-9, S-13, S-14) ve faz sonu incelemesi bitti. Kontroller yeşil (`1b0c22d`; SonarCloud kalite kapısı yalnız `dast.yml:43` S2068 yüzünden kırmızı, V6e-1'in false positive'i); PR #37 2026-11-27'de merge edildi (kullanıcı). DAST ilk koşusu: run `46002347264`. **F6e.3 (OpenID conformance suite) yapılmadı:** suite'in indirilip kurulması ön onaylı değil (F6e.4'ün araçlarıyla aynı gerekçe); PLAN'a göre sürüm öncesi şart → Kullanıcıya kalanlar |
 | 4 | Sabah raporu ve devir notu | ✅ | 2026-11-14 |
 
 ### Karar adayları (DA)
 
-Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-096 (6)).
-
-| ID | Karar | Gerekçe / kaynak |
-|---|---|---|
-| DA-1 | Şifre yenileme kodunun denemesi kod karşılaştırılmadan önce concurrency stamp ile sayılır; sayımı kaybeden istek kodu siler (kapalı tarafa düşer). | V8-2: `UserManager` yazmalarının sonucu yok sayılınca eşzamanlı tahminler 5/100 sınırını aşıyordu; `1777b77` |
-| DA-2 | Kod hasher'ı keyed singleton'dır (`PasswordResetCodes.HasherKey`); forgot ve reset'te kodu olmayan adres aynı hash işini yapar. | V8-3: D-030 (1), D-091 (4) "her adres aynı cevap" süre bakımından; `518b339` |
-| DA-3 | Kilitli hesabın şifresi gerçek hash'e değil yalnız sahte hash'e karşı sınanır: kilitliyken doğru şifre de bir şey açığa vurmaz, süre diğer retlerle aynıdır. | V8-4; R-138 (`SignInManager.CheckPasswordSignInCoreAsync`); `067821e` |
-| DA-4 | Aynı adrese eşzamanlı iki davet ikisi de 200 alır ve aynı hesabı davet eder (biri 409 almaz); kullanıcı deposu kaybedilen insert'i `DuplicateUserName` olarak bildirir. | V8-5; `8fc5500` |
-| DA-5 | Davetin "kullanıldı" işareti ve şifre yenileme kodunun silinmesi yeni şifreyle aynı transaction'da commit edilir. | V8-6: şifre kaydı eşzamanlı yazmaya yenilince davet/kod yanıyordu; `0aeeaea` |
-| DA-6 | Kodun deneme sayısı ve hesabın serisi tek kayıtta (tek stamp kontrolü), karşılaştırmadan önce sayılır (DA-1'i tamamlar). | V8-9: ayrı kayıt kaybedilince tahmin seriye yazılmıyordu; `a619a94` |
-| DA-7 | Seed bir client'ı yalnız bir alanı değiştiyse yazar; secret `ValidateClientSecretAsync` ile sınanır, eşleşiyorsa saklı hash korunur. | F9.2f (L56): her açılışta yeniden hash + yazma, çok örnekli açılışta satır yarışı; R-142; `bcfd95e` |
-| DA-8 | Bir eklenti host'un assembly'sini kendisi bulmaz (`Assembly.Load`, `GetEntryAssembly` yok); host `Program.cs`'te açıkça verir. `service.version` için `OpenTelemetry:ServiceVersion` ayarı eklenmedi (Y-19; `OTEL_RESOURCE_ATTRIBUTES` yetiyor). | V9-1 (Y-20'nin testi); `83cea0c` |
-| DA-9 | DAST job'u bulgu yüzünden kırmızı olmaz (raporlar artifact); taramanın kendisi koşamazsa kırmızı olur. Tarayıcı görüntülerinin digest'lerini Dependabot güncellemez. | F6e.2; `d07f199` |
-| DA-10 | Onaysız hesaba farklı şifreyle ikinci kayıt gelirse şifre silinir ve sahibine şifre kurma bağlantısı gider; sıfırlama sayfası şifresiz onaysız hesabı kabul edip aynı adımda onaylar (R-084'teki değişmezin yerine). Audit olayı EventId 46. | S-1; R-155 (Sudhodanan & Paverd §6.2.2); `6d709a4` |
-| DA-11 | Rol atamasında yükseltme koruması rolün adına değil izinlerine bakar: rolün izinlerinde `identity:*` varsa `identity:roles:manage` gerekir (D-053 (6)'yı genişletir). | S-4; `a484278` |
-| DA-12 | Çok kiracılılık eklentisi kurum rollerinde `identity:` önekli izni açılışta reddeder (D-080 (3)'ün "eklenti denetlemez" cümlesinin yerine). | S-3; `a39e0e7` |
+DA-1…DA-12 2026-11-27'de DECISIONS'a işlendi: D-099 (DA-1…6), D-100 (DA-7, 8), D-101 (DA-9…12). Tablo arşivde.
 
 ### Kullanıcıya kalanlar
 
@@ -70,17 +56,10 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 
 | İş | Neden | Ne gerekli |
 |---|---|---|
-| Dependabot PR'ları | Faz 9 merge edildi (F9.3'ün güncellemeleri `main`'de); açık PR'lar eski `main`'e karşı, `secret-scan` o yüzden kırmızıydı | Dependabot üstü kalanları kapatır; kalanlar `@dependabot rebase` ile yeni `main`'e karşı koşar |
+| Tam test paketinin SQL Server ve PostgreSQL katmanları (Faz 6e doğrulaması, 98 test) | Kullanıcı kararı (2026-11-27): 6e'de koşmaz | Faz 10 bittikten sonra, 0.2.0 tag'inden önce Docker açıkken `dotnet test --solution NovaCore.slnx` |
 | CodeRabbit CLI incelemesi (Faz 8) | "session could not be authenticated" | `coderabbit auth login`, sonra `coderabbit review --agent --base main` |
-| CodeRabbit PR incelemesi | Repo 10 yıldızın altında, otomatik inceleme yok; bot PR'larını hiç incelemez | PR başına `@coderabbitai review` (2026-11-27'de #35, #36, #37'ye yazıldı; yorumlar bir sonraki oturumda bulgu olarak okunur) |
 | SonarCloud: `dast.yml:43` S2068 ("password") | V6e-1'in false positive'i (değer `openssl rand` ifadesi); kalite kapısını kırmızı yapıyor | Kullanıcı SonarCloud'da "Safe/False positive" işaretler (L96 ile birlikte) |
-| S-1'in kalan yolu: kurban kendi kaydını yapmadan saldırganın kaydından gelen onay linkine tıklarsa hesap saldırganın şifresiyle onaylanır | Kapatmanın yolu onay anında şifre istemek: her kullanıcının kayıt akışını ve `RegisterRequest` sözleşmesini değiştirir (ürün kararı) | Kullanıcı karar verir; onaylarsa kayıt "önce e-posta, sonra şifre" akışına geçer |
-| S-7: açık kaydı kapatılabilir yapmak | Ürün kararı; Y-19 bir seçenek için gerçek tüketici ister. Kayıt olan herkes platform `UserPermissions`'ını alıyor | Kullanıcı karar verir: CRM-Nominal açık kayıt kullanacak mı; kullanmayacaksa `Identity:SignIn:AllowRegistration` (ya da kaydın hiç eşlenmemesi) planlanır |
-| F6e.4'ün adlı araçları (Cloudflare `security-audit-skill`, Claude Security plugin) | Kurulu değil; indirme/kurma ön onaylı değil | Kullanıcı kurar, iki kapsamla koşar |
-| F6e.3: OpenID conformance suite (yerel Docker) | Suite'in kaynağı/imajları indirilip kurulmalı, ön onaylı değil; PLAN "sürüm öncesi" diyor (D-089 (2) yalnız 0.1.0 için muaf tuttu) | Kullanıcı suite'i kurar ya da indirmeyi onaylar; bir sonraki sürümden önce koşulur, bulgular F6e.5 kuralıyla |
 | Dependabot #21 (`global.json` → SDK 10.0.403) | Bu makinede yalnız 10.0.300 kurulu (F9.3 kuralı) | SDK 10.0.403 kurulur, PR merge edilir |
-| S-6 varsayılanları (`Identity:EmailLimit` 5/saat, aşınca 429) | Ürün ayarı; R-157 | Kullanıcı değerleri onaylar ya da değiştirir |
-| V6e-4: bekleyen daveti olan şifresiz hesaba anonim kayıt | Hiçbir şey yapmamak ya da ayrı metin/audit: ürün davranışı | Kullanıcı seçer |
 | SonarCloud'un CORS bulgusunu "false positive" işaretlemek (L96) | Dış işlem; `AllowAnyOrigin` yalnız Development'ta (`CoreWebExtensions.cs:182`) | Kullanıcı SonarCloud'da işaretler |
 
 ## Adımlar
@@ -94,35 +73,52 @@ Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docke
 
 - [x] F6e.1 (`2b6df56`): `dast` client yalnız `eng/dast/dast.env`'de (ortam değişkenleri, index 100); `client_credentials`, dört okuma izni, secret koşuda `openssl rand`. Kod değişmedi. `DastClientTests` (5) önce kırmızı, sonra yeşil.
 - [x] F6e.2 (`d07f199`): `dast.yml` (haftalık + `workflow_dispatch`), `eng/dast.sh`, `/connect` ve `/account` için dar hedef listesi. Schemathesis 4.33.1, ZAP 2.17.0 (digest'e sabit; D-044: CI aracı, NuGet değil). Bulgu job'u kırmızı yapmaz, taramanın koşamaması yapar (DA-9). Yerelde Schemathesis 3 örnekle: `/account/*` formlarında ve `/connect/revoke`'ta bozuk form girdisine 500 (S-14). ZAP yerelde denenmedi (indirme takıldı). İlk koşu merge'den sonra (kullanıcıya kaldı).
+- [ ] F6e.3: D-102 (2) gereği bu sürümde koşmaz (bir sonraki sürümden önce).
 - [x] F6e.4: kurulu `security-review` ölçütleriyle dört Opus koşusu (salt okunur): auth çekirdeği ×2 (uçtan içeri; kontrol listesi/değişmezlerden koda), bütün repo ×2 (dizin dizin; OWASP API Top 10 + tehdit modeli). Skill yalnız diff okuduğu için ölçütleri elle, bütün koda uygulandı. Faz 6b'nin düzeltmeleri yerinde; bağımlılık taraması temiz.
+- [x] F6e.5: her bulgu testli düzeltme ya da `needs_validation` (aşağıdaki tablo, S-1…S-20); DAST bulgularının düzeltmeleri `faz/6e-dast-ilk-kosu`'da.
 
 #### Doğrulama (Faz 6e)
+
+Son doğrulanan commit: `ed41255` (2026-11-27; aralık `ce56885..ed41255`, 14 kod commit'i; test 726/824 `28663cc`'de, atlanan 98: SQL Server ve PostgreSQL katmanları, kullanıcı kararıyla Faz 10'dan sonra, 0.2.0 tag'inden önce; code-review 4 bulgu: 2 kapatıldı, 2 Sonraya; template smoke geçti; `check-openapi` ve coverage Docker ister, PR CI'ında; CodeRabbit CLI oturum açamadı). Restore `--locked-mode`, build (0 uyarı) ve format geçti. V6e-7/V6e-8 kullanıcı onayıyla doğrulama oturumunda düzeltildi (D-088 (2)'ye bu seferlik istisna).
 
 | ID | Bulgu | Yer | Durum |
 |---|---|---|---|
 | V6e-1 | CI `secret-scan` kırmızı: 1 bulgu, `1f3c034..4814ed1` aralığında (F6e.1/F6e.2 ya da S-1/S-2 commit'leri) | run `43579950658` | doğrulandı yerelde (`d5954f4`): `dast.yml:44`'teki çalışma anında üretilen parola ifadesi (generic-password FP); yalnız bu yol ve bu ifade için allowlist; yerel tam tarama temiz, CI bekleniyor |
 | V6e-2 | Bellek DoS: HTML `/account/forgot-password` e-postasının uzunluğu sınırsız (4 MB'a kadar); `EmailRecipientLimit` her farklı değeri bir saat partition olarak tutar | Opus inceleme, `PasswordResetPage.cs:60-67`, `EmailRecipientLimit.cs:56-60` | kapandı (`3144da9`): form e-postası `EmailAddress` + 256; `TryAcquire` uzun anahtarı reddeder; 4 kırmızı → yeşil |
 | V6e-3 | `InvalidDataException`→400 kaynağa bakmıyor: modülün bozuk arşiv açması (Zip/GZip/Brotli) 500 yerine logsuz 400 olur | Opus inceleme, `ExceptionMapping.cs:28,50-51,61-62` | kapandı (`c8b3d17`, R-158): form okuyucunun `InvalidDataException`'ı okunduğu yerde `BadHttpRequestException`'a sarılır; çıplak `InvalidDataException` 500 + log; 2 kırmızı → yeşil |
-| V6e-4 | Bekleyen daveti olan şifresiz hesaba anonim `register`: davetliye "yeniden kayıt" metinli şifre bağlantısı ve Warning audit gider (güvenlik açığı değil) | Opus inceleme, `AccountEndpoints.cs:741-760` | kullanıcıya: davranış ürün kararı (Kullanıcıya kalanlar) |
+| V6e-4 | Bekleyen daveti olan şifresiz hesaba anonim `register`: davetliye "yeniden kayıt" metinli şifre bağlantısı ve Warning audit gider (güvenlik açığı değil) | Opus inceleme, `AccountEndpoints.cs:741-760` | D-102 (6): davranış değişmez, README'ye (F10.3) |
+| V6e-5 | DAST'ın ilk koşusu hiçbir tarama koşmadan kırmızı: Schemathesis imajı (uid 1000) runner'ın (uid 1001) rapor klasöründe `--report-dir` açamadı | run `46002347264`, `eng/dast.sh:72-84` | kapatıldı (`045f686`, branch `faz/6e-dast-ilk-kosu`): rapor klasörü ZAP'ınki gibi önceden açılıp yazılabilir yapılır. xUnit'le gösterilemez (CI betiği, kapsayıcı kullanıcısı); run `46007644116` taramaları koşturdu; **doğrulandı** (`28663cc`) |
+| V6e-6 | Run `46007644116` yeşil ve "bulgulu" ama Schemathesis'in bütün işlemleri JUnit `<error>`: sertifikayı okuyamadı (`dotnet dev-certs` PEM'i yalnız sahibine açar); betik exit 1'i bulgu saydı | run `46007644116`, `eng/dast.sh` | kapatıldı (`8dfc457`): kopya herkese okunur; JUnit'te `<error>` varsa tarama eksik sayılır, job kırmızı (D-101 (1)). Run `46008665907`: 0 hata, 33 kontrol bulgusu; **doğrulandı** (`28663cc`): CI yolu düzgün; yerel yeniden koşu ve JUnit'siz çıkış V6e-7 |
+| V6e-7 | `<error>` denetimi tek bir JUnit dosyası varsayıyor: dosya yoksa (Schemathesis exit 1 ile rapor yazmadan çıkarsa) `errors` boş → 0; aynı rapor klasörüne yeniden koşuda iki dosya varsa `errors` iki satır olur, `[[ -gt ]]` hata verir ve yanlış sayılır. İki durumda da eksik tarama "bulgu" diye yazılır, betik 0 döner (D-101 (1)'e aykırı) | code-review, `eng/dast.sh:127-133` | doğrulandı (`ed41255`): her koşu boş klasörde başlar; exit 1 ve JUnit yoksa tarama eksik, job kırmızı. Yerelde ayrıştırma denendi; DAST CI koşusu yok |
+| V6e-8 | Mekanik `[`→`[property: ` değişikliği bir yorumu bozmuş: "`[property: Required] can't reject Guid.Empty`" (yorum attribute'un hedefini değil kendisini anlatıyor) | code-review, `CreatePayment.cs:34` | doğrulandı (`ed41255`): yorum `[Required]`; `src/Modules/CLAUDE.md`'nin anatomi satırı da `[property: ...]` der |
+| V6e-9 | PR #49'un `api-contract`'ı kırmızı: oasdiff 99 ERR (S-16'nın `maxLength`/`minLength`/`pattern`/`format`/sayfa aralığı, S-20'nin `POST /payments` gövdesi). Hepsi belgenin bilinçli düzeltmesi, sunucunun davranışı değişmedi | CI, run `46031745651` | kapatıldı: 99 satır `eng/openapi-breaking-accepted.txt`'e (D-061); satırlar `main`'in kendi kontrolü geçince silinir |
 
 #### F6e.4 bulguları ve F6e.5 triajı
 
 | ID | Bulgu (koşular) | Önem | Triaj |
 |---|---|---|---|
-| S-1 | Kayıtla hesabın önceden ele geçirilmesi: onaysız adrese ikinci kayıt sessizce yutulur, onay linki ilk kaydedenin şifresiyle açar; 2FA ile kalıcılaşır, davet üyeliği saldırgana gider (A1-1, A2-1, R2-2) | orta | kapatıldı (`6d709a4`; R-155): onaysız hesaba başka şifreyle ikinci kayıt şifreyi siler (stamp yenilenir, eski onay linkleri ölür), posta kutusuna şifre kurma bağlantısı gider. 2 test önce kırmızı. Kalan: kurban hiç kayıt olmadan saldırganın onay linkine tıklarsa → `needs_validation` (onayda şifre istemek ürün kararı) |
+| S-1 | Kayıtla hesabın önceden ele geçirilmesi: onaysız adrese ikinci kayıt sessizce yutulur, onay linki ilk kaydedenin şifresiyle açar; 2FA ile kalıcılaşır, davet üyeliği saldırgana gider (A1-1, A2-1, R2-2) | orta | kapatıldı (`6d709a4`; R-155): onaysız hesaba başka şifreyle ikinci kayıt şifreyi siler (stamp yenilenir, eski onay linkleri ölür), posta kutusuna şifre kurma bağlantısı gider. 2 test önce kırmızı. Kalan: kurban hiç kayıt olmadan saldırganın onay linkine tıklarsa → kabul edilmiş risk, README (D-102 (4)) |
 | S-2 | Davetle açılmış parolasız hesaba herkes onay e-postası yollatabilir; onaylanırsa davet kullanılamaz (A2-2) | düşük | kapatıldı (`e4d724a`): `resend` ve `confirm-email` şifresiz hesaba dokunmaz. 2 test önce kırmızı |
 | S-3 | `MultiTenancy:Roles`'a `identity:*` platform izni yazılabiliyor; belge yasaklıyor, açılışta denetim yok (A1-2) | düşük-orta | kapatıldı (`a39e0e7`): `MultiTenancyOptions` doğrulaması `identity:` önekli izni reddeder (host durur). Test önce kırmızı |
 | S-4 | Rol atamasında yükseltme koruması rolün adına bakıyor, içerdiği `identity:*` izinlerine değil (R2-5) | orta (OLASI) | kapatıldı (`a484278`): rolün izinlerinde herhangi bir `identity:*` varsa atama/kaldırma `identity:roles:manage` ister (D-053 (6)'nın genişlemesi). Test önce kırmızı (204) |
 | S-5 | Davet denetim kaydında daveti yapan yok (A2-3) | düşük | kapatıldı (`33c65ca`): davet denetim kaydı daveti yapanın id'sini yazar (`ICurrentUser`). Test önce kırmızı |
-| S-6 | E-posta gönderen anonim uçlarda alıcı adres başına sınır yok; IPv6 /64 döndürerek posta bombası, kod geçersizleştirme, 1000'lik kuyruğun dolması (R2-1) | orta | ✅ `ca29f6a`: anonim e-posta uçlarında alıcı adres başına sınır (`Identity:EmailLimit`, varsayılan 5/saat, herkese aynı 429) ve IPv6 /64 bölümleme (R-157); 5 kırmızı → yeşil. Varsayılanlar ürün kararı (Kullanıcıya kalanlar); örnek başına bellekte sayım |
-| S-7 | Açık kayıt kapatılamıyor; kayıt olan herkes platform `UserPermissions`'ını alır (R2-3) | orta | **kullanıcıya:** ürün kararı (Y-19: seçenek için tüketici gerekir) |
-| S-8 | Ödeme oluşturmada idempotency anahtarı yok (R2-4) | düşük | `needs_validation`: API tasarım kararı, referans modül |
+| S-6 | E-posta gönderen anonim uçlarda alıcı adres başına sınır yok; IPv6 /64 döndürerek posta bombası, kod geçersizleştirme, 1000'lik kuyruğun dolması (R2-1) | orta | ✅ `ca29f6a`: anonim e-posta uçlarında alıcı adres başına sınır (`Identity:EmailLimit`, varsayılan 5/saat, herkese aynı 429) ve IPv6 /64 bölümleme (R-157); 5 kırmızı → yeşil. Varsayılan 5/saat kalır (D-102 (5)); örnek başına bellekte sayım |
+| S-7 | Açık kayıt kapatılamıyor; kayıt olan herkes platform `UserPermissions`'ını alır (R2-3) | orta | D-102 (3): `Identity:SignIn:AllowRegistration`, varsayılan `true` (F10.3) |
+| S-8 | Ödeme oluşturmada idempotency anahtarı yok (R2-4) | düşük | D-102 (7): eklenmez; README notu, Sonraya (F10.3) |
 | S-9 | Testi olmayan değişmezler: scope yükseltme reddi (#17), başka client'ın token'ını iptal (#14), HTML `ReturnUrl` için `//evil` ve `/\evil`, üretimdeki 30 sn leeway sonrası zincir iptali (A2) | — | ✅ `63d588c`: dört değişmez testte; hata bulunmadı |
 | S-10 | Bağlantıyla sıfırlama token'ı 6 saat ve onay token'ıyla ortak sağlayıcı (#31) | düşük | `needs_validation` |
 | S-11 | Outbox handler hata mesajı ileride kişisel veriyi `Error` sütununa ve loga taşıyabilir (D1) | düşük | `needs_validation` |
-| S-12 | `includeInactive=true` her ürün okuyucusuna pasif ürünleri gösteriyor; karar kaydı yok (D2) | — | `needs_validation`: ürün kararı |
+| S-12 | `includeInactive=true` her ürün okuyucusuna pasif ürünleri gösteriyor; karar kaydı yok (D2) | — | D-102 (8): yalnız `catalog:products:update` (F10.3) |
 | S-13 | Şablonun `Program.cs:75`'inde `GetValue<int?>("HealthChecks:ProbePort")` (R-048'e aykırı) | — | ✅ `e18bd98`: `HealthCheckProbeOptions` (`[Range]`, `[OptionsValidator]`, `ValidateOnStart`); smoke CI'da |
 | S-14 | Bozuk form girdisine 500: `/account/*` formları ve `/connect/revoke` (F6e.2'nin yerel Schemathesis denemesi) | düşük-orta | ✅ `0923d61`: çekirdeğin `ExceptionMapping`'i `InvalidDataException` ve `AntiforgeryValidationException`'ı 400 yapar (R-156); `MalformedFormTests` 40/96 kırmızıydı. needs_validation: `/connect/*` artık OAuth `invalid_request` yerine ProblemDetails döner; sunucunun kendi `InvalidDataException`'ı da 400 olur |
+| S-15 | OpenAPI belgesi 401/403'ü belgelemiyor: izin isteyen uçlar (`/admin/*`, `/products`, `/payments`, `/auth/2fa/*`, `logout-all`) ve bazı 400'ler `application/json` diye belgeli, dönen `problem+json` (DAST run `46008665907`: ST103 15 uç, ST105 3) | düşük-orta (üretilen istemciler) | 401/403 kapatıldı (`dfb1dd3`): çekirdeğin `AuthorizationResponsesTransformer`'ı, 19 işlem; `OpenApiTests` 4 kırmızı → yeşil. ST105 kapatıldı (`965100b`, R-160): `confirm-email`'in 400'ü iki gövdeli (uç bazlı transformer); admin rol uçlarının 404'ü `{userId:guid}`'e uymayan yoldan: FP |
+| S-16 | Şemaya uyan istek 400 alıyor: gövde şemasında DataAnnotations kısıtları eksik (boş `Email`, `ReturnUrl` 4096), sayfa parametreleri `integer\|string` ve sınırsız (ST202, `/api/v1/auth/*`, liste uçları) | düşük | kapatıldı (`79ebf69`, `06acc8a`, `f7f54b4`; R-160, R-161, D-103 (1), D-105): attribute'lar `property:` hedefli; çekirdek transformer'ları `[Required]` → `minLength: 1` + boşluk dışı desen, `[EmailAddress]` → `format: email`, route/sorgu tamsayısı → `integer` + tipin aralığı (sunucu kırpar). `OpenApiTests` 8 + 12 kırmızı → yeşil. Gövdede tırnaklı sayı sınırsız kalır. `ReturnUrl`'nin "bu host'ta yol" kuralı FP |
+| S-20 | Şema adı çakışması: `CreateProduct.Request`, `UpdateProduct.Request`, `CreatePayment.Request` tek `Request` şemasında; `POST /api/v1/payments` ürünün gövdesiyle belgeli (`Response` aynı). S-16'nın ölçümünde bulundu | orta (üretilen istemciler) | kapatıldı (`19fdd59`, R-160, D-103 (3)): public tipin içindeki tipin şema adı tanımlayan tiplerle başlar (`CreatePaymentRequest`); 2 kırmızı → yeşil |
+| S-17 | Elle yazılan protokol şeması eksik: `/account/forgot-password` ve `/account/login/2fa`'nın GET'i yok (ST204/ST205); OpenIddict TRACE'e 405 yerine OAuth `invalid_request` 400 döner | — | kapatıldı (`d1a244c`): iki GET şemada; TRACE FP (OpenIddict) |
+| S-18 | CSP'de `form-action` ve `base-uri` yok; ikisi `default-src`'ye düşmez (ZAP, `/account/*`) | orta | kapatıldı (`b12ebdc`, R-159): `base-uri 'none'`; `NegativeProtocolTests` 3 kırmızı → yeşil. `form-action` eklenmez (Chrome yönlendirme zincirini engeller), gerekçe README'de |
+| S-19 | ZAP'ın kalanı: HSTS yok, COEP ve Permissions-Policy yok, giriş formunda "kullanıcı girdisi attribute'ta" (`Password=ZAP`), bilgi satırları | düşük | HSTS FP (DAST Development'ta, `UseHsts` yalnız dışında); yansıma FP (şifre alanında `value` yok, e-posta encode'lu); COEP/Permissions-Policy `needs_validation` |
+
+DAST'ta sunucu hatası (5xx) çıkmadı.
 
 Doğrulanamayanlar (`needs_validation`): son admin korumasında check-then-act yarışı (biliniyor, L94); CSP'nin `form_post` otomatik gönderimini engelleyip engellemediği (#8); `alg:none`/`jku` reddi (#21); kurumsal NAT arkasında `strict` kovasının `/connect/token` yenilemelerini de kapsaması. Biliniyor (Sonraya): L60, L44, L94, L95, L96, L103, L106, L107, L108, L11.
 
@@ -137,8 +133,9 @@ Yalnız cevabı beklenen sorular. Cevaplanan soru cevabıyla birlikte arşivin "
 
 > Yalnız en son not durur. Yeni not yazılırken bir önceki arşivin "Eski devir notları" bölümünün en üstüne taşınır (D-097).
 
-**2026-11-27, faz dışı: ücretli araçların denetimi.** `SONAR_TOKEN` yenilendi; `sonar` #35, #36, #37'de yeşil. Greptile'ın kredisi bitmişti, plandan çıkarıldı (D-098). V6e-1'in allowlist kaydı `faz/8` ve `faz/9`'a da eklendi: tarama bütün branch'lerin geçmişini okuduğu için oralarda da `secret-scan`'i kırmızı yapıyordu. CodeRabbit #35'e 12 yorum yazdı; #36 ve #37'de "rate limited". Kullanıcının isteğiyle #35 → #36 → #37 sırayla merge edildi (`611903f`, `06316de`, `d2be1d1`); Faz 8 ve 9 tamam. DAST'ın ilk koşusu başlatıldı (run `46002347264`).
+**2026-11-27, Faz 6e kapandı (PR açık, merge kullanıcıda).** DAST'ın ilk koşusundan çıkan her şey kapandı: V6e-5/V6e-6 (tarayıcının koşabilmesi), S-15…S-20 (OpenAPI belgesinin 401/403'ü, doğrulama kısıtları, şema adları, CSP `base-uri`), son doğrulamanın V6e-7/V6e-8'i (`ed41255`). Kararlar D-101, D-102, D-103, D-105; araştırma R-155…R-161.
 
-- **Sıradaki:** DAST raporları F6e.5 triajına (artifact'lar run `46002347264`'te). CodeRabbit'in #35 yorumları bulgu olarak sınıflandırılır (`novacore-verify` §4.2); merge edilmiş kod üzerinde, gerekirse yeni bir PR'la. DA-1…DA-12 tek düzenlemeyle DECISIONS'a işlenir. D-032: `DECISIONS.md` `protectedPaths`'e geri eklenir (Faz 6e sonu, kullanıcı).
-- **Bilinmesi gerekenler:** tam suite, SQL Server/PostgreSQL katmanları ve şablon smoke'u yalnız CI'da koştu (yeşil). CodeRabbit CLI çalışmadı (kimlik doğrulama). ZAP yerelde denenmedi. V6e-3'ün bedeli: `UseCoreWeb` çağırmayan host kendi form okuma hatasında 500 alır. `/account/login` e-postasına 256 sınırı konmadı (lockout veritabanında, bellek durumu yok).
-- **Bekleyen karar:** Kullanıcıya kalanlar tablosu (S-6 varsayılanları, V6e-4, S-7, S-1'in kalan yolu). Q-40 sürüyor.
+- **Yapılmayan:** F6e.3 (OpenID conformance) D-102 (2) gereği bir sonraki sürümden önce. Tam paketin SQL Server ve PostgreSQL katmanları (98 test) kullanıcı kararıyla Faz 10'dan sonra, 0.2.0 tag'inden önce. CodeRabbit CLI oturum açamadı (`coderabbit auth login`).
+- **Sürprizler:** DAST her koşuda bir katman açtı (izin, sertifika, sonra gerçek bulgular); .NET 10'da ikinci `Produces*` birinciyi siler (D-103 (2)); sunucu sayfa parametrelerini kırpıyor (D-105 (2)).
+- **Faz 10'un bilmesi gerekenler:** request record'larının attribute'ları `[property: ...]` (D-103 (1), şablon dahil). Faz 10 6e'nin merge'ünden sonra `main`'den açılır; Docker baştan açık olsun. Bu fazın uzamasının nedeni küçük bulguların da yazan/doğrulayan turu gerektirmesiydi; süreç değişikliği (küçük bulguyu Sonraya yazmak ya da doğrulamada düzeltmek) kullanıcının kararıdır.
+- **Bekleyen:** PR'ın CI'ı (`check-openapi`, coverage, SQL Server katmanı CI'da), merge onayı. Q-40 sürüyor.

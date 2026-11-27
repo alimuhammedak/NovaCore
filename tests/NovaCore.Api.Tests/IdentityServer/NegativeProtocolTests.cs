@@ -223,6 +223,22 @@ public sealed class NegativeProtocolTests(NegativeProtocolTests.Fixture fixture)
         Assert.Contains("frame-ancestors 'none'", Assert.Single(response.Headers.GetValues("Content-Security-Policy")), StringComparison.Ordinal);
     }
 
+    // An injected <base> would retarget the pages' relative form actions; base-uri does not fall back to default-src
+    // (CSP3 §6.3.1.1, docs/plan/RESEARCH.md R-159).
+    [Theory]
+    [InlineData("/account/login")]
+    [InlineData("/account/forgot-password")]
+    [InlineData("/account/reset-password?userId=x&token=y")]
+    public async Task The_account_pages_allow_no_base_element(string path)
+    {
+        using var flow = new OidcFlow(_host);
+
+        var response = await flow.Browser.GetAsync(new Uri(path, UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("base-uri 'none'", Assert.Single(response.Headers.GetValues("Content-Security-Policy")), StringComparison.Ordinal);
+    }
+
     // Signs in through the browser and returns the code the authorization endpoint issues, with its PKCE verifier.
     private async Task<(string Code, string Verifier)> CodeAsync(OidcFlow flow, string email)
     {

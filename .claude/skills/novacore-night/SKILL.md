@@ -66,7 +66,7 @@ NovaCore deposunda Faz <id>'nin <adım-id> adımını yaz. Bu bir gece koşusudu
 Adım: <PLAN'daki satırın alıntısı, kabul kriteriyle>.
 <Bulgu kapatılıyorsa: bulgunun ID'si, yeri ve hata satırı. CI hatasıysa günlüğün ilgili satırları.>
 
-`.claude/skills/novacore-phase/SKILL.md`'nin §3 (adım döngüsü) ve §4 (sapma protokolü) bölümlerini uygula, şu farklarla:
+`.claude/skills/novacore-phase/SKILL.md`'nin §3.2 (adım döngüsü) ve §4 (sapma protokolü) bölümlerini uygula, şu farklarla:
 - Yalnız build, adımın test sınıfları (hata düzeltmesinde ve yeni davranışta önce kırmızı, sonra yeşil) ve `dotnet format NovaCore.slnx` çalışır. Tam test, coverage, smoke ve inceleme çalışmaz.
 - PROGRESS.md, DECISIONS.md, PLAN.md ve `.claude/` altına yazma. Push etme.
 - §4'ün "Sor" satırına düşen ya da tag, yayın, silme, yeni Microsoft dışı paket, bastırma gerektiren işi yapma; raporda "kullanıcıya kalan" olarak yaz ve adımın geri kalanını bitir.

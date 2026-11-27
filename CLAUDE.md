@@ -20,9 +20,10 @@ The restructuring's source of truth is `docs/plan/` (Turkish). **Precedence:** `
 
 - **`PROGRESS.md` holds live state only** (D-097) and stays under 25 KB. Closed records move to `PROGRESS-ARSIV.md`
   the moment they close; deferred work is in `SONRAYA-BIRAKILANLAR.md`. Neither is read at session start: `grep` them.
-- **Phase work starts only via `/novacore-phase <id>`** (user-invoked), one phase per session, at most three committed
-  steps per session (D-082); then `/clear` and the same command. When a phase ends, **stop**: "devam"/"continue" means
-  the next step of the approved phase, never the next phase.
+- **Phase work starts only via `/novacore-phase <id>`** (user-invoked), one phase per session,
+  the whole phase in one invocation: the main session orchestrates and a fresh writer subagent writes and commits each
+  step (D-104). When a phase ends, **stop**: "devam"/"continue" means the next step of the approved phase, never the
+  next phase.
 - **The writing session** runs only the build, the step's new or changed test classes (red, then green) and
   `dotnet format`. **`/novacore-verify <id>`** runs once, after the last step, in a fresh session (D-088, D-093): the
   full suite and `code-review`, findings into PROGRESS, no code fixes; then the CodeRabbit CLI, the `faz/...` → `main`
@@ -127,8 +128,8 @@ Breaking one defeats the point of the project or fails an architecture test.
   `.ProducesProblem(...)`.
 - **Endpoints are guarded by permissions:** `RequirePermission("module:resource:action")`. Authorization is closed by
   default; a public endpoint says `.AllowAnonymous()`. No token role bypasses a permission check.
-- **One feature = one file** under a module's `Features/`. Request validation is DataAnnotations on the request record,
-  and every module calls `services.AddValidation()` (a missing call fails silently). Mapping for EF list queries is a
+- **One feature = one file** under a module's `Features/`. Request validation is DataAnnotations on the request record's
+  properties (`[property: Required]`, so the OpenAPI schema carries them too), and every module calls `services.AddValidation()` (a missing call fails silently). Mapping for EF list queries is a
   source-generated `ProjectToDto`.
 - **Configuration goes through validated options**
   (`AddOptions<T>().BindConfiguration(...).ValidateOnStart()` + `[OptionsValidator]`), never `GetValue`/`Get<T>` while

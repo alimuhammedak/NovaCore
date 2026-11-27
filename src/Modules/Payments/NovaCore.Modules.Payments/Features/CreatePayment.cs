@@ -23,7 +23,7 @@ namespace NovaCore.Modules.Payments.Features;
 /// </summary>
 public static class CreatePayment
 {
-    public sealed record Request([NotEmpty] Guid ProductId, [Range(1, int.MaxValue)] int Quantity);
+    public sealed record Request([property: NotEmpty] Guid ProductId, [property: Range(1, int.MaxValue)] int Quantity);
 
     public sealed record Response(Guid PaymentId, decimal Amount, string Status);
 

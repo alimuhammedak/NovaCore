@@ -93,6 +93,12 @@ paths:
       responses:
         default: { description: The sign-in page again or a redirect. }
   /account/login/2fa:
+    get:
+      operationId: loginTwoFactorPage
+      parameters:
+        - { name: ReturnUrl, in: query, schema: { type: string } }
+      responses:
+        default: { description: The code page, or a redirect to the sign-in page without a pending sign-in. }
     post:
       operationId: loginTwoFactor
       requestBody:
@@ -108,6 +114,10 @@ paths:
       responses:
         default: { description: The code page again or a redirect. }
   /account/forgot-password:
+    get:
+      operationId: forgotPasswordPage
+      responses:
+        default: { description: The address form. }
     post:
       operationId: forgotPassword
       requestBody:

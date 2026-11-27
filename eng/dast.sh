@@ -19,7 +19,8 @@
 #   DAST_MAX_EXAMPLES    Schemathesis's examples per operation and phase (default: eng/dast/schemathesis.toml's)
 #   DAST_SKIP_ZAP        1 skips ZAP (a quick local run)
 # Exit code: 0 when every scan ran, whatever it found; the findings are in the reports and summed up in
-# <report-dir>/summary.md. Non-zero when a scan couldn't run (no token, no document, a scanner's own error).
+# <report-dir>/summary.md. Non-zero when a scan couldn't run (no token, no document, a scanner's own error) or
+# Schemathesis couldn't exercise an operation (a JUnit <error>, e.g. no TLS trust).
 set -euo pipefail
 
 schemathesis_image='schemathesis/schemathesis@sha256:ddf8b3c9e0b3ee7edfa65dad4d0c0e05c53fb5d92f99db379d40da01883474c7' # 4.33.1
@@ -40,6 +41,8 @@ network="${DAST_DOCKER_NETWORK:-host}"
 mkdir -p "$1"
 reports="$(cd "$1" && pwd)"
 cp "$DAST_CA_FILE" "$reports/host-certificate.pem"
+# The scanners' users must read it; dotnet dev-certs writes it for its owner only. It is the certificate, not its key.
+chmod a+r "$reports/host-certificate.pem"
 
 # The client id, from the DAST configuration itself.
 client_id="$(sed -n 's/^Identity__Clients__[0-9]*__ClientId=//p' "$root/eng/dast/dast.env")"
@@ -67,9 +70,15 @@ cp "$root/eng/dast/schemathesis.toml" "$reports/schemathesis.toml"
 summary="$reports/summary.md"
 printf '## DAST\n\n| Scan | Result |\n|---|---|\n' > "$summary"
 
-# Schemathesis: 0 = every check passed, 1 = findings, anything else = it couldn't run.
+# Schemathesis: 0 = every check passed, 1 = findings, anything else = it couldn't run. Its image runs as its own user
+# (uid 1000), not the owner of the report directory (a GitHub runner's is uid 1001), so the directory it writes into must
+# be writable to it, as ZAP's is.
 schemathesis() {
   local name="$1" schema="$2" status=0
+  # A fresh directory, so the check below reads this run's JUnit report and no other.
+  rm -rf "$reports/schemathesis-$name"
+  mkdir -p "$reports/schemathesis-$name"
+  chmod a+rwx "$reports/schemathesis-$name"
   fetch_token
   export DAST_TOKEN="$access_token"
   docker run --rm --network "$network" -e DAST_TOKEN \
@@ -78,6 +87,22 @@ schemathesis() {
     --tls-verify /dast/host-certificate.pem \
     ${DAST_MAX_EXAMPLES:+--max-examples "$DAST_MAX_EXAMPLES"} \
     --report junit,html,har --report-dir "/dast/schemathesis-$name" || status=$?
+  # Exit 1 is a failed check (a finding) and also an error that kept an operation from being tested at all (no TLS trust,
+  # an unreachable host, a timeout); the JUnit report tells them apart: <failure> is a finding, <error> an operation the
+  # scan couldn't exercise, which makes the scan incomplete. No report at all means it stopped before testing anything.
+  local errors=0 junit
+  if [[ "$status" == 1 ]]; then
+    junit="$(find "$reports/schemathesis-$name" -maxdepth 1 -name 'junit*.xml' -print -quit)"
+    if [[ -z "$junit" ]]; then
+      printf '| Schemathesis: %s | could not test (exit 1, no JUnit report) |\n' "$name" >> "$summary"
+      return 1
+    fi
+    errors="$(grep -o -m1 '<testsuites [^>]*>' "$junit" | sed -n 's/.* errors="\([0-9]*\)".*/\1/p' || true)"
+    if [[ "${errors:-0}" -gt 0 ]]; then
+      printf '| Schemathesis: %s | could not test %s operations (schemathesis-%s/) |\n' "$name" "$errors" "$name" >> "$summary"
+      return 1
+    fi
+  fi
   case "$status" in
     0) printf '| Schemathesis: %s | no finding |\n' "$name" >> "$summary" ;;
     1) printf '| Schemathesis: %s | **findings** (schemathesis-%s/) |\n' "$name" "$name" >> "$summary" ;;

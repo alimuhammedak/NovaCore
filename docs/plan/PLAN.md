@@ -19,9 +19,9 @@
 ## Faz sırası ve bağımlılıklar
 
 ```
-0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 4c → 4d → 5 → 6a → 6b → 6c → 6d → 7a → 7b → 8 → 9 → 6e
+0 → 1 → 2a → 2b → 2c → 3a → 3b → 4a → 4b → 4c → 4d → 5 → 6a → 6b → 6c → 6d → 7a → 7b → 8 → 9 → 6e → 10
 ```
-9, 2026-11-13'te gece koşusuyla eklendi (D-096); 6e'den önce yürür, çünkü denetimler son kod yüzeyini ve son paket sürümlerini görmeli (D-071 (3)). Gece koşusunda (`/novacore-night`) fazlar aynı koşuda art arda yürür ve merge ön onaylıdır (D-096); onun dışında aşağıdaki kurallar geçerlidir.
+10, 2026-11-27'de 0.2.0 sürüm hazırlığı olarak eklendi (D-102); 6e'nin açık kalan DAST triajını da kapatır. 9, 2026-11-13'te gece koşusuyla eklendi (D-096); 6e'den önce yürür, çünkü denetimler son kod yüzeyini ve son paket sürümlerini görmeli (D-071 (3)). Gece koşusunda (`/novacore-night`) fazlar aynı koşuda art arda yürür ve merge ön onaylıdır (D-096); onun dışında aşağıdaki kurallar geçerlidir.
 
 
 Bir faza başlamadan önce kendisinden önceki tüm fazlar PROGRESS.md'de "tamam" olarak işaretlenmiş olmalıdır. 4d koşulludur: F4d.1'deki karar fazı gereksiz kılarsa faz `✅ tamam (atlandı)` olarak işaretlenir. 4c ve 4d, 2026-09-28'de tüketici hazırlığı araştırmasıyla eklendi (D-033, [proposals/tuketici-hazirligi.md](proposals/tuketici-hazirligi.md)). 6a–6e, 2026-10-21'de güvenlik ve kalite araştırmasıyla eklendi (D-042…D-049, [proposals/guvenlik-kalite-kararlari.md](proposals/guvenlik-kalite-kararlari.md)). 7a ve 7b, 2026-10-23'te CRM-Nominal geçişi değerlendirmesiyle eklendi (D-068…D-071, [proposals/crm-cok-kiracililik.md](proposals/crm-cok-kiracililik.md)). 6e'den önce yürürler: 6e'nin denetimleri son kod yüzeyini görmeli (D-071 (3)). 8, 2026-11-09'da CRM-Nominal'in giriş ekranı sorunuyla eklendi (D-090, R-136); aynı gerekçeyle 6e'den önce yürür.
@@ -390,3 +390,25 @@ Kaynak: [proposals/crm-cok-kiracililik.md](proposals/crm-cok-kiracililik.md) (ku
 **Bu fazda yapılmayacaklar:** Yapılmayacaklar listesindeki hiçbir madde; koşulu gerçekleşmemiş maddeler; Microsoft dışı yeni paket; bastırma; sürüm numarası ve yayın.
 
 **Faz doğrulaması:** faz branch'inin son commit'inde CI yeşil (D-096 (3)).
+
+---
+
+## Faz 10: 0.2.0 sürüm hazırlığı (D-102)
+
+**Amaç:** 0.1.0'dan sonra planlanıp yapılmamış işlerin kapatılması ve `0.2.0`'ın yayına hazır hale getirilmesi. Faz 6e'nin kalanı (S-15…S-19, DAST'ın yeniden koşusu, `faz/6e-dast-ilk-kosu` → `main` PR'ı) kendi akışında (`/novacore-phase 6e`, `/novacore-verify 6e`) önce biter; Faz 10'un branch'i `faz/10-surum-0.2.0` o merge'den sonra `main`'den açılır.
+
+**Kural:** davranış değiştiren ya da hata düzelten her madde önce kırmızı testle başlar; her madde ayrı commit (Y-37). Oturum başına en çok üç adım (D-082).
+
+| ID | Adım | Dosyalar / Kapsam | Kabul kriteri |
+|---|---|---|---|
+| F10.1 | **Ön koşul: Faz 6e kapandı.** 6e `✅ tamam` (F6e.3 D-102 (2) ile muaf); S-15…S-19'un triajı ve düzeltmeleri 6e'de, PR'ı `main`'de. Faz 10 bu adımda yalnız durumu doğrular ve branch'ini açar. | PROGRESS | 6e'nin merge kaydı PROGRESS'te; `faz/10-surum-0.2.0` `main`'den |
+| F10.2 | **İnceleme yorumları.** CodeRabbit'in PR #35'teki 12 ve #37'deki 1 yorumu bulgu olarak sınıflandırılır; kapsam içi olanlar testleriyle düzeltilir, her yoruma PR'da yanıt. | bulguya göre | Her yorum PROGRESS'te: düzeltildi (commit) ya da gerekçesiyle kaldı |
+| F10.3 | **Ürün kararları (D-102 (3)…(8)).** S-7: `Identity:SignIn:AllowRegistration` (varsayılan `true`; `false` iken kayıt JSON ucu ve HTML sayfası eşlenmez; şablonun appsettings'i ve README). S-12: `includeInactive=true` yalnız `catalog:products:update` ile. S-1'in kalan yolu, V6e-4 ve S-8 README'ye; S-8, F6e.4'ün araçları ve .NET 11 geçişi `SONRAYA-BIRAKILANLAR.md`'ye. S-10 ve S-11 D-016 ile karara bağlanır. | Identity eklentisi, Catalog modülü, şablon, README | Kırmızı → yeşil testler (S-7, S-12); OpenAPI kapısı kırıcı değişiklik görmez |
+| F10.4 | **Dependabot ve pack uyarısı.** CI'ı yeşil PR'lar merge edilir, kırmızı olanların güncellemesi faz branch'inde (F9.3 kuralı). #39 kapatılır; `dependabot.yml` `dotnet-sdk` için major sürümü yok sayar (D-102 (9)). Api csproj'unda `WarnOnPackingNonPackableProject=false` (D-102 (10)). | paketler, lock dosyaları, workflow'lar, compose, `dependabot.yml`, Api csproj | Açık Dependabot PR'ı kalmaz ya da kalanın nedeni PROGRESS'te; `dotnet pack` uyarısız |
+| F10.5 | **Sürüm hazırlığı.** `VersionPrefix` 0.2.0; `PackageValidationBaselineVersion` 0.1.0 (nereye yazılacağı R-040'a göre doğrulanır; pack baseline paketini GitHub Packages'tan indirir, CI ve `release.yml`'de `read:packages` gerekir, D-050); her paketin `PublicAPI.Unshipped.txt`'i `Shipped`'e taşınır (D-089 (3)); CHANGELOG `[Unreleased]` → `[0.2.0] - <tarih>`; şablonun paket sürümü. | `Directory.Build.props`/`.targets`, PublicAPI dosyaları, CHANGELOG, şablon, workflow'lar | `dotnet pack -c Release` baseline'la geçer; template smoke yeşil |
+
+**Faz doğrulaması:** `/novacore-verify 10` (tam paket, `code-review`, CodeRabbit CLI), faz branch'inin son commit'inde CI yeşil, `main`'e PR ve merge (kullanıcı onayıyla).
+
+**Merge'den sonra (kullanıcı, D-102 (11), (12)):** SonarCloud kalite kapısı yeşil; `v0.2.0` tag'i ve `release.yml`; ardından `docs/plan/DECISIONS.md` `protectedPaths`'e geri eklenir (D-032).
+
+**Bu fazda yapılmayacaklar:** Yapılmayacaklar listesindeki hiçbir madde; OpenID conformance suite (D-102 (2)); kayıt akışını "önce e-posta" yapmak (D-102 (4)); Payments'a idempotency (D-102 (7)); SDK 11; Microsoft dışı yeni paket; bastırma; tag ve yayın.

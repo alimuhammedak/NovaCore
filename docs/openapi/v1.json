@@ -105,6 +105,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/MessageResponse"
                 }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
               }
             }
           }
@@ -179,6 +184,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -193,6 +208,16 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -224,6 +249,16 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -278,6 +313,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -319,6 +364,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -350,6 +405,16 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -594,11 +659,9 @@
             "name": "page",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           },
@@ -606,11 +669,9 @@
             "name": "pageSize",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           }
@@ -622,6 +683,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PagedListOfUserSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -649,6 +730,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -670,6 +771,26 @@
                   "items": {
                     "$ref": "#/components/schemas/PermissionGroup"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -728,6 +849,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -778,6 +919,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -964,6 +1125,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -979,7 +1160,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Request"
+                "$ref": "#/components/schemas/CreateProductRequest"
               }
             }
           },
@@ -991,7 +1172,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Response"
+                  "$ref": "#/components/schemas/CreateProductResponse"
                 }
               }
             }
@@ -1002,6 +1183,26 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1019,11 +1220,9 @@
             "name": "page",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           },
@@ -1031,11 +1230,9 @@
             "name": "pageSize",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           },
@@ -1062,6 +1259,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PagedListOfProductDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1107,6 +1324,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       },
@@ -1131,7 +1368,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Request"
+                "$ref": "#/components/schemas/UpdateProductRequest"
               }
             }
           },
@@ -1167,6 +1404,26 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1213,6 +1470,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -1228,7 +1505,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Request"
+                "$ref": "#/components/schemas/CreatePaymentRequest"
               }
             }
           },
@@ -1240,7 +1517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Response"
+                  "$ref": "#/components/schemas/CreatePaymentResponse"
                 }
               }
             }
@@ -1274,6 +1551,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       },
@@ -1288,11 +1585,9 @@
             "name": "page",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           },
@@ -1300,11 +1595,9 @@
             "name": "pageSize",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           }
@@ -1316,6 +1609,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PagedListOfPaymentDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1348,6 +1661,9 @@
         "type": "object",
         "properties": {
           "role": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           }
         }
@@ -1360,10 +1676,118 @@
         "type": "object",
         "properties": {
           "currentPassword": {
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           },
           "newPassword": {
+            "maxLength": 128,
+            "minLength": 15,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
+          }
+        }
+      },
+      "CreatePaymentRequest": {
+        "required": [
+          "productId",
+          "quantity"
+        ],
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CreatePaymentResponse": {
+        "required": [
+          "paymentId",
+          "amount",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateProductRequest": {
+        "required": [
+          "name",
+          "description",
+          "price",
+          "stock"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 2000,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "price": {
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "stock": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CreateProductResponse": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -1422,9 +1846,15 @@
         "type": "object",
         "properties": {
           "token": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           },
           "password": {
+            "maxLength": 128,
+            "minLength": 15,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           }
         }
@@ -1448,7 +1878,11 @@
         "type": "object",
         "properties": {
           "email": {
-            "type": "string"
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
+            "type": "string",
+            "format": "email"
           }
         }
       },
@@ -1475,6 +1909,9 @@
         "type": "object",
         "properties": {
           "token": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           }
         }
@@ -1725,7 +2162,11 @@
         "type": "object",
         "properties": {
           "email": {
-            "type": "string"
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
+            "type": "string",
+            "format": "email"
           }
         }
       },
@@ -1738,12 +2179,22 @@
         "type": "object",
         "properties": {
           "email": {
-            "type": "string"
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
+            "type": "string",
+            "format": "email"
           },
           "code": {
+            "maxLength": 8,
+            "minLength": 8,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           },
           "newPassword": {
+            "maxLength": 128,
+            "minLength": 15,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           }
         }
@@ -1954,52 +2405,24 @@
         "type": "object",
         "properties": {
           "email": {
-            "type": "string"
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
+            "type": "string",
+            "format": "email"
           },
           "password": {
+            "maxLength": 128,
+            "minLength": 15,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           },
           "displayName": {
+            "maxLength": 128,
             "type": [
               "null",
               "string"
             ]
-          }
-        }
-      },
-      "Request": {
-        "required": [
-          "name",
-          "description",
-          "price",
-          "stock"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "description": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "price": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "stock": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
           }
         }
       },
@@ -2010,19 +2433,11 @@
         "type": "object",
         "properties": {
           "email": {
-            "type": "string"
-          }
-        }
-      },
-      "Response": {
-        "required": [
-          "id"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
             "type": "string",
-            "format": "uuid"
+            "format": "email"
           }
         }
       },
@@ -2060,9 +2475,13 @@
         "type": "object",
         "properties": {
           "code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           },
           "returnUrl": {
+            "maxLength": 4096,
             "type": [
               "null",
               "string"
@@ -2079,12 +2498,19 @@
         "type": "object",
         "properties": {
           "email": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           },
           "password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           },
           "returnUrl": {
+            "maxLength": 4096,
             "type": [
               "null",
               "string"
@@ -2118,9 +2544,14 @@
         "type": "object",
         "properties": {
           "password": {
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           },
           "code": {
+            "maxLength": 8,
+            "minLength": 6,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           }
         }
@@ -2132,6 +2563,8 @@
         "type": "object",
         "properties": {
           "password": {
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
             "type": "string"
           }
         }
@@ -2148,6 +2581,49 @@
           },
           "authenticatorUri": {
             "type": "string"
+          }
+        }
+      },
+      "UpdateProductRequest": {
+        "required": [
+          "name",
+          "description",
+          "price",
+          "stock"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "[^\\s\\u0085]",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 2000,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "price": {
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "stock": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
