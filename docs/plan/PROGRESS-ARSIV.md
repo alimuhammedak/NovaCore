@@ -1240,6 +1240,12 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 
 ## Eski devir notları
 
+**2026-11-27, Faz 6e: S-15, S-17, S-18 kapandı.** Üç commit (`d1a244c`, `b12ebdc`, `dfb1dd3`) `faz/6e-dast-ilk-kosu`'da, push edilmedi (plan commit'i `83e700c` de). Sürpriz: Chrome `form-action`'ı form gönderiminden sonraki yönlendirmelere de uygular; giriş zinciri istemcinin başka origin'deki `redirect_uri`'sinde bittiği için `form-action` eklenmedi (R-159, README).
+
+- **Sıradaki:** S-16 (.NET 10 OpenAPI'nin DataAnnotations'tan şemaya ne taşıdığını ölç, R-kaydı); S-15'in ST105 kısmı (3 uçta `application/json` belgeli 400 ama `problem+json` dönüyor; raporu (run `46008665907`, `dast-report` artifact'ı) okumadan hangi uçlar olduğu belli değil: aday `confirm-email`'in bağlama hatası). Sonra branch push, DAST yeniden koşulur (`gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu`), ardından `/novacore-verify 6e`.
+- **Doğrulamaya kalanlar:** tam paket, SQL Server/PostgreSQL katmanları, `check-openapi` (19 işleme 401/403 eklendi; oasdiff'te yanıt eklemek kırıcı olmamalı), coverage, şablon smoke.
+- **Bekleyen karar:** yok. Q-40 sürüyor.
+
 **2026-11-27, Faz 6e: DAST koşuyor, bulgular triajlı.** İki betik hatası kapandı (V6e-5 `045f686`, V6e-6 `8dfc457`); run `46008665907` dört taramayı da koşturdu: 5xx yok, 33 Schemathesis kontrol bulgusu ve ZAP uyarıları S-15…S-19 olarak triajlı. DA-1…DA-12 D-099…D-101'e işlendi (`0a091e4`). Branch `faz/6e-dast-ilk-kosu` push'lu, PR yok. Oturum bütçesi doldu.
 
 - **Sıradaki:** S-17 (protokol şeması), S-18 (CSP, önce kırmızı test), S-15 (401/403 belgesi, önce kırmızı belge testi, `OpenApiContractTests`), S-16 (ölç, R-kaydı). Sonra DAST yeniden koşulur ve `faz/6e-dast-ilk-kosu` → `main` PR'ı (`/novacore-verify 6e`). CodeRabbit'in #35 yorumları Faz 8'in işi.
