@@ -56,7 +56,8 @@ public static class CoreWebExtensions
             options.CreateSchemaReferenceId = SchemaReferenceIds.Create;
             options
                 .AddDocumentTransformer<BearerSecuritySchemeTransformer>()
-                .AddOperationTransformer<AuthorizationResponsesTransformer>();
+                .AddOperationTransformer<AuthorizationResponsesTransformer>()
+                .AddSchemaTransformer<StringValidationSchemaTransformer>();
         });
 
         AddForwardedHeaders(services);

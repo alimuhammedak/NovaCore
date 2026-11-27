@@ -74,7 +74,43 @@ public class OpenApiTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreAp
     [InlineData("/api/v1/admin/users/{userId}/roles", "role", "maxLength", 256)]
     [InlineData("/api/v1/products", "name", "maxLength", 200)]
     [InlineData("/api/v1/payments", "quantity", "minimum", 1)]
+    // [Required] refuses an empty string (AllowEmptyStrings is false); a larger minimum length stays.
+    [InlineData("/api/v1/auth/register", "email", "minLength", 1)]
+    [InlineData("/api/v1/auth/2fa/enable", "password", "minLength", 1)]
+    [InlineData("/api/v1/admin/users/{userId}/roles", "role", "minLength", 1)]
+    [InlineData("/api/v1/products", "name", "minLength", 1)]
     public async Task Request_schemas_carry_the_validation_limits(string path, string property, string keyword, int value)
+    {
+        var schema = await RequestPropertySchema(path, property);
+
+        Assert.Equal(value, schema.GetProperty(keyword).GetInt32());
+    }
+
+    // [Required] refuses a whitespace-only string too, [EmailAddress] a string that isn't an address.
+    [Theory]
+    [InlineData("/api/v1/auth/register", "email", "format", "email")]
+    [InlineData("/api/v1/auth/password/forgot", "email", "format", "email")]
+    [InlineData("/api/v1/auth/register", "email", "pattern", @"[^\s\u0085]")]
+    [InlineData("/api/v1/products", "name", "pattern", @"[^\s\u0085]")]
+    public async Task Request_schemas_carry_the_string_rules(string path, string property, string keyword, string value)
+    {
+        var schema = await RequestPropertySchema(path, property);
+
+        Assert.Equal(value, schema.GetProperty(keyword).GetString());
+    }
+
+    // A string the validation accepts keeps its schema: no format, no pattern.
+    [Fact]
+    public async Task Optional_strings_get_no_string_rules()
+    {
+        var schema = await RequestPropertySchema("/api/v1/products", "description");
+
+        Assert.False(schema.TryGetProperty("pattern", out _));
+        Assert.False(schema.TryGetProperty("format", out _));
+        Assert.False(schema.TryGetProperty("minLength", out _));
+    }
+
+    private async Task<JsonElement> RequestPropertySchema(string path, string property)
     {
         var client = _factory.CreateClient();
 
@@ -85,7 +121,7 @@ public class OpenApiTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreAp
         var schema = document.RootElement.GetProperty("components").GetProperty("schemas")
             .GetProperty(reference["#/components/schemas/".Length..]);
 
-        Assert.Equal(value, schema.GetProperty("properties").GetProperty(property).GetProperty(keyword).GetInt32());
+        return schema.GetProperty("properties").GetProperty(property).Clone();
     }
 
     // Nested request and response types share their names across features (CreateProduct.Request,

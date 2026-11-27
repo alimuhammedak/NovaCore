@@ -25,7 +25,7 @@ These are the NuGet packages a NovaCore host builds on (docs/plan/ANALYSIS.md §
   host with another `IClaimsTransformation`), the request's tenant (`ITenantResolver`, which the multi-tenancy add-on
   implements: the transformation asks it and caches its decision with the permissions, then gives the scope's
   `TenantContext` the validated tenant; `RequireTenant()` answers 403 without one) (`Authorization/`), the OpenAPI document (its 401/403 per operation, `AuthorizationResponsesTransformer`; a type nested
-  in a public type, a feature's `Request`/`Response`, named with its declaring type, `SchemaReferenceIds`), `SecurityHeadersMiddleware`, HybridCache (`AddCoreCaching`). Depends on
+  in a public type, a feature's `Request`/`Response`, named with its declaring type, `SchemaReferenceIds`; a `[Required]` string's `minLength: 1` and non-whitespace pattern, an `[EmailAddress]`'s `format: email`, `StringValidationSchemaTransformer`), `SecurityHeadersMiddleware`, HybridCache (`AddCoreCaching`). Depends on
   Abstractions + `FrameworkReference Microsoft.AspNetCore.App`, never on EntityFrameworkCore.
 
 - **`NovaCore.EntityFrameworkCore`** — persistence without ASP.NET Core: `AddModuleDatabase` (the host's database for
