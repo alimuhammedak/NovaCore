@@ -1240,6 +1240,12 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 
 ## Eski devir notları
 
+**2026-11-27, Faz 6e: S-16 kapandı; DAST bulgularının bütün testli düzeltmeleri bitti.** İki commit (`06acc8a`, `f7f54b4`) `faz/6e-dast-ilk-kosu`'da, push edilmedi. Sürpriz: sunucu sayfa parametrelerinde her int32'yi kabul edip kırpıyor; şema bu yüzden `minimum: 1` değil tipin aralığını yazar. Kararlar D-105, R-161.
+
+- **Sıradaki (kullanıcı onayıyla):** branch push, DAST yeniden (`gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu`), ST202'nin kalktığı görülür; ardından `/novacore-verify 6e`. F6e.3 D-102 (2) gereği bu sürümde koşmaz.
+- **Doğrulamaya kalanlar:** tam paket, SQL Server/PostgreSQL katmanları, `check-openapi` (şema adları, yeni `maxLength`/`minLength`/`pattern`/`format`, parametre tipi `integer|string` → `integer`; oasdiff'in kırıcı sayıp saymadığı, izin listesi boş), şablon smoke (`CreateTodo`'nun `property:` hedefi), coverage.
+- **Bekleyen karar:** push. Q-40 sürüyor.
+
 **2026-11-27, Faz 6e: S-15 kapandı, S-16 kısmen, S-20 bulundu ve kapandı.** Üç commit (`965100b`, `79ebf69`, `19fdd59`) `faz/6e-dast-ilk-kosu`'da, push edilmedi. Sürprizler: .NET 10 bir durum kodu için yalnız son `Produces*`'ı tutar; record attribute'ları `property:` hedefi olmadan şemaya girmez; aynı adlı iç içe `Request`/`Response` tipleri tek şemayı paylaşıyordu (`/payments` ürünün gövdesiyle belgeliydi, S-20). Kararlar D-103, R-160.
 
 - **Akış (D-104):** `/novacore-phase 6e` bir çağrıda fazın kalanını bitirir; adımları yazan alt ajanlar yazar.

@@ -28,7 +28,7 @@
 | 7b | ✅ tamam | `faz/7b-cok-kiracililik` | 2026-10-24 | 2026-10-25 | 2026-10-27 (kullanıcı onayı, PR #13 merge commit'i `dba8318`) |
 | 8 | ✅ tamam | `faz/8-bassiz-giris` | 2026-11-09 | 2026-11-14 | 2026-11-27 (kullanıcı onayı, PR #35 merge commit'i `611903f`; CodeRabbit'in 12 yorumu sonradan bulgu olarak okunur) |
 | 9 | ✅ tamam | `faz/9-bakim` (`faz/8-bassiz-giris` + `main`) | 2026-11-13 | 2026-11-14 | 2026-11-27 (kullanıcı onayı, PR #36 merge commit'i `06316de`) |
-| 6e | ⏸ duraklatıldı (faz sonu doğrulaması bekliyor; PR #37 merge `d2be1d1`; DAST düzeltmeleri `faz/6e-dast-ilk-kosu`'da, kalan: push, DAST yeniden, `/novacore-verify 6e`; F6e.3 D-102 (2)) | `faz/6e-dinamik-denetim` (`faz/9-bakim`'in üstüne açıldı) | 2026-11-13 | | |
+| 6e | ✅ tamam (PR açık; merge kullanıcıda; F6e.3 D-102 (2); SQL Server/PostgreSQL katmanları Faz 10'dan sonra, tag'den önce) | `faz/6e-dinamik-denetim` (PR #37, `d2be1d1`) + `faz/6e-dast-ilk-kosu` | 2026-11-13 | 2026-11-27 | |
 | 10 | ⏳ başlamadı (6e'nin merge'ünden sonra, D-102) | `faz/10-surum-0.2.0` (`main`'den) | | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
@@ -43,7 +43,7 @@ Durum: **bitti (2026-11-14).** Kuyruk boşaldı; üç PR (#35, #36, #37) 2026-11
 |---|---|---|---|
 | 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ✅ `611903f` | İki inceleme, on bulgu, hepsi kapalı. Bütün kontroller yeşil (`17790b1`); PR #35 2026-11-27'de merge edildi (kullanıcı) |
 | 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | ✅ `06316de` | Bütün adımlar ve iki inceleme bitti; kontroller yeşil (`d33a33c`); PR #36 2026-11-27'de merge edildi (kullanıcı) |
-| 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ⏸ merge `d2be1d1` | F6e.1, F6e.2, F6e.4, F6e.5 (S-1…S-6, S-9, S-13, S-14) ve faz sonu incelemesi bitti. Kontroller yeşil (`1b0c22d`; SonarCloud kalite kapısı yalnız `dast.yml:43` S2068 yüzünden kırmızı, V6e-1'in false positive'i); PR #37 2026-11-27'de merge edildi (kullanıcı). DAST ilk koşusu: run `46002347264`. **F6e.3 (OpenID conformance suite) yapılmadı:** suite'in indirilip kurulması ön onaylı değil (F6e.4'ün araçlarıyla aynı gerekçe); PLAN'a göre sürüm öncesi şart → Kullanıcıya kalanlar |
+| 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ✅ PR açık | F6e.1, F6e.2, F6e.4, F6e.5 (S-1…S-6, S-9, S-13, S-14) ve faz sonu incelemesi bitti. Kontroller yeşil (`1b0c22d`; SonarCloud kalite kapısı yalnız `dast.yml:43` S2068 yüzünden kırmızı, V6e-1'in false positive'i); PR #37 2026-11-27'de merge edildi (kullanıcı). DAST ilk koşusu: run `46002347264`. **F6e.3 (OpenID conformance suite) yapılmadı:** suite'in indirilip kurulması ön onaylı değil (F6e.4'ün araçlarıyla aynı gerekçe); PLAN'a göre sürüm öncesi şart → Kullanıcıya kalanlar |
 | 4 | Sabah raporu ve devir notu | ✅ | 2026-11-14 |
 
 ### Karar adayları (DA)
@@ -73,11 +73,13 @@ Başlangıç 2026-11-13, `faz/9-bakim` @ `1f3c034`. Plan onayı D-096 (2). Docke
 
 - [x] F6e.1 (`2b6df56`): `dast` client yalnız `eng/dast/dast.env`'de (ortam değişkenleri, index 100); `client_credentials`, dört okuma izni, secret koşuda `openssl rand`. Kod değişmedi. `DastClientTests` (5) önce kırmızı, sonra yeşil.
 - [x] F6e.2 (`d07f199`): `dast.yml` (haftalık + `workflow_dispatch`), `eng/dast.sh`, `/connect` ve `/account` için dar hedef listesi. Schemathesis 4.33.1, ZAP 2.17.0 (digest'e sabit; D-044: CI aracı, NuGet değil). Bulgu job'u kırmızı yapmaz, taramanın koşamaması yapar (DA-9). Yerelde Schemathesis 3 örnekle: `/account/*` formlarında ve `/connect/revoke`'ta bozuk form girdisine 500 (S-14). ZAP yerelde denenmedi (indirme takıldı). İlk koşu merge'den sonra (kullanıcıya kaldı).
+- [ ] F6e.3: D-102 (2) gereği bu sürümde koşmaz (bir sonraki sürümden önce).
 - [x] F6e.4: kurulu `security-review` ölçütleriyle dört Opus koşusu (salt okunur): auth çekirdeği ×2 (uçtan içeri; kontrol listesi/değişmezlerden koda), bütün repo ×2 (dizin dizin; OWASP API Top 10 + tehdit modeli). Skill yalnız diff okuduğu için ölçütleri elle, bütün koda uygulandı. Faz 6b'nin düzeltmeleri yerinde; bağımlılık taraması temiz.
+- [x] F6e.5: her bulgu testli düzeltme ya da `needs_validation` (aşağıdaki tablo, S-1…S-20); DAST bulgularının düzeltmeleri `faz/6e-dast-ilk-kosu`'da.
 
 #### Doğrulama (Faz 6e)
 
-Son doğrulanan commit: `28663cc` (2026-11-27; aralık `ce56885..28663cc`, 13 kod commit'i; test 726/824, atlanan 98: SQL Server ve PostgreSQL katmanları, Docker yok; code-review 4 bulgu: 2 açık, 2 Sonraya). Docker katmanları kullanıcı kararıyla 6e'de koşmaz: Faz 10 bittikten sonra, 0.2.0 tag'inden önce koşar (2026-11-27). Restore `--locked-mode`, build (0 uyarı) ve format geçti.
+Son doğrulanan commit: `ed41255` (2026-11-27; aralık `ce56885..ed41255`, 14 kod commit'i; test 726/824 `28663cc`'de, atlanan 98: SQL Server ve PostgreSQL katmanları, kullanıcı kararıyla Faz 10'dan sonra, 0.2.0 tag'inden önce; code-review 4 bulgu: 2 kapatıldı, 2 Sonraya; template smoke geçti; `check-openapi` ve coverage Docker ister, PR CI'ında; CodeRabbit CLI oturum açamadı). Restore `--locked-mode`, build (0 uyarı) ve format geçti. V6e-7/V6e-8 kullanıcı onayıyla doğrulama oturumunda düzeltildi (D-088 (2)'ye bu seferlik istisna).
 
 | ID | Bulgu | Yer | Durum |
 |---|---|---|---|
@@ -87,8 +89,8 @@ Son doğrulanan commit: `28663cc` (2026-11-27; aralık `ce56885..28663cc`, 13 ko
 | V6e-4 | Bekleyen daveti olan şifresiz hesaba anonim `register`: davetliye "yeniden kayıt" metinli şifre bağlantısı ve Warning audit gider (güvenlik açığı değil) | Opus inceleme, `AccountEndpoints.cs:741-760` | D-102 (6): davranış değişmez, README'ye (F10.3) |
 | V6e-5 | DAST'ın ilk koşusu hiçbir tarama koşmadan kırmızı: Schemathesis imajı (uid 1000) runner'ın (uid 1001) rapor klasöründe `--report-dir` açamadı | run `46002347264`, `eng/dast.sh:72-84` | kapatıldı (`045f686`, branch `faz/6e-dast-ilk-kosu`): rapor klasörü ZAP'ınki gibi önceden açılıp yazılabilir yapılır. xUnit'le gösterilemez (CI betiği, kapsayıcı kullanıcısı); run `46007644116` taramaları koşturdu; **doğrulandı** (`28663cc`) |
 | V6e-6 | Run `46007644116` yeşil ve "bulgulu" ama Schemathesis'in bütün işlemleri JUnit `<error>`: sertifikayı okuyamadı (`dotnet dev-certs` PEM'i yalnız sahibine açar); betik exit 1'i bulgu saydı | run `46007644116`, `eng/dast.sh` | kapatıldı (`8dfc457`): kopya herkese okunur; JUnit'te `<error>` varsa tarama eksik sayılır, job kırmızı (D-101 (1)). Run `46008665907`: 0 hata, 33 kontrol bulgusu; **doğrulandı** (`28663cc`): CI yolu düzgün; yerel yeniden koşu ve JUnit'siz çıkış V6e-7 |
-| V6e-7 | `<error>` denetimi tek bir JUnit dosyası varsayıyor: dosya yoksa (Schemathesis exit 1 ile rapor yazmadan çıkarsa) `errors` boş → 0; aynı rapor klasörüne yeniden koşuda iki dosya varsa `errors` iki satır olur, `[[ -gt ]]` hata verir ve yanlış sayılır. İki durumda da eksik tarama "bulgu" diye yazılır, betik 0 döner (D-101 (1)'e aykırı) | code-review, `eng/dast.sh:127-133` | açık: JUnit yoksa tarama eksik sayılır; birden çok dosyanın `errors`'u toplanır (ya da klasör koşu başında temizlenir) |
-| V6e-8 | Mekanik `[`→`[property: ` değişikliği bir yorumu bozmuş: "`[property: Required] can't reject Guid.Empty`" (yorum attribute'un hedefini değil kendisini anlatıyor) | code-review, `CreatePayment.cs:34` | açık: yorum `[Required]`'a döner |
+| V6e-7 | `<error>` denetimi tek bir JUnit dosyası varsayıyor: dosya yoksa (Schemathesis exit 1 ile rapor yazmadan çıkarsa) `errors` boş → 0; aynı rapor klasörüne yeniden koşuda iki dosya varsa `errors` iki satır olur, `[[ -gt ]]` hata verir ve yanlış sayılır. İki durumda da eksik tarama "bulgu" diye yazılır, betik 0 döner (D-101 (1)'e aykırı) | code-review, `eng/dast.sh:127-133` | doğrulandı (`ed41255`): her koşu boş klasörde başlar; exit 1 ve JUnit yoksa tarama eksik, job kırmızı. Yerelde ayrıştırma denendi; DAST CI koşusu yok |
+| V6e-8 | Mekanik `[`→`[property: ` değişikliği bir yorumu bozmuş: "`[property: Required] can't reject Guid.Empty`" (yorum attribute'un hedefini değil kendisini anlatıyor) | code-review, `CreatePayment.cs:34` | doğrulandı (`ed41255`): yorum `[Required]`; `src/Modules/CLAUDE.md`'nin anatomi satırı da `[property: ...]` der |
 
 #### F6e.4 bulguları ve F6e.5 triajı
 
@@ -130,8 +132,9 @@ Yalnız cevabı beklenen sorular. Cevaplanan soru cevabıyla birlikte arşivin "
 
 > Yalnız en son not durur. Yeni not yazılırken bir önceki arşivin "Eski devir notları" bölümünün en üstüne taşınır (D-097).
 
-**2026-11-27, Faz 6e: S-16 kapandı; DAST bulgularının bütün testli düzeltmeleri bitti.** İki commit (`06acc8a`, `f7f54b4`) `faz/6e-dast-ilk-kosu`'da, push edilmedi. Sürpriz: sunucu sayfa parametrelerinde her int32'yi kabul edip kırpıyor; şema bu yüzden `minimum: 1` değil tipin aralığını yazar. Kararlar D-105, R-161.
+**2026-11-27, Faz 6e kapandı (PR açık, merge kullanıcıda).** DAST'ın ilk koşusundan çıkan her şey kapandı: V6e-5/V6e-6 (tarayıcının koşabilmesi), S-15…S-20 (OpenAPI belgesinin 401/403'ü, doğrulama kısıtları, şema adları, CSP `base-uri`), son doğrulamanın V6e-7/V6e-8'i (`ed41255`). Kararlar D-101, D-102, D-103, D-105; araştırma R-155…R-161.
 
-- **Sıradaki (kullanıcı onayıyla):** branch push, DAST yeniden (`gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu`), ST202'nin kalktığı görülür; ardından `/novacore-verify 6e`. F6e.3 D-102 (2) gereği bu sürümde koşmaz.
-- **Doğrulamaya kalanlar:** tam paket, SQL Server/PostgreSQL katmanları, `check-openapi` (şema adları, yeni `maxLength`/`minLength`/`pattern`/`format`, parametre tipi `integer|string` → `integer`; oasdiff'in kırıcı sayıp saymadığı, izin listesi boş), şablon smoke (`CreateTodo`'nun `property:` hedefi), coverage.
-- **Bekleyen karar:** push. Q-40 sürüyor.
+- **Yapılmayan:** F6e.3 (OpenID conformance) D-102 (2) gereği bir sonraki sürümden önce. Tam paketin SQL Server ve PostgreSQL katmanları (98 test) kullanıcı kararıyla Faz 10'dan sonra, 0.2.0 tag'inden önce. CodeRabbit CLI oturum açamadı (`coderabbit auth login`).
+- **Sürprizler:** DAST her koşuda bir katman açtı (izin, sertifika, sonra gerçek bulgular); .NET 10'da ikinci `Produces*` birinciyi siler (D-103 (2)); sunucu sayfa parametrelerini kırpıyor (D-105 (2)).
+- **Faz 10'un bilmesi gerekenler:** request record'larının attribute'ları `[property: ...]` (D-103 (1), şablon dahil). Faz 10 6e'nin merge'ünden sonra `main`'den açılır; Docker baştan açık olsun. Bu fazın uzamasının nedeni küçük bulguların da yazan/doğrulayan turu gerektirmesiydi; süreç değişikliği (küçük bulguyu Sonraya yazmak ya da doğrulamada düzeltmek) kullanıcının kararıdır.
+- **Bekleyen:** PR'ın CI'ı (`check-openapi`, coverage, SQL Server katmanı CI'da), merge onayı. Q-40 sürüyor.
