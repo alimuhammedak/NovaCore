@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Identity provider: a headless sign-in surface for a project's own screens, next to the HTML pages, which stay as the
+  fallback. `Identity:SignIn:LoginPath` sends a signed-out browser from `/connect/authorize` to the project's screen
+  (a path on this host only, or the host doesn't start). The screen signs in with `GET /api/v1/auth/session/antiforgery`,
+  `POST /api/v1/auth/session/login` and `POST /api/v1/auth/session/login/2fa` (the antiforgery token in the
+  `X-XSRF-TOKEN` header, no CORS, local return URLs only); they open the provider's session cookie and never return a
+  token. Failures carry a stable `code` (`account.invalid_credentials`, `account.email_not_confirmed`, ...).
+- Identity provider: password reset with an emailed 8-digit code, `POST /api/v1/auth/password/forgot` and
+  `POST /api/v1/auth/password/reset`: 15 minutes, once, 5 wrong tries per code, and codes stop after 100 wrong ones in
+  a row until the owner signs in. A wrong code doesn't count toward lockout; a reset ends every session.
+- Identity provider: account invitations. `AccountInvitations.InviteAsync(email)` (for a product's own endpoint) and
+  `POST /api/v1/admin/invitations` (the new `identity:invitations:create` permission) email a single-use, 7-day link to
+  `Identity:SignIn:InvitationPath` (default `/accept-invitation`); `POST /api/v1/auth/invitations/status` and `/accept`
+  read and accept it. An invitation never sets the password of a confirmed account. `InviteAsync` returns a
+  `Result<Guid>`: an address that can't be a user name is `invitation.invalid_email` (400), one another account holds as
+  its user name `invitation.address_taken` (409); two invitations racing to create one account both invite it. **Upgrade:** a new `invitations`
+  table in the `identity` schema; add the migration to the host's identity store (the template's sets have it).
+
+### Changed
+
+- Identity provider: the sign-in rules moved into one internal service shared by the HTML pages and the JSON
+  endpoints; behaviour is unchanged. The antiforgery header name is `X-XSRF-TOKEN` (the HTML forms keep their field).
+
+### Fixed
+
+- Identity provider: two requests creating an account with one address at the same time (registration or invitation)
+  no longer answer 500: the user store reports the lost insert as a duplicate user name.
+
 ## [0.1.0] - 2026-10-27
 
 The first stable version. Everything below is relative to 0.1.0-preview.1. Each library package's public API is now

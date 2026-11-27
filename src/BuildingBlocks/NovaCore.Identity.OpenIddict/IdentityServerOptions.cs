@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
 
 namespace NovaCore.Identity.OpenIddict;
@@ -18,6 +19,39 @@ internal sealed class IdentityServerOptions
     public List<IdentityClientOptions> Clients { get; set; } = [];
 
     public IdentitySeedOptions Seed { get; set; } = new();
+
+    public IdentitySignInOptions SignIn { get; set; } = new();
+}
+
+/// <summary>The provider's sign-in screen (<c>Identity:SignIn</c>).</summary>
+internal sealed class IdentitySignInOptions
+{
+    /// <summary>
+    /// Where <c>/connect/authorize</c> sends a signed-out browser, with the authorization request as <c>ReturnUrl</c>: a
+    /// project's own sign-in screen on this host, e.g. <c>/sign-in</c>. Unset, the provider's own page
+    /// (<c>/account/login</c>). A path of this host only: it starts with one <c>/</c> and has no scheme, host, query or
+    /// fragment, or the host doesn't start.
+    /// </summary>
+    public string? LoginPath { get; set; }
+
+    /// <summary>
+    /// The project's screen that accepts an invitation, on this host: the emailed link opens it with the invitation as
+    /// <c>token</c> in the query. The provider has no page of its own for it. A path of this host only, like
+    /// <see cref="LoginPath"/>.
+    /// </summary>
+    public string InvitationPath { get; set; } = DefaultInvitationPath;
+
+    public const string DefaultInvitationPath = "/accept-invitation";
+
+    /// <summary>
+    /// True when <paramref name="path"/> is a path on this host that the login path or a link can hold: the framework's local
+    /// URL rule without its <c>~/</c> form, and no query or fragment (the handler appends <c>ReturnUrl</c> itself).
+    /// </summary>
+    public static bool IsLocalPath(string? path) =>
+        string.IsNullOrEmpty(path)
+        || (path[0] == '/'
+            && RedirectHttpResult.IsLocalUrl(path)
+            && path.IndexOfAny(['?', '#']) < 0);
 }
 
 /// <summary>A client application of the provider (<c>Identity:Clients:n</c>).</summary>
