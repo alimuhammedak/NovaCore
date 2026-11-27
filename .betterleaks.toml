@@ -45,3 +45,10 @@ condition = "AND"
 paths = ['''^docs/plan/PROGRESS(-ARSIV)?\.md$''']
 regexTarget = "secret"
 regexes = ['''^bm90LWEtdG9rZW4$''']
+
+[[allowlists]]
+description = "Not a value: the shell expression that generates the DAST run's SQL Server password (F6e.2, reviewed 2026-11-14)"
+condition = "AND"
+paths = ['''^\.github/workflows/dast\.yml$''']
+regexTarget = "secret"
+regexes = ['''^Dast-\$\(openssl rand -hex 24\)$''']
