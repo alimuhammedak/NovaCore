@@ -1240,6 +1240,13 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 
 ## Eski devir notları
 
+**2026-11-27, Faz 6e: S-15 kapandı, S-16 kısmen, S-20 bulundu ve kapandı.** Üç commit (`965100b`, `79ebf69`, `19fdd59`) `faz/6e-dast-ilk-kosu`'da, push edilmedi. Sürprizler: .NET 10 bir durum kodu için yalnız son `Produces*`'ı tutar; record attribute'ları `property:` hedefi olmadan şemaya girmez; aynı adlı iç içe `Request`/`Response` tipleri tek şemayı paylaşıyordu (`/payments` ürünün gövdesiyle belgeliydi, S-20). Kararlar D-103, R-160.
+
+- **Akış (D-104):** `/novacore-phase 6e` bir çağrıda fazın kalanını bitirir; adımları yazan alt ajanlar yazar.
+- **Sıradaki:** S-16'nın kalanı: `[Required]` (boş dizgi yasak) → `minLength: 1` ve `[EmailAddress]` → `format: email` için çekirdekte bir şema transformer'ı (seçenekler R-160'ta; önce `OpenApiTests`'te kırmızı), sayfa parametrelerinin sınırı (`PaginationRequest`, Abstractions). Sonra branch push, DAST yeniden koşulur (`gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu`), ardından `/novacore-verify 6e`.
+- **Doğrulamaya kalanlar:** tam paket, SQL Server/PostgreSQL katmanları, `check-openapi` (şema adları `Request`/`Response` → `Create*Request` vb., yeni `maxLength`/`minLength`; oasdiff'in kırıcı saymadığı görülmeli), şablon smoke (`CreateTodo`'nun `property:` hedefi), coverage.
+- **Bekleyen karar:** yok. Q-40 sürüyor.
+
 **2026-11-27, Faz 6e: S-15, S-17, S-18 kapandı.** Üç commit (`d1a244c`, `b12ebdc`, `dfb1dd3`) `faz/6e-dast-ilk-kosu`'da, push edilmedi (plan commit'i `83e700c` de). Sürpriz: Chrome `form-action`'ı form gönderiminden sonraki yönlendirmelere de uygular; giriş zinciri istemcinin başka origin'deki `redirect_uri`'sinde bittiği için `form-action` eklenmedi (R-159, README).
 
 - **Sıradaki:** S-16 (.NET 10 OpenAPI'nin DataAnnotations'tan şemaya ne taşıdığını ölç, R-kaydı); S-15'in ST105 kısmı (3 uçta `application/json` belgeli 400 ama `problem+json` dönüyor; raporu (run `46008665907`, `dast-report` artifact'ı) okumadan hangi uçlar olduğu belli değil: aday `confirm-email`'in bağlama hatası). Sonra branch push, DAST yeniden koşulur (`gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu`), ardından `/novacore-verify 6e`.
