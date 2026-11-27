@@ -1240,6 +1240,12 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 
 ## Eski devir notları
 
+**2026-11-27, Faz 6e: DAST koşuyor, bulgular triajlı.** İki betik hatası kapandı (V6e-5 `045f686`, V6e-6 `8dfc457`); run `46008665907` dört taramayı da koşturdu: 5xx yok, 33 Schemathesis kontrol bulgusu ve ZAP uyarıları S-15…S-19 olarak triajlı. DA-1…DA-12 D-099…D-101'e işlendi (`0a091e4`). Branch `faz/6e-dast-ilk-kosu` push'lu, PR yok. Oturum bütçesi doldu.
+
+- **Sıradaki:** S-17 (protokol şeması), S-18 (CSP, önce kırmızı test), S-15 (401/403 belgesi, önce kırmızı belge testi, `OpenApiContractTests`), S-16 (ölç, R-kaydı). Sonra DAST yeniden koşulur ve `faz/6e-dast-ilk-kosu` → `main` PR'ı (`/novacore-verify 6e`). CodeRabbit'in #35 yorumları Faz 8'in işi.
+- **Bilinmesi gerekenler:** raporlar run `46008665907`'nin `dast-report` artifact'ında (30 gün). Betik Schemathesis'in bir işlemi deneyememesini artık kırmızı sayar; bir uç zaman aşımına düşerse de job kırmızı olur.
+- **Bekleyen karar:** yok; sürüm öncesi kararlar D-102'de (2026-11-27), 6e'den sonra Faz 10 (`/novacore-phase 10`). D-032 sürümden sonra (kullanıcı). Q-40 sürüyor.
+
 **2026-11-27, Faz 6e: DAST'ın ilk koşusu.** Run `46002347264` hiçbir tarama koşmadan kırmızıydı (V6e-5): Schemathesis rapor klasörünü açamadı. `045f686` (`faz/6e-dast-ilk-kosu`, `main`'den) klasörü ZAP'ınki gibi önceden açar; yerelde Docker Desktop bunu göstermez, yalnız `bash -n` koşuldu.
 
 - **Sıradaki:** branch push'lanır, `gh workflow run dast.yml --ref faz/6e-dast-ilk-kosu` ile DAST koşulur; raporu (artifact `dast-report`) F6e.5 kuralıyla triaj edilir, bulgular `S-15…` olarak; düzeltmeler ve PR `main`'e. ZAP CI'da ilk kez koşacak. Sonra: CodeRabbit'in #35 yorumları (Faz 8), D-032 (`DECISIONS.md` `protectedPaths`'e, kullanıcı).
