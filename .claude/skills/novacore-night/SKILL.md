@@ -106,7 +106,7 @@ Rapor, en çok 150 kelime: commit hash'i; koşulan test sınıfları ve sonuçla
 5. **Merge koşulları (D-096 (4)), hepsi birden:**
    - PR'ın son commit'i yerel HEAD ve o commit'te bütün kontroller yeşil,
    - `#### Doğrulama` tablosunda `açık` bulgu yok,
-   - o ana kadar gelmiş inceleme yorumları (CodeRabbit, Greptile) `novacore-verify` §4.2'ye göre sınıflandırılmış ve yanıtlanmış. İnceleme CI yeşile dönene kadar gelmediyse beklenmez (danışman, D-067 (2)); sonradan gelen yorumlar bir sonraki fazın başında okunur ve bulgu olarak işlenir.
+   - o ana kadar gelmiş inceleme yorumları (CodeRabbit) `novacore-verify` §4.2'ye göre sınıflandırılmış ve yanıtlanmış. İnceleme CI yeşile dönene kadar gelmediyse beklenmez (danışman, D-067 (2)); sonradan gelen yorumlar bir sonraki fazın başında okunur ve bulgu olarak işlenir.
 
    Tutuyorsa:
    - `gh pr merge <no> --merge`, `git switch main`, `git pull --ff-only`,

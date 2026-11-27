@@ -1240,6 +1240,12 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 
 ## Eski devir notları
 
+**2026-11-14, gece koşusu bitti (D-096): Faz 8, 9, 6e'nin işleri tamam, üç PR açık.** Branch `faz/6e-dinamik-denetim`, push edildi; PR #37 (`main`'e, #36 ve #35'in üstünde).
+
+- **Sıradaki:** kullanıcı `SONAR_TOKEN`'ı yeniler; #35 → #36 → #37 sırayla merge edilir (kullanıcı kararı). Sonra `gh workflow run dast.yml` ile DAST'ın ilk koşusu, raporları F6e.5 triajına. DA-1…DA-12 tek düzenlemeyle DECISIONS'a işlenir. D-032: `DECISIONS.md` `protectedPaths`'e geri eklenir (Faz 6e sonu, kullanıcı).
+- **Bilinmesi gerekenler:** tam suite, SQL Server/PostgreSQL katmanları ve şablon smoke'u yalnız CI'da koştu (yeşil). CodeRabbit CLI çalışmadı (kimlik doğrulama). ZAP yerelde denenmedi. V6e-3'ün bedeli: `UseCoreWeb` çağırmayan host kendi form okuma hatasında 500 alır. `/account/login` e-postasına 256 sınırı konmadı (lockout veritabanında, bellek durumu yok).
+- **Bekleyen karar:** Kullanıcıya kalanlar tablosu (S-6 varsayılanları, V6e-4, S-7, S-1'in kalan yolu). Q-40 sürüyor.
+
 **2026-11-13, faz dışı: gece koşusu kuruldu (D-096), PROGRESS bölündü (D-097), Faz 9 plana eklendi (Q-63).** Branch `faz/8-bassiz-giris`, ilk kez push edildi; CI koşuyor. Kod değişmedi.
 
 - **Sıradaki:** kullanıcı `/novacore-night` ile koşuyu başlatır; kuyruk yukarıdaki "Gece koşusu" bölümünde. `/novacore-verify 8` ayrıca çalıştırılmaz: Faz 8'in doğrulamasını koşu yapar (CI ve yazmamış bir inceleme alt ajanı).
