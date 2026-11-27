@@ -16,7 +16,7 @@ namespace MyService.Modules.Todos.Features;
 /// </summary>
 public static class CreateTodo
 {
-    public sealed record Request([Required, MaxLength(200)] string Title);
+    public sealed record Request([property: Required, MaxLength(200)] string Title);
 
     public sealed record Response(Guid Id);
 

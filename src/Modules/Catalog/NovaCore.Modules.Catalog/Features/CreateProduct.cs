@@ -17,12 +17,12 @@ namespace NovaCore.Modules.Catalog.Features;
 public static class CreateProduct
 {
     public sealed record Request(
-        [Required, MaxLength(200)] string Name,
-        [MaxLength(2000)] string? Description,
-        [Range(0d, double.MaxValue, MinimumIsExclusive = true, ErrorMessage = "The field {0} must be greater than 0.")]
-        [DecimalColumn(ProductConfiguration.PricePrecision, ProductConfiguration.PriceScale)]
+        [property: Required, MaxLength(200)] string Name,
+        [property: MaxLength(2000)] string? Description,
+        [property: Range(0d, double.MaxValue, MinimumIsExclusive = true, ErrorMessage = "The field {0} must be greater than 0.")]
+        [property: DecimalColumn(ProductConfiguration.PricePrecision, ProductConfiguration.PriceScale)]
         decimal Price,
-        [Range(0, int.MaxValue)] int Stock);
+        [property: Range(0, int.MaxValue)] int Stock);
 
     public sealed record Response(Guid Id);
 

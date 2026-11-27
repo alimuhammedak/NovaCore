@@ -23,11 +23,11 @@ namespace NovaCore.Modules.Payments.Features;
 /// </summary>
 public static class CreatePayment
 {
-    public sealed record Request([NotEmpty] Guid ProductId, [Range(1, int.MaxValue)] int Quantity);
+    public sealed record Request([property: NotEmpty] Guid ProductId, [property: Range(1, int.MaxValue)] int Quantity);
 
     public sealed record Response(Guid PaymentId, decimal Amount, string Status);
 
-    // [Required] can't reject Guid.Empty: a Guid is never null. A rule on a single value is a custom attribute; an
+    // [property: Required] can't reject Guid.Empty: a Guid is never null. A rule on a single value is a custom attribute; an
     // IValidatableObject would only run once every property is valid (docs/plan/RESEARCH.md R-052, Q-25).
     [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Property)]
     private sealed class NotEmptyAttribute() : ValidationAttribute("The {0} field must not be empty.")

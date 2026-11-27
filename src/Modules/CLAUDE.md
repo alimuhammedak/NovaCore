@@ -81,7 +81,8 @@ they show a cross-module write through events both ways (DECISIONS D-034): a pay
   entity's indexes with `TenantId`. Never call `IgnoreQueryFilters()` without names (it fails); a read across tenants
   names the filter (`IgnoreQueryFilters([TenantQueryFilter.Name])`), and work outside a request gives its scope a tenant
   (`TenantContext.Use`). An event handler runs in the tenant that saved the event. README "Çok kiracılılık".
-- **Validate write DTOs with DataAnnotations** on the request record (`[Required, MaxLength(200)] string Name`).
+- **Validate write DTOs with DataAnnotations** on the request record's properties (`[property: Required, MaxLength(200)] string Name`):
+  the OpenAPI document reads an attribute on the property only, so one on the parameter never reaches the schema (S-16).
   The module's `services.AddValidation()` call makes .NET 10 run them before the handler and answer 400 with a
   validation ProblemDetails. Without that call nothing is validated, and nothing fails either. A rule no built-in
   attribute expresses: a custom `ValidationAttribute` for one value (`CreatePayment`'s `NotEmpty`), `IValidatableObject`

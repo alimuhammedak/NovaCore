@@ -841,8 +841,9 @@ Handler'ın dönüş tipi yanıt sözleşmesidir: `Task<Results<Ok<ProductDto>, 
 ile bildirilir, çünkü ProblemDetails'in durumu çalışma anında belli olur. `EndpointContractTests` OpenAPI'de görünen hiçbir
 handler'ın düz `IResult` dönmediğini doğrular.
 
-Validation, .NET 10'un yerleşik Minimal API validation'ıdır. Kurallar request record'unun parametrelerindeki
-DataAnnotations'tır (`[Required, MaxLength(200)] string Name`). Hazır bir attribute'un ifade edemediği kural, tek bir
+Validation, .NET 10'un yerleşik Minimal API validation'ıdır. Kurallar request record'unun özelliklerindeki
+DataAnnotations'tır (`[property: Required, MaxLength(200)] string Name`). `property:` hedefi şart: OpenAPI belgesi
+attribute'u yalnız özellikte okur (`maxLength`, `minLength`, `minimum`), parametredeki attribute şemaya girmez (S-16). Hazır bir attribute'un ifade edemediği kural, tek bir
 değer için özel bir `ValidationAttribute`'tur (ör. `CreatePayment`'taki `NotEmpty`), birden çok özellik için
 `IValidatableObject`'tir. Geçersiz istek handler'a ulaşmadan 400 validation ProblemDetails alır (`errors` alan adına
 göre). Modül `services.AddValidation()` çağırmazsa hiçbir şey doğrulanmaz ve bir hata da oluşmaz. Bu yüzden

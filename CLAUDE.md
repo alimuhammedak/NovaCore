@@ -127,8 +127,8 @@ Breaking one defeats the point of the project or fails an architecture test.
   `.ProducesProblem(...)`.
 - **Endpoints are guarded by permissions:** `RequirePermission("module:resource:action")`. Authorization is closed by
   default; a public endpoint says `.AllowAnonymous()`. No token role bypasses a permission check.
-- **One feature = one file** under a module's `Features/`. Request validation is DataAnnotations on the request record,
-  and every module calls `services.AddValidation()` (a missing call fails silently). Mapping for EF list queries is a
+- **One feature = one file** under a module's `Features/`. Request validation is DataAnnotations on the request record's
+  properties (`[property: Required]`, so the OpenAPI schema carries them too), and every module calls `services.AddValidation()` (a missing call fails silently). Mapping for EF list queries is a
   source-generated `ProjectToDto`.
 - **Configuration goes through validated options**
   (`AddOptions<T>().BindConfiguration(...).ValidateOnStart()` + `[OptionsValidator]`), never `GetValue`/`Get<T>` while

@@ -63,6 +63,30 @@ public class OpenApiTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreAp
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
+    // A request record's validation attributes target its properties, where the document reads them, so the schema says
+    // what the validation refuses (DAST S-16, ST202).
+    [Theory]
+    [InlineData("/api/v1/auth/register", "password", "minLength", 15)]
+    [InlineData("/api/v1/auth/register", "password", "maxLength", 128)]
+    [InlineData("/api/v1/auth/password/forgot", "email", "maxLength", 256)]
+    [InlineData("/api/v1/auth/2fa/enable", "code", "minLength", 6)]
+    [InlineData("/api/v1/auth/session/login", "returnUrl", "maxLength", 4096)]
+    [InlineData("/api/v1/admin/users/{userId}/roles", "role", "maxLength", 256)]
+    [InlineData("/api/v1/products", "name", "maxLength", 200)]
+    public async Task Request_schemas_carry_the_validation_limits(string path, string property, string keyword, int value)
+    {
+        var client = _factory.CreateClient();
+
+        using var document = JsonDocument.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative)));
+        var reference = document.RootElement.GetProperty("paths").GetProperty(path).GetProperty("post")
+            .GetProperty("requestBody").GetProperty("content").GetProperty("application/json").GetProperty("schema")
+            .GetProperty("$ref").GetString()!;
+        var schema = document.RootElement.GetProperty("components").GetProperty("schemas")
+            .GetProperty(reference["#/components/schemas/".Length..]);
+
+        Assert.Equal(value, schema.GetProperty("properties").GetProperty(property).GetProperty(keyword).GetInt32());
+    }
+
     // confirm-email answers a token it refuses with its own message, and a query value the framework can't bind with
     // ProblemDetails; the document lists both bodies under 400 (DAST S-15, ST105).
     [Fact]
