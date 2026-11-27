@@ -1240,6 +1240,12 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 
 ## Eski devir notları
 
+**2026-11-27, faz dışı: ücretli araçların denetimi.** `SONAR_TOKEN` yenilendi; `sonar` #35, #36, #37'de yeşil. Greptile'ın kredisi bitmişti, plandan çıkarıldı (D-098). V6e-1'in allowlist kaydı `faz/8` ve `faz/9`'a da eklendi: tarama bütün branch'lerin geçmişini okuduğu için oralarda da `secret-scan`'i kırmızı yapıyordu. CodeRabbit #35'e 12 yorum yazdı; #36 ve #37'de "rate limited". Kullanıcının isteğiyle #35 → #36 → #37 sırayla merge edildi (`611903f`, `06316de`, `d2be1d1`); Faz 8 ve 9 tamam. DAST'ın ilk koşusu başlatıldı (run `46002347264`).
+
+- **Sıradaki:** DAST raporları F6e.5 triajına (artifact'lar run `46002347264`'te). CodeRabbit'in #35 yorumları bulgu olarak sınıflandırılır (`novacore-verify` §4.2); merge edilmiş kod üzerinde, gerekirse yeni bir PR'la. DA-1…DA-12 tek düzenlemeyle DECISIONS'a işlenir. D-032: `DECISIONS.md` `protectedPaths`'e geri eklenir (Faz 6e sonu, kullanıcı).
+- **Bilinmesi gerekenler:** tam suite, SQL Server/PostgreSQL katmanları ve şablon smoke'u yalnız CI'da koştu (yeşil). CodeRabbit CLI çalışmadı (kimlik doğrulama). ZAP yerelde denenmedi. V6e-3'ün bedeli: `UseCoreWeb` çağırmayan host kendi form okuma hatasında 500 alır. `/account/login` e-postasına 256 sınırı konmadı (lockout veritabanında, bellek durumu yok).
+- **Bekleyen karar:** Kullanıcıya kalanlar tablosu (S-6 varsayılanları, V6e-4, S-7, S-1'in kalan yolu). Q-40 sürüyor.
+
 **2026-11-14, gece koşusu bitti (D-096): Faz 8, 9, 6e'nin işleri tamam, üç PR açık.** Branch `faz/6e-dinamik-denetim`, push edildi; PR #37 (`main`'e, #36 ve #35'in üstünde).
 
 - **Sıradaki:** kullanıcı `SONAR_TOKEN`'ı yeniler; #35 → #36 → #37 sırayla merge edilir (kullanıcı kararı). Sonra `gh workflow run dast.yml` ile DAST'ın ilk koşusu, raporları F6e.5 triajına. DA-1…DA-12 tek düzenlemeyle DECISIONS'a işlenir. D-032: `DECISIONS.md` `protectedPaths`'e geri eklenir (Faz 6e sonu, kullanıcı).
