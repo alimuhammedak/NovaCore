@@ -105,6 +105,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/MessageResponse"
                 }
+              },
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
               }
             }
           }

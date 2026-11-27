@@ -46,6 +46,7 @@ internal static class AccountEndpoints
         auth.MapGet("/confirm-email", ConfirmEmail)
             .WithName("ConfirmEmail")
             .WithSummary("Confirm an email address using the token from the confirmation link")
+            .AddOpenApiOperationTransformer(BindingProblemResponse.AddAsync)
             .AllowAnonymous();
 
         auth.MapPost("/resend-confirmation-email", ResendConfirmationEmail)

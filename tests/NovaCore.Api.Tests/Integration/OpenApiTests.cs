@@ -63,6 +63,33 @@ public class OpenApiTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreAp
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
+    // confirm-email answers a token it refuses with its own message, and a query value the framework can't bind with
+    // ProblemDetails; the document lists both bodies under 400 (DAST S-15, ST105).
+    [Fact]
+    public async Task Confirm_email_documents_both_bodies_of_its_400()
+    {
+        var client = _factory.CreateClient();
+
+        using var document = JsonDocument.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative)));
+        var content = document.RootElement.GetProperty("paths").GetProperty("/api/v1/auth/confirm-email").GetProperty("get")
+            .GetProperty("responses").GetProperty("400").GetProperty("content");
+
+        Assert.True(content.TryGetProperty("application/json", out _));
+        Assert.True(content.TryGetProperty("application/problem+json", out _));
+    }
+
+    [Fact]
+    public async Task Confirm_email_answers_a_query_it_cannot_bind_with_problem_details()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync(
+            new Uri("/api/v1/auth/confirm-email?userId=not-a-guid&token=x", UriKind.Relative), TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
     private static bool IsProblem(JsonElement responses, string status) =>
         responses.TryGetProperty(status, out var response)
         && response.GetProperty("content").TryGetProperty("application/problem+json", out _);
