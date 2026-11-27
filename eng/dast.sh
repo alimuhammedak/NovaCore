@@ -67,9 +67,13 @@ cp "$root/eng/dast/schemathesis.toml" "$reports/schemathesis.toml"
 summary="$reports/summary.md"
 printf '## DAST\n\n| Scan | Result |\n|---|---|\n' > "$summary"
 
-# Schemathesis: 0 = every check passed, 1 = findings, anything else = it couldn't run.
+# Schemathesis: 0 = every check passed, 1 = findings, anything else = it couldn't run. Its image runs as its own user
+# (uid 1000), not the owner of the report directory (a GitHub runner's is uid 1001), so the directory it writes into must
+# be writable to it, as ZAP's is.
 schemathesis() {
   local name="$1" schema="$2" status=0
+  mkdir -p "$reports/schemathesis-$name"
+  chmod a+rwx "$reports/schemathesis-$name"
   fetch_token
   export DAST_TOKEN="$access_token"
   docker run --rm --network "$network" -e DAST_TOKEN \
