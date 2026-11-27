@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using NovaCore.Modules.Catalog.Authorization;
 using Xunit;
 
 namespace NovaCore.Api.Tests.Integration;
@@ -108,6 +109,45 @@ public class OpenApiTests(NovaCoreApiFactory factory) : IClassFixture<NovaCoreAp
         Assert.False(schema.TryGetProperty("pattern", out _));
         Assert.False(schema.TryGetProperty("format", out _));
         Assert.False(schema.TryGetProperty("minLength", out _));
+    }
+
+    // A number in a query or a route is text the binder parses (int.TryParse), not JSON, so the string form the JSON
+    // options allow doesn't apply, and the schema's range is what the parse accepts (DAST S-16, ST202).
+    [Theory]
+    [InlineData("/api/v1/products", "page")]
+    [InlineData("/api/v1/products", "pageSize")]
+    [InlineData("/api/v1/payments", "page")]
+    [InlineData("/api/v1/admin/users", "pageSize")]
+    public async Task Integer_parameters_are_integers_in_the_range_the_binder_accepts(string path, string name)
+    {
+        var client = _factory.CreateClient();
+
+        using var document = JsonDocument.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative)));
+        var schema = document.RootElement.GetProperty("paths").GetProperty(path).GetProperty("get")
+            .GetProperty("parameters").EnumerateArray()
+            .Single(parameter => string.Equals(parameter.GetProperty("name").GetString(), name, StringComparison.Ordinal))
+            .GetProperty("schema");
+
+        Assert.Equal("integer", schema.GetProperty("type").GetString());
+        Assert.False(schema.TryGetProperty("pattern", out _));
+        Assert.Equal(int.MinValue, schema.GetProperty("minimum").GetInt32());
+        Assert.Equal(int.MaxValue, schema.GetProperty("maximum").GetInt32());
+    }
+
+    // What the schema documents: every 32-bit page and size is accepted and clamped (PaginationRequest), a value past
+    // the range isn't bound.
+    [Theory]
+    [InlineData("page=-2147483648&pageSize=2147483647", HttpStatusCode.OK)]
+    [InlineData("page=0&pageSize=0", HttpStatusCode.OK)]
+    [InlineData("page=2147483648", HttpStatusCode.BadRequest)]
+    [InlineData("pageSize=-2147483649", HttpStatusCode.BadRequest)]
+    public async Task Paging_parameters_accept_every_32_bit_value(string query, HttpStatusCode expected)
+    {
+        using var client = _factory.CreateClientWithPermissions(CatalogPermissions.ProductsRead);
+
+        var response = await client.GetAsync(new Uri("/api/v1/products?" + query, UriKind.Relative));
+
+        Assert.Equal(expected, response.StatusCode);
     }
 
     private async Task<JsonElement> RequestPropertySchema(string path, string property)

@@ -659,11 +659,9 @@
             "name": "page",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           },
@@ -671,11 +669,9 @@
             "name": "pageSize",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           }
@@ -1224,11 +1220,9 @@
             "name": "page",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           },
@@ -1236,11 +1230,9 @@
             "name": "pageSize",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           },
@@ -1593,11 +1585,9 @@
             "name": "page",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           },
@@ -1605,11 +1595,9 @@
             "name": "pageSize",
             "in": "query",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer",
               "format": "int32"
             }
           }

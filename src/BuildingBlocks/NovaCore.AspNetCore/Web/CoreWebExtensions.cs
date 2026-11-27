@@ -57,7 +57,8 @@ public static class CoreWebExtensions
             options
                 .AddDocumentTransformer<BearerSecuritySchemeTransformer>()
                 .AddOperationTransformer<AuthorizationResponsesTransformer>()
-                .AddSchemaTransformer<StringValidationSchemaTransformer>();
+                .AddSchemaTransformer<StringValidationSchemaTransformer>()
+                .AddSchemaTransformer<IntegerParameterSchemaTransformer>();
         });
 
         AddForwardedHeaders(services);
