@@ -75,6 +75,8 @@ printf '## DAST\n\n| Scan | Result |\n|---|---|\n' > "$summary"
 # be writable to it, as ZAP's is.
 schemathesis() {
   local name="$1" schema="$2" status=0
+  # A fresh directory, so the check below reads this run's JUnit report and no other.
+  rm -rf "$reports/schemathesis-$name"
   mkdir -p "$reports/schemathesis-$name"
   chmod a+rwx "$reports/schemathesis-$name"
   fetch_token
@@ -87,11 +89,15 @@ schemathesis() {
     --report junit,html,har --report-dir "/dast/schemathesis-$name" || status=$?
   # Exit 1 is a failed check (a finding) and also an error that kept an operation from being tested at all (no TLS trust,
   # an unreachable host, a timeout); the JUnit report tells them apart: <failure> is a finding, <error> an operation the
-  # scan couldn't exercise, which makes the scan incomplete.
-  local errors=0
+  # scan couldn't exercise, which makes the scan incomplete. No report at all means it stopped before testing anything.
+  local errors=0 junit
   if [[ "$status" == 1 ]]; then
-    errors="$(grep -o -m1 '<testsuites [^>]*>' "$reports/schemathesis-$name"/junit-*.xml \
-      | sed -n 's/.* errors="\([0-9]*\)".*/\1/p' || true)"
+    junit="$(find "$reports/schemathesis-$name" -maxdepth 1 -name 'junit*.xml' -print -quit)"
+    if [[ -z "$junit" ]]; then
+      printf '| Schemathesis: %s | could not test (exit 1, no JUnit report) |\n' "$name" >> "$summary"
+      return 1
+    fi
+    errors="$(grep -o -m1 '<testsuites [^>]*>' "$junit" | sed -n 's/.* errors="\([0-9]*\)".*/\1/p' || true)"
     if [[ "${errors:-0}" -gt 0 ]]; then
       printf '| Schemathesis: %s | could not test %s operations (schemathesis-%s/) |\n' "$name" "$errors" "$name" >> "$summary"
       return 1

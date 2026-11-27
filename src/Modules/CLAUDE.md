@@ -24,7 +24,7 @@ they show a cross-module write through events both ways (DECISIONS D-034): a pay
 
 ## Anatomy of a module
 
-- **`Features/`** — one file per feature: `record Request` (validation attributes on its parameters),
+- **`Features/`** — one file per feature: `record Request` (validation attributes on its properties, `[property: ...]`),
   `record Response`, `Map(group)`, and a static `Handle` that takes its dependencies as minimal-API parameters
   (DbContext, contracts, `CancellationToken`). No mediator. `Handle` returns a typed result, e.g.
   `Task<Results<Ok<ProductDto>, ProblemHttpResult>>` from `result.ToHttpResult()`; the union describes the success
