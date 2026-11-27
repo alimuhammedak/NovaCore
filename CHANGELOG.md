@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- OpenAPI: every operation that isn't anonymous documents its 401, and one that names a permission, tenant, policy or
+  roles its 403, both as `application/problem+json` (what the authorization gate answers).
 - Security headers: the Content-Security-Policy adds `base-uri 'none'`, which `default-src` doesn't cover. No
   `form-action`: Chrome applies it to the redirects after a sign-in form's post too.
 - Identity provider: the sign-in rules moved into one internal service shared by the HTML pages and the JSON
