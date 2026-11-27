@@ -19,7 +19,8 @@
 #   DAST_MAX_EXAMPLES    Schemathesis's examples per operation and phase (default: eng/dast/schemathesis.toml's)
 #   DAST_SKIP_ZAP        1 skips ZAP (a quick local run)
 # Exit code: 0 when every scan ran, whatever it found; the findings are in the reports and summed up in
-# <report-dir>/summary.md. Non-zero when a scan couldn't run (no token, no document, a scanner's own error).
+# <report-dir>/summary.md. Non-zero when a scan couldn't run (no token, no document, a scanner's own error) or
+# Schemathesis couldn't exercise an operation (a JUnit <error>, e.g. no TLS trust).
 set -euo pipefail
 
 schemathesis_image='schemathesis/schemathesis@sha256:ddf8b3c9e0b3ee7edfa65dad4d0c0e05c53fb5d92f99db379d40da01883474c7' # 4.33.1
@@ -40,6 +41,8 @@ network="${DAST_DOCKER_NETWORK:-host}"
 mkdir -p "$1"
 reports="$(cd "$1" && pwd)"
 cp "$DAST_CA_FILE" "$reports/host-certificate.pem"
+# The scanners' users must read it; dotnet dev-certs writes it for its owner only. It is the certificate, not its key.
+chmod a+r "$reports/host-certificate.pem"
 
 # The client id, from the DAST configuration itself.
 client_id="$(sed -n 's/^Identity__Clients__[0-9]*__ClientId=//p' "$root/eng/dast/dast.env")"
@@ -82,6 +85,18 @@ schemathesis() {
     --tls-verify /dast/host-certificate.pem \
     ${DAST_MAX_EXAMPLES:+--max-examples "$DAST_MAX_EXAMPLES"} \
     --report junit,html,har --report-dir "/dast/schemathesis-$name" || status=$?
+  # Exit 1 is a failed check (a finding) and also an error that kept an operation from being tested at all (no TLS trust,
+  # an unreachable host, a timeout); the JUnit report tells them apart: <failure> is a finding, <error> an operation the
+  # scan couldn't exercise, which makes the scan incomplete.
+  local errors=0
+  if [[ "$status" == 1 ]]; then
+    errors="$(grep -o -m1 '<testsuites [^>]*>' "$reports/schemathesis-$name"/junit-*.xml \
+      | sed -n 's/.* errors="\([0-9]*\)".*/\1/p' || true)"
+    if [[ "${errors:-0}" -gt 0 ]]; then
+      printf '| Schemathesis: %s | could not test %s operations (schemathesis-%s/) |\n' "$name" "$errors" "$name" >> "$summary"
+      return 1
+    fi
+  fi
   case "$status" in
     0) printf '| Schemathesis: %s | no finding |\n' "$name" >> "$summary" ;;
     1) printf '| Schemathesis: %s | **findings** (schemathesis-%s/) |\n' "$name" "$name" >> "$summary" ;;
