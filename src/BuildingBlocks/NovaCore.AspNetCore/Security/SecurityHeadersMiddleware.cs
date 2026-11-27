@@ -28,11 +28,13 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
             headers.Remove("Server");
             headers.Remove("X-Powered-By");
 
-            // Lock down API responses; leave the docs UI (Scalar) free to load its assets.
+            // Lock down API responses; leave the docs UI (Scalar) free to load its assets. base-uri doesn't fall back to
+            // default-src. No form-action: Chrome checks it against the redirects after a form post too, and a sign-in
+            // form's post ends at the client's redirect URI on another origin (docs/plan/RESEARCH.md R-159).
             var path = ctx.Request.Path;
             if (!path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase)
                 && !path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase))
-                headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+                headers["Content-Security-Policy"] = "default-src 'none'; base-uri 'none'; frame-ancestors 'none'";
 
             return Task.CompletedTask;
         }, context);

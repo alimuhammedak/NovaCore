@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Security headers: the Content-Security-Policy adds `base-uri 'none'`, which `default-src` doesn't cover. No
+  `form-action`: Chrome applies it to the redirects after a sign-in form's post too.
 - Identity provider: the sign-in rules moved into one internal service shared by the HTML pages and the JSON
   endpoints; behaviour is unchanged. The antiforgery header name is `X-XSRF-TOKEN` (the HTML forms keep their field).
 - Identity provider: a user's role permissions are resolved in one query, whatever the number of roles (two per role
