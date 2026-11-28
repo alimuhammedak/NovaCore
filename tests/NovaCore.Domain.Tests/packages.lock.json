@@ -4,14 +4,14 @@
     "net10.0": {
       "coverlet.MTP": {
         "type": "Direct",
-        "requested": "[10.1.0, )",
-        "resolved": "10.1.0",
-        "contentHash": "FbW1D7OFFUmITgKzYhasyaX0m/oQzuU3ab4ooOURngztKK/QulCT/YuADhRDSGrE79S2dVoEQPgNkg2qBz29tg==",
+        "requested": "[10.1.1, )",
+        "resolved": "10.1.1",
+        "contentHash": "dxxUyMyMa8AHnaglNC6aWkvYYV9PE4Z5mcyRXSWWinQ0OeSJ+kdcD7wNg8Dau/Lj9VK79VIC+QbYXdv1M+TVXA==",
         "dependencies": {
-          "Microsoft.Extensions.Configuration": "10.0.12",
-          "Microsoft.Extensions.Configuration.Json": "10.0.12",
-          "Microsoft.Extensions.DependencyInjection": "10.0.12",
-          "Microsoft.Testing.Platform": "2.4.1"
+          "Microsoft.Extensions.Configuration": "10.0.14",
+          "Microsoft.Extensions.Configuration.Json": "10.0.14",
+          "Microsoft.Extensions.DependencyInjection": "10.0.14",
+          "Microsoft.Testing.Platform": "2.5.2"
         }
       },
       "CsCheck": {
@@ -127,25 +127,25 @@
       },
       "Microsoft.Extensions.Configuration.FileExtensions": {
         "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "PNPS7yYH9U2M0dExn0tMkQFVtE53xTlCs/dgTfsWTTFyCF6qwGT3VrTgm2nnnkSRlSmvM9/J+n9xCpyzd9xTpQ==",
+        "resolved": "10.0.14",
+        "contentHash": "NBIfm8vWNi3UJ9OI9thvREJeV6KzEdPjQ4ONdH+yPWutGBpVnwLbXiEqdEFaGAFYpAluGCfyCwKFgH9pd2scfw==",
         "dependencies": {
-          "Microsoft.Extensions.Configuration": "10.0.12",
-          "Microsoft.Extensions.Configuration.Abstractions": "10.0.12",
-          "Microsoft.Extensions.FileProviders.Abstractions": "10.0.12",
-          "Microsoft.Extensions.FileProviders.Physical": "10.0.12",
-          "Microsoft.Extensions.Primitives": "10.0.12"
+          "Microsoft.Extensions.Configuration": "10.0.14",
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.14",
+          "Microsoft.Extensions.FileProviders.Abstractions": "10.0.14",
+          "Microsoft.Extensions.FileProviders.Physical": "10.0.14",
+          "Microsoft.Extensions.Primitives": "10.0.14"
         }
       },
       "Microsoft.Extensions.Configuration.Json": {
         "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "H4u2ZeIhjmRQvbHj7S7U4MK1kXb0khx3UtOWcir32VHczdFyIVF0lvHew/VVHmCF7Uk0QseAUaO7HyFKOCSiKA==",
+        "resolved": "10.0.14",
+        "contentHash": "4Tn8eNg85x+ICDN4OLC7Dl/xvZNREZIf7VSOAdT4Q4KYf5Ip1zAk+0BAx8BsRTomgEpCYV4kKsNNnP/ZXUbQkw==",
         "dependencies": {
-          "Microsoft.Extensions.Configuration": "10.0.12",
-          "Microsoft.Extensions.Configuration.Abstractions": "10.0.12",
-          "Microsoft.Extensions.Configuration.FileExtensions": "10.0.12",
-          "Microsoft.Extensions.FileProviders.Abstractions": "10.0.12"
+          "Microsoft.Extensions.Configuration": "10.0.14",
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.14",
+          "Microsoft.Extensions.Configuration.FileExtensions": "10.0.14",
+          "Microsoft.Extensions.FileProviders.Abstractions": "10.0.14"
         }
       },
       "Microsoft.Extensions.DependencyInjection": {
@@ -222,18 +222,18 @@
       },
       "Microsoft.Extensions.FileProviders.Physical": {
         "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "3cY+wo2+Qe65BVwShhr2fFqZv5Ns73h3kX4mpW3WvSgfT3AWCk0hKArKW4TF7Dg3mvbJdA6RhWPW7FR+PS5/1w==",
+        "resolved": "10.0.14",
+        "contentHash": "dcp6eCIk6ZpE3CTNmIna0ifgxsPel/MtOc23/Y/AJlD9SZZr7bhlKK2DAXYlrz81yMkMi6el/LHHUFKCZ3ufuQ==",
         "dependencies": {
-          "Microsoft.Extensions.FileProviders.Abstractions": "10.0.12",
-          "Microsoft.Extensions.FileSystemGlobbing": "10.0.12",
-          "Microsoft.Extensions.Primitives": "10.0.12"
+          "Microsoft.Extensions.FileProviders.Abstractions": "10.0.14",
+          "Microsoft.Extensions.FileSystemGlobbing": "10.0.14",
+          "Microsoft.Extensions.Primitives": "10.0.14"
         }
       },
       "Microsoft.Extensions.FileSystemGlobbing": {
         "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "45cV+UeI0chPAIXrx9Wv7K4PJXuuIR2pnOur5MOAo6kOFclBHSLLDrvGAxMfWRMtUvpv/kQZkxlgaUN56jwzSQ=="
+        "resolved": "10.0.14",
+        "contentHash": "xt6c/PWLL6+CiBiZA3PWRSfkwcPh+HCwiOLrgSUkhzBT7lrT/+QpIKPeuCQyDPspwOuG1q0cbJhuiGpRjr4UNQ=="
       },
       "Microsoft.Extensions.Http": {
         "type": "Transitive",
@@ -550,7 +550,7 @@
       "BMD.NovaCore.AspNetCore": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.Abstractions": "[0.1.0, )",
+          "BMD.NovaCore.Abstractions": "[0.2.0, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.15, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.15, )",
           "Microsoft.Extensions.Caching.Hybrid": "[10.11.1, )",
@@ -560,7 +560,7 @@
       "BMD.NovaCore.EntityFrameworkCore": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.Abstractions": "[0.1.0, )",
+          "BMD.NovaCore.Abstractions": "[0.2.0, )",
           "Microsoft.EntityFrameworkCore": "[10.0.15, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.15, )",
           "Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore": "[10.0.15, )",
@@ -571,33 +571,33 @@
       "novacore.modules.catalog": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.AspNetCore": "[0.1.0, )",
-          "BMD.NovaCore.EntityFrameworkCore": "[0.1.0, )",
-          "NovaCore.Modules.Catalog.Contracts": "[0.1.0, )",
-          "NovaCore.Modules.Payments.Contracts": "[0.1.0, )",
+          "BMD.NovaCore.AspNetCore": "[0.2.0, )",
+          "BMD.NovaCore.EntityFrameworkCore": "[0.2.0, )",
+          "NovaCore.Modules.Catalog.Contracts": "[0.2.0, )",
+          "NovaCore.Modules.Payments.Contracts": "[0.2.0, )",
           "Riok.Mapperly": "[4.3.1, )"
         }
       },
       "novacore.modules.catalog.contracts": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.Abstractions": "[0.1.0, )"
+          "BMD.NovaCore.Abstractions": "[0.2.0, )"
         }
       },
       "novacore.modules.payments": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.AspNetCore": "[0.1.0, )",
-          "BMD.NovaCore.EntityFrameworkCore": "[0.1.0, )",
-          "NovaCore.Modules.Catalog.Contracts": "[0.1.0, )",
-          "NovaCore.Modules.Payments.Contracts": "[0.1.0, )",
+          "BMD.NovaCore.AspNetCore": "[0.2.0, )",
+          "BMD.NovaCore.EntityFrameworkCore": "[0.2.0, )",
+          "NovaCore.Modules.Catalog.Contracts": "[0.2.0, )",
+          "NovaCore.Modules.Payments.Contracts": "[0.2.0, )",
           "Riok.Mapperly": "[4.3.1, )"
         }
       },
       "novacore.modules.payments.contracts": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.Abstractions": "[0.1.0, )"
+          "BMD.NovaCore.Abstractions": "[0.2.0, )"
         }
       },
       "Microsoft.AspNetCore.Authentication.JwtBearer": {
