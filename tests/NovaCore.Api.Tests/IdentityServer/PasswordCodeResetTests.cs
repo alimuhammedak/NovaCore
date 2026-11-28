@@ -297,6 +297,26 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Reset, new { email = user.Email, code = afterSignIn, newPassword = NewPassword })).StatusCode);
     }
 
+    // A concurrent write of the account (a /forgot, say) between the sign-in and the end of the run mustn't keep the run.
+    [Fact]
+    public async Task A_sign_in_ends_the_run_of_wrong_codes_despite_a_concurrent_write()
+    {
+        var user = await _host.CreateUserAsync("code-run-clear@novacore.test", Password);
+        await SetFailuresAsync(user, PasswordResetCodes.MaxConsecutiveFailures);
+        using var client = _host.CreateClient();
+
+        fixture.TokenWrites.Arm(user.Id, PasswordResetCodes.FailuresToken);
+        using (var browser = new OidcFlow(_host))
+            await browser.SignInAsync(user.Email!, Password);
+        // The run ends without a save through the change tracker, so the arming may still wait; the code's tries below
+        // must count normally.
+        fixture.TokenWrites.Disarm();
+
+        Assert.Equal(0, await FailuresOfAsync(user));
+        var code = await RequestCodeAsync(client, user.Email!);
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword })).StatusCode);
+    }
+
     [Fact]
     public async Task An_unknown_or_unconfirmed_account_answers_like_a_wrong_code()
     {

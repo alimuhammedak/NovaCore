@@ -147,7 +147,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   are paths of this host only (`IdentitySignInOptions.IsLocalPath`); anything else stops the host.
 - **Password reset with a code** (D-091 (4), D-095 (5)): `PasswordResetCodes` keeps 8 random digits as a
   `PasswordHasher` hash with expiry (15 min) and tries (5) in a user token; a run of 100 wrong codes (another user token)
-  blocks codes until `SignInFlow` signs the user in or the link reset succeeds, and both clear it. A wrong code never
+  blocks codes until `SignInFlow` signs the user in or the link reset succeeds, and both clear it (`ExecuteDelete`, so a
+  concurrent write of the account can't keep the run). A wrong code never
   counts toward lockout. A try is counted on the code and in the account's run in one save (both tokens, the user's
   concurrency stamp) before its code is compared, and only a counted try is compared; a request whose count loses to a
   concurrent write (another guess, a new code) isn't compared and ends the code (`ExecuteDelete`, apart from the change

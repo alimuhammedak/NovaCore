@@ -187,12 +187,15 @@ internal sealed class PasswordResetCodes(
         return (ResetCodeOutcome.Succeeded, []);
     }
 
-    /// <summary>Ends the account's run of wrong codes: a sign-in or a link reset succeeded, so its owner is back.</summary>
-    public async Task ClearFailuresAsync(ApplicationUser user)
-    {
-        if (await users.GetAuthenticationTokenAsync(user, LoginProvider, FailuresToken) is not null)
-            await users.RemoveAuthenticationTokenAsync(user, LoginProvider, FailuresToken);
-    }
+    /// <summary>
+    /// Ends the account's run of wrong codes: a sign-in or a link reset succeeded, so its owner is back. Deleted in the
+    /// database, apart from the user's concurrency stamp: through UserManager a concurrent write of the account (a
+    /// /forgot) would fail the removal, and the run would outlive the success that ends it.
+    /// </summary>
+    public async Task ClearFailuresAsync(ApplicationUser user) =>
+        await db.UserTokens
+            .Where(token => token.UserId == user.Id && token.LoginProvider == LoginProvider && token.Name == FailuresToken)
+            .ExecuteDeleteAsync();
 
     // Both tokens in one save: UserManager's SetAuthenticationTokenAsync saves the user once per token, so two calls are
     // two stamp checks, and the second can lose after the first won. The store's token methods only track the change;

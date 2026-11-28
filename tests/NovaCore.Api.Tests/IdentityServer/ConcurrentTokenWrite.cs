@@ -24,6 +24,13 @@ public sealed class ConcurrentTokenWrite : SaveChangesInterceptor
             _armed = (userId, token);
     }
 
+    /// <summary>Takes back an arming whose save never came (the code under test wrote the token another way).</summary>
+    public void Disarm()
+    {
+        lock (_gate)
+            _armed = null;
+    }
+
     public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
     {
