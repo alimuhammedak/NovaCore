@@ -1533,6 +1533,7 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 
 ## Kapanmış "Sonraya bırakılanlar" maddeleri
 
+- ~~`PasswordResetCodes.IssueAsync` kodun kaydının `IdentityResult`'ını yok sayıyor: kayıt düşerse e-postayla giden kod çalışmaz (güvenli taraf, kullanıcı yeniden ister). *Koşul:* böyle bir şikayet ya da log görülür.~~ → F10.2a'da yapıldı (`dc9241d`, CodeRabbit PR #35 …688).
 - ~~Forwarded headers yok (Faz 0) ve proxy arkasında cookie'lerin `Secure` bayrağı (Faz 3b) → F4c.3.~~ → F4c.3'te yapıldı.
 - ~~Y-31 testinin `IResult` kör noktası (Faz 0, F0.7) → F4c.5.~~ → F4c.5'te yapıldı.
 - ~~`BadHttpRequestException`'ın 500 dönmesi (Faz 2b) → F4c.4.~~ → F4c.4'te yapıldı.

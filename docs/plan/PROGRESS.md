@@ -78,7 +78,7 @@ Biten fazların adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
 - [ ] F10.4c: #48'in Microsoft.* 10.0.15 sürümleri (csproj eklemeleri olmadan), şablonun props'u.
 - F10.2 sınıflandırması (PR #35'te 12 satır içi + 1 review gövdesi; PR #37'de CodeRabbit yorumu yok, tek yorum Sonar S2068):
   - …688, …701, …715, gövde l.140-143 (`PasswordResetCodes`): düzeltildi, F10.2a `dc9241d`, F10.2b `a26231a`, F10.2c `f0e7288`, F10.2d `65ab787` (`PasswordCodeResetTests` kırmızı → yeşil 21/21).
-  - …676 (`AccountInvitations` süre dolumu yarışı): düzeltilecek (F10.2e). …638 (CLAUDE.md PostgreSQL migration komutu), …669 (README doğrulama anahtarları): düzeltilecek (F10.2f).
+  - …676 (`AccountInvitations` süre dolumu yarışı): düzeltildi, F10.2e `b4d715b` (`InvitationTests` kırmızı → yeşil 25/25; test host'u `DateTimeOffset`'i UTC tick olarak saklıyor). …638 (CLAUDE.md PostgreSQL migration komutu), …669 (README doğrulama anahtarları): düzeltildi, F10.2f `a508a09`.
   - …656: zaten düzeltildi (`0e4d755`). …725 (`HttpResponseMessage` dispose): kalır, ~98 yerde aynı kalıp, CA2000 yok. Sonar 4719236607: kalır, false positive (V6e-1).
   - …609, …617, …626 (`novacore-night/SKILL.md`), …648 (DECISIONS D-094/D-095 hücre kayması): kullanıcıya kalır (`.claude/` ve DECISIONS koşuda yazılmaz).
 
