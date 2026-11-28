@@ -16,7 +16,7 @@ internal enum ResetCodeOutcome
     InvalidCode,
 
     // The code is right but the new password breaks the policy, or its save lost to a concurrent write of the account;
-    // the code stays good for another try.
+    // the code stays good for another try, and the try isn't counted.
     PasswordRejected
 }
 
@@ -143,8 +143,26 @@ internal sealed class PasswordResetCodes(
         var redeemed = await strategy.ExecuteAsync(() => UseUpAndResetAsync(user, newPassword));
         if (redeemed.Outcome == ResetCodeOutcome.Succeeded)
             await ClearFailuresAsync(user);
+        else
+            await GiveBackCountAsync(user, stored, counted, failures);
         return redeemed;
     }
+
+    // The right code's try goes back when its reset fails after the count (a password save lost to a concurrent write,
+    // V8-6), like a rejected password's. Not through SaveCountAsync: the rolled-back attempt left the tracked user with a
+    // stamp the database doesn't have (R-139). Each token goes back only while it still holds this request's count, so a
+    // count or a new code saved since is kept, the stricter side.
+    private async Task GiveBackCountAsync(ApplicationUser user, StoredCode stored, StoredCode counted, int failures)
+    {
+        await SetTokenIfAsync(user, CodeToken, expected: Format(counted), value: Format(stored));
+        await SetTokenIfAsync(user, FailuresToken,
+            expected: (failures + 1).ToString(CultureInfo.InvariantCulture), value: failures.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private async Task SetTokenIfAsync(ApplicationUser user, string name, string expected, string value) =>
+        await db.UserTokens
+            .Where(token => token.UserId == user.Id && token.LoginProvider == LoginProvider && token.Name == name && token.Value == expected)
+            .ExecuteUpdateAsync(set => set.SetProperty(token => token.Value, value));
 
     // The code's end and the new password commit together: a reset that fails leaves the code as it was (V8-6).
     // A retrying strategy's replay can't succeed: Identity's saves accept their changes, so after a rolled-back first

@@ -218,6 +218,39 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         Assert.False(string.IsNullOrEmpty((await browser.SignInAsync(user.Email!, NewPassword)).AccessToken));
     }
 
+    // The right code's try is counted before the comparison; a reset that then loses its password save gives it back,
+    // like a rejected password, so the code's last try and the account's last one before the run's end aren't spent.
+    [Fact]
+    public async Task A_reset_lost_to_a_concurrent_write_after_four_wrong_tries_leaves_the_code_usable()
+    {
+        var user = await _host.CreateUserAsync("code-lost-tries@novacore.test", Password);
+        using var client = _host.CreateClient();
+        var code = await RequestCodeAsync(client, user.Email!);
+        for (var attempt = 1; attempt < PasswordResetCodes.MaxTriesPerCode; attempt++)
+            await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code = Wrong(code), newPassword = NewPassword }));
+
+        fixture.Writes.Arm();
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword })).StatusCode);
+
+        Assert.Equal(PasswordResetCodes.MaxTriesPerCode - 1, await FailuresOfAsync(user));
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword })).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_reset_lost_to_a_concurrent_write_does_not_end_a_run_one_short_of_its_limit()
+    {
+        var user = await _host.CreateUserAsync("code-lost-run@novacore.test", Password);
+        await SetFailuresAsync(user, PasswordResetCodes.MaxConsecutiveFailures - 1);
+        using var client = _host.CreateClient();
+        var code = await RequestCodeAsync(client, user.Email!);
+
+        fixture.Writes.Arm();
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword })).StatusCode);
+
+        Assert.Equal(PasswordResetCodes.MaxConsecutiveFailures - 1, await FailuresOfAsync(user));
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword })).StatusCode);
+    }
+
     [Fact]
     public async Task A_wrong_code_does_not_lock_the_account()
     {
