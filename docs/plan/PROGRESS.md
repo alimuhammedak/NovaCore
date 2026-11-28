@@ -91,7 +91,7 @@ Biten fazların adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
 
 - [x] F10.3a (6fd1909): `Identity:SignIn:AllowRegistration` (varsayılan `true`); `false` iken `POST /auth/register` eşlenmez (anonim istek fallback policy yüzünden 401 alır, test route'un yokluğunu doğrular). HTML kayıt sayfası yok. Şablon appsettings, README. `RegistrationTests` kırmızı → yeşil, `OpenApiContractTests` değişmedi.
 - [x] F10.3c (306b6f7): README'ye S-1'in kalan yolu (D-102 (4)), V6e-4 (D-102 (6)), S-8 (D-102 (7)); S-10 yorumu, S-11 kuralı (`src/Modules/CLAUDE.md`). Karar adayları DA-13, DA-14.
-- [ ] F10.3b: S-12 (yazan çalışıyor).
+- [x] F10.3b (0ed3fb9): `GetProducts` pasifleri yalnız `includeInactive` ve `catalog:products:update` ile gösterir (`ICurrentUser.HasPermission`; izinsiz bayrak sessizce aktiflere düşer, D-102 (8)). `CatalogEndpointsTests` kırmızı → yeşil 5/5, OpenAPI değişmedi.
 
 #### Doğrulama
 
