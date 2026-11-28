@@ -61,6 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   1.20.1; CsCheck 5.0.1 (tests). The template pins the same EF Core, Mvc.Testing, `System.Security.Cryptography.Pkcs`
   and `dotnet-ef` versions. Development compose images: Jaeger 2.22.0, Seq 2026.1.17526, Keycloak 26.8.2-1,
   PostgreSQL 18.6 (also the test image). CI: `github/codeql-action` 4.39.4, `actions/setup-dotnet` 6.1.0.
+- Catalog: `GET /api/v1/products?includeInactive=true` lists the inactive products only for a caller with
+  `catalog:products:update`; a caller who can only read gets the active ones, still with 200.
 
 ### Fixed
 

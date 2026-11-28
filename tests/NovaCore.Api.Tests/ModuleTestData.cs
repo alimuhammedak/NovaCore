@@ -18,11 +18,12 @@ internal static class ModuleTestData
     /// <summary>The <c>sub</c> the payments saved here belong to.</summary>
     public const string TestOwner = "test-owner";
 
-    public static async Task<Guid> AddProductAsync(this ApiFactory factory, int stock, bool active = true)
+    public static async Task<Guid> AddProductAsync(
+        this ApiFactory factory, int stock, bool active = true, string name = "Widget")
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var catalog = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
-        var product = new Product("Widget", null, 10m, stock);
+        var product = new Product(name, null, 10m, stock);
         if (!active)
             product.Deactivate();
         catalog.Products.Add(product);
