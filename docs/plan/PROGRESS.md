@@ -41,8 +41,8 @@ Durum: **koşuyor (2026-11-28), Faz 10.** Önceki koşu (Faz 8, 9, 6e) 2026-11-1
 
 | # | İş | Durum | Not |
 |---|---|---|---|
-| 1 | Faz 10: F10.1 branch, F10.2 inceleme yorumları, F10.3 ürün kararları, F10.4 Dependabot, F10.5 sürüm hazırlığı | 🔄 | Adımlar PLAN'da; tag ve yayın yapılmaz (D-102 (1)) |
-| 2 | Faz 10: faz sonu incelemesi, PR, merge (D-106 (3)) | ⏳ | |
+| 1 | Faz 10: F10.1 branch, F10.2 inceleme yorumları, F10.3 ürün kararları, F10.4 Dependabot, F10.5 sürüm hazırlığı | ✅ | Adımlar PLAN'da; tag ve yayın yapılmaz (D-102 (1)) |
+| 2 | Faz 10: faz sonu incelemesi, PR, merge (D-106 (3)) | 🔄 | |
 | 3 | Sabah raporu ve devir notu | ⏳ | Tam paketin Docker katmanları ve `v0.2.0` tag'i kullanıcıya (D-106 (4)) |
 
 ### Karar adayları (DA)
@@ -92,6 +92,8 @@ Biten fazların adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
 - [x] F10.3a (6fd1909): `Identity:SignIn:AllowRegistration` (varsayılan `true`); `false` iken `POST /auth/register` eşlenmez (anonim istek fallback policy yüzünden 401 alır, test route'un yokluğunu doğrular). HTML kayıt sayfası yok. Şablon appsettings, README. `RegistrationTests` kırmızı → yeşil, `OpenApiContractTests` değişmedi.
 - [x] F10.3c (306b6f7): README'ye S-1'in kalan yolu (D-102 (4)), V6e-4 (D-102 (6)), S-8 (D-102 (7)); S-10 yorumu, S-11 kuralı (`src/Modules/CLAUDE.md`). Karar adayları DA-13, DA-14.
 - [x] F10.3b (0ed3fb9): `GetProducts` pasifleri yalnız `includeInactive` ve `catalog:products:update` ile gösterir (`ICurrentUser.HasPermission`; izinsiz bayrak sessizce aktiflere düşer, D-102 (8)). `CatalogEndpointsTests` kırmızı → yeşil 5/5, OpenAPI değişmedi.
+
+- [x] F10.5a (7df5a92), F10.5b (9008429), F10.5c (0798604): kök `nuget.config` (source mapping), ci.yml `package-validation` job'u ve release.yml baseline 0.1.0 ile pack (DA-15, R-162); PublicAPI Unshipped → Shipped (EFCore 2, OpenTelemetry 1, Identity 99); `VersionPrefix` 0.2.0, CHANGELOG `[0.2.0] - 2026-11-28`. Yerelde baseline'sız pack uyarısız; baseline'lı kabul CI'ın `package-validation` job'unda.
 
 #### Doğrulama
 
