@@ -25,18 +25,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # packages: read for the package validation baseline below, which GitHub Packages serves only with a token (D-050).
     permissions:
       contents: read
+      packages: read
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
+      # The release the packages are validated against (Y-23): each library package is compared with its previous
+      # version and pack fails on a binary breaking change. Change it here and in ci.yml's package-validation job
+      # together, to the version just released (docs/plan/RESEARCH.md R-162).
+      PACKAGE_BASELINE_VERSION: 0.1.0
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
 
@@ -65,8 +71,12 @@ jobs:
           echo "version=$tag" >> "$GITHUB_OUTPUT"
 
       # Locked mode: the release is built from exactly the package graph in the committed lock files (R-094).
+      # The baseline version adds each library package's previous release as a PackageDownload, fetched here from the
+      # novacore source of nuget.config: Pack below doesn't restore. The credential is given to this step only.
       - name: Restore
-        run: dotnet restore NovaCore.slnx --locked-mode
+        env:
+          NuGetPackageSourceCredentials_novacore: Username=${{ github.actor }};Password=${{ secrets.GITHUB_TOKEN }}
+        run: dotnet restore NovaCore.slnx --locked-mode "-p:PackageValidationBaselineVersion=$PACKAGE_BASELINE_VERSION"
 
       # The suffix is passed to build too, so the assemblies' informational version matches the package version.
       # It reaches the shell through env, never through ${{ }} interpolation into the script.
@@ -81,7 +91,9 @@ jobs:
       - name: Pack
         env:
           VERSION_SUFFIX: ${{ steps.version.outputs.suffix }}
-        run: dotnet pack NovaCore.slnx -c Release --no-build -o artifacts "-p:VersionSuffix=$VERSION_SUFFIX"
+        run: >
+          dotnet pack NovaCore.slnx -c Release --no-build -o artifacts "-p:VersionSuffix=$VERSION_SUFFIX"
+          "-p:PackageValidationBaselineVersion=$PACKAGE_BASELINE_VERSION"
 
       # One CycloneDX SBOM per library package, from the restored package graph (R-098). It lists the third-party and
       # Microsoft packages, transitive ones included; the BMD.NovaCore.* packages a package depends on have SBOMs of
@@ -128,7 +140,7 @@ jobs:
           sparse-checkout: global.json
           sparse-checkout-cone-mode: false
 
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
 

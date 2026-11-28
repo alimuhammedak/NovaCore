@@ -48,7 +48,7 @@ iskelet üreten **şablon** (`BMD.NovaCore.Templates`). Paketler NovaCore'un sor
 dotnet nuget add source https://nuget.pkg.github.com/alimuhammedak/index.json -n novacore -u <github-kullanıcısı> -p <token>
 
 # 2) Şablon paketi
-dotnet new install BMD.NovaCore.Templates::0.1.0
+dotnet new install BMD.NovaCore.Templates::0.2.0
 
 # 3) Proje
 dotnet new novacore -n SiparisServisi                    # kimlik sağlayıcı host'un içinde (--auth BuiltIn), SQL Server (--db SqlServer)
@@ -451,7 +451,7 @@ sunucusu (Vite vb.) `/api`, `/connect` ve `/.well-known` isteklerini host'a prox
 taşımalı); antiforgery çerezi `SameSite=Strict`. Token tarayıcıya giriş ucundan hiç verilmez; ROPC yok.
 
 **Şifre yenileme (kodla):** `POST /api/v1/auth/password/forgot` (`{ email }`) her adrese aynı `202`'yi döner, yalnız onaylı
-hesaba 8 haneli bir kod e-postalanır. `POST /api/v1/auth/password/reset` (`{ email, code, newPassword }`): kod 15 dakika,
+hesaba 8 haneli bir kod e-postalanır (kaydı eşzamanlı bir yazmaya kaybeden kod gönderilmez). `POST /api/v1/auth/password/reset` (`{ email, code, newPassword }`): kod 15 dakika,
 bir kez ve 5 yanlış denemeye kadar geçer; yeni kod eskisinin yerini alır; hesapta art arda 100 yanlış kod olunca kodlar
 başarılı bir giriş ya da bağlantılı sıfırlamaya kadar çalışmaz. Her adres iki uçta da aynı sayıda hash işi yapar
 (yanıt süresi hesabı ele vermez); eşzamanlı yanlış denemeler de koda ve hesabın serisine sayılır, sayılamayan deneme
@@ -466,6 +466,11 @@ Bağlantı 7 gün, bir kez geçer. Onaylı bir hesabın daveti şifre kurmaz (`i
 şifresiyle girer, davet hesabı ele geçiremez. Denetim kaydı (`SECURITY invitation_created`) davet edilen hesabın ve
 daveti yapanın (ucu çağıran oturum açmış kullanıcı, `ICurrentUser`) id'sini yazar.
 
+**Kaydı kapatmak:** `Identity:SignIn:AllowRegistration` (varsayılan `true`) `false` iken `POST /api/v1/auth/register`
+eşlenmez: kimse kendi kendine kaydolamaz, hesaplar davetle (yukarıda) ya da admin API'siyle gelir. `confirm-email` ve
+`resend-confirmation-email` eşli kalır: kayıt kapatılmadan önce açılmış onaysız hesaplar adresini yine onaylar.
+Sağlayıcının kayıt için bir HTML sayfası yoktur; kayıt ekranı projenindir ve bu ayarla birlikte kaldırılır.
+
 **Onaysız adrese ikinci kayıt (hesabın önceden ele geçirilmesi):** `POST /api/v1/auth/register` her adrese aynı `200`'ü
 döner. Adresin onaysız bir hesabı varsa ve yeni kayıt başka bir şifreyle geldiyse iki kişi aynı adresi istiyordur; onay
 linkini açan posta kutusunun sahibidir, ilk şifrenin sahibi olmayabilir (Sudhodanan ve Paverd, 2022). Bu yüzden hesabın
@@ -473,7 +478,11 @@ linkini açan posta kutusunun sahibidir, ilk şifrenin sahibi olmayabilir (Sudho
 "Set your password" e-postası gider: `/account/reset-password` bağlantısı şifreyi kurar ve adresi aynı adımda onaylar,
 davetin yaptığı gibi. Aynı şifreyle tekrar kayıt hiçbir şeyi değiştirmez (link `resend-confirmation-email` ile
 istenir); onaylı hesaba kayıt da. Ekran için değişen bir şey yok: kayıt cevabı aynıdır, e-postadaki bağlantı
-sağlayıcının sayfasını açar.
+sağlayıcının sayfasını açar. **Bilinen davranış:** davet edilmiş, henüz şifresi olmayan bir hesabın adresine anonim
+bir kayıt da bu yoldan geçer: davetliye "Set your password" (yeniden kayıt metinli) şifre kurma e-postası gider ve
+`SECURITY registration_repeated` (Warning) audit olayı yazılır. Hesap değişmez ve şifreyi yine yalnız posta
+kutusunun sahibi kurar (davetin ya da bu e-postanın bağlantısıyla); kayıt cevabı her adres için aynıdır. Bu bir açık
+değildir, davranış değişmez (DECISIONS D-102 (6)).
 
 **Hata kodları → ekran durumu** (ProblemDetails'in `code` alanı; metni ekran yazar):
 
@@ -491,7 +500,7 @@ sağlayıcının sayfasını açar.
 | `invitation.account_exists` | 409 | "Hesabın var; şifrenle giriş yap" |
 | `invitation.invalid_email` | 400 | Davet eden: "Bu adres hesap adı olamaz" (Identity'nin `AllowedUserNameCharacters`'ı) |
 | `invitation.address_taken` | 409 | Davet eden: "Adres başka bir hesabın kullanıcı adı" |
-| (doğrulama) | 400 | `errors` alanlarını göster (ör. `newPassword`, `password`) |
+| (doğrulama) | 400 | `errors` alanlarını göster. İki biçim: istek doğrulaması (DataAnnotations) PascalCase anahtar üretir (ör. `NewPassword`, `Password`); ucun kendi reddi camelCase'dir: parola politikası, yanlış parola ve kilit `password` (kayıt, parola değiştirme, yeniden doğrulama, davet kabulü), kodla sıfırlamada (`/auth/password/reset`) parola politikası `newPassword`, 2FA kodu `code`. Anahtarı büyük/küçük harfe duyarsız eşle |
 | (hız sınırı) | 429 | "Biraz bekle" |
 
 ### Tarayıcı uygulamaları: BFF
@@ -589,6 +598,7 @@ Repo public'tir (DECISIONS D-042). Kararlar D-048, D-051 ve D-052'de; kaynaklar 
 |---|---|---|
 | Build, format, test, migration kontrolü, açık paket kontrolü | `ci.yml` → `build-and-test` | Restore `--locked-mode` ile; ardından lisans kapısı (`eng/check-licenses.sh`). Build'den sonra `dotnet format --verify-no-changes`. Testler coverage'la koşar: satır ve dal kapsamı `eng/coverage-baseline.txt`'in altına düşerse kırmızı (`eng/check-coverage.sh`, D-060); mimari testler ayrı adımda, coverage'sız |
 | API sözleşmesi | `ci.yml` → `api-contract` | Commit'li `docs/openapi/v1.json` main'dekiyle karşılaştırılır; kırıcı değişiklik `eng/openapi-breaking-accepted.txt`'te kabul edilmediyse kırmızı (oasdiff, `eng/check-openapi.sh`); belgeyi `OpenApiContractTests` güncel tutar |
+| Paket doğrulaması | `ci.yml` → `package-validation` | Kütüphane paketleri `release.yml`'deki gibi pack edilir ve son yayımlanan sürümle (baseline) karşılaştırılır: ikili kırıcı değişiklik pack'i kırar. Baseline paketleri GitHub Packages'tan iner, job `packages: read` ister; Dependabot ve fork PR'larında koşmaz (token feed'i okuyamaz) |
 | Şablonun tüketici smoke testi | `ci.yml` → `template-smoke` | Üretilen projelerin workflow'ları da lint'lenir |
 | Secret taraması | `ci.yml` → `secret-scan` | Betterleaks 1.9.0, bütün geçmiş, `.betterleaks.toml` |
 | Workflow denetimi | `ci.yml` → `workflow-lint` | actionlint + zizmor, digest'e sabit imajlarla (`eng/lint-workflows.sh`) |
@@ -886,6 +896,10 @@ Stoğu kesinleştiren kontrol rezervasyondur; `CreatePayment`'taki kontrol yaln�
 Son birim için gelen iki istek ikisi de 201 alabilir, ama biri sonra Failed olur. Teslimler başarılıysa sonuç iki
 dispatcher turu içinde (yaklaşık 10 sn) `GET /api/v1/payments`'ta görünür; başarısız her teslim bir tur daha ekler.
 
+**Idempotency yok:** `POST /api/v1/payments` bir idempotency anahtarı (`Idempotency-Key`) taşımaz; aynı isteği yeniden
+gönderen istemci ikinci bir ödeme açar. Payments bir referans modüldür, modüller arası akışı gösterir; gerçek bir
+ödeme ucu istemcinin yeniden denemesine karşı bir idempotency anahtarı ister (DECISIONS D-102 (7)).
+
 Stoğa aynı anda yazan iki işlem birbirinin üstüne yazamaz, çünkü `Product.Stock` bir concurrency token'dır. Ürün uç
 noktaları (`PUT`/`DELETE`) okuduktan sonra değişmiş bir stokta 409 `product.concurrency_conflict`, okuduktan sonra
 silinmiş bir üründe 404 `product.not_found` döner; rezervasyonun teslimi ise düşer ve outbox onu bir sonraki turda
@@ -916,6 +930,9 @@ Event'leri dağıtmanın tek yolu budur: entity event'lerini outbox'ı atlayıp 
 
 Garanti **en az bir kez**dir: bir handler'ın kendi kaydıyla bu işaret arasında süreç ölürse handler bir kez daha
 çalışır. Handler'lar bu yüzden idempotent yazılır. Veritabanı başına tek dispatcher varsayılır.
+
+Handler'dan atılan exception'ın tipi ve mesajı mesajın `Error` sütununa (ilk 2000 karakter) ve loga yazılır. Bu
+yüzden handler'ın attığı exception kişisel veri (e-posta adresi, ad, adres) değil id taşır.
 
 Handler DI'a açıkça kaydedilir: `services.AddScoped<IDomainEventHandler<PaymentCreated>, ReserveStockForPayment>()`.
 Başka bir modülün tepki vereceği event, yayımlayan modülün `*.Contracts` projesinde durur. Durum değiştiren bir
@@ -1019,11 +1036,20 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   hash'i olarak durur (ASVS 6.5.2). Onay linki `resend-confirmation-email` ile yeniden istenir; yalnızca onaylanmamış ve
   şifresi olan hesaba gider, yanıt her adres için aynıdır. Şifresiz hesap (davetle açılmış ya da kaydı tekrarlanmış)
   yalnız şifresi kurulurken onaylanır: `confirm-email` onu onaylamaz, böylece kimse bir daveti kullanılamaz yapamaz.
+- **Kabul edilmiş risk, onaysız kaydın kalan yolu:** saldırgan kurbanın adresiyle kendi şifresini seçerek kaydolur;
+  kurban kendisi hiç kaydolmadan gelen, istemediği onay e-postasındaki linke tıklarsa hesap saldırganın şifresiyle
+  onaylanır. Kurban kendisi de kaydolursa hesabın şifresi silinir ("Kendi giriş ekranı"). Kapatmanın yolu onay anında
+  şifre istemek olurdu, bu da her kullanıcının kayıt akışını değiştirir; saldırı kurbanın istemediği bir linke
+  tıklamasını gerektirdiği için akış değişmez (DECISIONS D-102 (4)). Kaydı hiç istemeyen proje onu kapatır
+  (`Identity:SignIn:AllowRegistration = false`).
 - **Parola sıfırlama:** giriş sayfasındaki "Forgot your password?" linki bir e-posta formu açar. Onaylı hesaba
   `/account/reset-password` linki gider (Identity token'ı, 6 saat, tek kullanımlık: sıfırlama security stamp'i
   yeniler). Bilinmeyen ya da onaysız adres aynı sayfayı alır, e-posta gitmez. Sayfa onaysız hesabı yalnız şifresizse
   kabul eder (ikinci kaydın gönderdiği bağlantı, "Kendi giriş ekranı"); şifre kurulunca adres de onaylanır. Yeni parola iki kez girilir; sıfırlama
   bütün refresh token'ları ve authorization'ları iptal eder, otomatik giriş yapmaz (OWASP Forgot Password).
+- **Açık kayıt kapatılabilir:** `Identity:SignIn:AllowRegistration = false` kayıt ucunu eşlemez; hesaplar yalnız
+  davetle ya da admin API'siyle açılır (kayıt olan her hesap `Identity:Seed:UserPermissions`'ı alır, kayıt açıkken
+  bu izinler herkese açıktır). Varsayılan `true`.
 - **Seed'siz kayıt:** `User` rolü yoksa (seed kapalı) hesap rolsüz oluşur; admin API'si rolü sonradan atar.
 - **Refresh ömrü mutlaktır:** refresh token girişten 7 gün sonra biter; her yenileme yeni 7 gün başlatmaz
   (`DisableSlidingRefreshTokenExpiration`).
@@ -1125,6 +1151,7 @@ geçerdi. 2FA'sı açık son admin rolünü kaybedemez (409).
   "Database":      { "ApplyMigrations": false },   // true: açılışta migration uygula
   "Jwt":           { "Authority": "", "Audience": "novacore.api" },   // Development: https://localhost:5443 (bu host)
   "Identity":      { "Seed": { "SeedOnStartup": false, "AdminEmail": "admin@novacore.local", "AdminPassword": "" },
+                     "SignIn": { "LoginPath": "", "InvitationPath": "/accept-invitation", "AllowRegistration": true },   // false: kayıt ucu yok
                      "EmailLimit": { "PermitLimit": 5, "WindowSeconds": 3600 },   // e-posta gönderen anonim uçlar, adres başına
                      "Clients": [] },                // { ClientId, DisplayName, ClientSecret, RedirectUris, PostLogoutRedirectUris, Permissions }
   "Cache":         { "DefaultExpiration": "00:05:00", "PermissionExpiration": "00:05:00" },
@@ -1258,14 +1285,14 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
    (BuildingBlocks kaynağı, plan belgeleri, `.claude/`, `release.yml`, PublicAPI dosyaları) şablona girmez. Kurulum ve
    kullanım: [Yeni Proje (Tüketici Rehberi)](#yeni-proje-tüketici-rehberi).
    ```bash
-   dotnet new install BMD.NovaCore.Templates::0.1.0
+   dotnet new install BMD.NovaCore.Templates::0.2.0
    dotnet new novacore -n YeniProje --auth BuiltIn   # ya da External: yalnızca Jwt:Authority, kimlik sağlayıcı yok
    ```
 2. **Lokal/özel NuGet paketi (BuildingBlocks için):** yalnızca stabil çekirdeği versiyonlu paketleyip
    bir bug fix'i tüm projelere yayın.
    ```bash
-   dotnet pack NovaCore.slnx -c Release -o ./artifacts                               # 0.1.0
-   dotnet pack NovaCore.slnx -c Release -o ./artifacts --version-suffix preview.1    # 0.1.0-preview.1
+   dotnet pack NovaCore.slnx -c Release -o ./artifacts                               # 0.2.0
+   dotnet pack NovaCore.slnx -c Release -o ./artifacts --version-suffix preview.1    # 0.2.0-preview.1
    # artifacts/ klasörünü lokal feed olarak ekleyin, sonra: dotnet add package BMD.NovaCore.AspNetCore (ve ihtiyaca göre diğerleri)
    ```
    - Sekiz kütüphane paketi ve şablon paketi üretilir: çekirdek `BMD.NovaCore.Abstractions`, `BMD.NovaCore.AspNetCore`,
@@ -1278,8 +1305,18 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
      `nuget.config`'i `BMD.NovaCore.*`'ı yalnızca GitHub feed'ine eşler (package source mapping).
    - Sürüm `Directory.Build.props`'taki `VersionPrefix`'ten gelir. API kararlı olana kadar 0.x kalır.
    - Her paket XML dokümanını, `src/PACKAGE.md`'den gelen README'yi, MIT lisans ifadesini ve repo linkini taşır. Yanında bir `.snupkg` sembol paketi üretilir.
-   - Public API `PublicAPI.*.txt` dosyalarında izlenir. İzlenmeyen bir değişiklik build'i kırar.
-   - Yayın `.github/workflows/release.yml` ile yapılır. `VersionPrefix` ile eşleşen bir `v*` tag'i (ör. `v0.1.0`; önizleme için `v0.2.0-preview.1`) GitHub Packages'a push eder.
+   - Public API `PublicAPI.*.txt` dosyalarında izlenir. İzlenmeyen bir değişiklik build'i kırar. Her sürüm
+     `PublicAPI.Unshipped.txt`'leri `PublicAPI.Shipped.txt`'e taşır.
+   - **Package validation baseline'ı:** `ci.yml`'in `package-validation` job'u ve `release.yml` paketleri
+     `-p:PackageValidationBaselineVersion=<son sürüm>` ile pack eder; SDK her kütüphane paketinin o sürümünü indirir ve
+     ikili kırıcı değişiklikte pack'i durdurur. Sürüm iki yerde, `PACKAGE_BASELINE_VERSION` env'inde durur: **her
+     yayından sonra ikisi birlikte yayımlanan sürüme yükseltilir.** `Directory.Build.props`'a yazılmaz: baseline her
+     restore'da `PackageDownload` olur ve GitHub Packages anonim isteği reddettiği için (D-050) her restore token
+     isterdi (RESEARCH R-162). Kök `nuget.config` `BMD.NovaCore.*`'ı yalnız `novacore` feed'ine eşler; o property
+     olmadan yapılan restore feed'e hiç gitmez (zafiyet denetimi de `auditSources` ile yalnız nuget.org'a sorar).
+     Yerelde baseline'la pack için kullanıcı düzeyi NuGet config'inizde
+     `novacore` adlı kaynağın `read:packages` token'lı kimlik bilgisi olmalı.
+   - Yayın `.github/workflows/release.yml` ile yapılır. `VersionPrefix` ile eşleşen bir `v*` tag'i (ör. `v0.2.0`; önizleme için `v0.3.0-preview.1`) GitHub Packages'a push eder.
      `build` job'u yalnızca okuma izniyle derler, test eder, pack eder ve kütüphane başına bir CycloneDX SBOM'u üretir.
      `publish` job'u `release` environment'ında sahibinin onayını bekler; paketlerin build provenance'ını imzalar
      (`actions/attest`) ve push eder (DECISIONS D-051 (6)).

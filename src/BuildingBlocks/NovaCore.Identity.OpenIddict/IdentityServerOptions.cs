@@ -44,6 +44,13 @@ internal sealed class IdentityEmailLimitOptions
 internal sealed class IdentitySignInOptions
 {
     /// <summary>
+    /// Whether anyone may register an account (<c>POST /api/v1/auth/register</c>). False, the endpoint isn't mapped and
+    /// accounts come by invitation or from the admin API only; confirming an address and resending the link stay, for the
+    /// accounts registered before. True by default.
+    /// </summary>
+    public bool AllowRegistration { get; set; } = true;
+
+    /// <summary>
     /// Where <c>/connect/authorize</c> sends a signed-out browser, with the authorization request as <c>ReturnUrl</c>: a
     /// project's own sign-in screen on this host, e.g. <c>/sign-in</c>. Unset, the provider's own page
     /// (<c>/account/login</c>). A path of this host only: it starts with one <c>/</c> and has no scheme, host, query or

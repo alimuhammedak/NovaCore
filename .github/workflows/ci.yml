@@ -30,7 +30,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
 
@@ -127,7 +127,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
 
@@ -188,7 +188,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
 
@@ -201,6 +201,48 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash eng/lint-workflows.sh "$RUNNER_TEMP"/template-smoke/projects/*
+
+  # The library packages as release.yml packs them: package validation against the last release (Y-23), so a binary
+  # breaking change shows up before the tag. The baseline packages come from GitHub Packages, which needs a token even
+  # for public packages (docs/plan/DECISIONS.md D-050); the credential is given to the restore step only. Change
+  # PACKAGE_BASELINE_VERSION here and in release.yml together, to the version just released (docs/plan/RESEARCH.md
+  # R-162).
+  # Dependabot's runs and pull requests from forks get a GITHUB_TOKEN that may not read the feed, so they skip this job;
+  # the pull request from the phase branch and every push to main still run it.
+  package-validation:
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      PACKAGE_BASELINE_VERSION: 0.1.0
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      # The baseline version adds each library package's previous release as a PackageDownload, which restore fetches
+      # from the novacore source of nuget.config.
+      - name: Restore
+        env:
+          NuGetPackageSourceCredentials_novacore: Username=${{ github.actor }};Password=${{ secrets.GITHUB_TOKEN }}
+        run: dotnet restore NovaCore.slnx --locked-mode "-p:PackageValidationBaselineVersion=$PACKAGE_BASELINE_VERSION"
+
+      - name: Pack with package validation
+        run: >
+          dotnet pack NovaCore.slnx -c Release --no-restore -o "$RUNNER_TEMP/packages"
+          "-p:PackageValidationBaselineVersion=$PACKAGE_BASELINE_VERSION"
 
   # Secrets in the whole git history, every branch and tag fetched: Betterleaks 1.9.0 with .betterleaks.toml (default
   # rules plus the reviewed test credentials), found values redacted in the log. The pre-commit hook in .githooks scans

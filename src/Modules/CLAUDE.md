@@ -61,6 +61,8 @@ they show a cross-module write through events both ways (DECISIONS D-034): a pay
   - A handler that changes state keeps a record keyed by the message's business id, saves it in the same `SaveChanges`
     as the change, and returns early when it finds it (`StockReservation`, keyed by the payment). The dispatcher's
     `outbox_consumers` record is written after the handler's own save, so it can't stop a second run after a crash.
+  - An exception a handler throws carries ids, not personal data: its type and message go into the outbox row's
+    `Error` column and into the log (`OutboxDispatcher`).
   - An event another module handles lives in the publisher's `*.Contracts` project, because modules reference each
     other only through Contracts.
 - **A value that concurrent writes change is a concurrency token** (`Product.Stock`: `IsConcurrencyToken()`,

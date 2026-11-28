@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace NovaCore.Identity.OpenIddict;
 
@@ -16,7 +17,7 @@ internal enum ResetCodeOutcome
     InvalidCode,
 
     // The code is right but the new password breaks the policy, or its save lost to a concurrent write of the account;
-    // the code stays good for another try.
+    // the code stays good for another try, and the try isn't counted.
     PasswordRejected
 }
 
@@ -36,7 +37,8 @@ internal sealed class PasswordResetCodes(
     IdentityServerDbContext db,
     [FromKeyedServices(PasswordResetCodes.HasherKey)] IPasswordHasher<ApplicationUser> hasher,
     DummyPasswordHash dummyHash,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<PasswordResetCodes> logger)
 {
     public const int Digits = 8;
     public const int MaxTriesPerCode = 5;
@@ -44,7 +46,7 @@ internal sealed class PasswordResetCodes(
     public static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(15);
 
     internal const string LoginProvider = "[NovaCore]";
-    private const string CodeToken = "PasswordResetCode";
+    internal const string CodeToken = "PasswordResetCode";
     internal const string FailuresToken = "PasswordResetCodeFailures";
 
     /// <summary>
@@ -55,12 +57,22 @@ internal sealed class PasswordResetCodes(
     /// </summary>
     internal const string HasherKey = "NovaCore.PasswordResetCodes";
 
-    /// <summary>Makes a new code for <paramref name="user"/>, replacing an unused one, and returns it for the email.</summary>
-    public async Task<string> IssueAsync(ApplicationUser user)
+    /// <summary>
+    /// Makes a new code for <paramref name="user"/>, replacing an unused one, and returns it for the email; or null when
+    /// its save failed, so a code that can't work isn't sent. A save fails when it loses to a concurrent write of the
+    /// account (another /forgot, a guess) or for any other reason the user store reports; the failure is logged with
+    /// its error codes (V10-3), since the caller's answer doesn't change.
+    /// </summary>
+    public async Task<string?> IssueAsync(ApplicationUser user)
     {
         var code = NewCode();
-        await SaveCodeAsync(user, new StoredCode(timeProvider.GetUtcNow() + Lifetime, Tries: 0, hasher.HashPassword(user, code)));
-        return code;
+        var saved = await SaveCodeAsync(user, new StoredCode(timeProvider.GetUtcNow() + Lifetime, Tries: 0, hasher.HashPassword(user, code)));
+        if (saved.Succeeded)
+            return code;
+
+        if (logger.IsEnabled(LogLevel.Warning))
+            logger.LogCodeNotSaved(user.Id, string.Join(", ", saved.Errors.Select(error => error.Code)));
+        return null;
     }
 
     /// <summary>
@@ -93,9 +105,10 @@ internal sealed class PasswordResetCodes(
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
+        // Only the code read here ends: a /forgot since then issued a new one, which stays.
         if (stored.ExpiresAt <= timeProvider.GetUtcNow() || stored.Tries >= MaxTriesPerCode)
         {
-            await EndCodeAsync(user);
+            await EndCodeAsync(user, Format(stored));
             RedeemForNobody(code);
             return (ResetCodeOutcome.InvalidCode, []);
         }
@@ -106,27 +119,23 @@ internal sealed class PasswordResetCodes(
         var counted = stored with { Tries = stored.Tries + 1 };
         if (!await SaveCountAsync(user, counted, failures + 1))
         {
-            await EndCodeAsync(user);
+            // Whichever code is there now ends, a new one too: the lost count can't be told from a new code (V8-2).
+            await EndCodeAsync(user, observed: null);
             RedeemForNobody(code);
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
         if (hasher.VerifyHashedPassword(user, stored.Hash, code) == PasswordVerificationResult.Failed)
         {
-            // Counted already; the fifth wrong try also ends the code (a later read refuses it either way).
+            // Counted already; the fifth wrong try also ends the code (a later read refuses it either way), only while
+            // it still holds this count: a code a /forgot issued since stays.
             if (counted.Tries >= MaxTriesPerCode)
-                await EndCodeAsync(user);
+                await EndCodeAsync(user, Format(counted));
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
         // The policy first, so a rejected password leaves the right code usable, like the link (PasswordResetPage).
-        var errors = new List<string>();
-        foreach (var validator in users.PasswordValidators)
-        {
-            var check = await validator.ValidateAsync(users, user, newPassword);
-            errors.AddRange(check.Errors.Select(error => error.Description));
-        }
-
+        var errors = await PolicyErrorsAsync(user, newPassword);
         if (errors.Count > 0)
         {
             // The right code isn't a wrong try: both counts go back. If another request saved in between, this save
@@ -140,8 +149,40 @@ internal sealed class PasswordResetCodes(
         var redeemed = await strategy.ExecuteAsync(() => UseUpAndResetAsync(user, newPassword));
         if (redeemed.Outcome == ResetCodeOutcome.Succeeded)
             await ClearFailuresAsync(user);
+        else
+            await GiveBackCountAsync(user, stored, counted, failures);
         return redeemed;
     }
+
+    private async Task<List<string>> PolicyErrorsAsync(ApplicationUser user, string newPassword)
+    {
+        var errors = new List<string>();
+        foreach (var validator in users.PasswordValidators)
+        {
+            var check = await validator.ValidateAsync(users, user, newPassword);
+            errors.AddRange(check.Errors.Select(error => error.Description));
+        }
+
+        return errors;
+    }
+
+    // The right code's try goes back when its reset fails after the count (a password save lost to a concurrent write,
+    // V8-6), like a rejected password's. Not through SaveCountAsync: the rolled-back attempt left the tracked user with a
+    // stamp the database doesn't have (R-139). Each token goes back only while it still holds this request's count, so a
+    // new code saved since is kept. The failure count is compared by value only: if a sign-in clears it and a new wrong
+    // try writes the same number again before this give-back, that try is undone. The accepted limit: at most one try
+    // per failed reset goes uncounted against the 100, and only the owner, who knows the right code, gets here.
+    private async Task GiveBackCountAsync(ApplicationUser user, StoredCode stored, StoredCode counted, int failures)
+    {
+        await SetTokenIfAsync(user, CodeToken, expected: Format(counted), value: Format(stored));
+        await SetTokenIfAsync(user, FailuresToken,
+            expected: (failures + 1).ToString(CultureInfo.InvariantCulture), value: failures.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private async Task SetTokenIfAsync(ApplicationUser user, string name, string expected, string value) =>
+        await db.UserTokens
+            .Where(token => token.UserId == user.Id && token.LoginProvider == LoginProvider && token.Name == name && token.Value == expected)
+            .ExecuteUpdateAsync(set => set.SetProperty(token => token.Value, value));
 
     // The code's end and the new password commit together: a reset that fails leaves the code as it was (V8-6).
     // A retrying strategy's replay can't succeed: Identity's saves accept their changes, so after a rolled-back first
@@ -166,12 +207,15 @@ internal sealed class PasswordResetCodes(
         return (ResetCodeOutcome.Succeeded, []);
     }
 
-    /// <summary>Ends the account's run of wrong codes: a sign-in or a link reset succeeded, so its owner is back.</summary>
-    public async Task ClearFailuresAsync(ApplicationUser user)
-    {
-        if (await users.GetAuthenticationTokenAsync(user, LoginProvider, FailuresToken) is not null)
-            await users.RemoveAuthenticationTokenAsync(user, LoginProvider, FailuresToken);
-    }
+    /// <summary>
+    /// Ends the account's run of wrong codes: a sign-in or a link reset succeeded, so its owner is back. Deleted in the
+    /// database, apart from the user's concurrency stamp: through UserManager a concurrent write of the account (a
+    /// /forgot) would fail the removal, and the run would outlive the success that ends it.
+    /// </summary>
+    public async Task ClearFailuresAsync(ApplicationUser user) =>
+        await db.UserTokens
+            .Where(token => token.UserId == user.Id && token.LoginProvider == LoginProvider && token.Name == FailuresToken)
+            .ExecuteDeleteAsync();
 
     // Both tokens in one save: UserManager's SetAuthenticationTokenAsync saves the user once per token, so two calls are
     // two stamp checks, and the second can lose after the first won. The store's token methods only track the change;
@@ -192,10 +236,12 @@ internal sealed class PasswordResetCodes(
     }
 
     // Deletes the code in the database, apart from the change tracker: after a save lost to the concurrency stamp, the
-    // context still holds that save's changes, and every later save through UserManager would fail the same way.
-    private async Task EndCodeAsync(ApplicationUser user) =>
+    // context still holds that save's changes, and every later save through UserManager would fail the same way. With
+    // an observed value, only while the token still holds it, so a code issued since that read isn't ended.
+    private async Task EndCodeAsync(ApplicationUser user, string? observed) =>
         await db.UserTokens
-            .Where(token => token.UserId == user.Id && token.LoginProvider == LoginProvider && token.Name == CodeToken)
+            .Where(token => token.UserId == user.Id && token.LoginProvider == LoginProvider && token.Name == CodeToken
+                            && (observed == null || token.Value == observed))
             .ExecuteDeleteAsync();
 
     private static string NewCode() =>
@@ -226,4 +272,12 @@ internal sealed class PasswordResetCodes(
     }
 
     private sealed record StoredCode(DateTimeOffset ExpiresAt, int Tries, string Hash);
+}
+
+internal static partial class PasswordResetCodesLog
+{
+    // The error codes only: an error's description may name the account's address (Y-35).
+    [LoggerMessage(EventId = 47, Level = LogLevel.Warning,
+        Message = "A password reset code for user {UserId} wasn't saved, so it isn't sent: {Errors}")]
+    public static partial void LogCodeNotSaved(this ILogger logger, Guid userId, string errors);
 }

@@ -64,6 +64,35 @@ public sealed class CatalogEndpointsTests(NovaCoreApiFactory factory) : IClassFi
         Assert.Equal("product.not_found", problem.GetProperty("code").GetString());
     }
 
+    // S-12, D-102 (8): includeInactive shows inactive products only to a caller who may update them.
+    [Fact]
+    public async Task A_reader_who_cannot_update_products_does_not_see_inactive_ones()
+    {
+        var name = UniqueName();
+        await factory.AddProductAsync(stock: 5, active: false, name: name);
+        using var client = factory.CreateClientWithPermissions(CatalogPermissions.ProductsRead);
+
+        var page = await client.GetFromJsonAsync<ProductPage>($"/api/v1/products?includeInactive=true&search={name}");
+
+        Assert.Empty(page!.Items);
+        Assert.Equal(0, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task A_caller_who_can_update_products_sees_inactive_ones()
+    {
+        var name = UniqueName();
+        var id = await factory.AddProductAsync(stock: 5, active: false, name: name);
+        using var client = factory.CreateClientWithPermissions(
+            CatalogPermissions.ProductsRead, CatalogPermissions.ProductsUpdate);
+
+        var page = await client.GetFromJsonAsync<ProductPage>($"/api/v1/products?includeInactive=true&search={name}");
+
+        Assert.Equal([id], page!.Items.Select(item => item.Id));
+        Assert.False(page.Items[0].IsActive);
+        Assert.Equal(1, page.TotalCount);
+    }
+
     private HttpClient CatalogClient() => factory.CreateClientWithPermissions(
         CatalogPermissions.ProductsCreate, CatalogPermissions.ProductsRead,
         CatalogPermissions.ProductsUpdate, CatalogPermissions.ProductsDelete);

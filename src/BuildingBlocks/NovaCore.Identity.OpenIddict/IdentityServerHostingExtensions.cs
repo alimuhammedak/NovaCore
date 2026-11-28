@@ -148,7 +148,10 @@ public static class IdentityServerHostingExtensions
         // OWASP Password Storage Cheat Sheet: at least 600,000 iterations for PBKDF2-HMAC-SHA256.
         services.Configure<PasswordHasherOptions>(options => options.IterationCount = 600_000);
 
-        // Email confirmation tokens expire after six hours.
+        // Data Protection tokens expire after six hours: the email confirmation link and the password reset link
+        // (also the one a repeated registration sends) share this provider. NIST SP 800-63B-4 allows up to 24 hours
+        // for an emailed recovery secret (docs/plan/RESEARCH.md R-137); six hours covers a delayed email and keeps a
+        // leaked link short-lived.
         services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = TimeSpan.FromHours(6));
 
         // Those tokens, the sign-in cookies and antiforgery are protected with Data Protection keys. The framework's
@@ -363,7 +366,7 @@ public static class IdentityServerHostingExtensions
     /// under <c>/api/v1/auth</c> (registration, email confirmation, the current user, password change, sign-out
     /// everywhere, two-factor authentication) and the user and role administration under <c>/api/v1/admin</c>, guarded
     /// by the <c>identity:*</c> permissions. The token endpoint, the pages and the account API use the <c>strict</c> rate
-    /// limit.
+    /// limit. With <c>Identity:SignIn:AllowRegistration</c> false, registration isn't mapped; email confirmation is.
     /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
     /// <returns><paramref name="endpoints"/>, for chaining.</returns>
@@ -379,7 +382,9 @@ public static class IdentityServerHostingExtensions
         LoginPage.Map(account);
         PasswordResetPage.Map(account);
 
-        AccountEndpoints.Map(endpoints);
+        // Read once the container is built, from the validated options (docs/plan/RESEARCH.md R-048).
+        var signIn = endpoints.ServiceProvider.GetRequiredService<IOptions<IdentityServerOptions>>().Value.SignIn;
+        AccountEndpoints.Map(endpoints, signIn.AllowRegistration);
         SessionEndpoints.Map(endpoints);
         PasswordCodeEndpoints.Map(endpoints);
         AdminEndpoints.Map(endpoints);

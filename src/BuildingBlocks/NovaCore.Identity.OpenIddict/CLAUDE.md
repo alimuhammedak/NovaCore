@@ -145,23 +145,34 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **A project's own screens** (D-091 (3), D-095 (2)): `Identity:SignIn:LoginPath` (the cookie's login path, so where
   `/connect/authorize` sends a signed-out browser) and `Identity:SignIn:InvitationPath` (the invitation link's target)
   are paths of this host only (`IdentitySignInOptions.IsLocalPath`); anything else stops the host.
+  `Identity:SignIn:AllowRegistration` (default `true`, S-7, D-102 (3)) false leaves `POST /api/v1/auth/register`
+  unmapped (`MapCoreIdentityServer` reads it from the validated options once the container is built); `confirm-email`
+  and `resend-confirmation-email` stay mapped for the accounts registered before. There is no HTML registration page.
 - **Password reset with a code** (D-091 (4), D-095 (5)): `PasswordResetCodes` keeps 8 random digits as a
   `PasswordHasher` hash with expiry (15 min) and tries (5) in a user token; a run of 100 wrong codes (another user token)
-  blocks codes until `SignInFlow` signs the user in or the link reset succeeds, and both clear it. A wrong code never
+  blocks codes until `SignInFlow` signs the user in or the link reset succeeds, and both clear it (`ExecuteDelete`, so a
+  concurrent write of the account can't keep the run). A wrong code never
   counts toward lockout. A try is counted on the code and in the account's run in one save (both tokens, the user's
   concurrency stamp) before its code is compared, and only a counted try is compared; a request whose count loses to a
   concurrent write (another guess, a new code) isn't compared and ends the code (`ExecuteDelete`, apart from the change
   tracker that still holds the lost save), so racing guesses never get more tries, on the code or the account, than
-  sequential ones (V8-2, V8-9). A right code gives both counts back.
+  sequential ones (V8-2, V8-9). An expired or used-up code, and the code of a fifth wrong try, end only while the
+  token still holds the value that request read or counted, so a code a concurrent `/forgot` issued stays; a lost
+  count ends whichever code is there. A right code gives both counts back, also when its reset then fails (a rejected
+  password, a password save lost to a concurrent write): after a lost save by a conditional `ExecuteUpdate` of each
+  token that still holds this request's count, since the tracked user's stamp is stale then (R-139).
   The code is used up with the user's concurrency stamp before the password changes through `ResetPasswordAsync`, both
   in one transaction (inside the execution strategy), so a reset that fails leaves the code usable (V8-6). A retrying
   strategy's replay of that transaction fails on the stamp (Identity's saves accept their changes), the safe side (R-139).
-  Every address gets the same `202` from `/password/forgot`. Both endpoints cost every address one hash of the codes'
+  Every address gets the same `202` from `/password/forgot`; a code whose save fails (a concurrent write of the
+  account, or any store error) isn't emailed (`IssueAsync` returns null) and is logged with the store's error codes
+  (event 47, the account's id, no address; V10-3). Both endpoints cost every address one hash of the codes'
   hasher (Identity's defaults, not the host's 600,000; a keyed singleton only so a test can count it,
   `PasswordResetCodes.HasherKey`): an address without a code hashes a throwaway one (`IssueToNobody`) or checks the
   dummy (`DummyPasswordHash.CheckCode`), and so does every refusal before the comparison (V8-3). The code's save on `/forgot` is the one difference left.
 - **Invitations** (D-091 (5), D-095): `AccountInvitations` (public, internal constructor) stores the SHA-256 of a 256-bit
-  token in `invitations`, 7 days, accepted once by a conditional update after the password policy passes; the update, the password and the
+  token in `invitations`, 7 days, accepted once by a conditional update after the password policy passes, which checks the end again (an
+  invitation that expires while the policy runs is `invitation.expired`, its password not set); the update, the password and the
   confirmation commit in one transaction, so a failed password step leaves the invitation unused (V8-6). A confirmed
   account's invitation sets no password (`invitation.account_exists`), so an invitation can't take an account over.
   `InviteAsync` returns a `Result<Guid>` (`invitation.invalid_email`, `invitation.address_taken`); an account a

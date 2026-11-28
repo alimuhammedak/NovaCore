@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using NovaCore.Abstractions.Identity;
 using NovaCore.Abstractions.Pagination;
 using NovaCore.AspNetCore.Authorization;
 using NovaCore.Modules.Catalog.Authorization;
@@ -11,7 +12,11 @@ using NovaCore.Modules.Catalog.Mapping;
 
 namespace NovaCore.Modules.Catalog.Features;
 
-/// <summary>Paged, optionally filtered product listing. Read side of CQRS — straight to the DbContext.</summary>
+/// <summary>
+/// Paged, optionally filtered product listing. Read side of CQRS — straight to the DbContext. <c>includeInactive</c> adds
+/// the inactive products only for a caller with <c>catalog:products:update</c> (D-102 (8)); anyone else gets the active
+/// ones.
+/// </summary>
 public static class GetProducts
 {
     public static void Map(IEndpointRouteBuilder group) =>
@@ -22,6 +27,7 @@ public static class GetProducts
 
     private static async Task<Ok<PagedList<ProductDto>>> Handle(
         CatalogDbContext dbContext,
+        ICurrentUser currentUser,
         CancellationToken cancellationToken,
         int? page = null,
         int? pageSize = null,
@@ -31,7 +37,7 @@ public static class GetProducts
         var pagination = new PaginationRequest(page ?? 1, pageSize ?? PaginationRequest.DefaultPageSize);
 
         var query = dbContext.Products.AsNoTracking();
-        if (!includeInactive)
+        if (!includeInactive || !currentUser.HasPermission(CatalogPermissions.ProductsUpdate))
             query = query.Where(p => p.IsActive);
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(p => EF.Functions.Like(p.Name, $"%{search}%"));

@@ -13,7 +13,7 @@ internal static class TestPostgreSql
 {
     /// <summary>The image docker-compose.yml runs, digest included (<c>DatabaseImageTests</c> keeps the two equal).</summary>
     public const string Image =
-        "postgres:18.4-trixie@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636";
+        "postgres:18.6-trixie@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42";
 
     private const string Provider = "PostgreSQL";
 
