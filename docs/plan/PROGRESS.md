@@ -49,6 +49,13 @@ Durum: **koşuyor (2026-11-28), Faz 10.** Önceki koşu (Faz 8, 9, 6e) 2026-11-1
 
 DA-1…DA-12 2026-11-27'de DECISIONS'a işlendi: D-099 (DA-1…6), D-100 (DA-7, 8), D-101 (DA-9…12). Tablo arşivde.
 
+| DA | Karar | Gerekçe |
+|---|---|---|
+| DA-13 | S-10: onay ve sıfırlama linklerinin ortak `TokenLifespan`'ı 6 saat kalır; yalnız yorum düzeltildi | NIST SP 800-63B-4 e-postalanan kurtarma sırrına 24 saate kadar izin verir (R-137); kısa yol 15 dakikalık koddur. `306b6f7` |
+| DA-14 | S-11: handler'dan atılan exception kişisel veri değil id taşır (mesaj `OutboxMessage.Error`'a ve loga gider); kod değişmez | Bugünkü handler'lar kişisel veri taşımıyor; yalnız tip adını saklamak sütunun teşhis değerini öldürür. `306b6f7` |
+| DA-15 | F10.5: package validation baseline (`PackageValidationBaselineVersion`) `Directory.Build.props`'ta değil, yalnız pack eden iş akışlarında `-p:` ile (restore ve pack adımı), `packages: read` ve `GITHUB_TOKEN` yalnız orada; kök `nuget.config` source mapping'le | SDK baseline'ı her restore'da `PackageDownload` olarak ekliyor (`Microsoft.NET.ApiCompat.targets:18-24`): props'ta olsaydı her geliştirici restore'u ve her CI job'u GitHub Packages token'ı isterdi (D-050). |
+
+
 ### Kullanıcıya kalanlar
 
 Ön onaylı olmayan ya da ortamın engellediği işler (D-096 (5)). Koşu bunlarda durmaz, buraya yazıp sıradaki işe geçer.
@@ -81,6 +88,10 @@ Biten fazların adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
   - …676 (`AccountInvitations` süre dolumu yarışı): düzeltildi, F10.2e `b4d715b` (`InvitationTests` kırmızı → yeşil 25/25; test host'u `DateTimeOffset`'i UTC tick olarak saklıyor). …638 (CLAUDE.md PostgreSQL migration komutu), …669 (README doğrulama anahtarları): düzeltildi, F10.2f `a508a09`.
   - …656: zaten düzeltildi (`0e4d755`). …725 (`HttpResponseMessage` dispose): kalır, ~98 yerde aynı kalıp, CA2000 yok. Sonar 4719236607: kalır, false positive (V6e-1).
   - …609, …617, …626 (`novacore-night/SKILL.md`), …648 (DECISIONS D-094/D-095 hücre kayması): kullanıcıya kalır (`.claude/` ve DECISIONS koşuda yazılmaz).
+
+- [x] F10.3a (6fd1909): `Identity:SignIn:AllowRegistration` (varsayılan `true`); `false` iken `POST /auth/register` eşlenmez (anonim istek fallback policy yüzünden 401 alır, test route'un yokluğunu doğrular). HTML kayıt sayfası yok. Şablon appsettings, README. `RegistrationTests` kırmızı → yeşil, `OpenApiContractTests` değişmedi.
+- [x] F10.3c (306b6f7): README'ye S-1'in kalan yolu (D-102 (4)), V6e-4 (D-102 (6)), S-8 (D-102 (7)); S-10 yorumu, S-11 kuralı (`src/Modules/CLAUDE.md`). Karar adayları DA-13, DA-14.
+- [ ] F10.3b: S-12 (yazan çalışıyor).
 
 #### Doğrulama
 
