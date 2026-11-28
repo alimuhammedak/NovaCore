@@ -1313,7 +1313,8 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
      yayından sonra ikisi birlikte yayımlanan sürüme yükseltilir.** `Directory.Build.props`'a yazılmaz: baseline her
      restore'da `PackageDownload` olur ve GitHub Packages anonim isteği reddettiği için (D-050) her restore token
      isterdi (RESEARCH R-162). Kök `nuget.config` `BMD.NovaCore.*`'ı yalnız `novacore` feed'ine eşler; o property
-     olmadan yapılan restore feed'e hiç gitmez. Yerelde baseline'la pack için kullanıcı düzeyi NuGet config'inizde
+     olmadan yapılan restore feed'e hiç gitmez (zafiyet denetimi de `auditSources` ile yalnız nuget.org'a sorar).
+     Yerelde baseline'la pack için kullanıcı düzeyi NuGet config'inizde
      `novacore` adlı kaynağın `read:packages` token'lı kimlik bilgisi olmalı.
    - Yayın `.github/workflows/release.yml` ile yapılır. `VersionPrefix` ile eşleşen bir `v*` tag'i (ör. `v0.2.0`; önizleme için `v0.3.0-preview.1`) GitHub Packages'a push eder.
      `build` job'u yalnızca okuma izniyle derler, test eder, pack eder ve kütüphane başına bir CycloneDX SBOM'u üretir.
