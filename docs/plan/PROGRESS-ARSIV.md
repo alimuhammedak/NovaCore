@@ -1292,7 +1292,43 @@ F9.1'in alt adım tablosu arşivde (PROGRESS-ARSIV.md, "### Faz 9 F9.1 tablosu")
 | F9.2i | L65 `OutboxInterceptor` tamponu başarısız kayıtta | Opus | evet |
 | F9.2j | L85 eşzamanlı silinmiş satırda 409 yerine 404 | Opus | evet |
 
+### Faz 10
+
+- [x] F10.1: 6e'nin merge kaydı doğrulandı (PR #49, `83ad2ef`). Branch'ten önce `main`'de yeşil Dependabot PR'ları merge edildi: #47, #40, #45, #44 (`21a3c7e`); #48 csproj'lara doğrudan referans eklediği için F10.4'e kaldı.
+
+- [x] F10.4a (767323a), F10.4b (879741c), F10.4d (89c462f): setup-dotnet 6.1.0, codeql-action 4.39.4 (scorecard dahil), postgres 18.6 (#42, #28, #30, #41'in yerine); dependabot `dotnet-sdk` major yok sayılır, Api pack uyarısı kalktı. #39 kapatıldı. `WorkflowPinTests`, `DatabaseImageTests`; Opus incelemesi temiz. CI yeşil (`89c462f`).
+- [x] F10.4c (445f9ff): #48'in sürümleri birebir (Microsoft.* 10.0.15, 10.11.1, `dotnet-ef`), csproj eklemeleri olmadan; şablonun props'u ve aracı; lock dosyaları yeniden üretildi. `PackageDependencyTests` 7/7; Opus incelemesi temiz (F10.2f dahil).
+- F10.2 sınıflandırması (PR #35'te 12 satır içi + 1 review gövdesi; PR #37'de CodeRabbit yorumu yok, tek yorum Sonar S2068):
+  - …688, …701, …715, gövde l.140-143 (`PasswordResetCodes`): düzeltildi, F10.2a `dc9241d`, F10.2b `a26231a`, F10.2c `f0e7288`, F10.2d `65ab787` (`PasswordCodeResetTests` kırmızı → yeşil 21/21).
+  - …676 (`AccountInvitations` süre dolumu yarışı): düzeltildi, F10.2e `b4d715b` (`InvitationTests` kırmızı → yeşil 25/25; test host'u `DateTimeOffset`'i UTC tick olarak saklıyor). …638 (CLAUDE.md PostgreSQL migration komutu), …669 (README doğrulama anahtarları): düzeltildi, F10.2f `a508a09`.
+  - …656: zaten düzeltildi (`0e4d755`). …725 (`HttpResponseMessage` dispose): kalır, ~98 yerde aynı kalıp, CA2000 yok. Sonar 4719236607: kalır, false positive (V6e-1).
+  - …609, …617, …626 (`novacore-night/SKILL.md`), …648 (DECISIONS D-094/D-095 hücre kayması): kullanıcıya kalır (`.claude/` ve DECISIONS koşuda yazılmaz).
+
+- [x] F10.3a (6fd1909): `Identity:SignIn:AllowRegistration` (varsayılan `true`); `false` iken `POST /auth/register` eşlenmez (anonim istek fallback policy yüzünden 401 alır, test route'un yokluğunu doğrular). HTML kayıt sayfası yok. Şablon appsettings, README. `RegistrationTests` kırmızı → yeşil, `OpenApiContractTests` değişmedi.
+- [x] F10.3c (306b6f7): README'ye S-1'in kalan yolu (D-102 (4)), V6e-4 (D-102 (6)), S-8 (D-102 (7)); S-10 yorumu, S-11 kuralı (`src/Modules/CLAUDE.md`). Karar adayları DA-13, DA-14.
+- [x] F10.3b (0ed3fb9): `GetProducts` pasifleri yalnız `includeInactive` ve `catalog:products:update` ile gösterir (`ICurrentUser.HasPermission`; izinsiz bayrak sessizce aktiflere düşer, D-102 (8)). `CatalogEndpointsTests` kırmızı → yeşil 5/5, OpenAPI değişmedi.
+
+- [x] F10.5a (7df5a92), F10.5b (9008429), F10.5c (0798604): kök `nuget.config` (source mapping), ci.yml `package-validation` job'u ve release.yml baseline 0.1.0 ile pack (DA-15, R-162); PublicAPI Unshipped → Shipped (EFCore 2, OpenTelemetry 1, Identity 99); `VersionPrefix` 0.2.0, CHANGELOG `[0.2.0] - 2026-11-28`. Yerelde baseline'sız pack uyarısız; baseline'lı kabul CI'ın `package-validation` job'unda.
+
+#### Doğrulama
+
+| ID | Bulgu | Durum |
+|---|---|---|
+| V10-1 | `nuget.config`'de `auditSources` yok: NuGet Audit GitHub kaynağını da sorgular, kimliksiz restore 401 → NU1900 → hata (code-review + CodeRabbit CLI) | kapatıldı (`e042cfd`; kök ve şablon `nuget.config`'e `auditSources` nuget.org; restore audit'i yalnız nuget.org'dan alıyor) |
+| V10-2 | `AccountInvitations` koşullu güncelleme 0 satırda `SingleAsync` ile yeniden okuyor; arada silinen davet 500 döner | kapatıldı (`a2ff3fa`; eksik satır `Used`, `InvitationTests` kırmızı → yeşil 26/26) |
+| V10-3 | `PasswordResetCodes.IssueAsync` her başarısız token yazımında null dönüyor, `/forgot` 202 ile log/audit'siz susuyor; doc yalnız yarıştan söz ediyor | kapatıldı (`5ea92a4`; Warning EventId 47, kimlik ve hata kodları, Y-35; `PasswordCodeResetTests` 21/21) |
+| V10-4 | `src/BuildingBlocks/CLAUDE.md:141` Shipped'in 0.1.0'ı tuttuğunu söylüyor (artık 0.2.0) | kapatıldı (`a94433d`) |
+| V10-5 | README ~503: handler'ın ürettiği `errors.newPassword` (camelCase) ile otomatik doğrulamanın PascalCase anahtarları ayrı belgelenmeli (CodeRabbit CLI) | kapatıldı (`a94433d`; DataAnnotations PascalCase, uçların kendi retleri camelCase: `password`, `newPassword`, `code`, `role`) |
+| V10-6 | CodeRabbit CLI sorusu: `PasswordResetCodes` ~167 telafisinin `expected` koşulu, arada başarılı giriş sayacı silip yeni yanlış deneme 1 yaptıysa o denemeyi silebilir mi | kabul edilmiş risk: gerçek, ama 100 deneme sınırında en çok bir deneme sayılmaz ve A doğru kodu bilen sahiptir; düzeltme yeni token biçimi ister. Yorum düzeltildi (`a94433d`) |
+
 ## Eski devir notları
+
+**2026-11-27, Faz 6e kapandı ve merge edildi (PR #49, `83ad2ef`, kullanıcı onayı, CI yeşil).** Adımları ve doğrulaması arşivin "Adımlar" bölümünde. DAST'ın ilk koşusundan çıkan her şey kapandı: V6e-5/V6e-6 (tarayıcının koşabilmesi), S-15…S-20 (OpenAPI belgesinin 401/403'ü, doğrulama kısıtları, şema adları, CSP `base-uri`), son doğrulamanın V6e-7/V6e-8'i (`ed41255`). Kararlar D-101, D-102, D-103, D-105; araştırma R-155…R-161.
+
+- **Yapılmayan:** F6e.3 (OpenID conformance) D-102 (2) gereği bir sonraki sürümden önce. Tam paketin SQL Server ve PostgreSQL katmanları (98 test) kullanıcı kararıyla Faz 10'dan sonra, 0.2.0 tag'inden önce. CodeRabbit CLI oturum açamadı (`coderabbit auth login`).
+- **Sürprizler:** DAST her koşuda bir katman açtı (izin, sertifika, sonra gerçek bulgular); .NET 10'da ikinci `Produces*` birinciyi siler (D-103 (2)); sunucu sayfa parametrelerini kırpıyor (D-105 (2)).
+- **Faz 10'un bilmesi gerekenler:** request record'larının attribute'ları `[property: ...]` (D-103 (1), şablon dahil). Faz 10 6e'nin merge'ünden sonra `main`'den açılır; Docker baştan açık olsun. Bu fazın uzamasının nedeni küçük bulguların da yazan/doğrulayan turu gerektirmesiydi; süreç değişikliği (küçük bulguyu Sonraya yazmak ya da doğrulamada düzeltmek) kullanıcının kararıdır.
+- **Bekleyen:** PR'ın CI'ı (`check-openapi`, coverage, SQL Server katmanı CI'da), merge onayı. Q-40 sürüyor.
 
 **2026-11-27, Faz 6e: S-16 kapandı; DAST bulgularının bütün testli düzeltmeleri bitti.** İki commit (`06acc8a`, `f7f54b4`) `faz/6e-dast-ilk-kosu`'da, push edilmedi. Sürpriz: sunucu sayfa parametrelerinde her int32'yi kabul edip kırpıyor; şema bu yüzden `minimum: 1` değil tipin aralığını yazar. Kararlar D-105, R-161.
 
