@@ -138,7 +138,7 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
 - **They are NuGet packages, so their public surface is tracked:**
   - Every public member has an XML doc comment. The docs also appear in consumers' OpenAPI documents (R-041), so
     describe behaviour and keep the claims true to the code.
-  - `PublicAPI.Shipped.txt` lists the API released in 0.1.0 and `PublicAPI.Unshipped.txt` every change since
+  - `PublicAPI.Shipped.txt` lists the API of the current release (0.2.0) and `PublicAPI.Unshipped.txt` every change since
     (RS0016/RS0017).
   - Package validation compares each package with the last release, but only where packing passes
     `-p:PackageValidationBaselineVersion=<v>`: `ci.yml`'s `package-validation` job and `release.yml`, each in its

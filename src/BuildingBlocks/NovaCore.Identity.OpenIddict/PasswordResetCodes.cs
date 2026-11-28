@@ -169,7 +169,9 @@ internal sealed class PasswordResetCodes(
     // The right code's try goes back when its reset fails after the count (a password save lost to a concurrent write,
     // V8-6), like a rejected password's. Not through SaveCountAsync: the rolled-back attempt left the tracked user with a
     // stamp the database doesn't have (R-139). Each token goes back only while it still holds this request's count, so a
-    // count or a new code saved since is kept, the stricter side.
+    // new code saved since is kept. The failure count is compared by value only: if a sign-in clears it and a new wrong
+    // try writes the same number again before this give-back, that try is undone. The accepted limit: at most one try
+    // per failed reset goes uncounted against the 100, and only the owner, who knows the right code, gets here.
     private async Task GiveBackCountAsync(ApplicationUser user, StoredCode stored, StoredCode counted, int failures)
     {
         await SetTokenIfAsync(user, CodeToken, expected: Format(counted), value: Format(stored));

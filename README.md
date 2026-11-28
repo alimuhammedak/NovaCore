@@ -500,7 +500,7 @@ değildir, davranış değişmez (DECISIONS D-102 (6)).
 | `invitation.account_exists` | 409 | "Hesabın var; şifrenle giriş yap" |
 | `invitation.invalid_email` | 400 | Davet eden: "Bu adres hesap adı olamaz" (Identity'nin `AllowedUserNameCharacters`'ı) |
 | `invitation.address_taken` | 409 | Davet eden: "Adres başka bir hesabın kullanıcı adı" |
-| (doğrulama) | 400 | `errors` alanlarını göster (PascalCase anahtarlar, ör. `NewPassword`, `Password`) |
+| (doğrulama) | 400 | `errors` alanlarını göster. İki biçim: istek doğrulaması (DataAnnotations) PascalCase anahtar üretir (ör. `NewPassword`, `Password`); ucun kendi reddi camelCase'dir: parola politikası, yanlış parola ve kilit `password` (kayıt, parola değiştirme, yeniden doğrulama, davet kabulü), kodla sıfırlamada (`/auth/password/reset`) parola politikası `newPassword`, 2FA kodu `code`. Anahtarı büyük/küçük harfe duyarsız eşle |
 | (hız sınırı) | 429 | "Biraz bekle" |
 
 ### Tarayıcı uygulamaları: BFF
