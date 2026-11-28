@@ -59,6 +59,9 @@ DA-1…DA-12 2026-11-27'de DECISIONS'a işlendi: D-099 (DA-1…6), D-100 (DA-7, 
 | CodeRabbit CLI incelemesi (Faz 8) | "session could not be authenticated" | `coderabbit auth login`, sonra `coderabbit review --agent --base main` |
 | SonarCloud: `dast.yml:43` S2068 ("password") | V6e-1'in false positive'i (değer `openssl rand` ifadesi); kalite kapısını kırmızı yapıyor | Kullanıcı SonarCloud'da "Safe/False positive" işaretler (L96 ile birlikte) |
 | Dependabot #21 (`global.json` → SDK 10.0.403) | Bu makinede yalnız 10.0.300 kurulu (F9.3 kuralı) | SDK 10.0.403 kurulur, PR merge edilir |
+| CodeRabbit PR #35 …609, …617, …626: `novacore-night/SKILL.md` §1.4 (PROGRESS düzenlemesini orkestratör commit'ler), §3.2 stash `-u`, §4.5 birleşmemiş fazdan açılan branch | Koşu `.claude/` altına yazmaz | Kullanıcı skill'i düzenler ya da onaylar |
+| CodeRabbit PR #35 …648: DECISIONS D-094 3 hücre, D-095 7 hücre (D-094'ün gerekçe ve onay hücreleri D-095'te) | DECISIONS koşuda yazılmaz (D-096 (5)) | Kullanıcı hücreleri taşır |
+| Dependabot #48, #42, #41, #30, #28 | Güncellemeleri branch'te yapıldı; Dependabot `main`'e merge'den sonra kendisi kapatmazsa | Merge'den sonra açık kalanları kapatmak |
 | SonarCloud'un CORS bulgusunu "false positive" işaretlemek (L96) | Dış işlem; `AllowAnyOrigin` yalnız Development'ta (`CoreWebExtensions.cs:182`) | Kullanıcı SonarCloud'da işaretler |
 
 ## Adımlar
@@ -70,6 +73,14 @@ Biten fazların adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
 ### Faz 10
 
 - [x] F10.1: 6e'nin merge kaydı doğrulandı (PR #49, `83ad2ef`). Branch'ten önce `main`'de yeşil Dependabot PR'ları merge edildi: #47, #40, #45, #44 (`21a3c7e`); #48 csproj'lara doğrudan referans eklediği için F10.4'e kaldı.
+
+- [x] F10.4a (767323a), F10.4b (879741c), F10.4d (89c462f): setup-dotnet 6.1.0, codeql-action 4.39.4 (scorecard dahil), postgres 18.6 (#42, #28, #30, #41'in yerine); dependabot `dotnet-sdk` major yok sayılır, Api pack uyarısı kalktı. #39 kapatıldı. `WorkflowPinTests`, `DatabaseImageTests`; Opus incelemesi temiz. CI yeşil (`89c462f`).
+- [ ] F10.4c: #48'in Microsoft.* 10.0.15 sürümleri (csproj eklemeleri olmadan), şablonun props'u.
+- F10.2 sınıflandırması (PR #35'te 12 satır içi + 1 review gövdesi; PR #37'de CodeRabbit yorumu yok, tek yorum Sonar S2068):
+  - …688, …701, …715, gövde l.140-143 (`PasswordResetCodes`): düzeltildi, F10.2a `dc9241d`, F10.2b `a26231a`, F10.2c `f0e7288`, F10.2d `65ab787` (`PasswordCodeResetTests` kırmızı → yeşil 21/21).
+  - …676 (`AccountInvitations` süre dolumu yarışı): düzeltilecek (F10.2e). …638 (CLAUDE.md PostgreSQL migration komutu), …669 (README doğrulama anahtarları): düzeltilecek (F10.2f).
+  - …656: zaten düzeltildi (`0e4d755`). …725 (`HttpResponseMessage` dispose): kalır, ~98 yerde aynı kalıp, CA2000 yok. Sonar 4719236607: kalır, false positive (V6e-1).
+  - …609, …617, …626 (`novacore-night/SKILL.md`), …648 (DECISIONS D-094/D-095 hücre kayması): kullanıcıya kalır (`.claude/` ve DECISIONS koşuda yazılmaz).
 
 #### Doğrulama
 
