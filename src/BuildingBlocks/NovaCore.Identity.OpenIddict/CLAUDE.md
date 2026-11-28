@@ -164,8 +164,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   The code is used up with the user's concurrency stamp before the password changes through `ResetPasswordAsync`, both
   in one transaction (inside the execution strategy), so a reset that fails leaves the code usable (V8-6). A retrying
   strategy's replay of that transaction fails on the stamp (Identity's saves accept their changes), the safe side (R-139).
-  Every address gets the same `202` from `/password/forgot`; a code whose save loses to a concurrent write of the
-  account isn't emailed (`IssueAsync` returns null). Both endpoints cost every address one hash of the codes'
+  Every address gets the same `202` from `/password/forgot`; a code whose save fails (a concurrent write of the
+  account, or any store error) isn't emailed (`IssueAsync` returns null) and is logged with the store's error codes
+  (event 47, the account's id, no address; V10-3). Both endpoints cost every address one hash of the codes'
   hasher (Identity's defaults, not the host's 600,000; a keyed singleton only so a test can count it,
   `PasswordResetCodes.HasherKey`): an address without a code hashes a throwaway one (`IssueToNobody`) or checks the
   dummy (`DummyPasswordHash.CheckCode`), and so does every refusal before the comparison (V8-3). The code's save on `/forgot` is the one difference left.

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace NovaCore.Identity.OpenIddict;
 
@@ -36,7 +37,8 @@ internal sealed class PasswordResetCodes(
     IdentityServerDbContext db,
     [FromKeyedServices(PasswordResetCodes.HasherKey)] IPasswordHasher<ApplicationUser> hasher,
     DummyPasswordHash dummyHash,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<PasswordResetCodes> logger)
 {
     public const int Digits = 8;
     public const int MaxTriesPerCode = 5;
@@ -57,13 +59,20 @@ internal sealed class PasswordResetCodes(
 
     /// <summary>
     /// Makes a new code for <paramref name="user"/>, replacing an unused one, and returns it for the email; or null when
-    /// its save lost to a concurrent write of the account (another /forgot, a guess), so a code that can't work isn't sent.
+    /// its save failed, so a code that can't work isn't sent. A save fails when it loses to a concurrent write of the
+    /// account (another /forgot, a guess) or for any other reason the user store reports; the failure is logged with
+    /// its error codes (V10-3), since the caller's answer doesn't change.
     /// </summary>
     public async Task<string?> IssueAsync(ApplicationUser user)
     {
         var code = NewCode();
         var saved = await SaveCodeAsync(user, new StoredCode(timeProvider.GetUtcNow() + Lifetime, Tries: 0, hasher.HashPassword(user, code)));
-        return saved.Succeeded ? code : null;
+        if (saved.Succeeded)
+            return code;
+
+        if (logger.IsEnabled(LogLevel.Warning))
+            logger.LogCodeNotSaved(user.Id, string.Join(", ", saved.Errors.Select(error => error.Code)));
+        return null;
     }
 
     /// <summary>
@@ -261,4 +270,12 @@ internal sealed class PasswordResetCodes(
     }
 
     private sealed record StoredCode(DateTimeOffset ExpiresAt, int Tries, string Hash);
+}
+
+internal static partial class PasswordResetCodesLog
+{
+    // The error codes only: an error's description may name the account's address (Y-35).
+    [LoggerMessage(EventId = 47, Level = LogLevel.Warning,
+        Message = "A password reset code for user {UserId} wasn't saved, so it isn't sent: {Errors}")]
+    public static partial void LogCodeNotSaved(this ILogger logger, Guid userId, string errors);
 }

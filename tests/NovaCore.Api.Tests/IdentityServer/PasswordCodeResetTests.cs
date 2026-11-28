@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using NovaCore.Identity.OpenIddict;
 using Xunit;
@@ -44,8 +45,11 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
 
         public CodeEndRace CodeEnds { get; } = new();
 
+        public LogCapture Log { get; } = new();
+
         protected override void Configure(WebApplicationBuilder builder)
         {
+            builder.Logging.AddProvider(Log);
             builder.Services.AddSingleton<IEmailSender>(Emails);
             builder.Services.AddKeyedSingleton<IPasswordHasher<ApplicationUser>>(PasswordResetCodes.HasherKey, CodeHashes);
             builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Race, Writes, TokenWrites, CodeEnds));
@@ -75,9 +79,10 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
     }
 
     // Two /forgot requests that read the account alike: one code's save loses to the other's write. The code that wasn't
-    // saved can't work, so it mustn't be emailed; the answer stays the same 202.
+    // saved can't work, so it mustn't be emailed; the answer stays the same 202, and the log says why (V10-3): the
+    // account's id and the store's error codes, never its address.
     [Fact]
-    public async Task A_code_whose_save_is_lost_to_a_concurrent_write_is_not_emailed()
+    public async Task A_code_whose_save_is_lost_to_a_concurrent_write_is_not_emailed_and_is_logged()
     {
         var user = await _host.CreateUserAsync("code-unsaved@novacore.test", Password);
         await _host.CreateUserAsync("code-unsaved-after@novacore.test", Password);
@@ -89,6 +94,9 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         // Emails go out in the order queued: once the later one is out, the unsaved code's would have gone before it.
         await RequestCodeAsync(client, "code-unsaved-after@novacore.test");
         Assert.DoesNotContain(fixture.Emails.Sent, email => string.Equals(email.To, user.Email, StringComparison.Ordinal));
+        var entry = Assert.Single(fixture.Log.Messages, message => message.StartsWith($"A password reset code for user {user.Id} wasn't saved", StringComparison.Ordinal));
+        Assert.EndsWith(nameof(IdentityErrorDescriber.ConcurrencyFailure), entry, StringComparison.Ordinal);
+        Assert.DoesNotContain(user.Email!, entry, StringComparison.OrdinalIgnoreCase);
     }
 
     // The answers are alike (above) and so is their cost: a hash of the codes' hasher for every address, so the time of
