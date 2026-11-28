@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before). The `/connect/*` endpoints pass the request's cancellation token to the store, so an aborted request
   stops its database work.
 - Dependencies: OpenIddict 7.8.0; Scalar.AspNetCore 2.18.7; ASP.NET Core and EF Core packages (and the `dotnet-ef`
-  tool) 10.0.14, `Microsoft.Extensions.Caching.Hybrid` and `Microsoft.Extensions.Http.Resilience` 10.11.0; OpenTelemetry
+  tool) 10.0.15, `Microsoft.Extensions.Caching.Hybrid` and `Microsoft.Extensions.Http.Resilience` 10.11.1; OpenTelemetry
   1.20.1; CsCheck 5.0.1 (tests). The template pins the same EF Core, Mvc.Testing, `System.Security.Cryptography.Pkcs`
   and `dotnet-ef` versions. Development compose images: Jaeger 2.22.0, Seq 2026.1.17526, Keycloak 26.8.2-1,
   PostgreSQL 18.6 (also the test image). CI: `github/codeql-action` 4.39.4, `actions/setup-dotnet` 6.1.0.
