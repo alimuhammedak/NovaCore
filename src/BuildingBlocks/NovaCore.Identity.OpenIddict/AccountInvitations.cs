@@ -173,12 +173,13 @@ public sealed class AccountInvitations
             .ExecuteUpdateAsync(set => set.SetProperty(entry => entry.AcceptedAtUtc, now), cancellationToken);
         if (marked == 0)
         {
-            // Used by a concurrent accept, or expired: the row tells which (the tracked copy still says pending).
-            var accepted = await _store.Invitations.AsNoTracking()
+            // Used by a concurrent accept, or expired: the row tells which (the tracked copy still says pending). A row
+            // deleted since (its account removed) is refused as used, as before the end was checked here (V10-2).
+            var row = await _store.Invitations.AsNoTracking()
                 .Where(entry => entry.Id == invitation.Id)
-                .Select(entry => entry.AcceptedAtUtc)
-                .SingleAsync(cancellationToken);
-            return (accepted is null ? InvitationState.Expired : InvitationState.Used, []);
+                .Select(entry => new { entry.AcceptedAtUtc })
+                .SingleOrDefaultAsync(cancellationToken);
+            return (row is { AcceptedAtUtc: null } ? InvitationState.Expired : InvitationState.Used, []);
         }
 
         // An unconfirmed account that registered with a password gets the new one: holding the link is holding the mailbox.

@@ -230,8 +230,9 @@ one user's reset code token (`Arm(userId, token)`), `CodeEndRace` (a command int
 its end before the next bulk `DELETE` of user tokens (a code's end), and `AccountCreationRace` holds the saves that add an
 account until the armed number of requests wait there (`InvitationTests`). `InvitationAcceptRace` holds the next
 transactions' start (not the conditional update: SQLite's `BEGIN IMMEDIATE` takes the write lock at the start), so two
-accepts of one invitation both find it pending first. `InvitationExpiryRace` moves a fake clock when the next accept
-opens that transaction, so the invitation expires between its lookup and its mark.
+accepts of one invitation both find it pending first. `InvitationEndRace` moves a fake clock (`ArmExpiry`) or deletes
+the invitations (`ArmDeletion`) when the next accept opens that transaction, so the invitation expires, or is gone,
+between its lookup and its mark.
 `IdentityServerFixture` shares one host per class; tests that need a different host start their own
 (`IdentityServerTestHost.StartAsync(environment, configure)`). These classes run in the `IdentityServerTestGroup`
 collection, apart from the parallel tests: their CPU load made the `WebApplicationFactory` startup race (R-055) hit

@@ -369,7 +369,7 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
         await AssertProblemAsync(await PostAsync(client, Accept, new { token, password = NewPassword }), HttpStatusCode.Gone, "invitation.expired");
     }
 
-    // The invitation is found pending before the password policy runs, and marked after it (InvitationExpiryRace moves the
+    // The invitation is found pending before the password policy runs, and marked after it (InvitationEndRace moves the
     // clock in between): the mark itself must still hold the invitation's end, or the request accepts an expired one.
     [Fact]
     public async Task An_invitation_that_expires_during_its_accept_is_refused_and_sets_no_password()
@@ -377,7 +377,7 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
         const string email = "expires-mid-accept@novacore.test";
         var clock = new FakeTimeProvider(TimeProvider.System.GetUtcNow());
         var emails = new CapturingEmailSender();
-        var expiry = new InvitationExpiryRace(clock);
+        var expiry = new InvitationEndRace(clock);
         await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
         {
             builder.Services.AddSingleton<TimeProvider>(clock);
@@ -389,10 +389,41 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
         var token = await TokenSentToAsync(emails, email);
         using var client = host.CreateClient();
 
-        expiry.Arm(AccountInvitations.Lifetime + TimeSpan.FromSeconds(1));
+        expiry.ArmExpiry(AccountInvitations.Lifetime + TimeSpan.FromSeconds(1));
         await AssertProblemAsync(await PostAsync(client, Accept, new { token, password = NewPassword }), HttpStatusCode.Gone, "invitation.expired");
 
         await AssertProblemAsync(await PostAsync(client, Status, new { token }), HttpStatusCode.Gone, "invitation.expired");
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var invited = (await users.FindByEmailAsync(email))!;
+            Assert.False(await users.HasPasswordAsync(invited));
+            Assert.False(invited.EmailConfirmed);
+        }
+    }
+
+    // V10-2: the invitation is found pending, then deleted (its account removed, or the row) before the mark: the mark
+    // matches nothing and the row it reads back to tell used from expired is gone. That is a refusal, not a 500.
+    [Fact]
+    public async Task An_invitation_deleted_during_its_accept_is_refused_and_sets_no_password()
+    {
+        const string email = "deleted-mid-accept@novacore.test";
+        var emails = new CapturingEmailSender();
+        var deletion = new InvitationEndRace();
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+        {
+            builder.Services.AddSingleton<IEmailSender>(emails);
+            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(deletion));
+        });
+        await using (var scope = host.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<AccountInvitations>().InviteAsync(email, TestContext.Current.CancellationToken);
+        var token = await TokenSentToAsync(emails, email);
+        using var client = host.CreateClient();
+
+        deletion.ArmDeletion();
+        await AssertProblemAsync(await PostAsync(client, Accept, new { token, password = NewPassword }), HttpStatusCode.Conflict, "invitation.used");
+
+        await AssertProblemAsync(await PostAsync(client, Status, new { token }), HttpStatusCode.NotFound, "invitation.not_found");
         await using (var scope = host.Services.CreateAsyncScope())
         {
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
