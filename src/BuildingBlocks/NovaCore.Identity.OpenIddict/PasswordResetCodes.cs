@@ -96,9 +96,10 @@ internal sealed class PasswordResetCodes(
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
+        // Only the code read here ends: a /forgot since then issued a new one, which stays.
         if (stored.ExpiresAt <= timeProvider.GetUtcNow() || stored.Tries >= MaxTriesPerCode)
         {
-            await EndCodeAsync(user);
+            await EndCodeAsync(user, Format(stored));
             RedeemForNobody(code);
             return (ResetCodeOutcome.InvalidCode, []);
         }
@@ -109,27 +110,23 @@ internal sealed class PasswordResetCodes(
         var counted = stored with { Tries = stored.Tries + 1 };
         if (!await SaveCountAsync(user, counted, failures + 1))
         {
-            await EndCodeAsync(user);
+            // Whichever code is there now ends, a new one too: the lost count can't be told from a new code (V8-2).
+            await EndCodeAsync(user, observed: null);
             RedeemForNobody(code);
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
         if (hasher.VerifyHashedPassword(user, stored.Hash, code) == PasswordVerificationResult.Failed)
         {
-            // Counted already; the fifth wrong try also ends the code (a later read refuses it either way).
+            // Counted already; the fifth wrong try also ends the code (a later read refuses it either way), only while
+            // it still holds this count: a code a /forgot issued since stays.
             if (counted.Tries >= MaxTriesPerCode)
-                await EndCodeAsync(user);
+                await EndCodeAsync(user, Format(counted));
             return (ResetCodeOutcome.InvalidCode, []);
         }
 
         // The policy first, so a rejected password leaves the right code usable, like the link (PasswordResetPage).
-        var errors = new List<string>();
-        foreach (var validator in users.PasswordValidators)
-        {
-            var check = await validator.ValidateAsync(users, user, newPassword);
-            errors.AddRange(check.Errors.Select(error => error.Description));
-        }
-
+        var errors = await PolicyErrorsAsync(user, newPassword);
         if (errors.Count > 0)
         {
             // The right code isn't a wrong try: both counts go back. If another request saved in between, this save
@@ -146,6 +143,18 @@ internal sealed class PasswordResetCodes(
         else
             await GiveBackCountAsync(user, stored, counted, failures);
         return redeemed;
+    }
+
+    private async Task<List<string>> PolicyErrorsAsync(ApplicationUser user, string newPassword)
+    {
+        var errors = new List<string>();
+        foreach (var validator in users.PasswordValidators)
+        {
+            var check = await validator.ValidateAsync(users, user, newPassword);
+            errors.AddRange(check.Errors.Select(error => error.Description));
+        }
+
+        return errors;
     }
 
     // The right code's try goes back when its reset fails after the count (a password save lost to a concurrent write,
@@ -216,10 +225,12 @@ internal sealed class PasswordResetCodes(
     }
 
     // Deletes the code in the database, apart from the change tracker: after a save lost to the concurrency stamp, the
-    // context still holds that save's changes, and every later save through UserManager would fail the same way.
-    private async Task EndCodeAsync(ApplicationUser user) =>
+    // context still holds that save's changes, and every later save through UserManager would fail the same way. With
+    // an observed value, only while the token still holds it, so a code issued since that read isn't ended.
+    private async Task EndCodeAsync(ApplicationUser user, string? observed) =>
         await db.UserTokens
-            .Where(token => token.UserId == user.Id && token.LoginProvider == LoginProvider && token.Name == CodeToken)
+            .Where(token => token.UserId == user.Id && token.LoginProvider == LoginProvider && token.Name == CodeToken
+                            && (observed == null || token.Value == observed))
             .ExecuteDeleteAsync();
 
     private static string NewCode() =>

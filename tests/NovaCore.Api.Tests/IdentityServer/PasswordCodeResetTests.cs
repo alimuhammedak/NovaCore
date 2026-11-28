@@ -42,11 +42,13 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
 
         public ConcurrentTokenWrite TokenWrites { get; } = new();
 
+        public CodeEndRace CodeEnds { get; } = new();
+
         protected override void Configure(WebApplicationBuilder builder)
         {
             builder.Services.AddSingleton<IEmailSender>(Emails);
             builder.Services.AddKeyedSingleton<IPasswordHasher<ApplicationUser>>(PasswordResetCodes.HasherKey, CodeHashes);
-            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Race, Writes, TokenWrites));
+            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Race, Writes, TokenWrites, CodeEnds));
         }
     }
 
@@ -146,6 +148,24 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
             await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code = Wrong(code), newPassword = NewPassword }));
 
         await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code, newPassword = NewPassword }));
+    }
+
+    // The fifth wrong try ends the code it compared, not one a /forgot issued after its count (CodeEndRace).
+    [Fact]
+    public async Task The_fifth_wrong_try_does_not_end_a_code_issued_after_it_was_read()
+    {
+        var user = await _host.CreateUserAsync("code-end-race@novacore.test", Password);
+        using var client = _host.CreateClient();
+        var code = await RequestCodeAsync(client, user.Email!);
+        for (var attempt = 1; attempt < PasswordResetCodes.MaxTriesPerCode; attempt++)
+            await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code = Wrong(code), newPassword = NewPassword }));
+
+        fixture.CodeEnds.RunBeforeNextTokenDelete(async () =>
+            Assert.Equal(HttpStatusCode.Accepted, (await PostAsync(client, Forgot, new { email = user.Email })).StatusCode));
+        await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = user.Email, code = Wrong(code), newPassword = NewPassword }));
+
+        var issued = await RequestedCodeAsync(user.Email!, previous: 1);
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Reset, new { email = user.Email, code = issued, newPassword = NewPassword })).StatusCode);
     }
 
     // Every request reads the code before any of them writes (ResetCodeRace): a try that can't be counted mustn't be lost.
@@ -411,9 +431,43 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email = "code-expired@novacore.test", code, newPassword = NewPassword }));
     }
 
+    // An expired code's end removes that code, not one a /forgot issued after the refused request read it (CodeEndRace).
+    // Its own host: the clock moves.
+    [Fact]
+    public async Task Ending_an_expired_code_does_not_end_a_code_issued_after_it_was_read()
+    {
+        const string email = "code-expired-race@novacore.test";
+        var clock = new FakeTimeProvider(TimeProvider.System.GetUtcNow());
+        var emails = new CapturingEmailSender();
+        var codeEnds = new CodeEndRace();
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+        {
+            builder.Services.AddSingleton<TimeProvider>(clock);
+            builder.Services.AddSingleton<IEmailSender>(emails);
+            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(codeEnds));
+        });
+        await host.CreateUserAsync(email, Password);
+        using var client = host.CreateClient();
+        await PostAsync(client, Forgot, new { email });
+        var code = CodeIn((await emails.WaitForAsync(sent => string.Equals(sent.To, email, StringComparison.Ordinal)))[0]);
+        clock.Advance(PasswordResetCodes.Lifetime + TimeSpan.FromSeconds(1));
+
+        codeEnds.RunBeforeNextTokenDelete(async () =>
+            Assert.Equal(HttpStatusCode.Accepted, (await PostAsync(client, Forgot, new { email })).StatusCode));
+        await AssertInvalidCodeAsync(await PostAsync(client, Reset, new { email, code, newPassword = NewPassword }));
+
+        var issued = CodeIn((await emails.WaitForAsync(sent => string.Equals(sent.To, email, StringComparison.Ordinal), 2))[1]);
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, Reset, new { email, code = issued, newPassword = NewPassword })).StatusCode);
+    }
+
     private async Task<string> RequestCodeAsync(HttpClient client, string email, int previous = 0)
     {
         Assert.Equal(HttpStatusCode.Accepted, (await PostAsync(client, Forgot, new { email })).StatusCode);
+        return await RequestedCodeAsync(email, previous);
+    }
+
+    private async Task<string> RequestedCodeAsync(string email, int previous)
+    {
         var sent = await fixture.Emails.WaitForAsync(message => string.Equals(message.To, email, StringComparison.Ordinal), previous + 1);
         return CodeIn(sent[previous]);
     }
