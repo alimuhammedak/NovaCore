@@ -478,7 +478,11 @@ linkini açan posta kutusunun sahibidir, ilk şifrenin sahibi olmayabilir (Sudho
 "Set your password" e-postası gider: `/account/reset-password` bağlantısı şifreyi kurar ve adresi aynı adımda onaylar,
 davetin yaptığı gibi. Aynı şifreyle tekrar kayıt hiçbir şeyi değiştirmez (link `resend-confirmation-email` ile
 istenir); onaylı hesaba kayıt da. Ekran için değişen bir şey yok: kayıt cevabı aynıdır, e-postadaki bağlantı
-sağlayıcının sayfasını açar.
+sağlayıcının sayfasını açar. **Bilinen davranış:** davet edilmiş, henüz şifresi olmayan bir hesabın adresine anonim
+bir kayıt da bu yoldan geçer: davetliye "Set your password" (yeniden kayıt metinli) şifre kurma e-postası gider ve
+`SECURITY registration_repeated` (Warning) audit olayı yazılır. Hesap değişmez ve şifreyi yine yalnız posta
+kutusunun sahibi kurar (davetin ya da bu e-postanın bağlantısıyla); kayıt cevabı her adres için aynıdır. Bu bir açık
+değildir, davranış değişmez (DECISIONS D-102 (6)).
 
 **Hata kodları → ekran durumu** (ProblemDetails'in `code` alanı; metni ekran yazar):
 
@@ -891,6 +895,10 @@ Stoğu kesinleştiren kontrol rezervasyondur; `CreatePayment`'taki kontrol yaln�
 Son birim için gelen iki istek ikisi de 201 alabilir, ama biri sonra Failed olur. Teslimler başarılıysa sonuç iki
 dispatcher turu içinde (yaklaşık 10 sn) `GET /api/v1/payments`'ta görünür; başarısız her teslim bir tur daha ekler.
 
+**Idempotency yok:** `POST /api/v1/payments` bir idempotency anahtarı (`Idempotency-Key`) taşımaz; aynı isteği yeniden
+gönderen istemci ikinci bir ödeme açar. Payments bir referans modüldür, modüller arası akışı gösterir; gerçek bir
+ödeme ucu istemcinin yeniden denemesine karşı bir idempotency anahtarı ister (DECISIONS D-102 (7)).
+
 Stoğa aynı anda yazan iki işlem birbirinin üstüne yazamaz, çünkü `Product.Stock` bir concurrency token'dır. Ürün uç
 noktaları (`PUT`/`DELETE`) okuduktan sonra değişmiş bir stokta 409 `product.concurrency_conflict`, okuduktan sonra
 silinmiş bir üründe 404 `product.not_found` döner; rezervasyonun teslimi ise düşer ve outbox onu bir sonraki turda
@@ -921,6 +929,9 @@ Event'leri dağıtmanın tek yolu budur: entity event'lerini outbox'ı atlayıp 
 
 Garanti **en az bir kez**dir: bir handler'ın kendi kaydıyla bu işaret arasında süreç ölürse handler bir kez daha
 çalışır. Handler'lar bu yüzden idempotent yazılır. Veritabanı başına tek dispatcher varsayılır.
+
+Handler'dan atılan exception'ın tipi ve mesajı mesajın `Error` sütununa (ilk 2000 karakter) ve loga yazılır. Bu
+yüzden handler'ın attığı exception kişisel veri (e-posta adresi, ad, adres) değil id taşır.
 
 Handler DI'a açıkça kaydedilir: `services.AddScoped<IDomainEventHandler<PaymentCreated>, ReserveStockForPayment>()`.
 Başka bir modülün tepki vereceği event, yayımlayan modülün `*.Contracts` projesinde durur. Durum değiştiren bir
@@ -1024,6 +1035,12 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   hash'i olarak durur (ASVS 6.5.2). Onay linki `resend-confirmation-email` ile yeniden istenir; yalnızca onaylanmamış ve
   şifresi olan hesaba gider, yanıt her adres için aynıdır. Şifresiz hesap (davetle açılmış ya da kaydı tekrarlanmış)
   yalnız şifresi kurulurken onaylanır: `confirm-email` onu onaylamaz, böylece kimse bir daveti kullanılamaz yapamaz.
+- **Kabul edilmiş risk, onaysız kaydın kalan yolu:** saldırgan kurbanın adresiyle kendi şifresini seçerek kaydolur;
+  kurban kendisi hiç kaydolmadan gelen, istemediği onay e-postasındaki linke tıklarsa hesap saldırganın şifresiyle
+  onaylanır. Kurban kendisi de kaydolursa hesabın şifresi silinir ("Kendi giriş ekranı"). Kapatmanın yolu onay anında
+  şifre istemek olurdu, bu da her kullanıcının kayıt akışını değiştirir; saldırı kurbanın istemediği bir linke
+  tıklamasını gerektirdiği için akış değişmez (DECISIONS D-102 (4)). Kaydı hiç istemeyen proje onu kapatır
+  (`Identity:SignIn:AllowRegistration = false`).
 - **Parola sıfırlama:** giriş sayfasındaki "Forgot your password?" linki bir e-posta formu açar. Onaylı hesaba
   `/account/reset-password` linki gider (Identity token'ı, 6 saat, tek kullanımlık: sıfırlama security stamp'i
   yeniler). Bilinmeyen ya da onaysız adres aynı sayfayı alır, e-posta gitmez. Sayfa onaysız hesabı yalnız şifresizse

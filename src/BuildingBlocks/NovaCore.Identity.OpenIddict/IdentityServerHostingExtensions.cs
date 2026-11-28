@@ -148,7 +148,10 @@ public static class IdentityServerHostingExtensions
         // OWASP Password Storage Cheat Sheet: at least 600,000 iterations for PBKDF2-HMAC-SHA256.
         services.Configure<PasswordHasherOptions>(options => options.IterationCount = 600_000);
 
-        // Email confirmation tokens expire after six hours.
+        // Data Protection tokens expire after six hours: the email confirmation link and the password reset link
+        // (also the one a repeated registration sends) share this provider. NIST SP 800-63B-4 allows up to 24 hours
+        // for an emailed recovery secret (docs/plan/RESEARCH.md R-137); six hours covers a delayed email and keeps a
+        // leaked link short-lived.
         services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = TimeSpan.FromHours(6));
 
         // Those tokens, the sign-in cookies and antiforgery are protected with Data Protection keys. The framework's
