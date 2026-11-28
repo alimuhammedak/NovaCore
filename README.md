@@ -491,7 +491,7 @@ sağlayıcının sayfasını açar.
 | `invitation.account_exists` | 409 | "Hesabın var; şifrenle giriş yap" |
 | `invitation.invalid_email` | 400 | Davet eden: "Bu adres hesap adı olamaz" (Identity'nin `AllowedUserNameCharacters`'ı) |
 | `invitation.address_taken` | 409 | Davet eden: "Adres başka bir hesabın kullanıcı adı" |
-| (doğrulama) | 400 | `errors` alanlarını göster (ör. `newPassword`, `password`) |
+| (doğrulama) | 400 | `errors` alanlarını göster (PascalCase anahtarlar, ör. `NewPassword`, `Password`) |
 | (hız sınırı) | 429 | "Biraz bekle" |
 
 ### Tarayıcı uygulamaları: BFF

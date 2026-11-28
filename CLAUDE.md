@@ -87,7 +87,7 @@ dotnet pack NovaCore.slnx -c Release -o artifacts
   `dotnet ef migrations add <Name> --project src/Api/NovaCore.Api --startup-project src/Api/NovaCore.Api --context <C>DbContext --output-dir <F>/Migrations`
   with `<C>/<F>` ∈ Catalog/Catalog, Payments/Payments, IdentityServer/Identity, MultiTenancy/MultiTenancy. A model
   change needs a migration in each provider's set (D-074): the PostgreSQL set lives in `tests/NovaCore.Api.Tests`
-  (`--output-dir PostgreSql/<F>/Migrations`), and the template has its own sets (`src/Templates/CLAUDE.md`).
+  (`dotnet ef migrations add <Name> --project tests/NovaCore.Api.Tests --startup-project tests/NovaCore.Api.Tests --context <C>DbContext --output-dir PostgreSql/<F>/Migrations`), and the template has its own sets (`src/Templates/CLAUDE.md`).
 - **Publishing** is `release.yml` on a `v*` tag that matches `VersionPrefix`; the user's decision, never part of a
   phase. The SDK is pinned exactly (`global.json`, `rollForward: disable`).
 
