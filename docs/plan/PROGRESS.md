@@ -82,7 +82,7 @@ Biten fazların adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
 - [x] F10.1: 6e'nin merge kaydı doğrulandı (PR #49, `83ad2ef`). Branch'ten önce `main`'de yeşil Dependabot PR'ları merge edildi: #47, #40, #45, #44 (`21a3c7e`); #48 csproj'lara doğrudan referans eklediği için F10.4'e kaldı.
 
 - [x] F10.4a (767323a), F10.4b (879741c), F10.4d (89c462f): setup-dotnet 6.1.0, codeql-action 4.39.4 (scorecard dahil), postgres 18.6 (#42, #28, #30, #41'in yerine); dependabot `dotnet-sdk` major yok sayılır, Api pack uyarısı kalktı. #39 kapatıldı. `WorkflowPinTests`, `DatabaseImageTests`; Opus incelemesi temiz. CI yeşil (`89c462f`).
-- [ ] F10.4c: #48'in Microsoft.* 10.0.15 sürümleri (csproj eklemeleri olmadan), şablonun props'u.
+- [x] F10.4c (445f9ff): #48'in sürümleri birebir (Microsoft.* 10.0.15, 10.11.1, `dotnet-ef`), csproj eklemeleri olmadan; şablonun props'u ve aracı; lock dosyaları yeniden üretildi. `PackageDependencyTests` 7/7; Opus incelemesi temiz (F10.2f dahil).
 - F10.2 sınıflandırması (PR #35'te 12 satır içi + 1 review gövdesi; PR #37'de CodeRabbit yorumu yok, tek yorum Sonar S2068):
   - …688, …701, …715, gövde l.140-143 (`PasswordResetCodes`): düzeltildi, F10.2a `dc9241d`, F10.2b `a26231a`, F10.2c `f0e7288`, F10.2d `65ab787` (`PasswordCodeResetTests` kırmızı → yeşil 21/21).
   - …676 (`AccountInvitations` süre dolumu yarışı): düzeltildi, F10.2e `b4d715b` (`InvitationTests` kırmızı → yeşil 25/25; test host'u `DateTimeOffset`'i UTC tick olarak saklıyor). …638 (CLAUDE.md PostgreSQL migration komutu), …669 (README doğrulama anahtarları): düzeltildi, F10.2f `a508a09`.
