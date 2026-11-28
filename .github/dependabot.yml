@@ -42,12 +42,16 @@ updates:
       default-days: 7
 
   # global.json pins the SDK exactly (rollForward: disable, R-094); after an update every developer installs that SDK.
+  # Major SDK updates (.NET 11) are a planned migration, not a Dependabot bump (D-102 (9)).
   - package-ecosystem: dotnet-sdk
     directory: /
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # The tag and digest of each image in the compose files.
   - package-ecosystem: docker-compose

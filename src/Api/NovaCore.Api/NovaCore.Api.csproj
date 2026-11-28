@@ -6,6 +6,8 @@
   -->
   <PropertyGroup>
     <UserSecretsId>novacore-api</UserSecretsId>
+    <!-- The Web SDK warns when `dotnet pack NovaCore.slnx` reaches this host, which is deliberately not packable (D-102 (10)). -->
+    <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
   </PropertyGroup>
 
   <ItemGroup>
