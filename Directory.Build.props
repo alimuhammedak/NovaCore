@@ -41,10 +41,11 @@
     <WarningsAsErrors>$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>
     <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902</WarningsNotAsErrors>
     <!--
-      Package version. 0.x while the API is unstable; the 1.0 decision is F5.4. Prereleases add a suffix on the command
-      line (dotnet pack -\-version-suffix preview.1); release.yml takes it from the v* tag (D-013).
+      Package version. 0.x while the API is unstable: a breaking change or new public API is the next minor version, and
+      1.0 is decided once the first real project runs on a release (D-089 (1), D-102 (1)). Prereleases add a suffix on
+      the command line (dotnet pack -\-version-suffix preview.1); release.yml takes it from the v* tag (D-013).
     -->
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionPrefix>0.2.0</VersionPrefix>
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
     <AssemblyName>$(MSBuildProjectName)</AssemblyName>
   </PropertyGroup>
