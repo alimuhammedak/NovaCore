@@ -29,19 +29,19 @@
 | 8 | ✅ tamam | `faz/8-bassiz-giris` | 2026-11-09 | 2026-11-14 | 2026-11-27 (kullanıcı onayı, PR #35 merge commit'i `611903f`; CodeRabbit'in 12 yorumu sonradan bulgu olarak okunur) |
 | 9 | ✅ tamam | `faz/9-bakim` (`faz/8-bassiz-giris` + `main`) | 2026-11-13 | 2026-11-14 | 2026-11-27 (kullanıcı onayı, PR #36 merge commit'i `06316de`) |
 | 6e | ✅ tamam (F6e.3 D-102 (2); SQL Server/PostgreSQL katmanları Faz 10'dan sonra, tag'den önce) | `faz/6e-dinamik-denetim` (PR #37, `d2be1d1`) + `faz/6e-dast-ilk-kosu` | 2026-11-13 | 2026-11-27 | 2026-11-27 (kullanıcı onayı, PR #49 merge commit'i `83ad2ef`; CI yeşil) |
-| 10 | ⏳ başlamadı (6e'nin merge'ünden sonra, D-102) | `faz/10-surum-0.2.0` (`main`'den) | | | |
+| 10 | 🔄 devam ediyor | `faz/10-surum-0.2.0` (`main`'den, `21a3c7e`) | 2026-11-28 | | |
 
 Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıldı` (devir notuna bak) · `✅ tamam`
 
 ## Gece koşusu (D-096)
 
-Durum: **hazır, Faz 10 kuyruğu (D-106, 2026-11-28).** Önceki koşu (Faz 8, 9, 6e) 2026-11-14'te bitti; PR #35, #36, #37 2026-11-27'de merge edildi. Kullanıcı `/novacore-night` ile başlatır; kurallar `.claude/skills/novacore-night/SKILL.md`'de. Koşu her turda bu bölümü okur ve günceller. Yerel test adım başına ~2 dk ile sınırlı; tam paket (SQL Server, PostgreSQL dahil) merge'den sonra, tag'den önce yerelde (D-106).
+Durum: **koşuyor (2026-11-28), Faz 10.** Önceki koşu (Faz 8, 9, 6e) 2026-11-14'te bitti; PR #35, #36, #37 2026-11-27'de merge edildi. Kullanıcı `/novacore-night` ile başlatır; kurallar `.claude/skills/novacore-night/SKILL.md`'de. Koşu her turda bu bölümü okur ve günceller. Yerel test adım başına ~2 dk ile sınırlı; tam paket (SQL Server, PostgreSQL dahil) merge'den sonra, tag'den önce yerelde (D-106).
 
 ### İş kuyruğu
 
 | # | İş | Durum | Not |
 |---|---|---|---|
-| 1 | Faz 10: F10.1 branch, F10.2 inceleme yorumları, F10.3 ürün kararları, F10.4 Dependabot, F10.5 sürüm hazırlığı | ⏳ | Adımlar PLAN'da; tag ve yayın yapılmaz (D-102 (1)) |
+| 1 | Faz 10: F10.1 branch, F10.2 inceleme yorumları, F10.3 ürün kararları, F10.4 Dependabot, F10.5 sürüm hazırlığı | 🔄 | Adımlar PLAN'da; tag ve yayın yapılmaz (D-102 (1)) |
 | 2 | Faz 10: faz sonu incelemesi, PR, merge (D-106 (3)) | ⏳ | |
 | 3 | Sabah raporu ve devir notu | ⏳ | Tam paketin Docker katmanları ve `v0.2.0` tag'i kullanıcıya (D-106 (4)) |
 
@@ -66,6 +66,15 @@ DA-1…DA-12 2026-11-27'de DECISIONS'a işlendi: D-099 (DA-1…6), D-100 (DA-7, 
 Biçim: `- [x] F0.3 (abc1234): not`. Not en çok iki satırdır: ne yapıldı, koşulan test sınıfları, doğrulamaya kalan. Gerekçe D/R kaydına, ayrıntı commit mesajına yazılır.
 
 Biten fazların adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
+
+### Faz 10
+
+- [x] F10.1: 6e'nin merge kaydı doğrulandı (PR #49, `83ad2ef`). Branch'ten önce `main`'de yeşil Dependabot PR'ları merge edildi: #47, #40, #45, #44 (`21a3c7e`); #48 csproj'lara doğrudan referans eklediği için F10.4'e kaldı.
+
+#### Doğrulama
+
+| ID | Bulgu | Durum |
+|---|---|---|
 
 ## Açık sorular (Q)
 
