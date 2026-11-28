@@ -4,9 +4,9 @@
     "net10.0": {
       "Meziantou.Analyzer": {
         "type": "Direct",
-        "requested": "[3.0.303, )",
-        "resolved": "3.0.303",
-        "contentHash": "IBcDi9Gq15J7F7Akw/KCVrxMsms13e7rgA6ssVhoqn+3BWDvCg3RAhzPMK8foJapDMgz5tG4cDHO/JImrnn1cw=="
+        "requested": "[3.0.341, )",
+        "resolved": "3.0.341",
+        "contentHash": "zpogT6IwYBgNRa9+oETzs7aTU6Te3M/Osdkk/HN1TlJTDjz9dZwoUgh/yWqovT3jTofQGGLB1JqEK8I4uA6+yA=="
       },
       "Microsoft.CodeAnalysis.BannedApiAnalyzers": {
         "type": "Direct",
@@ -578,7 +578,7 @@
       "BMD.NovaCore.AspNetCore": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.Abstractions": "[0.1.0, )",
+          "BMD.NovaCore.Abstractions": "[0.2.0, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.15, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.15, )",
           "Microsoft.Extensions.Caching.Hybrid": "[10.11.1, )",
@@ -588,7 +588,7 @@
       "BMD.NovaCore.EntityFrameworkCore": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.Abstractions": "[0.1.0, )",
+          "BMD.NovaCore.Abstractions": "[0.2.0, )",
           "Microsoft.EntityFrameworkCore": "[10.0.15, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.15, )",
           "Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore": "[10.0.15, )"
@@ -597,7 +597,7 @@
       "BMD.NovaCore.Identity.OpenIddict": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.AspNetCore": "[0.1.0, )",
+          "BMD.NovaCore.AspNetCore": "[0.2.0, )",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "[10.0.15, )",
           "OpenIddict.EntityFrameworkCore": "[7.8.0, )",
           "OpenIddict.Server.AspNetCore": "[7.8.0, )"
@@ -606,8 +606,8 @@
       "BMD.NovaCore.MultiTenancy": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.AspNetCore": "[0.1.0, )",
-          "BMD.NovaCore.EntityFrameworkCore": "[0.1.0, )",
+          "BMD.NovaCore.AspNetCore": "[0.2.0, )",
+          "BMD.NovaCore.EntityFrameworkCore": "[0.2.0, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.15, )"
         }
       },
@@ -638,33 +638,33 @@
       "novacore.modules.catalog": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.AspNetCore": "[0.1.0, )",
-          "BMD.NovaCore.EntityFrameworkCore": "[0.1.0, )",
-          "NovaCore.Modules.Catalog.Contracts": "[0.1.0, )",
-          "NovaCore.Modules.Payments.Contracts": "[0.1.0, )",
+          "BMD.NovaCore.AspNetCore": "[0.2.0, )",
+          "BMD.NovaCore.EntityFrameworkCore": "[0.2.0, )",
+          "NovaCore.Modules.Catalog.Contracts": "[0.2.0, )",
+          "NovaCore.Modules.Payments.Contracts": "[0.2.0, )",
           "Riok.Mapperly": "[4.3.1, )"
         }
       },
       "novacore.modules.catalog.contracts": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.Abstractions": "[0.1.0, )"
+          "BMD.NovaCore.Abstractions": "[0.2.0, )"
         }
       },
       "novacore.modules.payments": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.AspNetCore": "[0.1.0, )",
-          "BMD.NovaCore.EntityFrameworkCore": "[0.1.0, )",
-          "NovaCore.Modules.Catalog.Contracts": "[0.1.0, )",
-          "NovaCore.Modules.Payments.Contracts": "[0.1.0, )",
+          "BMD.NovaCore.AspNetCore": "[0.2.0, )",
+          "BMD.NovaCore.EntityFrameworkCore": "[0.2.0, )",
+          "NovaCore.Modules.Catalog.Contracts": "[0.2.0, )",
+          "NovaCore.Modules.Payments.Contracts": "[0.2.0, )",
           "Riok.Mapperly": "[4.3.1, )"
         }
       },
       "novacore.modules.payments.contracts": {
         "type": "Project",
         "dependencies": {
-          "BMD.NovaCore.Abstractions": "[0.1.0, )"
+          "BMD.NovaCore.Abstractions": "[0.2.0, )"
         }
       },
       "Microsoft.AspNetCore.Authentication.JwtBearer": {
