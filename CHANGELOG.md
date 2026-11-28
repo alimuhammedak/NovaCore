@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tool) 10.0.14, `Microsoft.Extensions.Caching.Hybrid` and `Microsoft.Extensions.Http.Resilience` 10.11.0; OpenTelemetry
   1.20.1; CsCheck 5.0.1 (tests). The template pins the same EF Core, Mvc.Testing, `System.Security.Cryptography.Pkcs`
   and `dotnet-ef` versions. Development compose images: Jaeger 2.22.0, Seq 2026.1.17526, Keycloak 26.8.2-1. CI:
-  `github/codeql-action` 4.39.3.
+  `github/codeql-action` 4.39.4, `actions/setup-dotnet` 6.1.0. The PostgreSQL test image is 18.6.
 
 ### Fixed
 
