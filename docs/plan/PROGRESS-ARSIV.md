@@ -1710,3 +1710,12 @@ Gece alınan kalıcı kararlar. Sabah tek düzenlemeyle DECISIONS'a işlenir (D-
 | F6e.3: OpenID conformance suite (yerel Docker) | Suite'in kaynağı/imajları indirilip kurulmalı, ön onaylı değil; PLAN "sürüm öncesi" diyor (D-089 (2) yalnız 0.1.0 için muaf tuttu) | Kullanıcı suite'i kurar ya da indirmeyi onaylar; bir sonraki sürümden önce koşulur, bulgular F6e.5 kuralıyla → **D-102 (2): bu sürümde muaf** |
 | S-6 varsayılanları (`Identity:EmailLimit` 5/saat, aşınca 429) | Ürün ayarı; R-157 | Kullanıcı değerleri onaylar ya da değiştirir → **D-102 (5): 5/saat kalır** |
 | V6e-4: bekleyen daveti olan şifresiz hesaba anonim kayıt | Hiçbir şey yapmamak ya da ayrı metin/audit: ürün davranışı | Kullanıcı seçer → **D-102 (6): değişmez, README** |
+
+## Gece koşusu kuyruğu (2026-11-13 … 2026-11-27, D-096)
+
+| # | İş | Durum | Not |
+|---|---|---|---|
+| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ✅ `611903f` | İki inceleme, on bulgu, hepsi kapalı. Bütün kontroller yeşil (`17790b1`); PR #35 2026-11-27'de merge edildi (kullanıcı) |
+| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | ✅ `06316de` | Bütün adımlar ve iki inceleme bitti; kontroller yeşil (`d33a33c`); PR #36 2026-11-27'de merge edildi (kullanıcı) |
+| 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ✅ merge edildi (PR #49, `83ad2ef`) | F6e.1, F6e.2, F6e.4, F6e.5 (S-1…S-6, S-9, S-13, S-14) ve faz sonu incelemesi bitti. Kontroller yeşil (`1b0c22d`; SonarCloud kalite kapısı yalnız `dast.yml:43` S2068 yüzünden kırmızı, V6e-1'in false positive'i); PR #37 2026-11-27'de merge edildi (kullanıcı). DAST ilk koşusu: run `46002347264`. **F6e.3 (OpenID conformance suite) yapılmadı:** suite'in indirilip kurulması ön onaylı değil (F6e.4'ün araçlarıyla aynı gerekçe); PLAN'a göre sürüm öncesi şart → Kullanıcıya kalanlar |
+| 4 | Sabah raporu ve devir notu | ✅ | 2026-11-14 |

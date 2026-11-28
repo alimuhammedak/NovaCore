@@ -1,6 +1,6 @@
 ---
 name: novacore-night
-description: NovaCore planında kalan işleri (Faz 8'in doğrulaması, Faz 9, Faz 6e) tek gözetimsiz koşuda bitirir (D-096). Orkestratördür; her adımı taze bağlamlı bir alt ajana verir, tam testi CI'a bırakır ve beklemez, faz sonunda PR açar, koşullar tutuyorsa merge eder, soru sormaz. Yalnızca kullanıcı `/novacore-night` ile çağırır.
+description: NovaCore planında kalan işleri (Faz 8'in doğrulaması, Faz 9, Faz 6e; D-106 ile Faz 10) tek gözetimsiz koşuda bitirir (D-096). Orkestratördür; her adımı taze bağlamlı bir alt ajana verir, tam testi CI'a bırakır ve beklemez, faz sonunda PR açar, koşullar tutuyorsa merge eder, soru sormaz. Yalnızca kullanıcı `/novacore-night` ile çağırır.
 disable-model-invocation: true
 ---
 
@@ -30,7 +30,7 @@ Kullanıcının bu skill'i çağırması şunlara izindir, ayrıca sorulmaz:
 ## 1. Her turun başında (bağlam özetlendiyse bu dosyayı da yeniden oku)
 
 1. `wc -c docs/plan/PROGRESS.md`. 25 KB'ı aşıyorsa önce D-097 (2)'yi uygula (kapanan kayıtları arşive taşı).
-2. Oku: `docs/plan/PROGRESS.md` (tamamı), `docs/plan/DECISIONS.md`'de "Yapılmayacaklar" bölümü ile D-096 ve D-097 satırları (`grep -n "^| D-09[67]"`), `docs/plan/PLAN.md`'de "Genel kurallar" ve sıradaki fazın bölümü.
+2. Oku: `docs/plan/PROGRESS.md` (tamamı), `docs/plan/DECISIONS.md`'de "Yapılmayacaklar" bölümü ile D-096, D-097 ve D-106 satırları (`grep -n "^| D-09[67]\|^| D-106"`), `docs/plan/PLAN.md`'de "Genel kurallar" ve sıradaki fazın bölümü.
 3. `git status --short`, `git branch --show-current`, `git log --oneline -5`.
 4. İzlenen bir dosyada commit'lenmemiş değişiklik varsa yarım kalmış bir adımdır: diff'in özetini oku ve adımı bir yazan alt ajana "yarım kalanı tamamla" diye ver. İzlenmeyen `.agents/`, `.codex/`, `AGENTS.md` dosyalarına dokunulmaz (Q-40).
 5. PROGRESS'in "İş kuyruğu"ndan sıradaki işi seç, durumunu `🔄` yap.
@@ -67,7 +67,7 @@ Adım: <PLAN'daki satırın alıntısı, kabul kriteriyle>.
 <Bulgu kapatılıyorsa: bulgunun ID'si, yeri ve hata satırı. CI hatasıysa günlüğün ilgili satırları.>
 
 `.claude/skills/novacore-phase/SKILL.md`'nin §3.2 (adım döngüsü) ve §4 (sapma protokolü) bölümlerini uygula, şu farklarla:
-- Yalnız build, adımın test sınıfları (hata düzeltmesinde ve yeni davranışta önce kırmızı, sonra yeşil) ve `dotnet format NovaCore.slnx` çalışır. Tam test, coverage, smoke ve inceleme çalışmaz.
+- Yalnız build, adımın test sınıfları (hata düzeltmesinde ve yeni davranışta önce kırmızı, sonra yeşil) ve `dotnet format NovaCore.slnx` çalışır. Tam test, coverage, smoke ve inceleme çalışmaz. Adımın test sınıflarının yerel koşusu yaklaşık iki dakikayı aşacaksa (Docker katmanları, geniş entegrasyon sınıfları) yerelde koşma, CI'a bırak ve raporda belirt (D-106 (2)).
 - PROGRESS.md, DECISIONS.md, PLAN.md ve `.claude/` altına yazma. Push etme.
 - §4'ün "Sor" satırına düşen ya da tag, yayın, silme, yeni Microsoft dışı paket, bastırma gerektiren işi yapma; raporda "kullanıcıya kalan" olarak yaz ve adımın geri kalanını bitir.
 - Kalıcı bir karar verdiysen D-kaydı biçiminde rapora yaz. Araştırmanı RESEARCH.md'ye R-kaydı olarak yaz.
@@ -137,6 +137,15 @@ Rapor, en çok 150 kelime: commit hash'i; koşulan test sınıfları ve sonuçla
 - **F6e.5:** her bulgu için bir yazan alt ajan önce başarısız xUnit testini yazar. Yazılamıyorsa bulgu `needs_validation` olarak PROGRESS'e girer (tek satır).
 - Faz bitince `SONRAYA-BIRAKILANLAR.md`'deki "Faz 6e sonu, unutulmamalı" (D-032) maddesini sabah raporuna koy.
 
+### Faz 10 (PLAN "Faz 10: 0.2.0 sürüm hazırlığı", D-102, D-106)
+
+- **F10.1:** 6e'nin merge kaydını PROGRESS'te doğrula, `main`'den `git switch -c faz/10-surum-0.2.0`, faz satırını `🔄 devam ediyor` yap.
+- **F10.2:** okuyan alt ajanlar PR #35'in 12 ve PR #37'nin 1 CodeRabbit yorumunu (`gh api repos/{owner}/{repo}/pulls/<no>/comments`) bugünkü koda karşı sınıflandırır; kapsam içi olanları yazan alt ajan testiyle düzeltir. Her yoruma PR'da yanıt (düzeltildi + commit, ya da gerekçe). Sonuç PROGRESS'te yorum başına tek satır.
+- **F10.3:** S-7 ve S-12 önce kırmızı testle (Opus). S-10 ve S-11 D-016 ile modelin kararıdır: `DA` olarak kaydet. Ürün kararı gerektiren yeni bir soru çıkarsa yapılmaz, kullanıcıya kalır.
+- **F10.4:** önce `main`'deyken CI'ı yeşil Dependabot PR'larını merge et (Faz 9'daki kural). `global.json`'ı değiştiren PR, o SDK `dotnet --list-sdks`'te yoksa kullanıcıya kalır (#21). #39'u kapatmak ön onaylıdır (D-102 (9)).
+- **F10.5:** baseline paketi GitHub Packages'tan indirilemezse (yerelde kimlik yok) `dotnet pack` kabulü CI'dan okunur. Tag, `release.yml` tetiklemek ve yayın **yapılmaz** (D-102 (1)).
+- **Faz sonu:** §4; merge ön onaylıdır (D-106 (3)). Sabah raporuna şunları koy: tam paketin SQL Server ve PostgreSQL katmanları Docker açıkken tag'den önce yerelde (D-106 (4)); SonarCloud kalite kapısı, `v0.2.0` tag'i ve DECISIONS'ın `protectedPaths`'e geri eklenmesi kullanıcıda (D-102 (11), (12)).
+
 ## 6. Bitiş
 
 Kuyruk bittiğinde ya da kalan her iş kullanıcıya kaldığında:
@@ -147,7 +156,7 @@ Kuyruk bittiğinde ya da kalan her iş kullanıcıya kaldığında:
 ```
 ## Gece koşusu raporu (<tarih>)
 
-**Kuyruk:** Faz 8 <durum> · Faz 9 <durum> · Faz 6e <durum>
+**Kuyruk:** <kuyruktaki her iş ve durumu>
 **Merge edilenler:** PR #N (<faz>, `<merge commit>`), ...
 **Açık PR'lar:** PR #N: neden merge edilmedi
 

@@ -35,16 +35,15 @@ Durum değerleri: `⏳ başlamadı` · `🔄 devam ediyor` · `⏸ duraklatıld�
 
 ## Gece koşusu (D-096)
 
-Durum: **bitti (2026-11-14).** Kuyruk boşaldı; üç PR (#35, #36, #37) 2026-11-27'de merge edildi. Kota sınırına birkaç kez takıldı, kaldığı yerden sürdü. Kullanıcı `/novacore-night` ile başlatır; kurallar `.claude/skills/novacore-night/SKILL.md`'de. Koşu her turda bu bölümü okur ve günceller.
+Durum: **hazır, Faz 10 kuyruğu (D-106, 2026-11-28).** Önceki koşu (Faz 8, 9, 6e) 2026-11-14'te bitti; PR #35, #36, #37 2026-11-27'de merge edildi. Kullanıcı `/novacore-night` ile başlatır; kurallar `.claude/skills/novacore-night/SKILL.md`'de. Koşu her turda bu bölümü okur ve günceller. Yerel test adım başına ~2 dk ile sınırlı; tam paket (SQL Server, PostgreSQL dahil) merge'den sonra, tag'den önce yerelde (D-106).
 
 ### İş kuyruğu
 
 | # | İş | Durum | Not |
 |---|---|---|---|
-| 1 | Faz 8: CI sonucu, inceleme, bulgular, PR, merge | ✅ `611903f` | İki inceleme, on bulgu, hepsi kapalı. Bütün kontroller yeşil (`17790b1`); PR #35 2026-11-27'de merge edildi (kullanıcı) |
-| 2 | Faz 9: F9.1 sınıflandırma, F9.2 maddeler, F9.3 Dependabot, F9.4 belgeler, PR, merge | ✅ `06316de` | Bütün adımlar ve iki inceleme bitti; kontroller yeşil (`d33a33c`); PR #36 2026-11-27'de merge edildi (kullanıcı) |
-| 3 | Faz 6e: F6e.1 → F6e.5, PR, merge | ✅ merge edildi (PR #49, `83ad2ef`) | F6e.1, F6e.2, F6e.4, F6e.5 (S-1…S-6, S-9, S-13, S-14) ve faz sonu incelemesi bitti. Kontroller yeşil (`1b0c22d`; SonarCloud kalite kapısı yalnız `dast.yml:43` S2068 yüzünden kırmızı, V6e-1'in false positive'i); PR #37 2026-11-27'de merge edildi (kullanıcı). DAST ilk koşusu: run `46002347264`. **F6e.3 (OpenID conformance suite) yapılmadı:** suite'in indirilip kurulması ön onaylı değil (F6e.4'ün araçlarıyla aynı gerekçe); PLAN'a göre sürüm öncesi şart → Kullanıcıya kalanlar |
-| 4 | Sabah raporu ve devir notu | ✅ | 2026-11-14 |
+| 1 | Faz 10: F10.1 branch, F10.2 inceleme yorumları, F10.3 ürün kararları, F10.4 Dependabot, F10.5 sürüm hazırlığı | ⏳ | Adımlar PLAN'da; tag ve yayın yapılmaz (D-102 (1)) |
+| 2 | Faz 10: faz sonu incelemesi, PR, merge (D-106 (3)) | ⏳ | |
+| 3 | Sabah raporu ve devir notu | ⏳ | Tam paketin Docker katmanları ve `v0.2.0` tag'i kullanıcıya (D-106 (4)) |
 
 ### Karar adayları (DA)
 
