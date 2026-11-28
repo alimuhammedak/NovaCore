@@ -44,7 +44,7 @@ internal sealed class PasswordResetCodes(
     public static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(15);
 
     internal const string LoginProvider = "[NovaCore]";
-    private const string CodeToken = "PasswordResetCode";
+    internal const string CodeToken = "PasswordResetCode";
     internal const string FailuresToken = "PasswordResetCodeFailures";
 
     /// <summary>
@@ -55,12 +55,15 @@ internal sealed class PasswordResetCodes(
     /// </summary>
     internal const string HasherKey = "NovaCore.PasswordResetCodes";
 
-    /// <summary>Makes a new code for <paramref name="user"/>, replacing an unused one, and returns it for the email.</summary>
-    public async Task<string> IssueAsync(ApplicationUser user)
+    /// <summary>
+    /// Makes a new code for <paramref name="user"/>, replacing an unused one, and returns it for the email; or null when
+    /// its save lost to a concurrent write of the account (another /forgot, a guess), so a code that can't work isn't sent.
+    /// </summary>
+    public async Task<string?> IssueAsync(ApplicationUser user)
     {
         var code = NewCode();
-        await SaveCodeAsync(user, new StoredCode(timeProvider.GetUtcNow() + Lifetime, Tries: 0, hasher.HashPassword(user, code)));
-        return code;
+        var saved = await SaveCodeAsync(user, new StoredCode(timeProvider.GetUtcNow() + Lifetime, Tries: 0, hasher.HashPassword(user, code)));
+        return saved.Succeeded ? code : null;
     }
 
     /// <summary>

@@ -40,11 +40,13 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
 
         public ConcurrentUserWrite Writes { get; } = new();
 
+        public ConcurrentTokenWrite TokenWrites { get; } = new();
+
         protected override void Configure(WebApplicationBuilder builder)
         {
             builder.Services.AddSingleton<IEmailSender>(Emails);
             builder.Services.AddKeyedSingleton<IPasswordHasher<ApplicationUser>>(PasswordResetCodes.HasherKey, CodeHashes);
-            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Race, Writes));
+            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(Race, Writes, TokenWrites));
         }
     }
 
@@ -68,6 +70,23 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         // The confirmed account's email was queued last; once it is out, the others would have gone before it.
         await fixture.Emails.WaitForAsync(email => string.Equals(email.To, "code-known@novacore.test", StringComparison.Ordinal));
         Assert.DoesNotContain(fixture.Emails.Sent, email => email.To is "code-nobody@novacore.test" or "code-unconfirmed@novacore.test");
+    }
+
+    // Two /forgot requests that read the account alike: one code's save loses to the other's write. The code that wasn't
+    // saved can't work, so it mustn't be emailed; the answer stays the same 202.
+    [Fact]
+    public async Task A_code_whose_save_is_lost_to_a_concurrent_write_is_not_emailed()
+    {
+        var user = await _host.CreateUserAsync("code-unsaved@novacore.test", Password);
+        await _host.CreateUserAsync("code-unsaved-after@novacore.test", Password);
+        using var client = _host.CreateClient();
+
+        fixture.TokenWrites.Arm(user.Id, PasswordResetCodes.CodeToken);
+        Assert.Equal(HttpStatusCode.Accepted, (await PostAsync(client, Forgot, new { email = user.Email })).StatusCode);
+
+        // Emails go out in the order queued: once the later one is out, the unsaved code's would have gone before it.
+        await RequestCodeAsync(client, "code-unsaved-after@novacore.test");
+        Assert.DoesNotContain(fixture.Emails.Sent, email => string.Equals(email.To, user.Email, StringComparison.Ordinal));
     }
 
     // The answers are alike (above) and so is their cost: a hash of the codes' hasher for every address, so the time of
@@ -266,7 +285,9 @@ public sealed partial class PasswordCodeResetTests(PasswordCodeResetTests.Fixtur
         await using (var scope = _host.Services.CreateAsyncScope())
         {
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-            code = await scope.ServiceProvider.GetRequiredService<PasswordResetCodes>().IssueAsync((await users.FindByEmailAsync(email))!);
+            var issued = await scope.ServiceProvider.GetRequiredService<PasswordResetCodes>().IssueAsync((await users.FindByEmailAsync(email))!);
+            Assert.NotNull(issued);
+            code = issued;
         }
         using var client = _host.CreateClient();
 

@@ -60,7 +60,10 @@ internal static class PasswordCodeEndpoints
         var user = await users.FindByEmailAsync(request.Email);
         if (user is not null && await users.IsEmailConfirmedAsync(user))
         {
-            var code = await codes.IssueAsync(user);
+            // A code whose save lost to a concurrent write of the account isn't sent; the answer stays the same.
+            if (await codes.IssueAsync(user) is not { } code)
+                return TypedResults.Accepted((string?)null, CodeSent);
+
             // Queued, not sent here: the answer mustn't wait for the mail server, or its timing would reveal the account.
             emails.Enqueue(user.Email!, "Your password reset code",
                 $"Your code to reset your password: <strong>{code}</strong>. It works once, for "
