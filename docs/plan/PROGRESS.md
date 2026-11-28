@@ -99,6 +99,12 @@ Biten fazların adımları: [PROGRESS-ARSIV.md](PROGRESS-ARSIV.md#adımlar).
 
 | ID | Bulgu | Durum |
 |---|---|---|
+| V10-1 | `nuget.config`'de `auditSources` yok: NuGet Audit GitHub kaynağını da sorgular, kimliksiz restore 401 → NU1900 → hata (code-review + CodeRabbit CLI) | açık |
+| V10-2 | `AccountInvitations` koşullu güncelleme 0 satırda `SingleAsync` ile yeniden okuyor; arada silinen davet 500 döner | açık |
+| V10-3 | `PasswordResetCodes.IssueAsync` her başarısız token yazımında null dönüyor, `/forgot` 202 ile log/audit'siz susuyor; doc yalnız yarıştan söz ediyor | açık |
+| V10-4 | `src/BuildingBlocks/CLAUDE.md:141` Shipped'in 0.1.0'ı tuttuğunu söylüyor (artık 0.2.0) | açık |
+| V10-5 | README ~503: handler'ın ürettiği `errors.newPassword` (camelCase) ile otomatik doğrulamanın PascalCase anahtarları ayrı belgelenmeli (CodeRabbit CLI) | açık |
+| V10-6 | CodeRabbit CLI sorusu: `PasswordResetCodes` ~167 telafisinin `expected` koşulu, arada başarılı giriş sayacı silip yeni yanlış deneme 1 yaptıysa o denemeyi silebilir mi | açık |
 
 ## Açık sorular (Q)
 
