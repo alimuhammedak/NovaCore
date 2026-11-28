@@ -598,6 +598,7 @@ Repo public'tir (DECISIONS D-042). Kararlar D-048, D-051 ve D-052'de; kaynaklar 
 |---|---|---|
 | Build, format, test, migration kontrolü, açık paket kontrolü | `ci.yml` → `build-and-test` | Restore `--locked-mode` ile; ardından lisans kapısı (`eng/check-licenses.sh`). Build'den sonra `dotnet format --verify-no-changes`. Testler coverage'la koşar: satır ve dal kapsamı `eng/coverage-baseline.txt`'in altına düşerse kırmızı (`eng/check-coverage.sh`, D-060); mimari testler ayrı adımda, coverage'sız |
 | API sözleşmesi | `ci.yml` → `api-contract` | Commit'li `docs/openapi/v1.json` main'dekiyle karşılaştırılır; kırıcı değişiklik `eng/openapi-breaking-accepted.txt`'te kabul edilmediyse kırmızı (oasdiff, `eng/check-openapi.sh`); belgeyi `OpenApiContractTests` güncel tutar |
+| Paket doğrulaması | `ci.yml` → `package-validation` | Kütüphane paketleri `release.yml`'deki gibi pack edilir ve son yayımlanan sürümle (baseline) karşılaştırılır: ikili kırıcı değişiklik pack'i kırar. Baseline paketleri GitHub Packages'tan iner, job `packages: read` ister; Dependabot ve fork PR'larında koşmaz (token feed'i okuyamaz) |
 | Şablonun tüketici smoke testi | `ci.yml` → `template-smoke` | Üretilen projelerin workflow'ları da lint'lenir |
 | Secret taraması | `ci.yml` → `secret-scan` | Betterleaks 1.9.0, bütün geçmiş, `.betterleaks.toml` |
 | Workflow denetimi | `ci.yml` → `workflow-lint` | actionlint + zizmor, digest'e sabit imajlarla (`eng/lint-workflows.sh`) |
@@ -1304,7 +1305,16 @@ MTP moduna alır. Çözüm `--solution` ile verilir, xUnit'in kendi seçenekleri
      `nuget.config`'i `BMD.NovaCore.*`'ı yalnızca GitHub feed'ine eşler (package source mapping).
    - Sürüm `Directory.Build.props`'taki `VersionPrefix`'ten gelir. API kararlı olana kadar 0.x kalır.
    - Her paket XML dokümanını, `src/PACKAGE.md`'den gelen README'yi, MIT lisans ifadesini ve repo linkini taşır. Yanında bir `.snupkg` sembol paketi üretilir.
-   - Public API `PublicAPI.*.txt` dosyalarında izlenir. İzlenmeyen bir değişiklik build'i kırar.
+   - Public API `PublicAPI.*.txt` dosyalarında izlenir. İzlenmeyen bir değişiklik build'i kırar. Her sürüm
+     `PublicAPI.Unshipped.txt`'leri `PublicAPI.Shipped.txt`'e taşır.
+   - **Package validation baseline'ı:** `ci.yml`'in `package-validation` job'u ve `release.yml` paketleri
+     `-p:PackageValidationBaselineVersion=<son sürüm>` ile pack eder; SDK her kütüphane paketinin o sürümünü indirir ve
+     ikili kırıcı değişiklikte pack'i durdurur. Sürüm iki yerde, `PACKAGE_BASELINE_VERSION` env'inde durur: **her
+     yayından sonra ikisi birlikte yayımlanan sürüme yükseltilir.** `Directory.Build.props`'a yazılmaz: baseline her
+     restore'da `PackageDownload` olur ve GitHub Packages anonim isteği reddettiği için (D-050) her restore token
+     isterdi (RESEARCH R-162). Kök `nuget.config` `BMD.NovaCore.*`'ı yalnız `novacore` feed'ine eşler; o property
+     olmadan yapılan restore feed'e hiç gitmez. Yerelde baseline'la pack için kullanıcı düzeyi NuGet config'inizde
+     `novacore` adlı kaynağın `read:packages` token'lı kimlik bilgisi olmalı.
    - Yayın `.github/workflows/release.yml` ile yapılır. `VersionPrefix` ile eşleşen bir `v*` tag'i (ör. `v0.1.0`; önizleme için `v0.2.0-preview.1`) GitHub Packages'a push eder.
      `build` job'u yalnızca okuma izniyle derler, test eder, pack eder ve kütüphane başına bir CycloneDX SBOM'u üretir.
      `publish` job'u `release` environment'ında sahibinin onayını bekler; paketlerin build provenance'ını imzalar

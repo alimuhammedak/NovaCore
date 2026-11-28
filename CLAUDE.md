@@ -90,7 +90,9 @@ dotnet pack NovaCore.slnx -c Release -o artifacts
   (the same command with `--project` and `--startup-project` both `tests/NovaCore.Api.Tests` and
   `--output-dir PostgreSql/<F>/Migrations`), and the template has its own sets (`src/Templates/CLAUDE.md`).
 - **Publishing** is `release.yml` on a `v*` tag that matches `VersionPrefix`; the user's decision, never part of a
-  phase. The SDK is pinned exactly (`global.json`, `rollForward: disable`).
+  phase. Package validation against the last release runs only where `PACKAGE_BASELINE_VERSION` is passed (`ci.yml`'s
+  `package-validation` job, `release.yml`); raise both after a release (`src/BuildingBlocks/CLAUDE.md`). The SDK is
+  pinned exactly (`global.json`, `rollForward: disable`).
 
 ## Architecture in brief
 

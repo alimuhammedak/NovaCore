@@ -140,6 +140,12 @@ assembly that declares the request types, so each module calls it (root `CLAUDE.
     describe behaviour and keep the claims true to the code.
   - `PublicAPI.Shipped.txt` lists the API released in 0.1.0 and `PublicAPI.Unshipped.txt` every change since
     (RS0016/RS0017).
+  - Package validation compares each package with the last release, but only where packing passes
+    `-p:PackageValidationBaselineVersion=<v>`: `ci.yml`'s `package-validation` job and `release.yml`, each in its
+    `PACKAGE_BASELINE_VERSION` env. **After a release, raise both to the released version together.** Never set it in
+    `Directory.Build.props`: the SDK turns it into a `PackageDownload` at evaluation, so every restore would need a
+    GitHub Packages token (D-050, R-162). A binary breaking change fails that pack; don't answer it with a
+    `CompatibilitySuppressions.xml` without the user (Y-46).
   - No two public overloads with optional parameters (RS0026). `ToHttpResult` has three plain overloads, each returning
     a `Results<TSuccess, ProblemHttpResult>` union (F4c.5).
   - `Result<T>`'s own `Success`/`Failure` are internal (CA1000). Callers use `Result.Success<T>(…)`/`Result.Failure<T>(…)`.
