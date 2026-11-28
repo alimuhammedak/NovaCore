@@ -369,6 +369,39 @@ public sealed partial class InvitationTests(InvitationTests.Fixture fixture) : I
         await AssertProblemAsync(await PostAsync(client, Accept, new { token, password = NewPassword }), HttpStatusCode.Gone, "invitation.expired");
     }
 
+    // The invitation is found pending before the password policy runs, and marked after it (InvitationExpiryRace moves the
+    // clock in between): the mark itself must still hold the invitation's end, or the request accepts an expired one.
+    [Fact]
+    public async Task An_invitation_that_expires_during_its_accept_is_refused_and_sets_no_password()
+    {
+        const string email = "expires-mid-accept@novacore.test";
+        var clock = new FakeTimeProvider(TimeProvider.System.GetUtcNow());
+        var emails = new CapturingEmailSender();
+        var expiry = new InvitationExpiryRace(clock);
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+        {
+            builder.Services.AddSingleton<TimeProvider>(clock);
+            builder.Services.AddSingleton<IEmailSender>(emails);
+            builder.Services.ConfigureDbContext<IdentityServerDbContext>(options => options.AddInterceptors(expiry));
+        });
+        await using (var scope = host.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<AccountInvitations>().InviteAsync(email, TestContext.Current.CancellationToken);
+        var token = await TokenSentToAsync(emails, email);
+        using var client = host.CreateClient();
+
+        expiry.Arm(AccountInvitations.Lifetime + TimeSpan.FromSeconds(1));
+        await AssertProblemAsync(await PostAsync(client, Accept, new { token, password = NewPassword }), HttpStatusCode.Gone, "invitation.expired");
+
+        await AssertProblemAsync(await PostAsync(client, Status, new { token }), HttpStatusCode.Gone, "invitation.expired");
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var invited = (await users.FindByEmailAsync(email))!;
+            Assert.False(await users.HasPasswordAsync(invited));
+            Assert.False(invited.EmailConfirmed);
+        }
+    }
+
     // S-2: an invited account has no password until the invitation sets one. Anyone may ask for the confirmation again;
     // whatever reaches the mailbox must not confirm the account without a password, or the invitation becomes useless.
     [Fact]

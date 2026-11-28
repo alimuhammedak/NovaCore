@@ -167,7 +167,8 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
   `PasswordResetCodes.HasherKey`): an address without a code hashes a throwaway one (`IssueToNobody`) or checks the
   dummy (`DummyPasswordHash.CheckCode`), and so does every refusal before the comparison (V8-3). The code's save on `/forgot` is the one difference left.
 - **Invitations** (D-091 (5), D-095): `AccountInvitations` (public, internal constructor) stores the SHA-256 of a 256-bit
-  token in `invitations`, 7 days, accepted once by a conditional update after the password policy passes; the update, the password and the
+  token in `invitations`, 7 days, accepted once by a conditional update after the password policy passes, which checks the end again (an
+  invitation that expires while the policy runs is `invitation.expired`, its password not set); the update, the password and the
   confirmation commit in one transaction, so a failed password step leaves the invitation unused (V8-6). A confirmed
   account's invitation sets no password (`invitation.account_exists`), so an invitation can't take an account over.
   `InviteAsync` returns a `Result<Guid>` (`invitation.invalid_email`, `invitation.address_taken`); an account a

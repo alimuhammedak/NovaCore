@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,7 +80,9 @@ public sealed class IdentityServerTestHost : IAsyncDisposable
             builder.AddCoreWeb();
             builder.AddCorePersistence();
             builder.AddCoreIdentityServer();
-            builder.Services.AddModuleDatabase((_, db) => db.UseSqlite(connection.ConnectionString));
+            // DateTimeOffset as UTC ticks, which SQLite can compare (UtcTicksModelCustomizer): the invitation's end is checked in SQL.
+            builder.Services.AddModuleDatabase((_, db) =>
+                db.UseSqlite(connection.ConnectionString).ReplaceService<IModelCustomizer, UtcTicksModelCustomizer>());
             builder.Services.AddModuleDbContext<IdentityServerDbContext>(IdentityServerDbContext.Schema,
                 (provider, db) => db.AddInterceptors(provider.GetRequiredService<AuditableEntityInterceptor>()));
 
