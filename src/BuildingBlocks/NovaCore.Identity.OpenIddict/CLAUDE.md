@@ -145,6 +145,9 @@ over, plus the provider's own. Design sources: OWASP Authentication / Password S
 - **A project's own screens** (D-091 (3), D-095 (2)): `Identity:SignIn:LoginPath` (the cookie's login path, so where
   `/connect/authorize` sends a signed-out browser) and `Identity:SignIn:InvitationPath` (the invitation link's target)
   are paths of this host only (`IdentitySignInOptions.IsLocalPath`); anything else stops the host.
+  `Identity:SignIn:AllowRegistration` (default `true`, S-7, D-102 (3)) false leaves `POST /api/v1/auth/register`
+  unmapped (`MapCoreIdentityServer` reads it from the validated options once the container is built); `confirm-email`
+  and `resend-confirmation-email` stay mapped for the accounts registered before. There is no HTML registration page.
 - **Password reset with a code** (D-091 (4), D-095 (5)): `PasswordResetCodes` keeps 8 random digits as a
   `PasswordHasher` hash with expiry (15 min) and tries (5) in a user token; a run of 100 wrong codes (another user token)
   blocks codes until `SignInFlow` signs the user in or the link reset succeeds, and both clear it (`ExecuteDelete`, so a

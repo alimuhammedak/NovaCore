@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -203,6 +204,36 @@ public sealed partial class RegistrationTests(RegistrationTests.Fixture fixture)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Single(await emails.WaitForAsync(email => string.Equals(email.To, "no-role@novacore.test", StringComparison.Ordinal)));
     }
+
+    // S-7, D-102 (3): a host whose accounts come by invitation only maps no registration endpoint. Confirming an address
+    // and resending the link stay: accounts registered before the switch may still be unconfirmed. An anonymous request
+    // to a path without an endpoint meets the core's fallback policy (authenticated users only), so registration answers
+    // as any unknown path does: 401, not 404.
+    [Fact]
+    public async Task With_registration_off_the_registration_endpoint_isnt_mapped()
+    {
+        await using var host = await IdentityServerTestHost.StartAsync(configure: builder =>
+        {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal) { ["Identity:SignIn:AllowRegistration"] = "false" });
+            builder.Services.AddSingleton<IEmailSender>(new CapturingEmailSender());
+        });
+        var client = host.CreateClient();
+
+        Assert.Contains("/api/v1/auth/register", AuthRoutes(_host), StringComparer.Ordinal);
+        Assert.DoesNotContain("/api/v1/auth/register", AuthRoutes(host), StringComparer.Ordinal);
+        Assert.Contains("/api/v1/auth/confirm-email", AuthRoutes(host), StringComparer.Ordinal);
+        Assert.Contains("/api/v1/auth/resend-confirmation-email", AuthRoutes(host), StringComparer.Ordinal);
+
+        var unknown = await client.PostAsJsonAsync("/api/v1/auth/no-such-endpoint", new { email = "closed@novacore.test" });
+        Assert.Equal(unknown.StatusCode, (await RegisterAsync(client, "closed@novacore.test")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await ResendAsync(client, "closed@novacore.test")).StatusCode);
+    }
+
+    private static List<string> AuthRoutes(IdentityServerTestHost host) =>
+        host.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText?.TrimEnd('/') ?? string.Empty)
+            .ToList();
 
     [Fact]
     public async Task Outside_Development_the_host_needs_an_email_sender()

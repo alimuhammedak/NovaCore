@@ -363,7 +363,7 @@ public static class IdentityServerHostingExtensions
     /// under <c>/api/v1/auth</c> (registration, email confirmation, the current user, password change, sign-out
     /// everywhere, two-factor authentication) and the user and role administration under <c>/api/v1/admin</c>, guarded
     /// by the <c>identity:*</c> permissions. The token endpoint, the pages and the account API use the <c>strict</c> rate
-    /// limit.
+    /// limit. With <c>Identity:SignIn:AllowRegistration</c> false, registration isn't mapped; email confirmation is.
     /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
     /// <returns><paramref name="endpoints"/>, for chaining.</returns>
@@ -379,7 +379,9 @@ public static class IdentityServerHostingExtensions
         LoginPage.Map(account);
         PasswordResetPage.Map(account);
 
-        AccountEndpoints.Map(endpoints);
+        // Read once the container is built, from the validated options (docs/plan/RESEARCH.md R-048).
+        var signIn = endpoints.ServiceProvider.GetRequiredService<IOptions<IdentityServerOptions>>().Value.SignIn;
+        AccountEndpoints.Map(endpoints, signIn.AllowRegistration);
         SessionEndpoints.Map(endpoints);
         PasswordCodeEndpoints.Map(endpoints);
         AdminEndpoints.Map(endpoints);

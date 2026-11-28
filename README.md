@@ -466,6 +466,11 @@ Bağlantı 7 gün, bir kez geçer. Onaylı bir hesabın daveti şifre kurmaz (`i
 şifresiyle girer, davet hesabı ele geçiremez. Denetim kaydı (`SECURITY invitation_created`) davet edilen hesabın ve
 daveti yapanın (ucu çağıran oturum açmış kullanıcı, `ICurrentUser`) id'sini yazar.
 
+**Kaydı kapatmak:** `Identity:SignIn:AllowRegistration` (varsayılan `true`) `false` iken `POST /api/v1/auth/register`
+eşlenmez: kimse kendi kendine kaydolamaz, hesaplar davetle (yukarıda) ya da admin API'siyle gelir. `confirm-email` ve
+`resend-confirmation-email` eşli kalır: kayıt kapatılmadan önce açılmış onaysız hesaplar adresini yine onaylar.
+Sağlayıcının kayıt için bir HTML sayfası yoktur; kayıt ekranı projenindir ve bu ayarla birlikte kaldırılır.
+
 **Onaysız adrese ikinci kayıt (hesabın önceden ele geçirilmesi):** `POST /api/v1/auth/register` her adrese aynı `200`'ü
 döner. Adresin onaysız bir hesabı varsa ve yeni kayıt başka bir şifreyle geldiyse iki kişi aynı adresi istiyordur; onay
 linkini açan posta kutusunun sahibidir, ilk şifrenin sahibi olmayabilir (Sudhodanan ve Paverd, 2022). Bu yüzden hesabın
@@ -1024,6 +1029,9 @@ Keycloak kullanıcıları için bir `IPermissionResolver` kaydeder.
   yeniler). Bilinmeyen ya da onaysız adres aynı sayfayı alır, e-posta gitmez. Sayfa onaysız hesabı yalnız şifresizse
   kabul eder (ikinci kaydın gönderdiği bağlantı, "Kendi giriş ekranı"); şifre kurulunca adres de onaylanır. Yeni parola iki kez girilir; sıfırlama
   bütün refresh token'ları ve authorization'ları iptal eder, otomatik giriş yapmaz (OWASP Forgot Password).
+- **Açık kayıt kapatılabilir:** `Identity:SignIn:AllowRegistration = false` kayıt ucunu eşlemez; hesaplar yalnız
+  davetle ya da admin API'siyle açılır (kayıt olan her hesap `Identity:Seed:UserPermissions`'ı alır, kayıt açıkken
+  bu izinler herkese açıktır). Varsayılan `true`.
 - **Seed'siz kayıt:** `User` rolü yoksa (seed kapalı) hesap rolsüz oluşur; admin API'si rolü sonradan atar.
 - **Refresh ömrü mutlaktır:** refresh token girişten 7 gün sonra biter; her yenileme yeni 7 gün başlatmaz
   (`DisableSlidingRefreshTokenExpiration`).
@@ -1125,6 +1133,7 @@ geçerdi. 2FA'sı açık son admin rolünü kaybedemez (409).
   "Database":      { "ApplyMigrations": false },   // true: açılışta migration uygula
   "Jwt":           { "Authority": "", "Audience": "novacore.api" },   // Development: https://localhost:5443 (bu host)
   "Identity":      { "Seed": { "SeedOnStartup": false, "AdminEmail": "admin@novacore.local", "AdminPassword": "" },
+                     "SignIn": { "LoginPath": "", "InvitationPath": "/accept-invitation", "AllowRegistration": true },   // false: kayıt ucu yok
                      "EmailLimit": { "PermitLimit": 5, "WindowSeconds": 3600 },   // e-posta gönderen anonim uçlar, adres başına
                      "Clients": [] },                // { ClientId, DisplayName, ClientSecret, RedirectUris, PostLogoutRedirectUris, Permissions }
   "Cache":         { "DefaultExpiration": "00:05:00", "PermissionExpiration": "00:05:00" },

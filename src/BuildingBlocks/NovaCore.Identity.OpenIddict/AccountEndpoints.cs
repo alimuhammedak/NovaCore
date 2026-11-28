@@ -33,15 +33,20 @@ internal static class AccountEndpoints
 
     [SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
         Justification = "The account API's route table: one Map call per endpoint, each naming its handler and the types of its request and response (docs/plan/RESEARCH.md R-117).")]
-    public static RouteGroupBuilder Map(IEndpointRouteBuilder endpoints)
+    public static RouteGroupBuilder Map(IEndpointRouteBuilder endpoints, bool allowRegistration)
     {
         var auth = endpoints.MapGroup("/api/v1/auth").WithTags("Auth").RequireRateLimiting("strict");
 
-        auth.MapPost("/register", Register)
-            .WithName("Register")
-            .WithSummary("Register a new account (sends an email confirmation link)")
-            .ProducesProblem(StatusCodes.Status429TooManyRequests)
-            .AllowAnonymous();
+        // Identity:SignIn:AllowRegistration (S-7): off, nobody registers; confirming an address stays for the accounts
+        // registered before.
+        if (allowRegistration)
+        {
+            auth.MapPost("/register", Register)
+                .WithName("Register")
+                .WithSummary("Register a new account (sends an email confirmation link)")
+                .ProducesProblem(StatusCodes.Status429TooManyRequests)
+                .AllowAnonymous();
+        }
 
         auth.MapGet("/confirm-email", ConfirmEmail)
             .WithName("ConfirmEmail")

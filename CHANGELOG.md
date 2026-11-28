@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Identity provider: `Identity:SignIn:AllowRegistration` (default `true`). False, `POST /api/v1/auth/register` isn't
+  mapped and accounts come by invitation or from the admin API; email confirmation and resending the link stay.
 - Identity provider: a headless sign-in surface for a project's own screens, next to the HTML pages, which stay as the
   fallback. `Identity:SignIn:LoginPath` sends a signed-out browser from `/connect/authorize` to the project's screen
   (a path on this host only, or the host doesn't start). The screen signs in with `GET /api/v1/auth/session/antiforgery`,
